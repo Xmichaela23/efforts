@@ -36,6 +36,7 @@ export interface CeilingResult {
  * it sits > `gapBpm` above the next (an isolated outlier), capped at ~10% of sessions so we only
  * shave isolated spikes, never the real cluster. Returns the first clustered value.
  */
+// OURS — `robustObservedMax` drops an isolated maximum > 10 bpm above the next, at most 10% of sessions: no outside source
 export function robustObservedMax(maxima: number[], gapBpm = 10): number | null {
   const sorted = (maxima || []).filter((v) => Number.isFinite(v) && v > 0).sort((a, b) => b - a);
   if (!sorted.length) return null;
@@ -57,6 +58,7 @@ export function resolveMaxHrCeiling(args: {
   outlierGapBpm?: number;    // isolated-outlier gap for robustObservedMax. Default 10.
 }): CeilingResult {
   const clean = (args.observedMaxima || []).filter((v) => Number.isFinite(v) && v > 0);
+  // OURS — `resolveMaxHrCeiling` ≥ 5 clean sessions, observed max + 15 bpm, else Tanaka + 30 bpm, age 40 when missing: headroom choices, no outside source (208 − 0.7 × age is FIELD — Tanaka et al. 2001)
   const minN = args.minCleanSessions ?? 5;
   const obsHead = args.observedHeadroom ?? 15;
   const formHead = args.formulaHeadroom ?? 30;
@@ -90,6 +92,7 @@ export function exceedsCeiling(hr: number | null | undefined, ceiling: number): 
 /** Pearson correlation of two equal-length series; null if degenerate (zero variance / too short). */
 export function pearson(a: number[], b: number[]): number | null {
   const n = Math.min(a.length, b.length);
+  // OURS — `pearson` needs ≥ 5 points: no outside source
   if (n < 5) return null;
   let sa = 0, sb = 0;
   for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; }
@@ -106,6 +109,7 @@ export function pearson(a: number[], b: number[]): number | null {
 export function isCadenceLocked(
   hrSeries: number[],
   cadenceSeries: number[],
+  // OURS — `isCadenceLocked` HR–cadence correlation > 0.85 = cadence lock: no outside source
   threshold = 0.85,
 ): { locked: boolean; correlation: number | null } {
   const r = pearson(hrSeries, cadenceSeries);
@@ -120,6 +124,7 @@ export function isCadenceLocked(
 
 export function detectHrSpikes(
   hrSeries: number[],
+  // OURS — `detectHrSpikes` an isolated jump of 40 bpm from both neighbours is a spike: no outside source
   jumpBpm = 40,
 ): { hasSpike: boolean; spikeCount: number; maxJump: number } {
   let spikeCount = 0, maxJump = 0;
@@ -156,6 +161,7 @@ export function assessHrPlausibility(args: {
 
   let correlation: number | null = null;
   if (args.hrSeries?.length && args.cadenceSeries?.length) {
+    // OURS — `assessHrPlausibility` same 0.85 lock and 40 bpm spike defaults as above
     const cl = isCadenceLocked(args.hrSeries, args.cadenceSeries, args.cadenceLockThreshold ?? 0.85);
     correlation = cl.correlation;
     if (cl.locked) reasons.push('cadence_lock');

@@ -33,8 +33,10 @@ import { getHrDriftBpmFromAnalysis, getOverallAvgHr } from '../fact-packet/queri
 // ─── Constants ────────────────────────────────────────────────────────────
 
 const PR_DURATIONS: CyclingPRDuration[] = ['1min', '5min', '20min'];
+// OURS — `RECENT_WINDOW_DAYS` 90-day ride PR look-back: no page, kept as found
 const RECENT_WINDOW_DAYS = 90;
 /** Minimum ride count before PRs are surfaced (D-010 minimum-data guard). */
+// OURS — `MIN_RIDES_FOR_PRS` / `MIN_MATCHES_FOR_VS_SIMILAR` / `DURATION_TOLERANCE_PCT` minimum-data and ±20% matching cuts (D-010): no outside source, kept as found
 const MIN_RIDES_FOR_PRS = 5;
 /** Minimum match count before vs-similar is surfaced (D-010 minimum-data guard). */
 const MIN_MATCHES_FOR_VS_SIMILAR = 3;
@@ -45,6 +47,7 @@ const DURATION_TOLERANCE_PCT = 0.2;
  * filter tolerance. Pool keeps rides within ±15% of the current ride's IF;
  * 3-hit fallback to unfiltered when the filter would leave <3 matches. Locked.
  */
+// OURS — `POOL_IF_TOLERANCE_PCT` ±15% IF pool filter (mirror of the run side, D-073): no outside source
 const POOL_IF_TOLERANCE_PCT = 15;
 /**
  * D-073 (mirror of D-038 run-side `POOL_INTENSITY_MATCH_PCT = 10`): boundary
@@ -52,6 +55,7 @@ const POOL_IF_TOLERANCE_PCT = 15;
  * The 5-point gap between filter (15%) and match (10%) lets a pool be filtered
  * in but still flagged as a different intensity class to the LLM.
  */
+// OURS — `POOL_INTENSITY_MATCH_PCT` 10% intensity-class boundary (D-073): no outside source
 const POOL_INTENSITY_MATCH_PCT = 10;
 
 /**
@@ -354,6 +358,7 @@ export async function fetchCyclingVsSimilar(
     // Summary assessment: weighted on execution + IF (NP varies with duration / route).
     let assessment: CyclingVsSimilarV1['assessment'] = 'typical';
     const signals: number[] = [];
+    // OURS — `vs_similar` assessment cuts: execution ±5 points, IF ±0.03: no outside source, kept as found
     if (execDelta != null) signals.push(execDelta >= 5 ? 1 : execDelta <= -5 ? -1 : 0);
     if (ifDelta != null) signals.push(ifDelta >= 0.03 ? 1 : ifDelta <= -0.03 ? -1 : 0);
     if (signals.length > 0) {
@@ -418,6 +423,7 @@ export function classifyWkgForRaceDistance(
 ): 'low' | 'mid_pack' | 'strong' {
   const midpack = WKG_MIDPACK_NORMS[raceDistance];
   if (wkg < midpack) return 'low';
+  // OURS — `classifyWkgForRaceDistance` "strong" = mid-pack + 0.5 W/kg: no outside source, kept as found
   if (wkg < midpack + 0.5) return 'mid_pack';
   return 'strong';
 }
@@ -444,6 +450,7 @@ export function assessCyclingLimiter(params: {
   // §1 W/kg path — requires bodyweight, FTP, tri context, and known race distance.
   if (
     params.isTriAthlete &&
+    // OURS — `assessCyclingLimiter` plausibility floors (weight > 30 kg, FTP > 50 W): no outside source
     params.weightKg != null && params.weightKg > 30 &&
     params.ftpW != null && params.ftpW > 50 &&
     params.raceDistance
@@ -494,5 +501,6 @@ export function resolveWeightKg(weight: number | null | undefined, units: string
   const w = safeNum(weight);
   if (w == null || w <= 0) return null;
   const u = String(units ?? '').toLowerCase();
+  // FIELD — definition (1 lb = 0.45359237 kg)
   return u === 'imperial' ? w * 0.45359237 : w;
 }

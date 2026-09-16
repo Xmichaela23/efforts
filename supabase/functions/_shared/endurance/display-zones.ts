@@ -22,6 +22,7 @@
  */
 
 /** The upper edge of L1–L6 as a fraction of FTP; L7 is open above the last. */
+// FIELD — Coggan power training levels, upper edges 55 / 75 / 90 / 105 / 120 / 150% FTP (see header)
 export const POWER_LEVEL_UPPER_FRACTION_OF_FTP = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50] as const;
 
 /** Bin edges in watts for time-in-zone: [0, L1 top, …, L6 top, Infinity]. */
@@ -47,6 +48,7 @@ export function powerZoneRows(ftp: number): PowerZoneRow[] {
     ({ name, low_w: w(lo), high_w: w(hi), range: `${w(lo)}-${w(hi)}W` });
   return [
     { name: 'Z1 Recovery', low_w: null, high_w: w(0.55), range: `< ${w(0.55)}W` },
+    // FIELD — Coggan power training levels L1–L7 (see header)
     band('Z2 Endurance', 0.56, 0.75),
     band('Z3 Tempo', 0.76, 0.90),
     band('Z4 Threshold', 0.91, 1.05),
@@ -83,6 +85,7 @@ export function swimPaceBandRows(thresholdSecPer100: number): SwimPaceBandRow[] 
   const c = thresholdSecPer100;
   if (!Number.isFinite(c) || c <= 0) return [];
   return [
+    // OURS — `swimPaceBandRows` +12 / +8 / +3 / −2 s per 100 offsets (ledger row: swim pace bands)
     { label: 'Recovery', range: `${clock(c + 12)} and slower`, anchor: false },
     { label: 'Easy', range: `${clock(c + 8)}–${clock(c + 12)}`, anchor: false },
     { label: 'Moderate', range: `${clock(c + 3)}–${clock(c + 8)}`, anchor: false },

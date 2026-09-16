@@ -33,8 +33,10 @@ const OLYMPIC_BAR_LB = DEFAULT_BAR_LB;
 // Intensity factor tables
 // ---------------------------------------------------------------------------
 
+// OURS — `INTENSITY_FACTORS` planned-step intensity table (run / ride / swim / strength rows): no outside source for any factor, kept as found
 export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
   run: {
+    // OURS — `INTENSITY_FACTORS` run factors: no outside source
     easypace: 0.65, warmup_run_easy: 0.65, cooldown_easy: 0.65,
     longrun_easypace: 0.70,
     // The MP-finish long run: harder than an easy long run, and it was falling to the generic
@@ -64,20 +66,24 @@ export const INTENSITY_FACTORS: Record<string, Record<string, number>> = {
     run_vo2: 0.95, run_hills: 0.90,
   },
   ride: {
+    // OURS — `INTENSITY_FACTORS` ride / bike factors: no outside source
     Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70,
     warmup_bike: 0.60, cooldown_bike: 0.60,
     tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10,
   },
   bike: {
+    // OURS — `INTENSITY_FACTORS` ride / bike factors: no outside source
     Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70,
     warmup_bike: 0.60, cooldown_bike: 0.60,
     tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10,
   },
   swim: {
+    // OURS — `INTENSITY_FACTORS` swim factors: no outside source
     warmup: 0.60, cooldown: 0.60, drill: 0.50, easy: 0.65,
     aerobic: 0.75, pull: 0.70, kick: 0.75, threshold: 0.95, interval: 1.00,
   },
   strength: {
+    // OURS — `INTENSITY_FACTORS` strength factors: no outside source
     '@pct60': 0.70, '@pct65': 0.75, '@pct70': 0.80, '@pct75': 0.85,
     '@pct80': 0.90, '@pct85': 0.95, '@pct90': 1.00,
     main_: 0.85, acc_: 0.70, core_: 0.60, bodyweight: 0.65,
@@ -94,6 +100,7 @@ export function clamp(n: number, lo: number, hi: number): number {
 
 export function getDefaultIntensityForType(type: string): number {
   const defaults: Record<string, number> = {
+    // OURS — `getDefaultIntensityForType` per-type defaults: no outside source
     run: 0.75, ride: 0.70, bike: 0.70, swim: 0.75,
     strength: 0.75, mobility: 0.60, pilates_yoga: 0.75, walk: 0.40,
   };
@@ -222,6 +229,7 @@ export function strengthSessionRpe(exercises: any[], sessionRPE?: number | null)
  * effort multiplier, so TEN band sets are worth ~6 points against a 47-minute easy run's 61. It is
  * a floor that makes the work visible, not an attempt to measure it.
  */
+// OURS — `BAND_SET_VOLUME_TOKEN` 100 lb × reps per band set: visible but too small to move a verdict, no outside source
 export const BAND_SET_VOLUME_TOKEN = 100;
 
 /**
@@ -240,6 +248,7 @@ export function resolveBodyweightLb(row: { weight?: unknown; units?: unknown } |
   const raw = Number((row as any)?.weight);
   if (!Number.isFinite(raw) || raw <= 0) return null;
   const metric = String((row as any)?.units ?? '').toLowerCase() === 'metric';
+  // FIELD — definition (1 kg = 2.20462 lb); OURS — `resolveBodyweightLb` 60–600 lb sane-adult bounds
   const lb = metric ? raw * 2.20462 : raw;
   // A human adult, generously bounded. Outside it, the number is not a body weight we can price.
   if (lb < 60 || lb > 600) return null;
@@ -389,6 +398,7 @@ export type StrengthVolumeOpts = {
  * remainder is not measurable either. Same philosophy as `BAND_SET_VOLUME_TOKEN`: visible, and far
  * too small to move a verdict.
  */
+// OURS — `MIN_ASSISTED_EFFECTIVE_LB` 5 lb floor on an assisted set: no outside source
 export const MIN_ASSISTED_EFFECTIVE_LB = 5;
 
 /**
@@ -538,6 +548,7 @@ export function calculatePlannedStrengthWorkload(
 export function getMobilityIntensity(exercises: any[]): number {
   const completedCount = exercises.filter((ex: any) => ex.completed).length;
   const totalCount = exercises.length;
+  // OURS — `getMobilityIntensity` / `calculateMobilityWorkload` 0.60 + 0.1 × completion, clamps 0.50–0.80 and 0.75–1.10, floor 3 at ≥ 3 done, cap 30: no outside source
   if (totalCount === 0) return 0.60;
   return 0.60 + (completedCount / totalCount) * 0.1;
 }
@@ -573,6 +584,7 @@ export function calculatePilatesYogaWorkload(durationMinutes: number, sessionRPE
 
   // Fallback when RPE unavailable: duration (hours) × 0.75² × 100
   const durationHours = durationMinutes / 60;
+  // OURS — `calculatePilatesYogaWorkload` 0.75 fallback intensity with no rating: no outside source
   return Math.round(durationHours * Math.pow(0.75, 2) * 100);
 }
 

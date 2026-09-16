@@ -16,6 +16,7 @@ export function computeEfficiencyIndex(
   const p = Number(paceSecPerKm);
   const h = Number(hrAvg);
   if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(h) || h <= 0) return null;
+  // OURS — `computeEfficiencyIndex` speed (m/s) ÷ average HR × 100, 2 dp: the app's own scaling, no outside source
   return Math.round((1000 / p) / h * 10000) / 100;
 }
 
@@ -34,6 +35,7 @@ export interface RouteEfficiency {
 // Need at least this many same-route runs (within the caller's 90-day window) WITH usable pace+HR
 // before claiming a direction. 4 is the floor where a half-vs-half split (2 vs 2) means anything;
 // below it the caller shows NOTHING (route familiarity only) — per Michael, no trend beats a thin one.
+// OURS — `ROUTE_EFF_MIN_POINTS` 4 runs (2 vs 2 halves) and `ROUTE_EFF_HOLDING_PCT` ±2% holding band: no outside source, kept as found
 export const ROUTE_EFF_MIN_POINTS = 4;
 // Efficiency-index change inside this band reads as "holding", not a real move.
 const ROUTE_EFF_HOLDING_PCT = 2;

@@ -48,6 +48,7 @@ function completedAtIso(w: WorkoutLike): string {
 
 function rirToIntensityContext(avgRir: number | null): string {
   if (avgRir == null) return "moderate";
+  // OURS — `rirToIntensityContext` RIR ≥ 4 recovery, ≥ 2 moderate, ≥ 1 hard, else max effort: no outside source
   if (avgRir >= 4) return "recovery";
   if (avgRir >= 2) return "moderate";
   if (avgRir >= 1) return "hard";
@@ -58,6 +59,7 @@ function effortFraction(avgRir: number | null): number {
   // estimate-ok: RIR is optional; absent → a moderate-effort PRIOR (0.7) for the internal
   // session_load recovery model. A model coefficient for a missing signal, not an impersonated
   // measurement in a rendered verdict; keeps a logged set as real load rather than blanking it.
+  // OURS — `effortFraction` (10 − RIR) ÷ 10, 0.7 with no RIR: no outside source
   if (avgRir == null) return 0.7;
   return Math.max(0, Math.min(1, (10 - avgRir) / 10));
 }
@@ -76,6 +78,7 @@ function enduranceIntensityFromZones(timeInZone: Record<string, number> | null |
   // estimate-ok: no zone data → a moderate-intensity PRIOR (0.8) for the session_load recovery
   // model (a coefficient for a missing signal, not an impersonated metric in a rendered verdict).
   if (!timeInZone || typeof timeInZone !== "object") {
+    // OURS — `enduranceIntensityFromZones` 0.8 moderate prior; ≥ 20% in Z4–Z5 hard (1.2), ≥ 55% in Z1–Z2 recovery (0.5): no outside source
     return { modifier: 0.8, context: "moderate", z4z5Minutes: 0, totalZoneMinutes: 0 };
   }
   let z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0;
@@ -123,6 +126,7 @@ function buildStrengthSessionLoad(
     const volumeLoad = vol * eff * lr;
     const decay = Number(ex.recovery_hours_typical);
     // estimate-ok: missing per-exercise recovery window → a 48 h PRIOR for the recovery model.
+    // OURS — `buildStrengthSessionLoad` 48 h recovery prior when the exercise has none; CNS row at RIR ≤ 1 and ≤ 5 reps, sets ÷ (RIR + 1), 24 h: no outside source
     const decayHours = Number.isFinite(decay) && decay > 0 ? Math.round(decay) : 48;
     const intensity = rirToIntensityContext(row.avg_rir);
     const detail = { exercise_id: row.exercise_id, exercise_slug: ex.slug };
@@ -230,6 +234,7 @@ function buildEnduranceSessionLoad(
   if (workload != null && Number.isFinite(workload) && workload > 0) {
     aerobicMag = workload;
   } else {
+    // OURS — `buildEnduranceSessionLoad` aerobic row decays over 36 h: no outside source
     aerobicMag = durationMinutes * modifier;
   }
 
@@ -249,6 +254,7 @@ function buildEnduranceSessionLoad(
   if (discipline === "swim") {
     // Muscular leg cost skipped for swim
   } else if (discipline === "run" || discipline === "ride") {
+    // OURS — `buildEnduranceSessionLoad` legs: run 1.0 / ride 0.4 impact, 48 h / 36 h; hamstrings 0.8 of quads; calves 0.7, 36 h: no outside source
     const impact = discipline === "run" ? 1.0 : 0.4;
     const legDecay = discipline === "run" ? 48 : 36;
 
@@ -295,6 +301,7 @@ function buildEnduranceSessionLoad(
   }
 
   const zoneGlycolytic =
+    // OURS — `buildEnduranceSessionLoad` glycolytic row at ≥ 15% in Z4–Z5 (or 25% of a structured session), magnitude × 2.0, 24 h: no outside source
     totalZoneMinutes > 0 && z4z5Minutes > 0 && (z4z5Minutes / totalZoneMinutes) >= 0.15;
   const glycolyticEligible = zoneGlycolytic || hasStructuredIntervals;
   if (glycolyticEligible) {

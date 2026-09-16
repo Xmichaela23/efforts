@@ -28,6 +28,7 @@ import {
 } from '../fact-packet/pace-resolution.ts';
 import { getOverallAvgHr } from '../fact-packet/queries.ts';
 
+// FIELD — definition (1 km = 0.621371 mi; sec/mi × 0.621371 = sec/km)
 const KM_PER_MI = 0.621371;
 
 export interface RunScalars {
@@ -56,6 +57,7 @@ export function resolveRunScalars(workout: any): RunScalars {
   const avgHr = getOverallAvgHr(workout); // already first-positive guarded (0 → null)
 
   const distMi = resolveOverallDistanceMi(workout);
+  // FIELD — definition (1 mi = 1609.34 m)
   const distanceMeters = distMi > 0 ? Math.round(distMi * 1609.34) : null;
   const durMin = resolveMovingDurationMinutes(workout);
   const movingSeconds = durMin != null && durMin > 0 ? Math.round(durMin * 60) : null;

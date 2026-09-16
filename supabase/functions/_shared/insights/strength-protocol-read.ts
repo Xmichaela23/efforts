@@ -40,6 +40,7 @@ export interface StrengthProtocolContext {
 }
 
 /** The 5×5 linear-progression ceiling: the block's own terminal condition (SCIENCE §2/§4 → retest). */
+// OURS — `FIVE_BY_FIVE_CEILING_PCT` 85% 1RM: the top of the 70→85% band in docs/SCIENCE-5x5-linear-progression.md (ACSM 2009 puts strength work at ≥ ~80%); no page
 const FIVE_BY_FIVE_CEILING_PCT = 85;
 
 /**

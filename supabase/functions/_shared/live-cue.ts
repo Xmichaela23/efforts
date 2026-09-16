@@ -15,6 +15,7 @@
  */
 
 /** Faster than the target midpoint by more than this reads too fast — the analyzer's number. */
+// OURS — `PACE_CUE_FAST_PCT` 5% / `PACE_CUE_SLOW_PCT` 7%: the running analyzer's own rep reading, uncited there too (ledger row: recording screen cue)
 export const PACE_CUE_FAST_PCT = 5;
 /** Slower than the target midpoint by more than this reads too slow — the analyzer's number. */
 export const PACE_CUE_SLOW_PCT = 7;

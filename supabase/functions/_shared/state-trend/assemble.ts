@@ -55,6 +55,7 @@ import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
 import { computeEfficiencyIndex } from '../efficiency-index.ts';
 import { ADHERENCE_WINDOW_DAYS, TREND_HALF_DAYS } from './thresholds.ts';
 
+// FIELD — definition (ms per day)
 const DAY = 86_400_000;
 export const ORDER = ['strength', 'bike', 'run', 'swim'] as const;
 
@@ -106,6 +107,7 @@ export const isoMinus = (days: number): string => new Date(Date.now() - days * D
 
 // Fetch windows the spine needs — exported so client + server slice identical boundaries.
 export const STATE_TREND_WINDOWS = {
+  // OURS — `STATE_TREND_WINDOWS` liftWeeks 12, bikeLimit 30 rides, swimDays 56: fetch windows, no outside source
   liftWeeks: 12, // useExerciseLog(12)
   /**
    * ⛔ HOW MUCH LIFTING HISTORY THE CHART CAN SHOW — 2026-08-29, and it is NOT `liftWeeks`.
@@ -123,6 +125,7 @@ export const STATE_TREND_WINDOWS = {
    * to the same rows (D-456 §5), so a max still expires with the block no matter how far the fetch
    * reaches.
    */
+  // FIELD — Hevy and Fitbod offer a one-year exercise graph (see note above)
   liftHistoryWeeks: 52,
   /**
    * ⛔⛔ HOW FAR BACK A "KNOWN MAX" STAYS KNOWN — the recency window for the derived heavy gate
@@ -146,9 +149,11 @@ export const STATE_TREND_WINDOWS = {
    * question** — the `MovementGroup`-vs-`MovementPattern` lesson in CLAUDE.md. Collapsing them is how
    * a fetch-window change would silently redefine what counts as a current max.
    */
+  // OURS — `STATE_TREND_WINDOWS` defaultBlockWeeks 12: the app's default block length (SPEC-get-stronger.md); the block-as-lifespan idea is Viada p215
   defaultBlockWeeks: 12,
   bikeLimit: 30, // latest 30 rides carrying workout_analysis
   swimDays: 56, // pace/100 8wk
+  // OURS — `STATE_TREND_WINDOWS` cadenceDays 90: sessions-per-week and anchor window, no outside source; baselineWindowDays 168 is no longer read
   cadenceDays: 90, // sessions/week
   adherenceDays: ADHERENCE_WINDOW_DAYS,
   // ⟳ ROLLING ANCHOR (2026-07-17 — DECISION REVERSAL of the 24wk "established level" horizon below).
@@ -1027,6 +1032,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // 12-WEEK efficiency chart series (the "long view") — the SAME points the verdict reads, over a wider 84d
   // window than the verdict's 42d, so the recent tail of the chart IS the verdict's data (no contradiction
   // possible). Each point flagged `recent` when inside the 42d verdict window. Fills as the athlete trains.
+  // FIELD — 12-week chart window, TrainingPeaks' 90-day default (ledger rows: "12-week trend window", lift chart 84 days)
   const CHART_WINDOW_DAYS = 84;
   const _chartStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - CHART_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
   // `recent` on a chart point = inside Garmin's recent 28-day half — the half the headline averages.
@@ -1385,6 +1391,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
    * latest reading a record (`isPr`), and is the record far enough above the latest to be worth showing
    * beside it. The card kept its own copy of the second one.
    */
+  // OURS — `E1RM_ROUNDING_SLACK_LB` 0.5 lb rounding slack: no outside source
   const E1RM_ROUNDING_SLACK_LB = 0.5;
 
   /** The newest all-out set for a lift, or null. Read twice — the rep PR and the tile below. */
@@ -1453,6 +1460,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       const latest = liftLatest.get(l.canonical) ?? null;
       const allBest = inp.allTimeBestByLift?.[l.canonical]?.best ?? null;
       const allCount = inp.allTimeBestByLift?.[l.canonical]?.count ?? 0;
+      // OURS — `isPr` needs ≥ 3 all-history readings behind the best: no outside source
       return latest != null && allBest != null && allCount >= 3 && latest >= allBest - E1RM_ROUNDING_SLACK_LB;
     })(),
     sampleCount: l.trend.sampleCount,
@@ -2250,6 +2258,7 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
 export function hrResponseExcludedRunNote(
   v1: StateTrendsV1 | null | undefined,
   contributors: HrResponseRollup['contributors'],
+  // OURS — `hrResponseExcludedRunNote` floor 8 runs mirrors RUN_TREND_MIN_RUNS on the phone: no outside source
   floor = 8,
   opts?: { runUnderTarget?: boolean },
 ): string | null {

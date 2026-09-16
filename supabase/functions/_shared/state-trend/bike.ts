@@ -21,6 +21,7 @@ export interface Pwr20Series {
   classified_type?: string;
 }
 
+// FIELD — definition (ms per day)
 const MS_DAY = 86_400_000;
 const windowStart = (asOf: string, days: number) =>
   new Date(Date.parse(asOf + 'T12:00:00Z') - days * MS_DAY).toISOString().slice(0, 10);

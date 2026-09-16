@@ -12,6 +12,7 @@ export interface ZonePaces {
   speed: number;
 }
 
+// OURS — `PACE_TABLE` values lifted from generate-run-plan/effort-score.ts; not checked against Daniels' published VDOT tables (none in the repo)
 const PACE_TABLE: { vdot: number; paces: ZonePaces }[] = [
   { vdot: 30, paces: { base: 744, steady: 622, power: 568, speed: 534 } },
   { vdot: 32, paces: { base: 708, steady: 592, power: 540, speed: 508 } },
@@ -19,17 +20,20 @@ const PACE_TABLE: { vdot: number; paces: ZonePaces }[] = [
   { vdot: 36, paces: { base: 642, steady: 538, power: 492, speed: 462 } },
   { vdot: 38, paces: { base: 612, steady: 514, power: 470, speed: 442 } },
   { vdot: 40, paces: { base: 585, steady: 491, power: 449, speed: 422 } },
+  // OURS — `PACE_TABLE` (continued; see note above)
   { vdot: 42, paces: { base: 560, steady: 470, power: 430, speed: 404 } },
   { vdot: 44, paces: { base: 536, steady: 450, power: 412, speed: 387 } },
   { vdot: 45, paces: { base: 525, steady: 441, power: 403, speed: 379 } },
   { vdot: 46, paces: { base: 514, steady: 432, power: 395, speed: 371 } },
   { vdot: 48, paces: { base: 494, steady: 415, power: 379, speed: 357 } },
   { vdot: 50, paces: { base: 474, steady: 399, power: 365, speed: 343 } },
+  // OURS — `PACE_TABLE` (continued; see note above)
   { vdot: 52, paces: { base: 456, steady: 383, power: 351, speed: 330 } },
   { vdot: 54, paces: { base: 439, steady: 369, power: 338, speed: 318 } },
   { vdot: 56, paces: { base: 423, steady: 355, power: 325, speed: 306 } },
   { vdot: 58, paces: { base: 408, steady: 343, power: 314, speed: 295 } },
   { vdot: 60, paces: { base: 394, steady: 331, power: 303, speed: 285 } },
+  // OURS — `PACE_TABLE` (continued; see note above)
   { vdot: 65, paces: { base: 362, steady: 304, power: 278, speed: 262 } },
   { vdot: 70, paces: { base: 334, steady: 280, power: 256, speed: 241 } },
   { vdot: 75, paces: { base: 309, steady: 260, power: 238, speed: 224 } },

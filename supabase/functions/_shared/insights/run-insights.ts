@@ -81,6 +81,7 @@ export interface PacingVerdict {
 export function pacingVerdict(splitsMi: any[] | null | undefined, decouplingPct: number | null | undefined, gapAdjusted: boolean): PacingVerdict | null {
   const raw = (Array.isArray(splitsMi) ? splitsMi : []).map((s: any) => {
     const pk = Number(s?.avgPace_s_per_km), gk = Number(s?.avgGapPace_s_per_km);
+    // FIELD — definition (1 mi = 1.60934 km)
     return { mile: Number(s?.n), pace: Number.isFinite(pk) && pk > 0 ? pk * 1.60934 : NaN, gap: Number.isFinite(gk) && gk > 0 ? gk * 1.60934 : NaN };
   }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
   if (raw.length < 2) return null;
@@ -128,6 +129,7 @@ export function composeRunInsight(inp: RunInsightInput): string | null {
   const hrDrifted = !dcpConfounded && inp.pacing?.hrHeld === false && inp.decoupling?.pct != null;
   const dcp = dcpConfounded ? null : inp.decoupling?.pct;
   const dcpTxt = typeof dcp === 'number' ? `${Math.round(dcp * 10) / 10}%` : null;
+  // OURS — `composeRunInsight` ≥ 150 ft counts as rolling / a climbing clause, ≥ 250 ft climbing alone adds load: no outside source
   const rolling = inp.terrain?.rolling === true || (inp.terrain?.gainFt ?? 0) >= 150;
   const gain = inp.terrain?.gainFt;
   const heat = inp.conditions?.heatStress;

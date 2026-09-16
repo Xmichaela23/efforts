@@ -67,12 +67,14 @@ function getOverallDurationMin(row: any): number | null {
  * 15% locked, tune after 2 weeks of pool_intensity_filter aggregates. Single
  * constant; do NOT per-bucket-type (the path to config explosion).
  */
+// OURS — `POOL_PACE_TOLERANCE_PCT` ±15% pace pool filter (D-038, "tune after 2 weeks"): no outside source
 export const POOL_PACE_TOLERANCE_PCT = 15;
 
 /**
  * D-038 §8 #3 — boundary for pool_pace_context.intensity_match enum.
  * 10% locked, aligned with PACING's "uneven" band (CV thresholds in D-034).
  */
+// OURS — `POOL_INTENSITY_MATCH_PCT` 10% intensity-class boundary (D-038): no outside source
 export const POOL_INTENSITY_MATCH_PCT = 10;
 
 /**
@@ -214,6 +216,7 @@ export function getHrDriftBpmFromAnalysis(row: any): number | null {
 
 function getElevationGainFt(row: any): number | null {
   const m = coerceNumber(row?.elevation_gain);
+  // FIELD — definition (1 m = 3.28084 ft)
   return m != null ? m * 3.28084 : null;
 }
 
@@ -347,6 +350,7 @@ export async function getSimilarWorkoutComparisons(
             overlapCount.set(wid, (overlapCount.get(wid) || 0) + 1);
           }
           // Require at least 25% segment overlap to qualify as "same route"
+          // OURS — `getSimilarWorkoutComparisons` same route = ≥ 25% shared segments: no outside source
           const minOverlap = Math.max(1, Math.floor(currentSegIds.length * 0.25));
           const matchedIds = new Set(
             [...overlapCount.entries()]
@@ -362,6 +366,7 @@ export async function getSimilarWorkoutComparisons(
       })(),
     ]);
 
+    // OURS — `getSimilarWorkoutComparisons` duration band 70–130% (min 5 min), pools need ≥ 3 rows after each filter: no outside source
     const bandLo = Math.max(5, Math.round(durationMin * 0.7));
     const bandHi = Math.round(durationMin * 1.3);
 
@@ -480,6 +485,7 @@ export async function getSimilarWorkoutComparisons(
     }
     // Trend sparkline: compute BEFORE the sample_size early return since
     // trend uses a wider pool (type-matched, not duration-matched).
+    // OURS — `getSimilarWorkoutComparisons` trend fallback duration band 40–160%: no outside source
     const wideBandLo = Math.max(5, Math.round(durationMin * 0.4));
     const wideBandHi = Math.round(durationMin * 1.6);
     const wideDurationMatch = typeMatch.filter((r) => {
@@ -610,6 +616,7 @@ export async function getSimilarWorkoutComparisons(
       })
       .filter((tp) =>
         typeof tp.pace_sec_per_mi === 'number' && Number.isFinite(tp.pace_sec_per_mi)
+        // OURS — `getSimilarWorkoutComparisons` trend point kept at 4:00–60:00 /mi: plausibility window, no outside source
         && tp.pace_sec_per_mi >= 240 && tp.pace_sec_per_mi <= 3600
       );
 
@@ -642,6 +649,7 @@ export async function getSimilarWorkoutComparisons(
 
     let avgPaceAtSimilarHr: number | null = null;
     if (currentAvgHr != null) {
+      // OURS — `getSimilarWorkoutComparisons` similar HR = within 5 bpm, ≥ 2 runs: no outside source
       const near = filtered.filter((x) => x.hr != null && Math.abs((x.hr as number) - currentAvgHr) <= 5);
       avgPaceAtSimilarHr = near.length >= 2 ? avg(near.map((x) => x.pace)) : null;
     }
@@ -653,6 +661,7 @@ export async function getSimilarWorkoutComparisons(
 
     const assess = (() => {
       if (pace_delta_sec == null || hr_delta_bpm == null) return 'typical' as SimilarAssessment;
+      // OURS — `getSimilarWorkoutComparisons` assessment: pace ±10 s/mi, HR ±5 bpm, drift 3 bpm: no outside source
       const paceBetter = pace_delta_sec <= -10;
       const paceWorse = pace_delta_sec >= 10;
       const hrSameOrLower = hr_delta_bpm <= 5;
@@ -756,6 +765,7 @@ export async function getPaceTrend(
       .filter((x) => x.date && x.pace != null)
       .slice(0, count);
 
+    // OURS — `getPaceTrend` ≥ 5 runs, ±3 s/mi per week slope, ≥ 3-week span: no outside source
     if (filtered.length < 5) {
       return { data_points: filtered.length, direction: 'insufficient_data', magnitude: null };
     }
@@ -821,6 +831,7 @@ export async function getNotableAchievements(
 
     if (curDist != null) {
       const maxDist = Math.max(...completed.map((r) => getOverallDistanceMi(r) || 0), 0);
+      // OURS — `getNotableAchievements` longest distance: +0.05 mi to count, 2 mi major, 0.7 mi moderate: no outside source
       if (curDist > maxDist + 0.05) {
         const margin = curDist - maxDist;
         achievements.push({
@@ -833,6 +844,7 @@ export async function getNotableAchievements(
 
     if (curDur != null) {
       const maxDur = Math.max(...completed.map((r) => getOverallDurationMin(r) || 0), 0);
+      // OURS — `getNotableAchievements` longest duration: +2 min to count, 25 min major, 10 min moderate: no outside source
       if (curDur > maxDur + 2) {
         const margin = curDur - maxDur;
         achievements.push({
@@ -853,6 +865,7 @@ export async function getNotableAchievements(
       const curDate = String(current?.date || '');
       if (curDate) {
         const gapDays = Math.round((new Date(`${curDate}T00:00:00Z`).getTime() - new Date(`${priorDate}T00:00:00Z`).getTime()) / (24 * 3600 * 1000));
+        // OURS — `getNotableAchievements` first in a while: ≥ 14 days, 28 days moderate: no outside source
         if (gapDays >= 14) {
           achievements.push({
             type: 'first_in_a_while',
@@ -903,6 +916,7 @@ export function acwrFatigueSignal(
       ? { tier: 'high', message: 'Training stress elevated — recovery matters' }
       : null;
   }
+  // FIELD — Blanch & Gabbett 2016 1.3 upper sweet-spot line; OURS — `acwrFatigueSignal` 1.1 moderate cut, no outside source
   if (v > 1.3) return { tier: 'high', message: 'Training stress elevated — recovery matters' };
   if (v > 1.1) return { tier: 'moderate', message: 'Training stress trending up' };
   return null;
@@ -976,6 +990,7 @@ export async function getTrainingLoadContext(
       const hasNonTrivialType = types.some((t) => !/(mobility|yoga|stretch)/i.test(t));
       // Thresholds tuned to avoid counting mobility/yoga/stretch as "training days".
       // A day can count via workload alone, or via meaningful duration only if it isn't just mobility-type work.
+      // OURS — `getTrainingLoadContext` training day = workload ≥ 10 or ≥ 20 min non-mobility: no outside source
       return a.workload >= 10 || (a.durationMin >= 20 && hasNonTrivialType);
     };
 
@@ -1117,6 +1132,7 @@ export async function getTrainingLoadContext(
     const streakAvgDaily = consecutive_training_days > 0
       ? streak_combined_workload / consecutive_training_days
       : 0;
+    // OURS — `getTrainingLoadContext` streak counts at ≥ 3 days, ≥ 28 combined load, ≥ 12 per day; 5 days = high: no outside source
     const streakMeaningful =
       consecutive_training_days >= 3 &&
       streak_combined_workload >= 28 &&
@@ -1134,6 +1150,7 @@ export async function getTrainingLoadContext(
       if (streakLabel) fatigue_evidence.push(streakLabel);
     }
 
+    // OURS — `getTrainingLoadContext` yesterday > 80 hard / > 50 moderate; week > 120% / > 100% of plan; ≥ 2 high flags = high: no outside source
     if (previous_day_workload > 80) { flagsHigh.push(true); fatigue_evidence.push(`Hard session yesterday`); }
     else if (previous_day_workload > 50) { flagsMod.push(true); fatigue_evidence.push(`Moderate session yesterday`); }
 

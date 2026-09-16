@@ -50,6 +50,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
 
   const paceOnTarget = workT.every((s) => {
     const dev = coerceNumber(s.pace_deviation_sec);
+    // OURS — `identifyPerformanceLimiter` on target within ±15 s/mi; recovery too fast < −20 s/mi: no outside source
     return dev == null ? true : Math.abs(dev) <= 15;
   });
   if (paceOnTarget) {
@@ -76,6 +77,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
     if (wx && (wx.heat_stress_level === 'moderate' || wx.heat_stress_level === 'severe')) {
       const impact = estimatedHeatPaceImpact(wx.dew_point_f);
       const expected = impact.maxSeconds; // conservative gate
+      // OURS — `identifyPerformanceLimiter` heat explains up to 1.5× the expected impact or HR +5 bpm vs similar; confidences 0.85 / 0.65: no outside source
       const heatExplains = avgDev > 0 && avgDev <= expected * 1.5;
       const hrElevated = (coerceNumber(input.vs_similar?.hr_delta_bpm) || 0) > 5;
       if (heatExplains || hrElevated) {
@@ -94,6 +96,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
   try {
     const fatigue = input.training_load?.cumulative_fatigue;
     const acwr = coerceNumber(input.training_load?.acwr_ratio);
+    // OURS — `identifyPerformanceLimiter` fatigue: ACWR > 1.3 (Blanch & Gabbett line), yesterday > 50, week > 110%, drift > typical + 3, fade > 3%: cuts other than 1.3 have no outside source
     const fatigueHigh = fatigue === 'high' || (acwr != null && acwr > 1.3);
     if (fatigueHigh) {
       const evidence: string[] = [];
@@ -128,6 +131,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
     const mi = coerceNumber(input.total_distance_mi);
     if (gain != null && mi != null && mi > 0.5) {
       const ftPerMi = gain / mi;
+      // OURS — `identifyPerformanceLimiter` terrain limiter > 30 ft/mi (hilly > 60) over > 0.5 mi: no outside source
       if (ftPerMi > 30) {
         const label = ftPerMi > 60 ? 'hilly' : 'rolling';
         const evidence = [`${label} terrain: ${Math.round(gain)}ft gain over ${mi.toFixed(1)}mi (~${Math.round(ftPerMi)}ft/mi)`];
@@ -147,6 +151,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
       const firstDev = coerceNumber(first.pace_deviation_sec) ?? 0; // + slower, - faster
       const firstP = coerceNumber(first.pace_sec_per_mi);
       const lastP = coerceNumber(last.pace_sec_per_mi);
+      // OURS — `identifyPerformanceLimiter` went out fast < −15 s/mi and faded > 20 s/mi; fitness gap > 20 s/mi: no outside source
       const wentOutFast = firstDev < -15;
       const significantFade = (firstP != null && lastP != null) ? (lastP - firstP) > 20 : false;
       if (wentOutFast && significantFade) {

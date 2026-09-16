@@ -44,6 +44,7 @@ const positive = (v: unknown): number | null => {
 /** Minutes when small, seconds when not — the `workouts` column convention. */
 const minutesOrSeconds = (v: unknown): number | null => {
   const n = positive(v);
+  // OURS — `minutesOrSeconds` under 1000 is minutes, 1000 and over is seconds: the storage convention swim-scalars.ts documents, no outside source
   return n == null ? null : Math.round(n < 1000 ? n * 60 : n);
 };
 
@@ -72,6 +73,7 @@ export function completedMovingSeconds(row: any): number | null {
     };
 
     // 0 — a race is its elapsed time.
+    // FIELD — Strava activity `workout_type` 1 = race (run)
     if (Number(row?.workout_type) === 1 || analysis?.is_goal_race === true) {
       const e = elapsedSeconds();
       if (e != null) return e;
@@ -114,6 +116,7 @@ export function completedMovingSeconds(row: any): number | null {
       const elapsed = elapsedSeconds();
       const kph = positive(row?.avg_speed);
       let est: number | null = null;
+      // FIELD — definition (1 m/s = 3.6 km/h)
       if (kph != null) est = Math.round(distM / (kph / 3.6));
       else {
         const secPerKm = positive(row?.avg_pace);

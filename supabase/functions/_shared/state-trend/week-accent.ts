@@ -284,6 +284,7 @@ export function upkeepCandidate(opts: {
   // to say weekly (the science lives in the glass box, not here) → silence.
   const hasTarget = typeof actualPerWeek === 'number' && typeof targetPerWeek === 'number' && targetPerWeek > 0;
   if (!hasTarget) return null;
+  // OURS — `upkeepCandidate` under 85% of target for ≥ 2 weeks (≥ 3 names the count): no outside source (posture.ts uses the TrainingPeaks 80% line instead)
   if (!(actualPerWeek! < targetPerWeek! * 0.85)) return null;           // ≥85% ≈ still maintaining
   if (typeof weeksUnder === 'number' && weeksUnder < 2) return null;     // one light week is not a pattern
 

@@ -29,17 +29,20 @@ import {
 // dew point barely clears its reference (SD < 1.4°F) while air temperature swings 30–40°F — temperature
 // is the heat the body actually feels. Neutral reference: endurance optima sit ~50–55°F; we hinge at
 // 60°F so genuinely pleasant days aren't "corrected". One-sided, tunable/calibratable like DEFAULT_HEAT_K.
+// OURS — `TEMP_REF_F` 60°F: hinged above the 50–55°F endurance optimum so pleasant days are not corrected (ledger row: hot-day line)
 export const TEMP_REF_F = 60;
 
 // Dew point is CAPTURED (compute-facts) but DORMANT in the model — the humid-climate refinement,
 // deferred until a humid-climate user exists (docs/DESIGN-familiar-routes.md §4.2). Its neutral ref,
 // kept for dewPointF's documentation and the future humid path:
+// FIELD — Ely et al. (dew point as the heat-stress variable, ~55°F neutral; see header receipts)
 export const DEW_REF_F = 55;
 
 // UNVALIDATED POPULATION PLACEHOLDER, declared as such (D-237 / Law 2). 0.005 = a 0.5% HR rise per °F
 // of air temperature above neutral. It exists only so the linear-k path has a documented default before
 // calibration; it MUST be replaced by a value fit from the athlete's own hot-vs-cool same-route runs
 // (see PROHIBITION). Do NOT treat this number as validated, and do NOT derive it from a pace coefficient.
+// OURS — `DEFAULT_HEAT_K` 0.5% HR per °F: declared unvalidated placeholder until the athlete's own paired runs fit it
 export const DEFAULT_HEAT_K = 0.005;
 
 /**
@@ -58,6 +61,7 @@ export function dewPointF(
   const rh = Number(humidityPct);
   if (!Number.isFinite(t) || !Number.isFinite(rh) || rh <= 0 || rh > 100) return null;
   const tc = (t - 32) * (5 / 9);
+  // FIELD — Magnus formula coefficients (a = 17.625, b = 243.04 °C)
   const a = 17.625;
   const b = 243.04;
   const gamma = Math.log(rh / 100) + (a * tc) / (b + tc);
@@ -112,6 +116,7 @@ export function adjEfficiency(
 
 // Efficiency-index change within this band reads as "holding", not a real move. Mirrors the
 // (unexported) band in efficiency-index.ts so the raw and heat-adjusted reads agree on "holding".
+// OURS — `HEAT_HOLDING_PCT` ±2%: mirrors `ROUTE_EFF_HOLDING_PCT` in efficiency-index.ts, no outside source
 const HEAT_HOLDING_PCT = 2;
 
 // Non-comparable efforts — dropped before trending, because a hard day's pace:HR is a DIFFERENT
@@ -190,6 +195,7 @@ export function routeEfficiencyDirectionHeatAdjusted(
 //   • heatTerm varies weakly (present but under-identified) → NOT separable from fitness → do not guess
 //     it; fall back to the calibrated-k linear correction. (method "linear_k")
 
+// OURS — `MIN_REGRESSION_N` 8 runs, `HEAT_CONSTANT_EPS` numeric zero, `HEAT_SPREAD_MIN` 4°F SD: no outside source, kept as found
 export const MIN_REGRESSION_N = 8;   // below this → linear-k half-vs-half fallback (data-poor)
 const HEAT_CONSTANT_EPS = 1e-9;      // heatTerm SD below this → heat is constant/absent → drop the term
 const HEAT_SPREAD_MIN = 4;           // °F SD of heatTerm (air temp) needed to identify β_heat; between → fallback
@@ -245,6 +251,7 @@ function median(a: number[]): number {
 }
 function madScale(r: number[]): number {
   const m = median(r);
+  // FIELD — definition (MAD ÷ 0.6745 = normal-consistent σ)
   return median(r.map((x) => Math.abs(x - m))) / 0.6745; // robust σ estimate
 }
 // Invert a small square matrix via Gauss–Jordan with partial pivoting. null if singular.
@@ -270,6 +277,7 @@ function matVec(A: number[][], v: number[]): number[] {
   return A.map((row) => row.reduce((s, a, j) => s + a * v[j], 0));
 }
 // 97.5th percentile of Student's t (two-sided 95% CI). Table df 1..30; smooth approach to 1.96 beyond.
+// FIELD — definition (Student's t, 97.5th percentile, df 1–30)
 const T_975 = [
   0, 12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160,
   2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086, 2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052,
@@ -278,6 +286,7 @@ const T_975 = [
 function tCrit(df: number): number {
   const d = Math.max(1, Math.floor(df));
   if (d <= 30) return T_975[d];
+  // OURS — `tCrit` beyond df 30: 1.96 + 2.4/df approximation, chosen to meet the table at 30
   return 1.96 + 2.4 / d; // ≈2.04 at 30, →1.96 for large df
 }
 
@@ -308,6 +317,7 @@ interface HuberFit {
 function huberFit(X: number[][], y: number[]): HuberFit | null {
   const n = y.length;
   const p = X[0].length;
+  // FIELD — Huber M-estimator tuning constant 1.345 (95% Gaussian efficiency); OURS — `huberFit` 25-iteration cap
   const c = 1.345;
   let w = new Array(n).fill(1);
   let beta: number[] | null = null;

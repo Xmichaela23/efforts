@@ -301,6 +301,7 @@ export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Reco
     }).filter((r): r is number => r != null);
     if (ratios.length) {
       const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      // OURS — `computeE1rmBand` confident at ≥ 2 lifts with a baseline: no outside source
       return { low: 0, high: 1, current: avg, positionPct: Math.max(0, Math.min(1, avg)), confident: ratios.length >= 2 };
     }
   }
@@ -421,6 +422,7 @@ export interface AllOutTrendInput {
  * (and roughly the same span) as `REP_RECORD_WINDOW_SESSIONS = 40` in `_shared/strength/all-out-set.ts`,
  * and the same 84d window the per-lift sparkline already uses.
  */
+// OURS — `ALL_OUT_WINDOW_DAYS` 84 days: spans a full cycle pair, same as the lift chart window; no outside source
 export const ALL_OUT_WINDOW_DAYS = 84;
 
 

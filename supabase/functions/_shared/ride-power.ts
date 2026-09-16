@@ -26,9 +26,11 @@ export const NORMALIZED_POWER_MIN_DURATION_S = 20 * 60;
 export const NORMALIZED_POWER_WINDOW = 30;
 
 /** A second above this counts as pedalling. The Details tile's rule, unchanged. */
+// OURS — `PEDALING_POWER_THRESHOLD_W` 25 W: the Details tile's existing pedalling rule, moved unchanged, no outside source
 export const PEDALING_POWER_THRESHOLD_W = 25;
 
 /** Power readings above this are sensor spikes, not efforts. The interval builders' existing bound. */
+// OURS — `MAX_PLAUSIBLE_W` 2000 W: the interval builders' existing spike bound, no outside source
 const MAX_PLAUSIBLE_W = 2000;
 
 /**
@@ -93,6 +95,7 @@ export function pedalingAveragePowerW(
   let clockSec = 0;
   for (let i = 1; i < stream.length && i < timeS.length; i += 1) {
     const dt = Math.max(0, (timeS[i] || 0) - (timeS[i - 1] || 0));
+    // OURS — `pedalingAveragePowerW` a gap over 300 s is a recording break: no outside source
     if (dt <= 0 || dt > 300) continue;
     clockSec += dt;
     const p = stream[i];

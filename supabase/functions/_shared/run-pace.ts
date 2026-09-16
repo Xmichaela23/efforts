@@ -27,6 +27,7 @@
  */
 import { hasUsableElevation, paceToGAP } from './gap.ts';
 
+// FIELD — definition (1 mi = 1609.34 m)
 const METERS_PER_MILE = 1609.34;
 
 /** OURS — slower than this a second counts as stopped (see header). */
@@ -115,6 +116,7 @@ export function runMovingSeconds(
  * running centred on it (50 m either side, shorter only at the start and end of the run), capped at ±45% as in
  * `./gap.ts`.
  */
+// FIELD — Smyth & Muniz-Pumares 2020, 100 m grade intervals (see note above)
 export const GRADE_WINDOW_M = 100;
 
 /** Per-sample grades in percent for the whole run, or null when the run has no usable elevation. Compute once per run. */
@@ -125,6 +127,7 @@ export function runGrades(samples: ReadonlyArray<RunSample>): number[] | null {
   // counts; under 5 m of range every grade reads 0 and the adjusted pace equals the pace, as Strava and Garmin show it.
   // No elevation at all still returns null — nothing says the ground was flat.
   const withElev = view.filter((x) => x.elevation_m != null).length;
+  // OURS — `runGrades` elevation on ≥ half the samples counts: no outside source
   if (n < 2 || withElev < n * 0.5) return null;
   if (!hasUsableElevation(view)) return new Array<number>(n).fill(0);
   // Cumulative distance, never decreasing; elevation carried forward over gaps.
@@ -148,6 +151,7 @@ export function runGrades(samples: ReadonlyArray<RunSample>): number[] | null {
     while (hi < n - 1 && dist[hi] - dist[i] < half) hi += 1;
     const span = dist[hi] - dist[lo];
     const a = elev[lo], b = elev[hi];
+    // OURS — `runGrades` a grade needs > 5 m of distance; the ±45% cap is the one in gap.ts
     if (a != null && b != null && span > 5) grades[i] = Math.max(-45, Math.min(45, ((b - a) / span) * 100));
   }
   return grades;

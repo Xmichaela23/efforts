@@ -13,6 +13,7 @@
  * Valid for grades roughly -0.45 to +0.45.
  */
 export function metabolicCostPerMeter(gradeDecimal: number): number {
+  // FIELD — Minetti et al. 2002 (J Appl Physiol 93:1039) cost polynomial and its measured ±45% grade range
   const g = Math.max(-0.45, Math.min(0.45, gradeDecimal));
   return (
     155.4 * g ** 5 -
@@ -38,6 +39,7 @@ export function paceToGAP(paceSecPerUnit: number, gradePercent: number): number 
   if (!Number.isFinite(gradePercent)) return paceSecPerUnit;
 
   // Don't adjust for negligible grade (<0.3%)
+  // OURS — `paceToGAP` grades under 0.3% left unadjusted; cost ≤ 0.5 J/kg/m treated as extreme downhill: no outside source
   if (Math.abs(gradePercent) < 0.3) return paceSecPerUnit;
 
   const cost = metabolicCostPerMeter(gradePercent / 100);
@@ -62,6 +64,7 @@ export function computeSampleGrades(
     pace_s_per_mi?: number | null;
     distance_m?: number | null;
   }>,
+  // OURS — `computeSampleGrades` 30-sample default window: no outside source (run-pace.ts uses the 100 m window instead)
   windowSize = 30,
 ): number[] {
   const n = samples.length;
@@ -89,6 +92,7 @@ export function computeSampleGrades(
     // ~1 Hz: integrate horizontal distance from pace (sec/mi → m/s per step)
     for (let i = 1; i < n; i++) {
       const pace = samples[i].pace_s_per_mi;
+      // OURS — `computeSampleGrades` 40:00/mi stop line (same as run-pace.ts `STOPPED_SLOWER_THAN_S_PER_MI`); 1 mi = 1609.34 m by definition
       if (pace && pace > 0 && pace < 2400) {
         const speedMps = 1609.34 / pace;
         cumDist[i] = cumDist[i - 1] + speedMps;
@@ -109,6 +113,7 @@ export function computeSampleGrades(
     if (
       elevLo != null && elevHi != null &&
       Number.isFinite(elevLo) && Number.isFinite(elevHi) &&
+      // OURS — `computeSampleGrades` ≥ 5 m of distance per grade: no outside source; cap ±45% = Minetti range
       distDelta > 5 // at least 5m horizontal to avoid noise
     ) {
       const raw = ((elevHi - elevLo) / distDelta) * 100;
@@ -133,6 +138,7 @@ export function computeSampleGrades(
 export function aggregateGapPace(
   paceSecPerMi: Array<number | null | undefined>,
   grades: number[],
+  // OURS — `aggregateGapPace` > 60 usable samples, pace kept at 3:00–40:00 /mi: no outside source
   minSamples = 60,
 ): number | null {
   let flatEquivTime = 0; // seconds
@@ -159,6 +165,7 @@ export function aggregateGapPace(
 export function hasUsableElevation(
   samples: Array<{ elevation_m?: number | null }>,
 ): boolean {
+  // OURS — `hasUsableElevation` ≥ 60 samples, elevation on ≥ 50% of them, ≥ 5 m range: no outside source
   if (samples.length < 60) return false; // need at least 1 minute
 
   let count = 0;

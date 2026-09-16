@@ -48,6 +48,7 @@ type WorkoutMeta = {
 
 export function residualStress(row: SessionLoadRow, asOf: Date): number {
   const hoursElapsed = (asOf.getTime() - new Date(row.completed_at).getTime()) / MS_H;
+  // OURS — `residualStress` magnitude × e^(−3 × hours ÷ decay hours), 48 h default: about 95% gone at the decay time; no outside source (TRUTH-MAP: inferred)
   const dh = Math.max(1, row.decay_hours || 48);
   return row.magnitude * Math.exp((-3.0 * hoursElapsed) / dh);
 }
@@ -98,6 +99,7 @@ function resolvePhaseMultiplier(ctx: PlanContextV1): number {
 
 function demandStatus(residual: number, threshold: number): DemandStatusLevel {
   const ratio = residual / Math.max(threshold, 1);
+  // OURS — `demandStatus` residual under 40% of threshold fresh, under 85% manageable: no outside source
   if (ratio < 0.4) return "fresh";
   if (ratio < 0.85) return "manageable";
   return "compromised";
@@ -106,6 +108,7 @@ function demandStatus(residual: number, threshold: number): DemandStatusLevel {
 function deriveRecommendation(statuses: DemandStatusLevel[]): string {
   const dominated = statuses.filter((s) => s === "compromised");
   if (dominated.length === 0) return "proceed_as_planned";
+  // OURS — `deriveRecommendation` 1–2 compromised reduce, 3–4 swap, 5+ rest: no outside source
   if (dominated.length <= 2) return "reduce_intensity";
   if (dominated.length <= 4) return "swap_session";
   return "rest";
@@ -265,6 +268,7 @@ export async function buildReadiness(
 ): Promise<ReadinessSnapshotV1> {
   const computed_at = asOf.toISOString();
   const asOfIso = computed_at;
+  // OURS — `buildReadiness` 96-hour residual window, 14-day fallback, 7-day aerobic trend halves: no outside source
   const h96 = new Date(asOf.getTime() - 96 * MS_H);
   const d14 = new Date(asOf.getTime() - 14 * 24 * MS_H);
 
@@ -533,6 +537,7 @@ export async function buildReadiness(
           if (!ledgers.includes(row.load_target)) continue;
           const hoursElapsed = (sessionEnd.getTime() - new Date(row.completed_at).getTime()) / MS_H;
           const dh = Math.max(1, row.decay_hours || 48);
+          // OURS — same decay as `residualStress` (48 h default)
           proj += row.magnitude * Math.exp((-3.0 * hoursElapsed) / dh);
         }
         const ratio = proj / Math.max(th, 1);
@@ -542,6 +547,7 @@ export async function buildReadiness(
         }
       }
 
+      // OURS — `buildReadiness` protected-session risk above 40% of threshold; < 50% low, < 75% moderate, else high: no outside source
       if (worstRatio > 0.4) {
         const contributors = rows14
           .filter((r) => worstDemandLedgers.includes(r.load_target))
@@ -583,6 +589,7 @@ export async function buildReadiness(
     for (const w of workoutsWeek) {
       const t = (w.type ?? "other").toLowerCase();
       const dur = Number(w.moving_time ?? w.duration) || 0;
+      // OURS — `buildReadiness` a duration over 1000 is read as seconds: unit guess, no outside source
       const minutes = dur > 1000 ? dur / 60 : dur;
       if (t === "strength") {
         completed_volume_by_type[t] = (completed_volume_by_type[t] ?? 0) + 1;
@@ -609,12 +616,14 @@ export async function buildReadiness(
       plannedTotal += planned_volume_by_type[t] ?? 0;
       completedTotal += completed_volume_by_type[t] ?? 0;
     }
+    // OURS — `buildReadiness` on track = ≥ 70% of the prorated planned volume; build week short at day 5+ below 50%; anything > 50% / < 40% of threshold caps the narrative: no outside source
     const on_track = plannedTotal <= 0 ? true : completedTotal >= plannedTotal * expectedFrac * 0.7;
 
     const sysNow = totalSystemicResidual(rows14, asOf);
     const sys24 = totalSystemicResidual(rows14, new Date(asOf.getTime() - 24 * MS_H));
     const sys48 = totalSystemicResidual(rows14, new Date(asOf.getTime() - 48 * MS_H));
     let systemic_fatigue_trend: WeekLoadStatusV1["systemic_fatigue_trend"] = "stable";
+    // OURS — `buildReadiness` systemic fatigue accumulating / recovering = ±10% at both 24 h and 48 h steps: no outside source
     if (sysNow > sys24 * 1.1 && sys24 > sys48 * 1.1) systemic_fatigue_trend = "accumulating";
     else if (sysNow < sys24 * 0.9 && sys24 < sys48 * 0.9) systemic_fatigue_trend = "recovering";
 
@@ -639,6 +648,7 @@ export async function buildReadiness(
       concern = "recovery week but completed hard session(s)";
     } else if (
       plan_context.week_intent === "load" && dayIndex >= 5 && plannedTotal > 0 &&
+      // OURS — `buildReadiness` build week short = day 5+ and under 50% of planned volume: no outside source
       completedTotal < plannedTotal * 0.5
     ) {
       intent_match = false;
@@ -657,6 +667,7 @@ export async function buildReadiness(
     };
 
     const muscularTargets = Object.keys(muscular);
+    // OURS — `buildReadiness` narrative caps: a muscle over 50% of its threshold blocks "fully recovered", under 40% reads fresh: no outside source
     const anyHighResidual = muscularTargets.some((k) =>
       muscular[k]!.residual_stress > 0.5 * thresholdForTarget(k)
     );
@@ -725,6 +736,7 @@ export async function buildReadiness(
       const t = (w.type ?? "other").toLowerCase();
       const dur = Number((w as { moving_time?: number; duration?: number }).moving_time ??
         (w as { duration?: number }).duration) || 0;
+      // OURS — `buildReadiness` a duration over 1000 is read as seconds: unit guess, no outside source
       const minutes = dur > 1000 ? dur / 60 : dur;
       if (t === "strength") {
         completed_volume_by_type[t] = (completed_volume_by_type[t] ?? 0) + 1;
@@ -737,6 +749,7 @@ export async function buildReadiness(
     const sys24 = totalSystemicResidual(rows14, new Date(asOf.getTime() - 24 * MS_H));
     const sys48 = totalSystemicResidual(rows14, new Date(asOf.getTime() - 48 * MS_H));
     let systemic_fatigue_trend: WeekLoadStatusV1["systemic_fatigue_trend"] = "stable";
+    // OURS — `buildReadiness` systemic fatigue accumulating / recovering = ±10% at both 24 h and 48 h steps: no outside source
     if (sysNow > sys24 * 1.1 && sys24 > sys48 * 1.1) systemic_fatigue_trend = "accumulating";
     else if (sysNow < sys24 * 0.9 && sys24 < sys48 * 0.9) systemic_fatigue_trend = "recovering";
 

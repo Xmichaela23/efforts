@@ -58,6 +58,7 @@ export interface ClassifyPaceAtHrResult {
   basis: PaceAtHrBasis;
 }
 
+// OURS — `classifyPaceAtHrDirection` ≥ 6 points, GAP basis at ≥ 60% coverage, recent 3 pair-slopes, thirds split: the 2026-05-25 calibration, no outside source
 const MIN_POINTS = 6;
 const GAP_COVERAGE_THRESHOLD = 0.6;
 const RECENT_K = 3;
@@ -114,6 +115,7 @@ export function classifyPaceAtHrDirection(
     pairs.push((ys[i + 1] - ys[i]) / dx);
   }
   // Need at least 3 pair-slopes to compute meaningful percentile cutoffs.
+  // OURS — at least 3 pair-slopes before percentile cuts (see `classifyPaceAtHrDirection` note above)
   if (pairs.length < 3) {
     return { direction: 'stable', basis };
   }

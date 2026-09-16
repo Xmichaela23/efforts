@@ -34,6 +34,7 @@ export const isComparableRunEffort = (classifiedType: unknown): boolean =>
 // audit found one easy run at 2280 s/km (38 min/km), which alone flipped the trend to a bogus
 // "improving −66.7%". The root cause of such corrupt GAP values is upstream (compute-facts GAP
 // computation), tracked separately; this guard keeps one bad row from poisoning the trend.
+// OURS — `MIN_RUN_PACE_S` / `MAX_RUN_PACE_S` 2:30–12:30 /km plausibility band for GAP pace: no outside source
 const MIN_RUN_PACE_S = 150;
 const MAX_RUN_PACE_S = 750;
 
@@ -69,6 +70,7 @@ export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerW
 
 // efficiency_index sits ~1.5–1.9 for real runs; this band drops corrupt/zero-HR rows without
 // clipping legitimate variation.
+// OURS — `MIN_EFF_INDEX` 0.5 / `MAX_EFF_INDEX` 5 plausibility band for the efficiency index: no outside source
 const MIN_EFF_INDEX = 0.5;
 const MAX_EFF_INDEX = 5;
 
@@ -146,6 +148,7 @@ export function efficiencyIndexToSeries(
  *  null pace when the group has no run with a real pace — the caller then shows the count, never a
  *  reconstructed number. */
 /** ⛔ 1 mi in metres, by definition — the constant `save-baselines/zones.ts` converts paces with. */
+// FIELD — definition (1 mi = 1.609344 km)
 const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 /**
  * `M:SS` from seconds. ⛔ THE WHOLE PACE IS ROUNDED ONCE, then split — rounding the remainder on its
@@ -163,6 +166,7 @@ export function recentGroupPaceHr(
    *  Absent → imperial, which is today's behaviour for every account in production. */
   metric = false,
 ): { recentPaceSecPerKm: number | null; recentHrAvg: number | null; paceIsGraded: boolean; recentPaceDisplay: string | null } {
+  // OURS — `recentGroupPaceHr` median of the last 5 runs: no outside source
   const last5 = (Array.isArray(rows) ? rows : []).slice(-5);
   const median = (get: (r: Record<string, unknown>) => unknown): number => {
     const xs = last5.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
@@ -318,6 +322,7 @@ export function isQualifyingDecouplingRow(r: DecouplingRow): boolean {
   if (!(typeof r.decoupling_pct === 'number' && Number.isFinite(Number(r.decoupling_pct)))) return false;
   if (r.decoupling_basis === 'raw') return false;               // drop confirmed terrain-confounded
   if (!isSteadyAerobic(r.workout_type)) return false;           // steady aerobic only
+  // OURS — `isQualifyingDecouplingRow` ≥ 20 min and a plausible −30%…+50% band: no outside source
   if (!(r.duration_minutes == null || Number(r.duration_minutes) >= 20)) return false; // ≥20 min (null = keep)
   const v = Number(r.decoupling_pct);
   return v >= -30 && v <= 50;                                   // plausible decoupling band
@@ -335,6 +340,7 @@ export function decouplingToSeries(rows: DecouplingRow[] | null | undefined): Tr
 // on decoupling, which crosses zero. Offsetting the series positive lets us REUSE classifyTrend's
 // tested window / min-session floor / endpoint-smoothing / STALENESS gate (the "never extrapolate from
 // stale" honesty requirement) unchanged; the band is read from the RAW (un-offset) values.
+// OURS — `DECOUPLING_OFFSET` 30: arithmetic shift matching the −30% floor so the trend math sees positive values
 const DECOUPLING_OFFSET = 30;
 
 export interface DecouplingState {

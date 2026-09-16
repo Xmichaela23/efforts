@@ -45,6 +45,7 @@ export function computeFtpBinsMinutes(args: {
     const pw = Number(p);
     if (!Number.isFinite(pw) || pw <= 0) continue;
     const r = pw / ftpW;
+    // OURS — `computeFtpBinsMinutes` bin edges 60 / 75 / 85 / 95 / 105 / 120% FTP, ≥ 60 samples: no outside source
     if (r < 0.60) bins.lt_0_60_min += minsPerSample;
     else if (r < 0.75) bins.p0_60_0_75_min += minsPerSample;
     else if (r < 0.85) bins.p0_75_0_85_min += minsPerSample;
@@ -71,6 +72,7 @@ export function classifyExecutedIntensity(args: {
   if (if0 == null) return 'unknown';
 
   // Power-first, conservative thresholds.
+  // OURS — `classifyExecutedIntensity` IF < 0.65 easy, < 0.80 moderate; ≤ 3 min above 95% FTP stays moderate: no outside source
   if (if0 < 0.65) return 'easy';
   if (if0 < 0.80) return 'moderate';
   if (if0 >= 0.80) {

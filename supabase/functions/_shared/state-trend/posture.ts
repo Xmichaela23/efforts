@@ -191,6 +191,7 @@ export function postureSentence(
   // the athlete set (dropped fires below 80% of target, so the buckets only cover < 0.8).
   const volumeGap = (act: number, tgt: number): string => {
     const r = act / tgt;
+    // OURS — `volumeGap` wording buckets < 0.4 / < 0.6 / else: no outside source
     if (r < 0.4) return `well under half the ${tgt}-a-week plan`;
     if (r < 0.6) return `about half the ${tgt}-a-week plan`;
     return `about two-thirds of the ${tgt}-a-week plan`;

@@ -43,6 +43,7 @@ export function extractWarmupEasy(
   totalSeconds: number,
   opts: { skipSeconds?: number; minSeconds?: number } = {},
 ): WarmupEasyRead | null {
+  // OURS — `extractWarmupEasy` skip the first 180 s, need ≥ 180 s in the window, ≥ 10 samples, moving = faster than 0.5 m/s: no outside source
   const skip = opts.skipSeconds ?? 180;
   const minS = opts.minSeconds ?? 180;
   if (!Array.isArray(samples) || samples.length < 10) return null;

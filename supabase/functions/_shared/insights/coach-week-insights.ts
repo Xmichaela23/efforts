@@ -111,6 +111,7 @@ const label = (d: string) => LABEL[String(d || '').toLowerCase()] ?? String(d ||
 const pct = (n: number) => `${Math.round(n)}%`;
 
 // Field-standard bands. Not invented here — see the header note.
+// FIELD — TrainingPeaks / Intervals.icu / Final Surge ±20% planned-vs-actual band; 0.8 floor = Blanch & Gabbett lower sweet-spot line (see header)
 const BAND_LO = 0.8;
 const BAND_HI = 1.2;
 /** A discipline is "below its own normal" under the conventional ACWR under-training floor. */

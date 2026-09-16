@@ -6,6 +6,7 @@
 // Extracted from analyze-strength so the overall-readiness label is unit-tested — the missed-normalizer
 // class (D-234 left calculateOverallReadiness on the 0–10 assumption) can't recur silently.
 
+// FIELD — definition (Hooper index items scored 1–7)
 export const HOOPER_MIN = 1;
 export const HOOPER_MAX = 7;
 
@@ -22,18 +23,21 @@ function inHooperRange(v: number | null): v is number {
 /** Energy band label (1–7). */
 export function energyLevel(energy: number | null): 'High' | 'Moderate' | 'Low' | null {
   if (!inHooperRange(energy)) return null;
+  // OURS — `energyLevel` bands 6+ high, 4–5 moderate: no outside source
   return energy >= 6 ? 'High' : energy >= 4 ? 'Moderate' : 'Low';
 }
 
 /** Soreness band label (1–7). */
 export function sorenessLevel(soreness: number | null): 'Low' | 'Moderate' | 'High' | null {
   if (!inHooperRange(soreness)) return null;
+  // OURS — `sorenessLevel` bands ≤ 2 low, ≤ 4 moderate: no outside source
   return soreness <= 2 ? 'Low' : soreness <= 4 ? 'Moderate' : 'High';
 }
 
 /** Sleep quality band — HOURS, unchanged (objective member of the set). */
 export function sleepQuality(sleepHours: number | null): 'Excellent' | 'Good' | 'Fair' | 'Poor' | null {
   if (sleepHours == null || !Number.isFinite(sleepHours)) return null;
+  // OURS — `sleepQuality` 8 / 7 / 6 h bands: no outside source
   return sleepHours >= 8 ? 'Excellent' : sleepHours >= 7 ? 'Good' : sleepHours >= 6 ? 'Fair' : 'Poor';
 }
 
@@ -53,6 +57,7 @@ export function overallReadinessLabel(
   const scores: number[] = [];
   if (inHooperRange(energy)) scores.push((energy - 1) / 6);
   if (inHooperRange(soreness)) scores.push((7 - soreness) / 6);
+  // OURS — `overallReadinessLabel` sleep scored against 12 h; averages ≥ 0.8 / 0.6 / 0.4: no outside source
   if (sleepHours != null && Number.isFinite(sleepHours)) scores.push(Math.min(sleepHours / 12, 1));
   if (scores.length === 0) return null;
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;

@@ -55,8 +55,10 @@ export function runEasyZone3FloorBpm(lthr: number): number {
   return zone3FloorBpm(lthr);
 }
 /** Cold-start bootstrap: the field's aerobic ceiling is 80% of max — NOT the 75% that starved this. */
+// FIELD — MyProCoach and Garmin top the aerobic band at 80% of max (see header)
 export const EASY_CEILING_PCT_MAXHR = 0.80;
 /** Cold-start floor: below 65% of max is recovery/commute territory (mirrors the working bike band). */
+// OURS — `EASY_FLOOR_PCT_MAXHR` 65% of max: copied from the bike easy band, no outside source
 export const EASY_FLOOR_PCT_MAXHR = 0.65;
 
 export type EasyHrAnchor = 'lthr' | 'max_hr' | 'none';
@@ -181,10 +183,12 @@ export function isEasyHr(hr: number | null | undefined, band: EasyHrBand): boole
 // same, and nothing depends on the analyzer having classified the run before `compute-facts` runs.
 
 /** Whole-run minimum, in MINUTES. Mirrors the baseline learner's `duration >= 20`. */
+// OURS — `MIN_EASY_RUN_MINUTES` 20 min: mirrors the baseline learner's duration >= 20, no outside source
 export const MIN_EASY_RUN_MINUTES = 20;
 
 /** Minimum in-band DWELL, in SECONDS, before a pace-at-easy-HR is a measurement and not a fragment.
  *  Mirrors the bike's `MIN_EFFICIENCY_IN_BAND_S = 600` (D-275-bike). The old floor was 10 SAMPLES. */
+// OURS — `MIN_EASY_PACE_IN_BAND_S` 600 s: mirrors the bike's in-band dwell floor (D-275-bike), no outside source
 export const MIN_EASY_PACE_IN_BAND_S = 600;
 
 /**

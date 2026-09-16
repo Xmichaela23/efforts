@@ -49,6 +49,7 @@ export function fosterEffortWord(rpe: number): string {
 export const FOSTER_LEGEND: readonly string[] = ['1 very easy', '3 moderate', '5 hard', '10 maximal'];
 
 /** The popup question, asked only when the planned session is an easy or long run. */
+// Viada p235 (talk test after 5 and after 20 minutes) and p211 ("without taking a breath"), see header
 export const TALK_TEST_QUESTION = 'At 5 and 20 minutes in, could you say a full sentence without taking a breath?';
 
 /** Performance row: "Effort · RPE 4, somewhat hard". Null when no RPE is logged. */

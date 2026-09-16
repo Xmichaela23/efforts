@@ -32,6 +32,7 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 /** Friel cycling Z2 ceiling as a fraction of lactate-threshold HR. */
 export const RIDE_EASY_CEILING_PCT_LTHR = 0.89;
 /** Bootstrap ceiling as a fraction of max HR — the top of the band this app's own ride learner uses. */
+// OURS — `RIDE_EASY_CEILING_PCT_MAXHR` 75% of max: top of this app's own ride-learner band (65–75%), no outside source
 export const RIDE_EASY_CEILING_PCT_MAXHR = 0.75;
 
 export type RideEasyCeiling = {

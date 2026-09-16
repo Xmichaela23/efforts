@@ -103,6 +103,7 @@ function clean(sentences: (string | null | undefined)[]): string | null {
  * the classifier's `climbing` gate). Imported as a CONSTANT rather than re-typed so the insight and
  * the classification can never disagree about what counts as a hilly ride.
  */
+// OURS — `CLIMBING_FT_PER_MI` 40 ft/mi: copy of the ride classifier's climbing gate (cycling-v1/build.ts), no outside source
 const CLIMBING_FT_PER_MI = 40;
 const r0 = (n: number) => Math.round(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -208,6 +209,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   if (fam === 'aerobic') {
     if (power) {
       // steadiness of the power itself (VI near 1.0 = you held it smooth), then the load.
+      // OURS — `composeBikeInsight` VI ≤ 1.05 smooth, ≤ 1.03 barely a surge; IF 0.85 "harder than base" cut (0.75 endurance top is Coggan): no outside source
       if (vi != null && vi <= 1.05) parts.push(`You held the power smooth (${np} W normalized${vi <= 1.03 ? ', barely a surge' : ''}).`);
       else parts.push(`Steady aerobic ride at ${np} W normalized.`);
       // The efficiency read — same watts at a lower HR is the fitness gain cyclists track. NO drift NUMBER

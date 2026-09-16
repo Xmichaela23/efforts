@@ -15,13 +15,16 @@ export interface AcwrPlanContext {
   isTaperWeek?: boolean | null;
 }
 
+// FIELD — Blanch & Gabbett 2016: 0.8–1.3 sweet spot, >1.5 overreaching (undertrained / ramp_fast / overreaching / build_optimal_max)
 export const ACWR_RATIO_THRESHOLDS = {
+  // OURS — `ACWR_RATIO_THRESHOLDS` detrained 0.7 and the build 1.7 / recovery 1.05, 1.2 / taper 1.1, 1.25 phase bands: no outside source, kept as found
   detrained: 0.7,
   undertrained: 0.8,
   ramp_fast: 1.3,
   overreaching: 1.5,
   build_optimal_max: 1.5,
   build_elevated_max: 1.7,
+  // OURS — `ACWR_RATIO_THRESHOLDS` recovery / taper bands (1.05, 1.2, 1.1, 1.25): no outside source, kept as found
   recovery_optimal_max: 1.05,
   recovery_elevated_max: 1.2,
   taper_optimal_max: 1.1,

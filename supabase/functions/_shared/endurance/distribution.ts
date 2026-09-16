@@ -16,6 +16,7 @@ export interface ZoneDistribution {
 }
 
 /** Per-phase polarized intensity distribution (low/tempo/high fractions). */
+// OURS — `PHASE_ZONE_DIST` per-phase fractions lifted from generate-combined-plan/science.ts; the polarized idea is Seiler, these numbers have no printed source
 export const PHASE_ZONE_DIST: Record<PhaseKey, ZoneDistribution> = {
   base:          { low: 0.87, tempo: 0.08, high: 0.05 },
   build:         { low: 0.80, tempo: 0.10, high: 0.10 },
@@ -23,6 +24,7 @@ export const PHASE_ZONE_DIST: Record<PhaseKey, ZoneDistribution> = {
   taper:         { low: 0.83, tempo: 0.07, high: 0.10 },
   recovery:      { low: 0.95, tempo: 0.05, high: 0.00 },
   rebuild:       { low: 0.88, tempo: 0.08, high: 0.04 },
+  // OURS — `PHASE_ZONE_DIST` (continued)
   retest:        { low: 0.77, tempo: 0.13, high: 0.10 },
 };
 

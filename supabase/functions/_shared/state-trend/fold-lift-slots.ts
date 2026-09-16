@@ -199,6 +199,7 @@ function merge<T extends FoldableLift>(a: T, b: T): T {
     sampleCount: (a.sampleCount ?? 0) + (b.sampleCount ?? 0),
     lastAllOut,
     // Never widen a PR claim; only withdraw one the merge invalidated.
+    // OURS — 0.5 lb rounding slack, the same as assemble.ts `E1RM_ROUNDING_SLACK_LB`
     isPr: rep.isPr === true && !(best != null && latest != null && best > latest + 0.5),
     // Keep the freshest reading's age, so "as of" still describes the number shown.
     newestAgeDays: rep.newestAgeDays ?? other.newestAgeDays ?? null,

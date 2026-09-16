@@ -117,6 +117,7 @@ function derivePlannedDistanceMi(plannedWorkout: any): number | null {
         const dm = coerceNumber(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters);
         if (dm != null && dm > 0) meters += dm;
       }
+      // FIELD — definition (1 mi = 1609.34 m)
       if (meters > 0) return meters / 1609.34;
     }
 
@@ -150,6 +151,7 @@ function deriveWeather(workout: any): WeatherV1 | null {
   const avgTempC = coerceNumber(workout?.avg_temperature);
   const weatherData = parseJson(workout?.weather_data) || null;
   const apiTempF = coerceNumber(weatherData?.temperature ?? weatherData?.temp ?? weatherData?.temperature_f);
+  // FIELD — definition (°F = °C × 9/5 + 32)
   const deviceTempF = avgTempC != null && avgTempC !== 0 ? Math.round(avgTempC * 9 / 5 + 32) : null;
   const tempF = deviceTempF ?? apiTempF ?? (avgTempC === 0 ? 32 : null);
   const source: 'device' | 'openmeteo' = deviceTempF != null ? 'device' : 'openmeteo';
@@ -201,6 +203,7 @@ function buildZonesFromLearnedFitness(learnedFitness: any): HrZone[] | null {
     if (thr == null || !(thr > 0)) return null;
     // Conservative 5-zone model anchored to threshold HR.
     // Not perfect, but deterministic and user-specific.
+    // OURS — `buildZonesFromLearnedFitness` zone tops 75 / 85 / 92 / 98% of threshold HR: a "conservative" table, not Friel's, no outside source
     const z1Max = Math.round(thr * 0.75);
     const z2Max = Math.round(thr * 0.85);
     const z3Max = Math.round(thr * 0.92);
@@ -324,6 +327,7 @@ export async function buildWorkoutFactPacketV1(args: {
       }
     }
     if (m == null) return null;
+    // FIELD — definition (1 m = 3.28084 ft)
     return Math.round(m * 3.28084);
   })();
 
@@ -445,6 +449,7 @@ export async function buildWorkoutFactPacketV1(args: {
   // hrDriftCurrent is already terrain-adjusted; reconstruct raw for transparency.
   const raw_hr_drift_bpm = (() => {
     if (hrDriftCurrent == null) return null;
+    // OURS — `buildWorkoutFactPacketV1` terrain contribution counts at ≥ 3 bpm: no outside source
     if (terrainContributionBpm != null && Math.abs(terrainContributionBpm) >= 3) {
       return Math.round(hrDriftCurrent + terrainContributionBpm);
     }
@@ -465,6 +470,7 @@ export async function buildWorkoutFactPacketV1(args: {
     type PaceHrPoint = { pace: number; hr: number; dist: number };
     let points: PaceHrPoint[] = [];
 
+    // OURS — `buildWorkoutFactPacketV1` drift explanation: ≥ 4 points, pace 2:00–40:00 /mi, HR 40–250; pace change ≥ 30 s/mi; normalized drift < 3 bpm pace-driven (raw ≥ 5), terrain ≥ 40% with < 5, ≥ 5 cardiac: no outside source
     if (segments.length >= 4) {
       points = segments
         .filter((s) => coerceNumber(s.pace_sec_per_mi) != null && coerceNumber(s.avg_hr) != null)
@@ -545,6 +551,7 @@ export async function buildWorkoutFactPacketV1(args: {
       : 0;
 
     let explanation: DriftExplanation;
+    // OURS — `buildWorkoutFactPacketV1` drift explanation cuts (see note above)
     if (Math.abs(paceNorm) < 3 && significantPaceChange && absRaw >= 5) {
       explanation = 'pace_driven';
     } else if (terrainExplainsPct >= 0.4 && Math.abs(paceNorm) < 5) {
@@ -576,6 +583,7 @@ export async function buildWorkoutFactPacketV1(args: {
           type: String(s?.terrain_type || '').toLowerCase(),
         }))
         .filter((s: any) => s.mile != null && s.pace != null)
+        // OURS — `buildWorkoutFactPacketV1` downhill mile = grade ≤ −0.5%, notable when ≥ 5 s/mi faster than overall (top 2): no outside source
         .filter((s: any) => s.type === 'downhill' || (s.grade != null && s.grade <= -0.5));
 
       const notable = downhill
@@ -660,6 +668,7 @@ export async function buildWorkoutFactPacketV1(args: {
       const progressRows = Array.isArray(progressData) ? progressData : [];
       const segMap = new Map(segmentRows.map((s: any) => [String(s.id), s]));
 
+      // OURS — `buildWorkoutFactPacketV1` segment insight at ≥ 3 samples, trend at ≥ 6; climb at ≥ 2% grade: no outside source
       const insightEligibleCount = segmentRows.filter((s: any) => Number(s?.sample_count || 0) >= 3).length;
       const trendEligibleCount = segmentRows.filter((s: any) => Number(s?.sample_count || 0) >= 6).length;
 
@@ -691,6 +700,7 @@ export async function buildWorkoutFactPacketV1(args: {
         const segType = seg.metadata?.segment_type || (Number(seg.avg_grade_pct) >= 2 ? 'climb' : 'rolling');
         const paceDeltaS = Math.round(todayPace - avgPastPace);
         const hrDelta = (todayHr > 0 && avgPastHr > 0) ? Math.round(todayHr - avgPastHr) : null;
+        // FIELD — definition (1 mi = 1.60934 km)
         const pacePerMiToday = Math.round(todayPace * 1.60934);
         const pacePerMiAvg = Math.round(avgPastPace * 1.60934);
 
@@ -770,6 +780,7 @@ export async function buildWorkoutFactPacketV1(args: {
             const secPerMi = Number(g.computed?.overall?.gap_pace_s_per_mi);
             // sec/MILE -> sec/KM. Plausibility band mirrors the write-site clamp (150-750 s/km).
             const secPerKm = Number.isFinite(secPerMi) && secPerMi > 0 ? secPerMi / 1.609344 : NaN;
+            // OURS — `buildWorkoutFactPacketV1` 150–750 s/km plausibility band (same as state-trend/run.ts `MIN_RUN_PACE_S`); 1 mi = 1.609344 km by definition
             if (Number.isFinite(secPerKm) && secPerKm >= 150 && secPerKm <= 750) {
               gapByWid.set(String(g.id), Math.round(secPerKm * 10) / 10);
             }
@@ -852,6 +863,7 @@ export async function buildWorkoutFactPacketV1(args: {
       planned != null && actual != null
         ? Math.round(((actual - planned) / planned) * 100)
         : null;
+    // OURS — `buildWorkoutFactPacketV1` ≥ 30% off the planned distance counts as intentional: no outside source
     const intentional = deviationPct != null ? Math.abs(deviationPct) >= 30 : false;
     // D-035: When there's no planned workout at all, treat as 'actual' so the
     // client's AdherenceChips guard (AdherenceChips.tsx:60) hides chips and the

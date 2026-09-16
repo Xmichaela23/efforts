@@ -21,6 +21,7 @@ export interface ZoneBand {
 // fallback when too few rides land enough time in the narrow band (build-time check).
 /** Coggan endurance zone, 56–75% of FTP (TrainingPeaks / TrainerRoad). Also the planned range for easy and long rides (2026-09-14). */
 export const COGGAN_Z2 = { lo: 0.56, hi: 0.75 } as const;
+// OURS — `COGGAN_Z2_WIDE` top widened to 85% FTP for coverage: no outside source (56–75% is Coggan)
 const COGGAN_Z2_WIDE = { lo: 0.56, hi: 0.85 };
 
 /**

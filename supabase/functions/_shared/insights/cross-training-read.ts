@@ -68,6 +68,7 @@ export interface CoachEyeRead {
   info?: string;
 }
 
+// OURS — `PUSHING` ACWR > 1.1 reads as pushing a discipline: no outside source
 const PUSHING = 1.1;
 const LABEL: Record<string, string> = {
   strength: 'strength', run: 'running', running: 'running',

@@ -53,6 +53,7 @@ export function assessStimulus(
   const totalDurS = sumDurationSeconds(segsWork.length ? segsWork : segments);
   const totalDurMin = totalDurS > 0 ? totalDurS / 60 : null;
   const durationTarget = coerceNumber(planned?.planned_duration_min);
+  // OURS — `assessStimulus` duration met at ≥ 85% of planned: no outside source
   const durationHit = durationTarget == null || (totalDurMin != null && totalDurMin >= durationTarget * 0.85);
 
   const zs = Array.isArray(zones) ? zones : null;
@@ -84,6 +85,7 @@ export function assessStimulus(
         if (pct != null) {
           evidence.push(`${Math.round(pct * 100)}% of time in target aerobic HR range`);
         }
+        // OURS — `assessStimulus` ≥ 70% of time in the aerobic range; decoupling ≤ 5% is the line state-trend/run.ts reads from Viada p107
         const zoneHit = pct != null ? pct >= 0.7 : false;
         const dec = calculateCardiacDecouplingPct(segsWork.length ? segsWork : segments);
         const decOk = dec != null ? dec <= 5 : null;
@@ -165,6 +167,7 @@ export function assessStimulus(
     const reps = segsWork.filter((s) => /interval|rep|work/i.test(String(s.name || '')));
     const done = reps.length || segsWork.length;
     const completionPct = plannedCount && plannedCount > 0 ? done / plannedCount : 1;
+    // OURS — `assessStimulus` intervals complete at ≥ 85% of planned reps; tempo high confidence at pace variability ≤ 5; HR rise ≥ 5 bpm into the finish: no outside source
     const completedAll = completionPct >= 0.85;
     if (plannedCount && plannedCount > 0) evidence.push(`Completed ${done}/${Math.round(plannedCount)} work segments`);
 

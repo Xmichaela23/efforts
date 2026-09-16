@@ -38,6 +38,7 @@ export function segmentKey(name: unknown, distanceM: unknown): string {
     .trim()
     .replace(/\s+/g, '-');
   const d = Number(distanceM);
+  // OURS — `segmentKey` 50 m distance bucket: no outside source
   const bucket = Number.isFinite(d) && d > 0 ? Math.round(d / 50) * 50 : 0;
   return `${n || 'segment'}|${bucket}`;
 }
@@ -108,6 +109,7 @@ export function detectClimbSegments(
   let climbIdx = 0;
   while (i < n) {
     const g = gradePct[i];
+    // OURS — `detectClimbSegments` climb = grade ≥ 3%, ≥ 30 m gain, ≥ 120 s: no outside source
     if (typeof g !== 'number' || g < 3) {
       i++;
       continue;

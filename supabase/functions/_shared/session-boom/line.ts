@@ -216,6 +216,7 @@ function paceAtHrGainSecPerMi(w: BoomWorkout): { faster: number; meanAtHr: numbe
   // different claim wearing the same sentence.
   const priors = pts
     .filter((p) => p?.is_current !== true && Number.isFinite(Number(p?.pace_at_hr)))
+    // OURS — `LAST_N` the same eight earlier sessions (ledger row: the line of good news on a done session)
     .slice(-8)
     .map((p) => Number(p.pace_at_hr));
   if (priors.length < 8) return null;
@@ -236,6 +237,7 @@ const DRIFT_LINE_PCT = 5;
 const MIN_STREAK = 2;
 
 /** The number of earlier sessions both aerobic-gain lines compare against — the lines say "eight". */
+// OURS — `LAST_N` 8 earlier sessions: moved unchanged from the phone (ledger row: the line of good news on a done session)
 const LAST_N = 8;
 
 function powerCurveOf(w: BoomWorkout): Record<string, unknown> | null {
@@ -279,6 +281,7 @@ function enduranceLine(input: BoomInput, isRide: boolean): SessionBoomV1 | null 
         // ⚠️ ONLY THE FOUR THE LINE NAMES. The curve stores twelve durations; the approved line lists
         // 20 min, 5 min, 1 min and 5 s, and printing "best 12-minute power" would be a line he has
         // not written.
+        // OURS — 20 min / 5 min / 1 min / 5 s power durations (ledger row: the line of good news on a done session)
         if (![1200, 300, 60, 5].includes(seconds)) continue;
         const w = Number(mine[label]);
         if (!Number.isFinite(w) || w <= 0) continue;
@@ -476,6 +479,7 @@ function liftLine(input: BoomInput): SessionBoomV1 | null {
     return intent || null;
   };
   const meSets = exercises.filter((e) => intentOf(e.name) === 'me').flatMap((e) => e.sets);
+  // OURS — 1 or more in reserve = reps to spare (ledger row: the line of good news on a done session)
   if (meSets.length > 0 && meSets.every((s) => typeof s.rir === 'number' && s.rir >= 1)) {
     return {
       v: 1,

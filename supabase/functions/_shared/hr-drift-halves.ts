@@ -32,6 +32,7 @@ export function warmupSkipSeconds(computed: any, fallbackS = 180): number {
     const iv = Array.isArray(computed?.intervals) ? computed.intervals[0] : null;
     const role = String(iv?.role || iv?.kind || '').toLowerCase();
     const s = Number(iv?.executed?.duration_s ?? iv?.planned?.duration_s);
+    // OURS — `warmupSkipSeconds` a warm-up step counts at ≥ 60 s, never under the 180 s lag fallback
     if (/warm/.test(role) && Number.isFinite(s) && s >= 60) return Math.max(fallbackS, Math.round(s));
   } catch { /* fall through */ }
   return fallbackS;
@@ -42,6 +43,7 @@ export function hrDriftHalvesPct(
   totalSeconds: number,
   opts: { skipStartS?: number; minSeconds?: number } = {},
 ): HrDriftHalves | null {
+  // OURS — `hrDriftHalvesPct` skip 180 s, ≥ 360 s usable, ≥ 20 samples, HR 40–230, ≥ 10 points and ≥ 5 per half; ms detection at 10× the session length (the halves measure itself is Viada p107)
   const skip = opts.skipStartS ?? 180;
   const minS = opts.minSeconds ?? 360;
   if (!Array.isArray(samples) || samples.length < 20) return null;

@@ -1,5 +1,6 @@
 /** Versioned population defaults — adjust in one place. */
 
+// OURS — `BASE_THRESHOLDS` per-muscle and per-system residual thresholds ("population defaults"): no outside source, kept as found
 export const BASE_THRESHOLDS: Record<string, number> = {
   quadriceps: 2500,
   hamstrings: 2000,
@@ -26,6 +27,7 @@ export const BASE_THRESHOLDS: Record<string, number> = {
   _default: 1500,
 };
 
+// OURS — `PHASE_MULTIPLIERS` recovery 0.6 / base, build 1.0 / peak 1.2 / taper 0.4 / race week 0.2: no outside source
 export const PHASE_MULTIPLIERS: Record<string, number> = {
   recovery: 0.6,
   base: 1.0,

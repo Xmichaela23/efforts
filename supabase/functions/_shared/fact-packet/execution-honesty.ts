@@ -40,6 +40,7 @@ export interface ExecutionHonestyInput {
 // A run that faded ≥ this within itself did NOT "hold steady" — provable from its OWN splits, no route
 // history needed. 20 sits just above build.ts' even-pacing cutoff (15s/mi = noise), so it's a principled
 // GENERAL "this is a real positive split" bar — NOT tuned to any one athlete or run.
+// OURS — `POSITIVE_SPLIT_FADE_SEC` 20 s/mi: just above the 15 s/mi even-pacing cut in build.ts, no outside source
 const POSITIVE_SPLIT_FADE_SEC = 20;
 
 /**
@@ -78,6 +79,7 @@ export function computePositiveSplitSec(splitsMi: any[], gapAdjusted: boolean): 
     const gk = Number(s?.avgGapPace_s_per_km);
     return {
       mile: Number(s?.n),
+      // FIELD — definition (1 mi = 1.60934 km)
       pace: Number.isFinite(pk) && pk > 0 ? pk * 1.60934 : NaN,
       gap: Number.isFinite(gk) && gk > 0 ? gk * 1.60934 : NaN,
     };
@@ -116,6 +118,7 @@ export function paceVariedPct(splitsMi: any[] | null | undefined): number | null
  *  a few % (CV under ~3-4%); above 5% the pace visibly moved. This is the STEADY-CLAIM line — deliberately
  *  lower than the app's "moderate vs high variability" quality line (CV 10), which answers a different
  *  question. A general linguistic bar on the word "steady", not tuned to any athlete/run. */
+// OURS — `PACE_STEADY_FALSE_ABOVE_CV` 5% pace CV: no outside source, kept as found
 export const PACE_STEADY_FALSE_ABOVE_CV = 5;
 
 /** Does the narrative claim the PACE (not effort/HR) held steady/even/constant? Requires "pace/pacing"

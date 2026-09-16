@@ -71,9 +71,11 @@ export interface LoadFloorInput {
   series?: Array<{ date: string; value: number }> | null;
 }
 
+// OURS — `TREND_DEADBAND_PER_WEEK` ±1.0 CTL per week reads as holding (needs ≥ 7 days between readings): no outside source
 const TREND_DEADBAND_PER_WEEK = 1.0;
 
 export function freshnessFromTsb(tsb: number): LoadFreshness {
+  // FIELD — Friel "Managing Training Using TSB" zones +25 / +5 / −10 / −30, as fitness-fatigue.ts `formZone` (boundary handling differs there)
   if (tsb > 25) return 'very_fresh';
   if (tsb >= 5) return 'fresh';
   if (tsb >= -10) return 'neutral';
@@ -81,6 +83,7 @@ export function freshnessFromTsb(tsb: number): LoadFreshness {
   return 'heavily_fatigued';
 }
 
+// OURS — `RECENT_WINDOW_DAYS` 56 days marks the recent part of the load chart: no outside source
 const RECENT_WINDOW_DAYS = 56;
 
 function buildLoadSeries(

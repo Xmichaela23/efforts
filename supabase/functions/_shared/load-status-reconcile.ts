@@ -88,6 +88,7 @@ export interface DecliningSignalOpts {
 export function computeDecliningSignals(bodyTrends: BodyTrends, opts: DecliningSignalOpts = {}): string[] {
   const s: string[] = [];
   const driftUsable = opts.driftUsable !== false; // default true (pre-D-318)
+  // OURS — `computeDecliningSignals` a trend counts on ≥ 2 sessions: no outside source
   if (driftUsable && bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining') s.push('HR drift');
   if (bodyTrends.effort_perception.based_on_sessions >= 2 && bodyTrends.effort_perception.trend === 'declining') s.push('RPE');
   if (bodyTrends.run_quality.based_on_sessions >= 2 && bodyTrends.run_quality.trend === 'declining') s.push('execution');
@@ -153,6 +154,7 @@ export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string, op
 /** Actual load must exceed planned load by more than this (%) to count as "you did more than the
  *  plan asked". 25% matches the reconciler's long-standing unplanned-load escalation step, so the
  *  exceed threshold is one number, not two. Below it, a week is normal execution noise. */
+// OURS — `EXCEED_PLAN_PCT` 25% over plan: the reconciler's own unplanned-load step, no outside source
 export const EXCEED_PLAN_PCT = 25;
 
 export interface OverloadVerdict {
@@ -236,6 +238,7 @@ export type PlanPrimary = 'strength' | 'endurance' | 'hybrid' | 'unknown';
 export interface PrimaryAdherence { discipline: string; met: boolean; note: string }
 
 /** Strength sessions may fall short of the (prorated) weekly target by this much and still count on-plan. */
+// OURS — `STRENGTH_ADHERENCE_TOLERANCE` 1 session, `ENDURANCE_COVERED_ACWR_MIN` 1.0, `UNDER_TOTAL_ACWR_MAX` 0.8 (the Blanch & Gabbett lower sweet-spot line): D-267 cuts, no page
 export const STRENGTH_ADHERENCE_TOLERANCE = 1;
 /** total acute:chronic ≥ this ⇒ a skipped endurance shortfall was redistributed into cross-training, not lost. */
 export const ENDURANCE_COVERED_ACWR_MIN = 1.0;
@@ -391,6 +394,7 @@ export function reconcileLoadStatus(
   const { weekIntent, weeksOut, isPlanTransition, planPrimary = 'unknown', primaryAdherence = null } = planPosition;
   const isEasyWeek = ['recovery', 'taper', 'deload'].includes(weekIntent);
   const isBuildWeek = weekIntent === 'build';
+  // OURS — `reconcileLoadStatus` race proximity = ≤ 3 weeks out; legacy corroborator ACWR ≥ 1.2: no outside source
   const isRaceProximity = weeksOut != null && weeksOut <= 3;
 
   // Compute escalation ceiling from raw inputs only (ACWR, body trends,
@@ -457,6 +461,7 @@ export function reconcileLoadStatus(
 
   // Cross-training ACWR gap — skip escalation when cross-training disciplines
   // are still "building" (near-zero chronic baseline makes ACWR meaningless)
+  // OURS — `reconcileLoadStatus` cross-training cuts: discipline ACWR > 1.3, running < 1.1, total > 1.3 elevated / > 1.5 high (1.3 / 1.5 = Blanch & Gabbett; 1.1 ours)
   const crossTrainingEstablished = discProfiles
     ? discProfiles.some(p => p.discipline !== 'run' && p.maturity !== 'building' && p.acwr != null && p.acwr > 1.3)
     : true;
@@ -482,6 +487,7 @@ export function reconcileLoadStatus(
   // load → "build more / off plan". Genuine overload still fires here when ACWR
   // ≥ 1.0, and the body-decline and overreached-readiness paths are independent
   // of this gate, so real overreaching at any ACWR is preserved.
+  // OURS — `reconcileLoadStatus` unplanned load: ACWR ≥ 1.0 gate, > 25% elevated / > 50% high, cross-training > 100%: no outside source
   const loadActuallyElevated = unweightedAcwr != null && unweightedAcwr >= 1.0;
   if (loadActuallyElevated && unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad > 0) {
     const unplannedPct = Math.round((unplannedLoad.totalLoad / unplannedLoad.plannedWeekLoad) * 100);
@@ -532,6 +538,7 @@ export function reconcileLoadStatus(
     status === 'elevated' &&
     isAcwrDetrainedSignal(unweightedAcwr) &&
     raw.running_acwr != null &&
+    // OURS — `reconcileLoadStatus` detrained soften: running ACWR < 1.0 and total < 1.25: no outside source
     raw.running_acwr < 1.0 &&
     (unweightedAcwr == null || unweightedAcwr < 1.25)
   ) {
@@ -658,6 +665,7 @@ export function reconcileLoadStatus(
   // "the verdict stayed low" (which also happens for real-base athletes whose spike is cross-training-
   // attributed — flagging THOSE was wrong). So: a genuinely-thin base with a high ratio → provisional;
   // a real base → never provisional, whatever the composition. Athlete/plan-agnostic.
+  // FIELD — Blanch & Gabbett 2016 1.3 upper sweet-spot line
   const acwrProvisional = spikeOnEmptyBase && unweightedAcwr != null && unweightedAcwr >= 1.3;
   return { status, interpretation, acwrProvisional };
 }

@@ -49,6 +49,7 @@ function sportTypes(type: string): string[] | null {
 }
 
 /** One PostgREST page. ⚠️ THE PROJECT'S ROW CAP IS 1,000, so a page asks for exactly that and no more. */
+// FIELD — definition (the project's PostgREST row cap, 1,000 rows per request)
 const PAGE = 1000;
 
 /**

@@ -20,6 +20,7 @@ export interface SwimState {
 
 // Plausible lap-swim pace band: 0:40–4:00 per 100m. Outside this is Q-038 corruption
 // (e.g. a duration-unit bug inflating pace into the thousands), not a real swim.
+// OURS — `MIN_PACE_S` / `MAX_PACE_S` 0:40–4:00 per 100 m plausibility band for swim pace: no outside source
 const MIN_PACE_S = 40;
 const MAX_PACE_S = 240;
 
@@ -69,6 +70,7 @@ export interface SwimRestState {
   droppedOutOfBand: number;
 }
 
+// OURS — `REST_MIN` 2% / `REST_MAX` 80% rest-fraction band; comparable swims within 75–125% of the median distance: no outside source
 const REST_MIN = 0.02; // < 2% rest ≈ a continuous open-water swim or a bad scalar — not a pool set
 const REST_MAX = 0.80; // > 80% rest isn't a swim workout's work:rest — drop defensively
 
@@ -84,6 +86,7 @@ export function swimRestToSeries(
   if (!valid.length) return { series: [], dropped: 0 };
   const dists = valid.map((r) => Number(r.distance_m)).sort((a, b) => a - b);
   const median = dists[Math.floor(dists.length / 2)];
+  // OURS — `swimRestToSeries` comparable distance = 75–125% of the median swim: no outside source
   const lo = median * 0.75, hi = median * 1.25;
   let dropped = 0;
   const series: TrendPoint[] = [];

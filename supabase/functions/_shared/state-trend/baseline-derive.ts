@@ -50,6 +50,7 @@ export interface DerivedBaselines {
   swim: BaselineCandidate | null;
 }
 
+// FIELD — definition (ms per day)
 const MS_PER_DAY = 86_400_000;
 function windowStartISO(asOf: string, windowDays: number): string {
   return new Date(Date.parse(asOf + 'T12:00:00Z') - windowDays * MS_PER_DAY).toISOString().slice(0, 10);
@@ -77,6 +78,7 @@ export function deriveProvisionalBaselines(inp: BaselineDeriveInputs, opts: Base
 // is not clean enough to define the BAND's "stronger" edge either — so assemble.ts floors the band's
 // COORDINATE FRAME with THIS SAME constant (imported, one definition, no second copy). It still does NOT
 // touch classifyTrend's series — the trend keeps the fuller data for slope.
+// OURS — `CROWN_MIN_DECOUPLING` 0%: a negative-decoupling run is not auto-crowned as a baseline, no outside source
 export const CROWN_MIN_DECOUPLING = 0;
 
 function deriveRun(rows: DecouplingRow[] | null | undefined, windowStart: string, asOf: string): BaselineCandidate | null {
@@ -87,6 +89,7 @@ function deriveRun(rows: DecouplingRow[] | null | undefined, windowStart: string
   // CROWN-FROM-N (rule b): the crown is the level reached AT LEAST TWICE — the best value matched-or-beaten
   // by ≥2 qualifying efforts, i.e. the 2ND-BEST qualifying value. A lone outlier (one kind day) is
   // structurally uncrownable: a benchmark you hit once is an event, not a level. <2 qualifying → no crown.
+  // OURS — `deriveRun` / `deriveSwim` a baseline is crowned from ≥ 2 qualifying efforts (the second-best value): no outside source
   if (qualifying.length < 2) return null;
   const sorted = [...qualifying].sort((a, b) => {
     const d = Number(a.decoupling_pct) - Number(b.decoupling_pct); // best (lowest drift) first

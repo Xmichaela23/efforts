@@ -30,6 +30,7 @@ export function karvonenZones(maxHR: number, restingHR: number): HRZone[] {
   const hrr = maxHR - restingHR;
   const z = (pct: number) => Math.round(restingHR + hrr * pct);
   return [
+    // FIELD — Karvonen heart-rate reserve formula; OURS — `karvonenZones` 60 / 70 / 80 / 90% HRR band edges, no printed source
     { name: 'Z1', label: 'Recovery',  min: 0,       max: z(0.60) },
     { name: 'Z2', label: 'Aerobic',   min: z(0.60), max: z(0.70) },
     { name: 'Z3', label: 'Tempo',     min: z(0.70), max: z(0.80) },
@@ -40,6 +41,7 @@ export function karvonenZones(maxHR: number, restingHR: number): HRZone[] {
 
 /** Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR) if resting HR known. */
 export function hrZones(lthr: number | null, maxHR: number | null, restingHR: number | null): HRZone[] | null {
+  // OURS — `hrZones` LTHR and max HR must be > 100 bpm, resting HR > 30 bpm: plausibility floors, no outside source
   if (lthr && lthr > 100) return frielZones(lthr);
   if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return karvonenZones(maxHR, restingHR);
   return null;

@@ -33,6 +33,7 @@ export function paceStringToSecondsPerMi(pace: any): number | null {
 
 // Dew point derivation (Magnus formula). Input tempF, humidityPct; output dew point in F (rounded).
 export function deriveDewPointF(tempF: number, humidityPct: number): number {
+  // FIELD — Magnus formula (a = 17.625, b = 243.04 °C); OURS — clamps −40…140°F and RH 1–100%
   const tF = clamp(tempF, -40, 140);
   const rh = clamp(humidityPct, 1, 100);
   const tempC = (tF - 32) * 5 / 9;
@@ -45,6 +46,7 @@ export function deriveDewPointF(tempF: number, humidityPct: number): number {
 }
 
 export function getHeatStressLevel(dewPointF: number): HeatStressLevel {
+  // OURS — `getHeatStressLevel` dew point ≥ 70°F severe, ≥ 65 moderate, ≥ 60 mild: no outside source
   if (dewPointF >= 70) return 'severe';
   if (dewPointF >= 65) return 'moderate';
   if (dewPointF >= 60) return 'mild';
@@ -52,6 +54,7 @@ export function getHeatStressLevel(dewPointF: number): HeatStressLevel {
 }
 
 export function estimatedHeatPaceImpact(dewPointF: number): { minSeconds: number; maxSeconds: number } {
+  // OURS — `estimatedHeatPaceImpact` s/mi slow-down by dew point (60 / 65 / 70 / 75°F): no outside source
   if (dewPointF >= 75) return { minSeconds: 25, maxSeconds: 45 };
   if (dewPointF >= 70) return { minSeconds: 15, maxSeconds: 30 };
   if (dewPointF >= 65) return { minSeconds: 8, maxSeconds: 20 };
@@ -64,6 +67,7 @@ export function classifyTerrain(elevationGainFt: number | null | undefined, dist
   const mi = coerceNumber(distanceMi);
   if (gain == null || mi == null || !(mi > 0.2) || !(gain >= 0)) return 'flat';
   const ftPerMi = gain / mi;
+  // OURS — `classifyTerrain` > 60 ft/mi hilly, ≥ 20 rolling, over > 0.2 mi: no outside source
   if (ftPerMi > 60) return 'hilly';
   if (ftPerMi >= 20) return 'rolling';
   return 'flat';
@@ -108,6 +112,7 @@ export function calculatePaceFadePct(segments: WorkoutSegmentV1[]): number | nul
       const p = coerceNumber(s.pace_sec_per_mi);
       const d = coerceNumber(s.duration_s) ?? 0;
       if (p == null || !(p > 0)) continue;
+      // OURS — `calculatePaceFadePct` / `calculateCardiacDecouplingPct` a segment with no duration weighs 60 s: no outside source
       const wt = d > 0 ? d : 60;
       sum += p * wt;
       w += wt;
@@ -141,6 +146,7 @@ export function calculateCardiacDecouplingPct(segments: WorkoutSegmentV1[]): num
       const hr = coerceNumber(s.avg_hr);
       if (pace == null || hr == null || !(pace > 0) || !(hr > 0)) continue;
       const d = coerceNumber(s.duration_s) ?? 0;
+      // OURS — `calculatePaceFadePct` / `calculateCardiacDecouplingPct` a segment with no duration weighs 60 s: no outside source
       const wt = d > 0 ? d : 60;
       sum += (pace / hr) * wt;
       w += wt;

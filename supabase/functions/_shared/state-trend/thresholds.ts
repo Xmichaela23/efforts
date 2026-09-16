@@ -38,4 +38,5 @@ export function resolveThresholds(discipline: Discipline, precision: number): Tr
 
 // Adherence (fallback axis) = weekly plan-compliance: "am I on plan THIS week". 7-day, universal
 // (a week is a week) — not a cadence-scaled knob.
+// FIELD — definition (one calendar week, 7 days)
 export const ADHERENCE_WINDOW_DAYS = 7;

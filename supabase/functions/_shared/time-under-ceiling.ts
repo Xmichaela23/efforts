@@ -52,6 +52,7 @@ export function timeUnderCeiling(
   let total = 0, under = 0;
   for (const raw of hrSamples) {
     const hr = num(raw);
+    // OURS — `timeUnderCeiling` a reading above 240 bpm is a strap artefact: no outside source
     if (hr == null || hr > 240) continue; // strap artefacts are not evidence of anything
     total++;
     if (hr <= ceiling) under++;

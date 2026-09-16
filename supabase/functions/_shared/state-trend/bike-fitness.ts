@@ -57,6 +57,7 @@ export function bikeEfficiencyRideEligible(
   return Number(inBandS) >= MIN_EFFICIENCY_IN_BAND_S;
 }
 
+// OURS — `PROVISIONAL_MAX_N` ≤ 4 rides or `PROVISIONAL_MIN_SPAN_DAYS` < 21 days marks the bike trend provisional: no outside source
 const PROVISIONAL_MAX_N = 4; // n ∈ {minSessions..4} → provisional (near the floor)
 const PROVISIONAL_MIN_SPAN_DAYS = 21; // qualifying points clustered in <3wk → provisional
 
@@ -79,6 +80,7 @@ export function efficiencyThresholds(discipline: 'bike' | 'run', _spw: number) {
 /** Provisional when the trend rests on near-floor n (3–4) or a clustered <21d span. */
 export function isProvisionalTrend(t: TrendResult): boolean {
   if (t.verdict === 'needs_data') return false;
+  // OURS — `isProvisionalTrend` 3–4 sessions (ledger row: "provisional" tag)
   if (t.sampleCount >= 3 && t.sampleCount <= PROVISIONAL_MAX_N) return true;
   if (t.points.length >= 2) {
     const dates = t.points.map((p) => p.date).sort();
@@ -212,6 +214,7 @@ export function bikePowerChartSeries(
   rides: BikeEffortRide[],
   asOf: string,
   bin: string | null,
+  // FIELD — 12-week chart window, TrainingPeaks' 90-day default (ledger row: "12-week trend window")
   chartDays = 84,
   /** points inside Garmin's recent 28-day half flag `recent` */
   verdictDays = TREND_HALF_DAYS,

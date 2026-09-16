@@ -26,6 +26,7 @@ export interface BaselineSuggestion {
 
 // Gate constants (Michael-approved). Suggest only from a TRUSTED, RECENT aggregate that
 // MEANINGFULLY diverges.
+// OURS — `SUGGEST_MIN_SAMPLES` 3, `SUGGEST_MIN_DIVERGENCE_PCT` 5%, `SUGGEST_FRESHNESS_DAYS` 42 (ledger row: My Record "Logged suggests")
 export const SUGGEST_MIN_SAMPLES = 3; // ≥3 sessions in the aggregate
 export const SUGGEST_MIN_DIVERGENCE_PCT = 5; // ≥5% gap from the typed baseline
 export const SUGGEST_FRESHNESS_DAYS = 42; // aggregate's newest session within ~6 weeks

@@ -55,6 +55,7 @@ export async function computeLongitudinalSignals(
   supabase: any,
   userId: string,
   asOfDate: string,
+  // OURS — `computeLongitudinalSignals` 6-week window, ≥ 3 facts before trend detectors run: no outside source
   windowWeeks: number = 6,
 ): Promise<LongitudinalSignals> {
   const signals: LongitudinalSignal[] = [];
@@ -177,6 +178,7 @@ function detectSnapshotChronicSignals(
     typeof prevEf === 'number' && !Number.isNaN(prevEf) &&
     prevEf > 0
   ) {
+    // OURS — `detectSnapshotChronicSignals` ride EF down ≥ 5% week over week (≥ 10% warning): no outside source
     const pct = ((curEf - prevEf) / prevEf) * 100;
     if (pct <= -5) {
       out.push({
@@ -196,6 +198,7 @@ function detectThresholdPacePlateau(facts: WorkoutFactRow[], out: LongitudinalSi
     if (f.discipline !== 'run') return false;
     const rf = f.run_facts;
     if (!rf?.pace_avg_s_per_km || !rf?.hr_avg) return false;
+    // OURS — `detectThresholdPacePlateau` key run = faster than 330 s/km and HR > 150; ≥ 4 runs; plateau within ±3 s/km at ≥ 6 runs, improving < −5 s/km: no outside source
     return rf.pace_avg_s_per_km < 330 && rf.hr_avg > 150;
   });
   if (keyRuns.length < 4) return;
@@ -231,6 +234,7 @@ function detectThresholdPacePlateau(facts: WorkoutFactRow[], out: LongitudinalSi
 
 function detectE1rmTrends(facts: WorkoutFactRow[], out: LongitudinalSignal[]): void {
   const strengthSessions = facts.filter((f) => f.discipline === 'strength' && f.strength_facts?.exercises);
+  // OURS — `detectE1rmTrends` ≥ 3 sessions per lift; flat < 2% at ≥ 4 sessions, improving ≥ 5%; ≥ 2 lifts to report: no outside source
   if (strengthSessions.length < 3) return;
 
   const liftHistory = new Map<string, Array<{ date: string; e1rm: number }>>();
@@ -300,6 +304,7 @@ function calendarDaysFromPlanToAsOf(planDate: string, asOfDate: string): number 
  * allows late logging and device sync.
  */
 function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[], asOfDate: string, out: LongitudinalSignal[]): void {
+  // OURS — `detectSessionSkipPatterns` ≥ 5 planned, 2-day sync grace, ≥ 3 per discipline, gap rate ≥ 40% with ≥ 3 gaps (≥ 60% concern): no outside source
   if (planned.length < 5) return;
 
   const MISSED_GRACE_CALENDAR_DAYS = 2;
@@ -368,6 +373,7 @@ function detectEasyPaceDrift(facts: WorkoutFactRow[], out: LongitudinalSignal[])
     if (f.discipline !== 'run') return false;
     const rf = f.run_facts;
     const p = rf?.pace_avg_s_per_km;
+    // OURS — `detectEasyPaceDrift` easy pace 330–900 s/km, ≥ 5 runs, drift 8–60 s/km (≥ 20 s/mi warning): no outside source
     return typeof p === 'number' && p > 330 && p < 900;
   });
   if (easyRuns.length < 5) return;
@@ -396,6 +402,7 @@ function isEasyRideSession(f: WorkoutFactRow, plannedById: Map<string, PlannedRo
   if (f.discipline !== 'ride') return false;
   const rf = f.ride_facts;
   if (!rf) return false;
+  // OURS — `detectRidePhysiologyTrends` easy ride = IF ≤ 0.68: no outside source
   if (typeof rf.intensity_factor === 'number' && !Number.isNaN(rf.intensity_factor) && rf.intensity_factor <= 0.68) {
     return true;
   }
@@ -420,6 +427,7 @@ function detectRidePhysiologyTrends(
   if (ridesChrono.length < 2) return;
 
   const withDrift = ridesChrono.filter((f) => typeof f.ride_facts?.hr_drift_pct === 'number' && !Number.isNaN(f.ride_facts.hr_drift_pct));
+  // OURS — `detectRidePhysiologyTrends` ≥ 4 rides, drift up ≥ 3 points (≥ 6 warning): no outside source
   if (withDrift.length >= 4) {
     const mid = Math.ceil(withDrift.length / 2);
     const first = withDrift.slice(0, mid).map((f) => f.ride_facts.hr_drift_pct as number);
@@ -443,6 +451,7 @@ function detectRidePhysiologyTrends(
   const withEf = ridesChrono.filter((f) =>
     typeof f.ride_facts?.efficiency_factor === 'number' && !Number.isNaN(f.ride_facts.efficiency_factor) && f.ride_facts.efficiency_factor > 0
   );
+  // OURS — `detectRidePhysiologyTrends` ≥ 4 rides, EF down ≥ 5% (≥ 9% warning): no outside source
   if (withEf.length >= 4) {
     const mid = Math.ceil(withEf.length / 2);
     const first = withEf.slice(0, mid).map((f) => f.ride_facts.efficiency_factor as number);
@@ -467,6 +476,7 @@ function detectRidePhysiologyTrends(
   const easyWithIf = easyRides.filter((f) =>
     typeof f.ride_facts?.intensity_factor === 'number' && !Number.isNaN(f.ride_facts.intensity_factor)
   );
+  // OURS — `detectRidePhysiologyTrends` ≥ 5 easy rides, IF up ≥ 0.08 (≥ 0.14 warning): no outside source
   if (easyWithIf.length >= 5) {
     const mid = Math.ceil(easyWithIf.length / 2);
     const first = easyWithIf.slice(0, mid).map((f) => f.ride_facts.intensity_factor as number);
@@ -550,6 +560,7 @@ function detectStrengthRirGap(
       const ar = ex.avg_rir;
       if (typeof ar !== 'number' || Number.isNaN(ar)) continue;
       compared++;
+      // OURS — `detectStrengthRirGap` RIR more than 0.9 under or 1.4 over the prescription; ≥ 2 below / ≥ 3 above to report: no outside source
       if (ar < prescribed - 0.9) {
         below++;
         if (belowLifts.length < 4) belowLifts.push(String(ex.name || ex.canonical || canonK || nameK));
@@ -619,6 +630,7 @@ async function detectReadinessSignals(
 
     // ── Soreness → possible overreaching ──────────────────────────────────────
     // v1 detection: absolute floor. (v2: replace this predicate with baseline-relative — see header.)
+    // OURS — `detectReadinessSignals` soreness ≥ 4/7 on ≥ 4 of the last 6 check-ins (≥ 5 concern); sleep average < 6 h over ≥ 4: no outside source
     const SORE_HIGH = 4;   // Hooper 1–7 (D-234/D-235; rescaled from 6/10 → 4/7 — preserves the fire-set,
                            // and stays intentionally BELOW LEGS SORE's ≥5 since this is a softer multi-session signal)
     const WINDOW = 6;      // last N check-ins

@@ -25,11 +25,13 @@
  *  Calibration param (tunable, non-universal per the D-255 discipline): 15% keeps
  *  real data clean (observed worst on user 45d122e7 was FORM at 5.2%, Edge 4.3%)
  *  while rejecting genuinely broken series. */
+// OURS — `HR_MAX_DROPOUT_PCT` 15%: calibration on real data (worst clean series 5.2%), no outside source
 export const HR_MAX_DROPOUT_PCT = 15;
 
 /** Physiological bounds for a session-average HR (bpm). Outside this, the value is
  *  a sensor error, not a real effort. 40 is below any plausible working average
  *  (even elite); 210 is above any sustainable session average. */
+// OURS — `HR_PLAUSIBLE_RANGE` 40–210 bpm session average: plausibility bounds, no outside source
 export const HR_PLAUSIBLE_RANGE = { min: 40, max: 210 } as const;
 
 export type HrQuality = 'ok' | 'low' | 'none';

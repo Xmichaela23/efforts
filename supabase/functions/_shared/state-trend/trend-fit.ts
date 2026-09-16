@@ -50,6 +50,7 @@ export const TREND_FIT_MAX_WEEKS = 12;
  */
 export const TREND_BUILDING_UNDER_WEEKS = 11;
 /** ⛔ The minimum a chart draws at all. Below this the caller prints the count, not a line. */
+// FIELD — definition (two points are the fewest that draw a line)
 export const TREND_CHART_MIN_POINTS = 2;
 
 /** The span, the building state and the range of a chart's own points. */

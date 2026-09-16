@@ -44,6 +44,7 @@ export type { AcwrStatus, AcwrPlanContext, AcwrWeekIntent } from './acwr-state.t
  * already suppressed this at 500; every other site reported the inflated number.
  * Now uniform.
  */
+// OURS — `CHRONIC_LOAD_FLOOR` 500: the coach's pre-existing thin-base cut, made uniform; no page, kept as found
 export const CHRONIC_LOAD_FLOOR = 500;
 
 // ---------------------------------------------------------------------------
@@ -154,6 +155,7 @@ function addDays(ymd: string, delta: number): string {
  */
 export function computeAcwr(rows: LoadRow[], opts: AcwrOptions): AcwrResult {
   const asOf = toDateOnly(opts.asOfDate);
+  // FIELD — Blanch & Gabbett 2016 coupled ACWR, 7-day acute : 28-day chronic
   const acuteDays = opts.window?.acuteDays ?? 7;
   const chronicDays = opts.window?.chronicDays ?? 28;
   const includeAsOfDate = opts.window?.includeAsOfDate ?? true;
@@ -246,8 +248,10 @@ export function computeEstimatedLoadDisclosure(
   const empty: DisclosureResult = { disclose: false, reason: null, chronicPct: 0, estimatedCount: 0 };
   const asOf = toDateOnly(opts.asOfDate);
   if (!asOf || !Array.isArray(rows)) return empty;
+  // FIELD — Blanch & Gabbett 2016, 7-day acute : 28-day chronic
   const chronicDays = opts.chronicDays ?? 28;
   const acuteDays = opts.acuteDays ?? 7;
+  // OURS — `computeEstimatedLoadDisclosure` 30% chronic / 40% acute low-trust share: ratified 2026-07-03, no outside source
   const chronicThresh = opts.chronicFractionThreshold ?? 0.30;
   const acuteThresh = opts.dominantAcuteThreshold ?? 0.40;
 

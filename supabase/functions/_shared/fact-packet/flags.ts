@@ -32,6 +32,7 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
         const intent = String((packet as any)?.facts?.plan?.week_intent || '').toLowerCase();
         const workoutType = String(packet.facts.workout_type || '').toLowerCase();
         const isRecovery = intent === 'recovery' || workoutType.includes('recovery') || workoutType.includes('easy');
+        // OURS — `generateFlagsV1` too fast for recovery = > 20 s/mi faster than the range with HR in Z3–Z5: no outside source
         if (isRecovery && avgDev != null && avgDev < -20) {
           // Only treat "too fast for recovery" as a concern when HR indicates intensity drifted above aerobic.
           // If HR stayed aerobic, faster-than-range can be terrain/fitness-driven rather than "too hard".
@@ -56,6 +57,7 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
       } catch {}
 
       const maxMiss = Math.max(...work.map((s) => Math.abs(coerceNumber(s.pace_deviation_sec) || 0)));
+      // OURS — `generateFlagsV1` work segments on target within ±15 s/mi, ≥ 60 s/mi off noted: no outside source
       if (maxMiss <= 15) {
         push(flags, { type: 'positive', category: 'pacing', message: 'Work segments were on target (±15s/mi).', priority: 3 });
       } else if (maxMiss >= 60) {
@@ -86,6 +88,7 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
 
     if (driftExplanation === 'pace_driven') {
       // HR increase was entirely explained by the athlete running faster — not a concern
+      // OURS — `generateFlagsV1` pace-driven HR rise noted at ≥ 8 bpm; drift flags at ≥ 3 bpm: no outside source
       if (rawDrift != null && Math.abs(rawDrift) >= 8) {
         push(flags, {
           type: 'neutral',
@@ -106,6 +109,7 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
       }
     } else if (signal != null && (driftExplanation === 'cardiac_drift' || driftExplanation === 'mixed') && Math.abs(signal) >= 3) {
       const durMin = coerceNumber(packet.facts.total_duration_min) ?? 0;
+      // OURS — `generateFlagsV1` expected drift ceiling 20 / 15 / 12 / 8 bpm at 150 / 90 / 60 min; better than typical by 3, elevated at +5: no outside source
       const expectedMax =
         durMin >= 150 ? 20 :
         durMin >= 90  ? 15 :

@@ -26,6 +26,7 @@ export type BinSignal = 'hr' | 'power' | 'pace_unanchored' | 'srpe' | 'mixed';
  *  ACWR is a BONUS that only exists when a slice's chronic base earns the 500
  *  floor (usually it doesn't — see PERMISE reframe: composition is primary, ratios
  *  mature in). Canonical home (D-264: one place). */
+// OURS — `SLICE_LOADED_ACWR_MIN` 1.0 = acute average at or above chronic average (D-263): no outside source
 export const SLICE_LOADED_ACWR_MIN = 1.0;
 
 /** D-263 bs3: a slice carries the acute load when its share of the total acute
@@ -33,6 +34,7 @@ export const SLICE_LOADED_ACWR_MIN = 1.0;
  *  not per-slice ACWR (which is null-by-floor in prod). Below it there is no
  *  dominant carrier and the generic "across your training" line is CORRECT — not
  *  a fallback failure. */
+// OURS — `ATTRIBUTION_DOMINANT_SHARE` 0.5 = a majority of the acute load (D-263): no outside source
 export const ATTRIBUTION_DOMINANT_SHARE = 0.5;
 
 /** Which slice (if any) carries a majority of the acute load. Returns null when
@@ -56,6 +58,7 @@ export function dominantAcuteSlice(pd: PerDomainLoad | null | undefined): SliceK
  *  (IF 0.80 = the aerobic|threshold seam). Per-discipline so each can diverge; today
  *  all anchor to the same D-238 line. `hard` iff IF ≥ value. Swim never consults this
  *  (unanchored → easy). */
+// OURS — `CARDIO_HARD_EASY_IF` IF 0.80 hard/easy seam, from the D-238 tempo band: no outside source
 export const CARDIO_HARD_EASY_IF: Record<string, number> = { run: 0.80, ride: 0.80 };
 
 export interface SliceSession {

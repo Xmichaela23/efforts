@@ -34,6 +34,7 @@ export function getRunningFatigueWeight(session: {
   const t = normType(session.type);
   const nameLower = (session.name || '').toLowerCase();
 
+  // OURS — `getRunningFatigueWeight` run 1.0, strength upper 0.3 / lower 0.7 / full 0.5, ride 0.6, swim 0.2, mobility 0, other 0.3: no outside source
   if (t === 'run') return 1.0;
 
   if (t === 'strength') {
@@ -72,6 +73,7 @@ export function getCyclingFatigueWeight(session: {
   const t = normType(session.type);
   const nameLower = (session.name || '').toLowerCase();
 
+  // OURS — `getCyclingFatigueWeight` ride 1.0, strength upper 0.2 / lower 0.7 / full 0.5, run 0.4, swim 0.1, mobility 0, other 0.3: no outside source
   if (t === 'ride') return 1.0;
 
   if (t === 'strength') {

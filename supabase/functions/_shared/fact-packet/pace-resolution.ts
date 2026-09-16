@@ -29,6 +29,7 @@ export function resolveOverallDistanceMi(workout: any): number {
     coerceNumber(overall?.distance_m) ??
     coerceNumber(overall?.distance_meters as number | undefined) ??
     coerceNumber(overall?.distanceMeters as number | undefined);
+  // FIELD — definition (1 mi = 1609.34 m; 1 km = 0.621371 mi)
   if (m != null && m > 0) return m / 1609.34;
   const kmOverall = coerceNumber(overall?.distance_km ?? overall?.distanceKm);
   if (kmOverall != null && kmOverall > 0) return kmOverall * 0.621371;
@@ -46,6 +47,7 @@ export function resolveMovingDurationMinutes(workout: any): number | null {
 
   const fromSeconds = (sec: number): number => {
     let min = sec / 60;
+    // OURS — `resolveMovingDurationMinutes` over 600 min on a run under 50 mi is a 60× units error: no outside source
     if (min > 600 && distMi > 0 && distMi < 50) {
       const corrected = min / 60;
       if (corrected > 0 && corrected < 600) min = corrected;
@@ -72,6 +74,7 @@ export function resolveMovingDurationMinutes(workout: any): number | null {
 
   /** ~4:00/mi … ~45:00/mi — outside is almost always unit/corruption for training runs. */
   const pacePlausible = (p: number | null): boolean =>
+    // OURS — `resolveMovingDurationMinutes` plausible pace 4:00–45:00 /mi, columns under 720 min, under 1000 = minutes: no outside source
     p != null && p >= 240 && p <= 2700;
 
   const col = columnMinutes();
@@ -105,6 +108,7 @@ export function resolveOverallPaceSecPerMi(workout: any): number | null {
   let derived: number | null = null;
   if (distMi > 0 && durMin != null && durMin > 0 && durMin < 600) {
     const d = (durMin * 60) / distMi;
+    // OURS — `resolveOverallPaceSecPerMi` derived pace under 7200 s/mi (duration < 600 min); stored pace replaced at 2.5× / 0.4× disagreement: no outside source
     if (d > 0 && d < 7200) derived = d;
   }
 

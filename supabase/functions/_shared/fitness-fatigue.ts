@@ -24,6 +24,7 @@
 
 import { type LoadRow } from './acwr.ts';
 
+// FIELD — TrainingPeaks Performance Management Chart: CTL 42-day, ATL 7-day constants (see header)
 export const FITNESS_TAU_DAYS = 42;
 export const FATIGUE_TAU_DAYS = 7;
 

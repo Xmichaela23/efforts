@@ -14,6 +14,7 @@ export type PhaseKey =
 /** Distance-keyed long-run peak target (mi). Covers tri AND running distances (half/marathon). */
 export function longRunPeakTarget(distance: string): number {
   const peakTarget: Record<string, number> = {
+    // OURS — `longRunPeakTarget` peak long runs 4 / 7 / 13 / 18 mi (RUN-PROTOCOL §4.5): no printed source
     sprint: 4.0, olympic: 7.0,
     '70.3': 13.0, half: 13.0, half_marathon: 13.0,
     ironman: 18.0, full: 18.0, marathon: 18.0,
@@ -21,6 +22,7 @@ export function longRunPeakTarget(distance: string): number {
   return peakTarget[distance] ?? 13.0;
 }
 
+// OURS — `LONG_RUN_RAMP_ENDPOINTS` 65–75% / 75–85% / 85–100% of peak, ramp 6 weeks base else 4: no printed source
 const LONG_RUN_RAMP_ENDPOINTS: Record<'base' | 'build' | 'race_specific', { start: number; peak: number }> = {
   base:          { start: 0.65, peak: 0.75 },
   build:         { start: 0.75, peak: 0.85 },
@@ -55,6 +57,7 @@ export function longRunFloorMiles(distance: string, phase: PhaseKey | string): n
   const peak = longRunPeakTarget(distance);
   const multiplier = (() => {
     switch (phase) {
+      // OURS — `longRunFloorMiles` phase floors 0.75 / 0.85 / 1.00 / 0.85 / 0.45 / 0.40 / 0.45: no printed source
       case 'base': return 0.75;
       case 'build': return 0.85;
       case 'race_specific': return 1.00;

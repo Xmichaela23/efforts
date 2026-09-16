@@ -47,6 +47,7 @@ export function positionInRange(
   // near min → best. A flat range (no spread yet) sits at the middle — honest "no range to place in".
   const rawFromLow = spread > 0 ? (current - min) / spread : 0.5;
   const positionPct = opts.higherIsBetter ? rawFromLow : 1 - rawFromLow;
+  // OURS — `positionInRange` coloured dot needs ≥ 4 samples; a flat range sits at the middle (0.5): no outside source
   const floor = opts.minSamples ?? 4;
   const confident = vals.length >= floor && spread > 0;
   return {

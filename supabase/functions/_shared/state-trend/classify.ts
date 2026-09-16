@@ -17,6 +17,7 @@
 import type { TrendPoint, TrendResult, TrendThresholds, TrendVerdict } from './types.ts';
 import { TREND_HALF_DAYS } from './thresholds.ts';
 
+// FIELD — definition (ms per day)
 const MS_PER_DAY = 86_400_000;
 
 /** Window start = asOf − windowDays, computed from the ISO date alone (pure). */

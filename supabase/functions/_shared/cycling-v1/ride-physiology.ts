@@ -93,6 +93,7 @@ export type RideFitness = {
  */
 export function computeCtlAtl(dailyTss: ReadonlyArray<number>): RideFitness | null {
   if (!Array.isArray(dailyTss) || dailyTss.length === 0) return null;
+  // FIELD — TrainingPeaks PMC 42-day / 7-day constants; OURS — `computeCtlAtl` step k = 1 − e^(−1/τ), where fitness-fatigue.ts uses the 1/τ step
   const kCtl = 1 - Math.exp(-1 / 42);
   const kAtl = 1 - Math.exp(-1 / 7);
   let ctl = 0;
@@ -129,6 +130,7 @@ export function computeRideEfficiency(
       ped.push({ t, hr, p });
     }
   }
+  // OURS — `computeRideEfficiency` ≥ 60 pedalling samples; halves decoupling only on ≥ 1200 s: no outside source
   if (ped.length < 60) return null;
   const avgP = mean(ped.map((x) => x.p));
   const judged = Number(judgedPowerW);
@@ -166,6 +168,7 @@ export function computeRideVam(
     const e0 = elevationM[i - 1];
     const e1 = elevationM[i];
     const dt = Math.max(0, (timeS[i] || 0) - (timeS[i - 1] || 0));
+    // OURS — `computeRideVam` climbing = grade ≥ 3%; needs ≥ 30 m gain and ≥ 120 s: no outside source
     if (typeof g === 'number' && g >= 3 && typeof e0 === 'number' && typeof e1 === 'number') {
       const de = e1 - e0;
       if (de > 0) {

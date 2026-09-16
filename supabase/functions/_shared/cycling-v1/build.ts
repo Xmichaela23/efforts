@@ -109,6 +109,7 @@ export function fallbackClassifyIntent(args: {
   // and keep the existing logic.
   const vi = coerceNumber(variabilityIndex);
   const epm = coerceNumber(elevationGainPerMi);
+  // OURS — `fallbackClassifyIntent` variable ride = VI ≥ 1.10 and IF ≥ 0.85; climbing at ≥ 40 ft/mi; long endurance ≥ 120 min under IF 0.75: no outside source
   if (vi != null && vi >= 1.10 && if0 >= 0.85) {
     return (epm != null && epm >= 40) ? 'climbing' : 'tempo';
   }
@@ -130,6 +131,7 @@ export function fallbackClassifyIntent(args: {
       ? Number(ftpBinsMin.p0_85_0_95_min || 0)
       : 0;
 
+  // OURS — `fallbackClassifyIntent` IF / minutes ladder (vo2 1.05; threshold 0.88–0.95 or 10 min; sweet spot 0.82–0.90 or 12 min; tempo 0.75–0.82; recovery < 0.60; 8 supra-threshold min): no outside source
   if (supraMin >= 8 || if0 >= 0.95) return if0 >= 1.05 ? 'vo2' : 'threshold';
   if (thrMin >= 10 || (if0 >= 0.88 && if0 < 0.95)) return 'threshold';
   if (ssMin >= 12 || (if0 >= 0.82 && if0 < 0.90)) return 'sweet_spot';
@@ -202,6 +204,7 @@ export function buildCyclingFactPacketV1(args: {
       if (vMin != null && vMin > 0) {
         const vSec = vMin * 60;
         const ratio = vSec > 0 ? (s / vSec) : null;
+        // OURS — `buildCyclingFactPacketV1` duration guardrail: a 6× disagreement means the legacy 60× units bug
         if (ratio != null && (ratio >= 6 || ratio <= (1 / 6))) {
           return vMin;
         }
@@ -215,6 +218,7 @@ export function buildCyclingFactPacketV1(args: {
     // Prefer server-computed distance meters from computed.overall.
     const overall = workout?.computed?.overall || {};
     const m = coerceNumber(overall?.distance_m ?? overall?.distance_meters ?? overall?.distanceMeters);
+    // FIELD — definition (1 mi = 1609.34 m; 1 km = 0.621371 mi)
     if (m != null && m > 0) return m / 1609.34;
     const km = coerceNumber(workout?.distance);
     if (km == null) return null;
@@ -270,6 +274,7 @@ export function buildCyclingFactPacketV1(args: {
     const climbSegM = coerceNumber(workout?.computed?.analysis?.climbing?.climb_ascent_m);
     const ascentM = (totalM != null && totalM > 0) ? totalM : climbSegM;
     if (ascentM == null || ascentM <= 0 || distMi == null || distMi <= 0) return null;
+    // FIELD — definition (1 m = 3.28084 ft)
     return (ascentM * 3.28084) / distMi;
   })();
 
@@ -292,6 +297,7 @@ export function buildCyclingFactPacketV1(args: {
 
   const ftp_quality: FtpQualityV1 = ftp == null ? 'missing' : 'ok';
   const confidence: ConfidenceV1 =
+    // OURS — `buildCyclingFactPacketV1` confidence: ≥ 600 power samples high, ≥ 180 medium: no outside source
     ftp != null && powerSamplesW.length >= 600 ? 'high' :
     ftp != null && powerSamplesW.length >= 180 ? 'medium' :
     'low';
