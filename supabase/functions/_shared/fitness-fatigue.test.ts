@@ -92,3 +92,13 @@ Deno.test('one 100-point day from zero → fitness 2.4, fatigue 14.3, form 0 (ye
   assertEquals(r.fatigue, 14.3);
   assertEquals(r.form, 0);
 });
+
+Deno.test('§8.0 #31: the key line adds up as printed', () => {
+  // Any load history at all: the ⓘ's three numbers must satisfy fitness − fatigue = form as whole numbers.
+  const ff = computeFitnessFatigue(series((off) => 40 + (off % 7) * 12), { asOfDate: ASOF });
+  const k = ff.key_line!;
+  assertEquals(k.fitness - k.fatigue, k.form);
+  assertEquals(k.fitness, Math.round(ff.fitness_prior!));
+  assertEquals(k.fatigue, Math.round(ff.fatigue_prior!));
+});
+

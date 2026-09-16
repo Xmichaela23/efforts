@@ -570,11 +570,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     try {
       const type = String(w?.type || '').toLowerCase();
       const overall = (w as any)?.computed?.overall || (w as any)?.overall || {};
-      const distM = Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
+      /**
+       * ⛔ THE SERVER'S TOTALS FIRST (2026-09-15, §8.0 #36) — `session_detail_v1.completed_totals`, the same
+       * figures Performance prints and the same ones the share text now reads. `get-week` sends
+       * `workout_analysis`, and the session detail is persisted inside it.
+       * ⚠️ THE `overall` READS BELOW ARE THE SENT-THEN-COMPUTED FALLBACK (rule 7) for a session whose detail
+       * has never been built — the card would otherwise lose its pace line on those rows.
+       */
+      const totals = (w as any)?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
+      const posTot = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      const distM = posTot(totals?.distance_m) ?? Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
       // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10) — `moving_seconds`, not a ladder over `overall`.
-      const durS = Number(w?.moving_seconds);
+      const durS = posTot(totals?.moving_s) ?? Number(w?.moving_seconds);
       // ⛔ THE SERVER'S AVERAGE HEART RATE (D-477) — get-week resolves it into `overall.avg_hr`; no picking here.
-      const avgHr = Number(overall?.avg_hr);
+      const avgHr = posTot(totals?.avg_hr) ?? Number(overall?.avg_hr);
       const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
 
       const parts: string[] = [];
@@ -593,9 +602,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       // pace / speed / swim pace
       if (Number.isFinite(durS) && durS > 0 && Number.isFinite(distM) && distM > 0) {
         if (type === 'run' || type === 'walk') {
-          // ⛔ THE ONE PACE FORMATTER (2026-09-15, §8.0 #2) — the minutes and the seconds were rounded apart,
-          // so this line could read "7:60/mi".
-          parts.push(formatPace(durS / (distM / 1000), true));
+          // ⛔ THE SERVER'S PACE (§8.0 #36) — `completed_totals.avg_pace_s_per_mi`; the distance-over-time sum
+          // behind it is the fallback for a session with no detail yet. One formatter either way (§8.0 #2).
+          const paceMi = posTot(totals?.avg_pace_s_per_mi);
+          parts.push(formatPace(paceMi != null ? paceMi / 1.60934 : durS / (distM / 1000), true));
         } else if (type === 'ride' || type === 'bike' || type === 'cycling') {
           const avgSpeedMps = Number(overall?.avg_speed_mps) || distM / durS;
           if (Number.isFinite(avgSpeedMps) && avgSpeedMps > 0) {
@@ -604,11 +614,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           }
         } else if (type === 'swim') {
           const preferYards = !!useImperial;
+          // The server's per-100 when the detail exists (§8.0 #36); the phone's division is the fallback.
+          const serverPer100 = posTot(totals?.swim_pace_per_100_s);
           const denom = preferYards ? (distM / 0.9144) / 100 : distM / 100;
-          if (denom > 0) {
-            const per100 = durS / denom;
-            parts.push(`${formatSwimPace(per100)} ${preferYards ? '/100yd' : '/100m'}`);
-          }
+          const per100 = serverPer100 ?? (denom > 0 ? durS / denom : null);
+          if (per100 != null) parts.push(`${formatSwimPace(per100)} ${preferYards ? '/100yd' : '/100m'}`);
         }
       }
 
@@ -1453,7 +1463,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    */
   const formKey = useMemo(() => {
     const load = coachWeek.data?.weekly_state_v1?.load as {
-      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null } | null;
+      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; key_line?: { fitness: number; fatigue: number; form: number } | null } | null;
       form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
     } | undefined;
     const ff = load?.fitness_fatigue ?? null;

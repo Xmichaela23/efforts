@@ -10,7 +10,7 @@ export interface LoadBarData {
    * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
    * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
    */
-  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null; provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null } | null;
+  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; key_line?: { fitness: number; fatigue: number; form: number } | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null; provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
   acwr_provisional?: boolean;
@@ -88,8 +88,6 @@ export function Dot() {
 // the dominant sport are the coach's (`load.label`, `load.form_zones`, `load.total_7d`,
 // `load.composition_7d`, `load.dominant`). This bar used to sum and round them itself.
 
-const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
-
 /**
  * ⛔ THE LOAD EXPLANATION, IN ONE PLACE (2026-09-09). Two surfaces open it — State, behind this
  * bar's ⓘ, and Today's load card, behind its chevron. It is athlete-facing copy, and a second copy
@@ -127,8 +125,11 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
         */}
       <p>
         Form is fitness minus fatigue. Below zero you are training harder than usual, building but tired. Above zero you are rested.
-        {keyFmt1(ff.fitness_prior) != null && keyFmt1(ff.fatigue_prior) != null
-          ? ` Today: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : (ff.form ?? 0) < 0 ? '−' : ''}${Math.abs(keyFmt1(ff.form) ?? 0)}.`
+        {/* ⛔ THE SERVER'S THREE NUMBERS (2026-09-15, §8.0 #31) — `key_line`, rounded there so the subtraction
+            holds. This rounded each operand itself and printed the server's separately rounded form, so the
+            line could read "47 − 63 = −15". No arithmetic here. */}
+        {ff.key_line
+          ? ` Today: ${ff.key_line.fitness} − ${ff.key_line.fatigue} = ${ff.key_line.form > 0 ? '+' : ff.key_line.form < 0 ? '−' : ''}${Math.abs(ff.key_line.form)}.`
           : ''}
       </p>
       {rows.length > 0 && (
