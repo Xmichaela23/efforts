@@ -2112,7 +2112,8 @@ Deno.serve(async (req) => {
     // `swimCadenceInStrokesPerMinute` sample in the recording inside the render.
     const avg_swim_cadence_spm = (() => {
       if (!_isSwim) return null;
-      const col = Number(d?.avg_swim_cadence ?? d?.avg_cadence);
+      // ⚠️ READ OFF THE RAW ROW, not `d`: `normalizeBasic` is a whitelist and drops this column.
+      const col = Number((row as { avg_swim_cadence?: unknown })?.avg_swim_cadence ?? d?.avg_cadence);
       if (Number.isFinite(col) && col > 0) return Math.round(col);
       const raw = (d as { sensor_data?: unknown })?.sensor_data as { samples?: unknown } | unknown[] | undefined;
       const samples = Array.isArray((raw as { samples?: unknown })?.samples)
@@ -2159,7 +2160,8 @@ Deno.serve(async (req) => {
     // OURS with ledger rows — searched Garmin, Strava, TrainingPeaks and Open-Meteo, none publishes
     // a threshold for reporting a peak or a feels-like temperature.
     const weather_lines = (() => {
-      const wRaw = (d as { weather_data?: unknown })?.weather_data;
+      // ⚠️ READ OFF THE RAW ROW, not `d`: `normalizeBasic` is a whitelist and drops `weather_data`.
+      const wRaw = (row as { weather_data?: unknown })?.weather_data;
       let w: Record<string, unknown> | null = null;
       if (wRaw && typeof wRaw === 'object') w = wRaw as Record<string, unknown>;
       else if (typeof wRaw === 'string' && wRaw.length > 1) { try { w = JSON.parse(wRaw); } catch { w = null; } }
