@@ -17,7 +17,7 @@
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+import { ageEstimateMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -368,11 +368,15 @@ Deno.serve(async (req) => {
 
     const { data: baseline } = await supabase
       .from('user_baselines')
-      .select('age,learned_fitness,performance_numbers')
+      .select('birthday,learned_fitness,performance_numbers')
       .eq('user_id', (w as any)?.user_id)
       .maybeSingle();
 
-    const userAge = baseline?.age != null ? Number(baseline.age) : null;
+    /**
+     * ⛔ THE BIRTHDAY IS THE FACT (2026-09-15). `user_baselines.age` was written once by the phone and
+     * never refreshed, so it read a year stale after a birthday. One rule: `ageFromBirthday`.
+     */
+    const userAge = ageFromBirthday((baseline as { birthday?: string | null } | null)?.birthday ?? null, new Date().toISOString().slice(0, 10));
     const learnedFitness = baseline?.learned_fitness ? parseJson<any>(baseline.learned_fitness) : null;
     const perfNumbers = baseline?.performance_numbers ? parseJson<any>(baseline.performance_numbers) : null;
 

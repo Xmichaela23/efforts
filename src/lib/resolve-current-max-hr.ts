@@ -94,6 +94,29 @@ function asPositiveFinite(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * ONE AGE, WORKED OUT FROM THE BIRTHDAY AT READ TIME (2026-09-15, one-truth workorder Stage 4 session 1).
+ *
+ * ⛔ THE BIRTHDAY IS THE FACT; THE AGE IS DERIVED. `user_baselines.age` was a stored copy that
+ * `AppContext.saveUserBaselines` wrote once and never refreshed, so after a birthday the Profile screen
+ * (which recomputed on every render) and the three server readers of the column disagreed by a year.
+ * Everything now reads the birthday and calls this. The column is neither written nor read.
+ *
+ * `asOf` is a YYYY-MM-DD date — the caller's, so a server read and a screen read agree on "today".
+ * Returns null outside 0 < age < 120, which is how a missing or malformed birthday reads.
+ */
+export function ageFromBirthday(birthday: string | null | undefined, asOf: string): number | null {
+  const b = String(birthday ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) return null;
+  const ref = /^\d{4}-\d{2}-\d{2}/.test(String(asOf ?? '')) ? String(asOf).slice(0, 10) : null;
+  if (!ref) return null;
+  const [by, bm, bd] = b.split('-').map(Number);
+  const [ry, rm, rd] = ref.split('-').map(Number);
+  let age = ry - by;
+  if (rm < bm || (rm === bm && rd < bd)) age -= 1;
+  return age > 0 && age < 120 ? age : null;
+}
+
 /** ONE age formula: Tanaka (208 − 0.7·age); Gulati (206 − 0.88·age) for female. Matches HRZoneChart "auto". */
 export function ageEstimateMaxHr(age: number, sex?: string | null): number {
   const s = String(sex ?? '').toLowerCase();

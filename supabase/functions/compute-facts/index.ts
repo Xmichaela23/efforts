@@ -65,6 +65,7 @@ import { dewPointF } from "../_shared/heat-adjust.ts";
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
+import { ageFromBirthday } from "../../../src/lib/resolve-current-max-hr.ts";
 // Q-169: the ONE definition of "is this heartbeat easy" (threshold-anchored, %max-bootstrapped).
 import { resolveRunEasyHrBand, isEasyHr, runEasyPaceEligible } from "../_shared/easy-hr.ts";
 
@@ -123,7 +124,8 @@ interface PlannedRow {
 interface Baselines {
   performance_numbers: Record<string, any> | null;
   learned_fitness: Record<string, any> | null;
-  age: number | null;
+  /** ⛔ The BIRTHDAY, not `age` — the stored age column was written once and never refreshed (2026-09-15). */
+  birthday: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1547,7 +1549,7 @@ serve(async (req: Request) => {
       .from("user_baselines")
       // `weight` + `units` ride along for D1: a calisthenic set is priced at the athlete's own body
       // weight, and `units` is the only thing that says whether that number is pounds or kilograms.
-      .select("performance_numbers, learned_fitness, age, weight, units")
+      .select("performance_numbers, learned_fitness, birthday, weight, units")
       .eq("user_id", w.user_id)
       .maybeSingle();
     const baselines = (baselinesRow as Baselines | null) ?? null;
@@ -1615,7 +1617,8 @@ serve(async (req: Request) => {
         .from("workouts").select("max_heart_rate")
         .eq("user_id", w.user_id).gt("max_heart_rate", 100);
       const observedMaxima = (hrMaxRows ?? []).map((r: any) => Number(r.max_heart_rate)).filter((v: number) => Number.isFinite(v));
-      const ceiling = resolveMaxHrCeiling({ observedMaxima, age: baselines?.age ?? null });
+      // ⛔ THE BIRTHDAY IS THE FACT (2026-09-15) — `user_baselines.age` was a stale stored copy.
+      const ceiling = resolveMaxHrCeiling({ observedMaxima, age: ageFromBirthday(baselines?.birthday ?? null, new Date().toISOString().slice(0, 10)) });
       hrCeilingUsed = ceiling.ceiling;
       const sd: any = parseJsonSafe(w.sensor_data);
       const samples: any[] = Array.isArray(sd?.samples) ? sd.samples : Array.isArray(sd) ? sd : [];

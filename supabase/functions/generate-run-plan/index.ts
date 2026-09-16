@@ -39,7 +39,7 @@ import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { effectiveStrengthFrequency } from '../shared/strength-system/frequency-policy.ts';
 import { addTimingLogic } from './timing-logic.ts';
-import { resolveCurrentMaxHr, ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+import { resolveCurrentMaxHr, ageEstimateMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
 // THE run-pace resolver (D-285/D-287) — the pace ladder here reads through it rather than off
 // `learned_fitness`, so this consumer cannot land on a different number from every other surface.
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
@@ -197,17 +197,10 @@ Deno.serve(async (req: Request) => {
       // Age-estimated tier — mirrors getAgeBasedHREstimates (maxHR = 220 − age, LTHR = round(maxHR × 0.88)).
       let ageMaxHr: number | undefined;
       let ageLthr: number | undefined;
-      const bd = ubZones?.birthday ? String(ubZones.birthday) : null;
-      if (bd) {
-        const d = new Date(bd);
-        if (!isNaN(d.getTime())) {
-          const t = new Date();
-          let age = t.getFullYear() - d.getFullYear();
-          const m = t.getMonth() - d.getMonth();
-          if (m < 0 || (m === 0 && t.getDate() < d.getDate())) age--;
-          if (age > 0 && age < 120) { ageMaxHr = ageEstimateMaxHr(age); ageLthr = Math.round(ageMaxHr * 0.88); } // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
-        }
-      }
+      // ⛔ ONE AGE RULE (2026-09-15): `ageFromBirthday`, beside the one age formula. This held its own
+      // copy of the year/month/day walk, the phone held two more, and `user_baselines.age` was a fourth.
+      const age = ageFromBirthday(ubZones?.birthday ? String(ubZones.birthday) : null, new Date().toISOString().slice(0, 10));
+      if (age != null) { ageMaxHr = ageEstimateMaxHr(age); ageLthr = Math.round(ageMaxHr * 0.88); } // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
       // The resolution chain (manual → learned), via the ONE max-HR resolver; age fallback below.
       zoneMaxHr = resolveCurrentMaxHr(
         { athlete_config: cfg, learned_fitness: lf },
