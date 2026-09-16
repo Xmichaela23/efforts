@@ -195,6 +195,8 @@ export type SessionDetailV1 = {
      *  two numbers must come from the same population. */
     easy_under_s?: number | null;
     easy_total_s?: number | null;
+    /** 2026-09-16: "22 of 35 min" — the Easy chip's line, the two seconds above rounded once, here. */
+    easy_line?: string | null;
     /** The ceiling it was judged against, so the screen can state the bar rather than a bare %. */
     easy_ceiling_bpm?: number | null;
     /** WHERE that ceiling came from — 'threshold' (measured) or 'max_hr' (estimated off observed max).
@@ -297,8 +299,29 @@ export type SessionDetailV1 = {
     pool_display?: string | null;
     /** The saved pool unit behind `pool_display`; null when none was saved (the label then reads metres). */
     pool_unit?: 'yd' | 'm' | null;
+    /* ── 2026-09-16 (Stage 4 session 3): the lines the screen prints, in the athlete's own unit ──
+     * Each one replaced arithmetic in a render. Absent on a copy written before this version.  */
+    /** "6.2 mi" / "10.0 km" — the header line's distance. It divided by 1609.34 with no metric branch. */
+    distance_display?: string | null;
+    /** "9:41/mi" / "6:01/km" — the overall pace as the interval table's header prints it. */
+    avg_pace_display?: string | null;
+    /** "46:30" or "1:12:05" — the header line's clock, off the same seconds the chip below reads. */
+    duration_display?: string | null;
+    /** The same seconds as whole minutes — the Duration chip's "30 of 48 min". Two roundings became one. */
+    duration_minutes?: number | null;
+    /** Swim only: the per-100 pace in the ATHLETE's unit, with its label — "2:00 /100yd" (§8.0 A4).
+     *  `swim_pace_per_100_s` above stays the PLAN's unit; nothing athlete-facing reads it now. */
+    swim_pace_display?: string | null;
+    swim_pace_unit?: '100yd' | '100m' | null;
+    swim_pace_athlete_unit_s?: number | null;
+    /** Swim only: "5s/100yd faster" — the chip subtracted the two paces and chose the word itself. */
+    swim_pace_vs_plan_display?: string | null;
   };
   planned_totals: {
+    /** 2026-09-16: the planned distance and length as the athlete reads them — the swim card converted
+     *  metres to yards in its own render. Absent on a copy written before this version. */
+    distance_display?: string | null;
+    duration_display?: string | null;
     duration_s: number | null;
     distance_m: number | null;
     avg_pace_s_per_mi: number | null;
@@ -506,6 +529,13 @@ export type SessionDetailV1 = {
     discipline: string;
     verdict: 'improving' | 'holding' | 'sliding' | 'needs_data';
     pct_change: number | null;
+    /**
+     * ⛔ THE CHANGE AS THE ROW PRINTS IT (2026-09-16, Stage 4 session 3) — "+6.5%" / "−4.2%", signed by
+     * what the verdict MEANS rather than by the raw delta (D-160: a lower-is-better metric improves on
+     * a negative one, so the raw number read "↑ improving −34%"). Two screens ran this rule in their
+     * own renders; State's server copy has owned it since 2026-09-15 and this is the same function.
+     */
+    signed_pct?: string | null;
   } | null;
 
   // ── Next session (forward-looking context) ────────────────────────────────
@@ -853,12 +883,26 @@ export type IntervalRow = {
   planned_power_range?: { lower_w: number; upper_w?: number };
   /** Display-ready planned pace string, e.g. "10:30-11:00/mi". */
   planned_pace_display: string | null;
+  /**
+   * ⛔ DOES THIS ROW PRINT WITHOUT THE TOGGLE (2026-09-16, Stage 4 session 3).
+   *
+   * On an easy session the table shows the long block and folds the strides behind "show all", so a
+   * forty-minute run does not open as a list of twenty-second rows. The screen made that call itself,
+   * with two cut-offs of its own; it is decided here now, over the same rows, and the table renders it.
+   * ⚠️ Absent on a copy written before this version → every row prints, which is the safe reading.
+   */
+  print_by_default?: boolean;
   executed: {
     duration_s: number | null;
     distance_m: number | null;
     avg_hr: number | null;
     actual_pace_sec_per_mi: number | null;
     actual_gap_sec_per_mi: number | null;
+    /* ── 2026-09-16: the printed forms, in the athlete's own unit. The table wrote "/mi" on every
+     *    account and converted metres in its render. The per-mile fields above are unchanged. ── */
+    pace_display?: string | null;
+    gap_display?: string | null;
+    distance_display?: string | null;
     power_watts: number | null;
     /**
      * 2026-09-10 (audit H-D11): where the actual sits against the planned range — `below` (slower / fewer

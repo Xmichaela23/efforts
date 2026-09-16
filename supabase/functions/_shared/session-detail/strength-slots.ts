@@ -196,6 +196,12 @@ export type StrengthSlotsInput = {
   bodyweightLb: number | null | undefined;
   /** `workout_analysis.detailed_analysis.exercise_adherence` — the analyzer's per-exercise RIR read. */
   exerciseAdherence: unknown;
+  /**
+   * ⛔ THE ATHLETE READS KILOGRAMS (2026-09-16, Stage 4 session 3). A set is stored in POUNDS always;
+   * each performed set comes back with `weight_display` and `assist_display` already converted, so the
+   * compare table prints them and rounds nothing. It wrote "lb" on every account. Absent → imperial.
+   */
+  athleteMetric?: boolean;
 };
 
 export type StrengthSlotsFields = Pick<SessionDetailV1, 'strength_slots' | 'strength_counts' | 'strength_totals'>;
@@ -203,6 +209,9 @@ export type StrengthSlotsFields = Pick<SessionDetailV1, 'strength_slots' | 'stre
 export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFields {
   const none: StrengthSlotsFields = { strength_slots: null, strength_counts: null, strength_totals: null };
   if (input.type !== 'strength' && input.type !== 'mobility') return none;
+  /** A stored pound weight as the athlete reads it. 1 lb = 0.45359237 kg, by definition. */
+  const setWeightText = (lb: number): string =>
+    input.athleteMetric === true ? `${Math.round(lb * 0.45359237)} kg` : `${Math.round(lb)} lb`;
   const rawCompleted = Array.isArray(input.completedStrengthExercises) ? input.completedStrengthExercises : [];
   const { rows: planned, fromSteps } = plannedRows(input.plannedRowRaw);
   if (planned.length === 0 && rawCompleted.length === 0) return none;
@@ -287,7 +296,17 @@ export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFiel
       intent_word: SLOT_INTENT_WORD[String(p?.slot_intent ?? c?.slot_intent ?? '').toUpperCase()] ?? null,
       target_label: repsTarget != null ? `${repsTarget} total · by feel` : band ? `${band} · by feel` : null,
       planned_sets: p ? plannedSetsFor(p) : [],
-      completed_sets: performed,
+      // ⛔ EACH PERFORMED SET CARRIES ITS OWN WEIGHT TEXT (2026-09-16). The table rounded the number and
+      // wrote "lb" beside it in the render; a metric account read pounds labelled pounds.
+      completed_sets: performed.map((st) => {
+        const w = Number((st as Record<string, unknown>)?.weight);
+        const a = Number((st as Record<string, unknown>)?.resistance_level);
+        return {
+          ...(st as Record<string, unknown>),
+          ...(Number.isFinite(w) && w > 0 ? { weight_display: setWeightText(w) } : {}),
+          ...(Number.isFinite(a) && a > 0 ? { assist_display: setWeightText(a) } : {}),
+        };
+      }),
       sets_done: performed.length,
       reps_done: repsDone,
       reps_target: repsTarget,

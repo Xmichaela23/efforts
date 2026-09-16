@@ -21,6 +21,9 @@ import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 import { swimPacePer100Seconds } from '../swim/swim-pace.ts';
+// ⛔ THE SIGNED CHANGE, THE ONE RULE (2026-09-16) — the same function State's rows have read since
+// 2026-09-15. Two screens composed it in their own renders. `src/lib/` bundles at deploy time.
+import { verdictSignedPct } from '../../../../src/lib/trend-receipt.ts';
 import { detectSwimEquipment } from '../swim/swim-equipment.ts';
 import type { SwimScalars } from '../swim/swim-scalars.ts';
 import { resolveRunGap, type RunScalars } from '../run/run-scalars.ts';
@@ -235,6 +238,13 @@ export type SessionDetailInput = {
    */
   completedPool?: import('../swim/pool-label.ts').PoolLabelInput | null;
   /**
+   * ⛔ THE ATHLETE READS KILOMETRES AND KILOGRAMS (2026-09-16, Stage 4 session 3). Every distance, pace
+   * and weight this contract prints is written in their unit, so the Performance tab prints a string
+   * and converts nothing — it multiplied metres by 1609.34 with no metric branch at all.
+   * ⚠️ Absent → imperial, which is today's behaviour for every account in production.
+   */
+  athleteMetric?: boolean;
+  /**
    * ⛔ THE SESSION'S MOVING SECONDS, FROM `_shared/moving-seconds.ts` (2026-09-10, audit H-D10) — the
    * number `get-week` stamps as `moving_seconds` for the done card and the Week row. workout-detail is
    * the DB reader and passes it; absent (fixtures, older callers) → `computed.overall` as before.
@@ -389,6 +399,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedComputed,
     completedSwimScalars,
     completedPool,
+    athleteMetric: athleteMetricIn,
     completedMovingS,
     completedRunScalars,
     loadContext,
@@ -405,6 +416,56 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   const type = normType(workoutType) as SessionDetailV1['type'];
   const wa = workoutAnalysis || {};
+
+  /* ────────────────────────────────────────────────────────────────────────────────────────────
+   * ⛔ THE ATHLETE'S UNIT, AND THE FORMATTERS THAT USE IT (2026-09-16, Stage 4 session 3).
+   *
+   * The Performance tab converted metres to miles with a bare 1609.34 and NO metric branch, split the
+   * same stored seconds into minutes two different ways in two places, subtracted one swim pace from
+   * another in the render, and wrote "lb" beside every set weight. All of it is below now, once.
+   * ⚠️ M:SS IS ROUNDED WHOLE, THEN SPLIT — rounding the remainder alone is what printed "7:60/mi".
+   * ──────────────────────────────────────────────────────────────────────────────────────────── */
+  const sdMetric = athleteMetricIn === true;
+  const SD_M_PER_MI = 1609.344;   // 1 mi, by definition
+  const SD_KG_PER_LB = 0.45359237; // 1 lb, by definition
+  const sdClock = (sec: number): string => {
+    const v = Math.max(0, Math.round(sec));
+    return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+  };
+  /** H:MM:SS over an hour, M:SS under it — the shape the header line prints. */
+  const sdDuration = (sec: number | null | undefined): string | null => {
+    const v = Number(sec);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    const t = Math.round(v);
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const ss = t % 60;
+    return h > 0
+      ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+      : `${m}:${String(ss).padStart(2, '0')}`;
+  };
+  /** Whole minutes — the shape the Duration chip prints. */
+  const sdMinutes = (sec: number | null | undefined): number | null => {
+    const v = Number(sec);
+    return Number.isFinite(v) && v > 0 ? Math.round(v / 60) : null;
+  };
+  /**
+   * A distance as the athlete reads it. ⚠️ A SWIM READS SHORT — yards or metres, never miles — which is
+   * the split the swim card made on the phone with its own 0.9144.
+   */
+  const SD_M_PER_YD = 0.9144;   // 1 yd, by definition
+  const sdDistance = (metres: number | null | undefined, swim = false): string | null => {
+    const v = Number(metres);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    if (swim) return sdMetric ? `${Math.round(v)} m` : `${Math.round(v / SD_M_PER_YD)} yd`;
+    return sdMetric ? `${(v / 1000).toFixed(1)} km` : `${(v / SD_M_PER_MI).toFixed(1)} mi`;
+  };
+  /** A lift is stored in pounds and converts for a metric account by the definition constant (§8.0 #7). */
+  const sdWeight = (lb: number | null | undefined): string | null => {
+    const v = Number(lb);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    return sdMetric ? `${Math.round(v * SD_KG_PER_LB)} kg` : `${Math.round(v)} lb`;
+  };
   // Q-097/Q-102 phase 2: a 1RM/baseline TEST is measurement, not training. When flagged by the analyzer
   // (top-level or session_state_v1), the Performance screen renders the test-result frame INSTEAD of the
   // training table + execution/volume — so suppress the execution score + training narrative here.
@@ -858,6 +919,53 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedTotals.pool_unit = pool.unit;
   }
 
+  /* ────────────────────────────────────────────────────────────────────────────────────────────
+   * ⛔ THE LINES THE PERFORMANCE TAB PRINTS (2026-09-16, Stage 4 session 3).
+   *
+   * `distance_display` — the header line divided metres by 1609.34 in the render, with no metric
+   *   branch, so a metric athlete read miles.
+   * `duration_display` / `duration_minutes` — the header split the stored seconds into m:ss while the
+   *   Duration chip rounded the SAME seconds to whole minutes two files away. At 2790 s one read
+   *   46:30 and the other 47 min. One number, both shapes, written here.
+   * `swim_pace_display` — ⛔ THE UNIT IS THE ATHLETE'S, NOT THE PLAN'S (§8.0 A4). The pace was computed
+   *   in the plan's unit and labelled with the athlete's, so a metric plan on an imperial account
+   *   printed seconds per 100 METRES as "/100yd" while the Details tab, reading its own field, printed
+   *   the yards. Two tabs, two paces, one swim. One field now, and Details reads it too.
+   * ──────────────────────────────────────────────────────────────────────────────────────────── */
+  completedTotals.distance_display = sdDistance(completedTotals.distance_m, type === 'swim');
+  plannedTotals.distance_display = sdDistance(plannedTotals.distance_m, type === 'swim');
+  plannedTotals.duration_display = sdDuration(plannedTotals.duration_s);
+  completedTotals.duration_display = sdDuration(completedTotals.duration_s);
+  completedTotals.duration_minutes = sdMinutes(completedTotals.duration_s);
+  completedTotals.avg_pace_display = (() => {
+    const v = Number(completedTotals.avg_pace_s_per_mi);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    return `${sdClock(sdMetric ? v / (SD_M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
+  })();
+  if (type === 'swim') {
+    const per100AthleteUnit = swimPacePer100Seconds(swimDurS, swimDistM, sdMetric ? 'm' : 'yd');
+    completedTotals.swim_pace_unit = sdMetric ? '100m' : '100yd';
+    completedTotals.swim_pace_athlete_unit_s = per100AthleteUnit;
+    completedTotals.swim_pace_display = per100AthleteUnit != null && per100AthleteUnit > 0
+      ? `${sdClock(per100AthleteUnit)} /${completedTotals.swim_pace_unit}` : null;
+    /**
+     * ⛔ THE DIFFERENCE AGAINST PLAN, AS A PHRASE (§8.1 Perf #8a). The chip subtracted the two server
+     * paces, split the remainder into minutes and seconds, and chose "faster" or "slower" in the
+     * render. Both paces are taken in the ATHLETE's unit so the phrase and the number beside it agree.
+     */
+    const plannedPer100 = plannedTotals.distance_m != null && plannedTotals.duration_s != null
+      ? swimPacePer100Seconds(plannedTotals.duration_s, plannedTotals.distance_m, sdMetric ? 'm' : 'yd')
+      : null;
+    if (plannedPer100 != null && per100AthleteUnit != null && plannedPer100 > 0 && per100AthleteUnit > 0) {
+      const delta = plannedPer100 - per100AthleteUnit;
+      const v = Math.abs(delta);
+      const m = Math.floor(v / 60);
+      const ss = Math.round(v % 60);
+      completedTotals.swim_pace_vs_plan_display =
+        `${m ? `${m}m ` : ''}${ss}s/${completedTotals.swim_pace_unit} ${delta > 0 ? 'faster' : 'slower'}`.trim();
+    }
+  }
+
   // Single planned/executed row must match completed_totals (same source as Details / chips).
   if (type === 'run' && intervals.length === 1 && completedDistM != null && completedDistM > 0) {
     const row = intervals[0];
@@ -1062,6 +1170,67 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const rw = !!fpFacts.plan?.is_recovery_week;
     return rw || /easy|recovery|long\s?run|base|endurance/i.test(wt) || /recovery|easy/i.test(wi);
   })();
+
+  /**
+   * ⛔ WHICH INTERVAL ROWS PRINT WITHOUT THE TOGGLE (2026-09-16, Stage 4 session 3).
+   *
+   * An easy run with strides in it is one long block and a handful of twenty-second efforts. The table
+   * opens on the block and folds the rest behind "show all" — otherwise the row an athlete came to see
+   * is buried under the strides. The screen applied this rule in its own render with two bare numbers.
+   *
+   * ⚠️ IT HIDES ROWS AND CHANGES NO VALUE. Every row is still on the contract, and the toggle still
+   * shows them all.
+   * ⚠️ IT ONLY APPLIES TO AN EASY-LIKE SESSION with more than two rows, and only when every row that is
+   * not the long block is a MICRO one — so a real interval session is never folded.
+   */
+  {
+    /** OURS — a block this long is the session's own work, not a stride. Forty minutes of easy running
+     *  is one block; fifteen minutes is the shortest thing an athlete would call the run itself.
+     *  docs/STATE-SOURCES.md. */
+    const LONG_BLOCK_MIN_S = 900;
+    /** OURS — under two minutes a row is a stride, a pickup or a lap marker, never the session.
+     *  No app publishes a cut-off for this; Strava and Garmin list every lap and leave the reading to
+     *  the athlete. docs/STATE-SOURCES.md. */
+    const MICRO_ROW_UNDER_S = 120;
+    const durOf = (iv: IntervalRow) => iv.executed?.duration_s ?? null;
+    let printable: IntervalRow[] = intervals;
+    if (isEasyLike && intervals.length > 2) {
+      const big = intervals.filter((iv) => { const d = durOf(iv); return d != null && d >= LONG_BLOCK_MIN_S; });
+      const rest = intervals.filter((iv) => { const d = durOf(iv); return d == null || d < LONG_BLOCK_MIN_S; });
+      const everyRestIsMicro = rest.length > 0 && rest.every((iv) => { const d = durOf(iv); return d != null && d < MICRO_ROW_UNDER_S; });
+      if (big.length >= 1 && everyRestIsMicro) {
+        const longest = [...big].sort((a, b) => (durOf(b) ?? 0) - (durOf(a) ?? 0))[0];
+        printable = [longest];
+      }
+    }
+    const shown = new Set(printable);
+    for (const iv of intervals) iv.print_by_default = shown.has(iv);
+  }
+
+  /**
+   * ⛔ EACH ROW'S PACE AND DISTANCE, IN THE ATHLETE'S OWN UNIT (2026-09-16, Stage 4 session 3). The
+   * table printed "/mi" on every account and converted metres to miles — or to yards on a swim, off
+   * the athlete's setting — in its own render.
+   * ⚠️ THE STORED FIELDS ARE UNCHANGED. `actual_pace_sec_per_mi` and `actual_gap_sec_per_mi` stay per
+   * mile, which is what every other reader expects; these are the printed forms beside them.
+   */
+  for (const iv of intervals) {
+    const perMiToUnit = (perMi: number | null | undefined): string | null => {
+      const v = Number(perMi);
+      if (!Number.isFinite(v) || v <= 0) return null;
+      return `${sdClock(sdMetric ? v / (SD_M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
+    };
+    iv.executed.pace_display = perMiToUnit(iv.executed.actual_pace_sec_per_mi);
+    iv.executed.gap_display = perMiToUnit(iv.executed.actual_gap_sec_per_mi);
+    iv.executed.distance_display = (() => {
+      const m = Number(iv.executed.distance_m);
+      if (!Number.isFinite(m) || m <= 0) return null;
+      if (type === 'swim') return sdMetric ? `${Math.round(m)} m` : `${Math.round(m / SD_M_PER_YD)} yd`;
+      if (sdMetric) return `${(m / 1000).toFixed(m < 1000 ? 2 : 1)} km`;
+      const mi = m / SD_M_PER_MI;
+      return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
+    })();
+  }
   const isAutoLapOrSplit = !!(detailed?.interval_breakdown?.is_auto_lap_or_split);
   const isPoolSwim = type === 'swim' && (
     String(completedRefinedType || '').toLowerCase() === 'pool_swim' ||
@@ -1184,6 +1353,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       volume_ratio_pct: fin(perf?.volume_ratio_pct),
       easy_under_s: fin(perf?.easy_under_s),
       easy_total_s: fin(perf?.easy_total_s),
+      // ⛔ THE CHIP'S LINE, WRITTEN HERE (2026-09-16) — "22 of 35 min". It rounded both to whole minutes
+      // in the render, the same two roundings the Duration chip made one file up.
+      easy_line: (() => {
+        const under = sdMinutes(fin(perf?.easy_under_s));
+        const total = sdMinutes(fin(perf?.easy_total_s));
+        return under != null && total != null && total > 0 ? `${under} of ${total} min` : null;
+      })(),
       easy_ceiling_bpm: fin(perf?.easy_ceiling_bpm),
       easy_ceiling_anchor: (perf?.easy_ceiling_anchor ?? null) as any,
       performance_assessment: granular?.performance_assessment ?? null,
@@ -1298,7 +1474,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // but is no longer called here.
     trend: null,
 
-    discipline_trend: input.disciplineTrend ?? null,
+    discipline_trend: (() => {
+      const dt = input.disciplineTrend ?? null;
+      if (!dt) return null;
+      // The one rule, shared with State's rows (`src/lib/trend-receipt.ts`).
+      return { ...dt, signed_pct: verdictSignedPct(dt.verdict, dt.pct_change) };
+    })(),
 
     next_session: nextSession ?? null,
 
@@ -1363,6 +1544,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       strengthVolume,
       bodyweightLb,
       exerciseAdherence: (wa as any)?.detailed_analysis?.exercise_adherence,
+      athleteMetric: sdMetric,
     }),
     readiness: (() => {
       if (readinessUnavailable || !readinessSnapshot) return null;
