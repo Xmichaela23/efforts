@@ -28,9 +28,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
 
     const { data: baselines } = await supabase
-      .from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
+      .from('user_baselines').select('performance_numbers, units').eq('user_id', userId).maybeSingle();
     const perfRaw = baselines?.performance_numbers;
     const perf = typeof perfRaw === 'string' ? JSON.parse(perfRaw || '{}') : (perfRaw ?? {});
+    // The athlete's unit, the column every other strength surface reads (materialize-plan, workout-detail).
+    const metric = String(baselines?.units ?? 'imperial') === 'metric';
 
     const plannedId = typeof body?.planned_workout_id === 'string' && body.planned_workout_id.trim()
       ? body.planned_workout_id.trim() : null;
@@ -41,12 +43,12 @@ Deno.serve(async (req) => {
       if (error) return json({ success: false, error: error.message }, 500);
       if (!row) return json({ success: false, error: 'Planned workout not found' }, 404);
       const rows = Array.isArray(row.strength_exercises) ? row.strength_exercises : [];
-      return json({ success: true, exercises: plannedTestSession(rows, row.tags, perf) });
+      return json({ success: true, exercises: plannedTestSession(rows, row.tags, perf, undefined, metric) });
     }
 
     const type = String(body?.test_type ?? '');
     if (type === 'lower' || type === 'upper' || type === 'full') {
-      return json({ success: true, exercises: launcherTestSession(type, perf) });
+      return json({ success: true, exercises: launcherTestSession(type, perf, undefined, metric) });
     }
     return json({ success: false, error: 'planned_workout_id or test_type required' }, 400);
   } catch (e) {

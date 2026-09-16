@@ -33,6 +33,7 @@ import {
   heaviestCompletedWeight,
   normalizeLiftKey,
 } from '../../../src/lib/exercise-config.ts';
+import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 
 /**
  * ⛔ THE DEFAULT INTENSITY, AND IT IS THE LAST RESORT — not the first answer.
@@ -70,7 +71,10 @@ Deno.serve(async (req) => {
       ? Number(p.planned_percent) : null;
     /** For a SWAP: the exercise being replaced, and what the athlete is currently loading on it. */
     const previousName = String(p?.previous_name ?? '').trim() || null;
-    const currentWeight = Number(p?.current_weight) || 0;
+    // ⛔ THE LOGGER SENDS THE BOX AS THE ATHLETE READS IT, with its unit (2026-09-16, Stage 4 session 4);
+    // pounds are what the back-inference below divides, so a kilogram box converts here, on the way in.
+    const currentWeightRaw = Number(p?.current_weight) || 0;
+    const currentWeight = String(p?.current_weight_unit ?? 'lb') === 'kg' ? currentWeightRaw / KG_PER_LB : currentWeightRaw;
     const targetReps = Number.isFinite(Number(p?.target_reps)) && Number(p?.target_reps) > 0
       ? Number(p.target_reps) : undefined;
     /** Today, so history never includes the session being logged. */
@@ -90,11 +94,19 @@ Deno.serve(async (req) => {
 
     const { data: baselines } = await supabase
       .from('user_baselines')
-      .select('performance_numbers, learned_fitness')
+      .select('performance_numbers, learned_fitness, units')
       .eq('user_id', userId)
       .maybeSingle();
 
     const performanceNumbers = (baselines?.performance_numbers as Record<string, any>) ?? {};
+    /**
+     * ⛔ EVERY ANSWER CARRIES THE SEED IN THE ATHLETE'S UNIT (2026-09-16, Stage 4 session 4). `weight` stays
+     * pounds; `weight_in_unit` is what the logger's box opens on, and `unit` is the label it prints.
+     */
+    const metric = String(baselines?.units ?? 'imperial') === 'metric';
+    const inUnit = (lb: number | null | undefined) => (lb != null && lb > 0
+      ? { unit: metric ? 'kg' : 'lb', weight_in_unit: liftInAthletesUnit(lb, metric) }
+      : {});
     const learned1rms = ((baselines?.learned_fitness as any)?.strength_1rms ?? {}) as Record<string, any>;
 
     // ── THE PERCENTAGE ────────────────────────────────────────────────────────
@@ -123,6 +135,7 @@ Deno.serve(async (req) => {
       return json({
         success: true,
         weight: Math.max(5, Math.round(w / 5) * 5),
+        ...inUnit(Math.max(5, Math.round(w / 5) * 5)),
         source: 'own_measured_1rm',
         percent, percent_source: percentSource,
       });
@@ -151,7 +164,7 @@ Deno.serve(async (req) => {
           if (normalizeLiftKey(ex?.name || '') !== want) continue;
           const best = heaviestCompletedWeight(ex?.sets);
           if (best != null) {
-            return json({ success: true, weight: best, source: 'last_logged', percent, percent_source: percentSource });
+            return json({ success: true, weight: best, ...inUnit(best), source: 'last_logged', percent, percent_source: percentSource });
           }
         }
       }
@@ -165,6 +178,7 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       weight: resolved?.weight ?? null,
+      ...inUnit(resolved?.weight),
       source: resolved?.weight != null ? 'baseline_proxy' : 'unknown',
       percent, percent_source: percentSource,
     });

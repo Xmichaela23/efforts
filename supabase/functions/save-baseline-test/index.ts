@@ -25,6 +25,31 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
 import { pickTestLifts } from './pick.ts';
+import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
+
+/**
+ * ⛔ THE TYPED WEIGHT CONVERTS HERE, ON THE WAY IN (2026-09-16, Stage 4 session 4). The logger sends each
+ * exercise in the unit its boxes show (`unit`), and a set the athlete never retyped carries the pounds the
+ * server gave it (`weight_lb`). Every max is stored in pounds, so a kilogram box converts by the definition
+ * constant before the set is picked; a 100 typed on a metric account is 100 kg, not 100 lb.
+ * An exercise with no `unit` is an older app bundle, whose boxes were pounds.
+ */
+function setsInPounds(exercises: unknown[]): unknown[] {
+  return exercises.map((ex: any) => {
+    const kg = String(ex?.unit ?? 'lb') === 'kg';
+    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+    return {
+      ...ex,
+      unit: 'lb',
+      sets: sets.map((st: any) => {
+        const typed = Number(st?.weight) || 0;
+        const lb = Number(st?.weight_lb);
+        const { weight_lb: _drop, ...rest } = st ?? {};
+        return { ...rest, weight: Number.isFinite(lb) && lb > 0 ? lb : (kg ? typed / KG_PER_LB : typed) };
+      }),
+    };
+  });
+}
 
 /**
  * ⛔ THE OHP WRITE GUARD (D-224), MOVED SERVER-SIDE UNCHANGED. Overhead press has ONE canonical key —
@@ -111,7 +136,7 @@ Deno.serve(async (req) => {
     // change still sends; it is read only when `exercises` is absent.
     const sentSets = Array.isArray(payload?.exercises);
     const lifts = sentSets
-      ? pickTestLifts(payload.exercises, payload?.session)
+      ? pickTestLifts(setsInPounds(payload.exercises), payload?.session)
       : (Array.isArray(payload?.lifts) ? payload.lifts : []);
     if (lifts.length === 0) {
       return sentSets
@@ -131,17 +156,21 @@ Deno.serve(async (req) => {
 
     const { data: row } = await supabase
       .from('user_baselines')
-      .select('id, performance_numbers')
+      .select('id, performance_numbers, units')
       .eq('user_id', userId)
       .maybeSingle();
 
     const currentPerf: Record<string, any> = (row?.performance_numbers as Record<string, any>) ?? {};
+    // Every number echoed to the logger also comes in the athlete's unit, with the unit (Stage 4 session 4).
+    const metric = String(row?.units ?? 'imperial') === 'metric';
+    const unit = metric ? 'kg' : 'lb';
+    const inUnit = (lb: number): number => Math.round(liftInAthletesUnit(lb, metric));
     const updatedPerf: Record<string, any> = { ...currentPerf };
 
     /** Results the athlete has to rule on: the test came in BELOW what is stored. */
-    const downs: Array<{ key: string; lift: string; prior: number; next: number }> = [];
+    const downs: Array<{ key: string; lift: string; prior: number; next: number; unit: string; prior_in_unit: number; next_in_unit: number }> = [];
     /** What we computed, echoed back so the screen renders the server's number rather than its own. */
-    const computed: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }> = [];
+    const computed: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number; unit?: string; weight_in_unit?: number; estimated1RM_in_unit?: number }> = [];
 
     for (const l of lifts) {
       const key = canonKey(l?.baselineKey);
@@ -163,7 +192,11 @@ Deno.serve(async (req) => {
         next = roundedFromTest(weight, reps);
         if (!(next > 0)) continue;
       }
-      computed.push({ key, lift: LIFT_LABEL[key] ?? key, weight, reps, estimated1RM: next });
+      computed.push({
+        key, lift: LIFT_LABEL[key] ?? key, weight, reps, estimated1RM: next,
+        // A rep-count lift has no weight to convert; its value is a count.
+        ...(isRepCountLift(key) ? {} : { unit, weight_in_unit: inUnit(weight), estimated1RM_in_unit: inUnit(next) }),
+      });
 
       const prior = Number(currentPerf[key]);
 
@@ -178,7 +211,12 @@ Deno.serve(async (req) => {
       const decision = String(decisions[key] ?? '').toLowerCase();
       if (decision === 'update') { updatedPerf[key] = next; continue; }
       if (decision === 'keep') { continue; } // stored value stands
-      downs.push({ key, lift: LIFT_LABEL[key] ?? key, prior, next });
+      downs.push({
+        key, lift: LIFT_LABEL[key] ?? key, prior, next,
+        unit: isRepCountLift(key) ? '' : unit,
+        prior_in_unit: isRepCountLift(key) ? prior : inUnit(prior),
+        next_in_unit: isRepCountLift(key) ? next : inUnit(next),
+      });
     }
 
     // Phase one: something needs the athlete. NOTHING is written — including the unambiguous raises,

@@ -479,9 +479,15 @@ Deno.serve(async (req)=>{
     let userFtp = null;
     // D-349 body weight, read through the one resolver, so a lift's pounds here are workout-detail's.
     let bodyweightLb = null;
+    /**
+     * ⛔ THE ATHLETE'S LIFT UNIT, ON THE FEED THE LOGGER ALREADY ASKS (2026-09-16, Stage 4 session 4). A lift
+     * the athlete adds by hand has no plan step to carry a unit, and the logger's boxes are typed in this one.
+     */
+    let liftUnit = null;
     try {
       const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, weight, units').eq('user_id', userId).maybeSingle();
       bodyweightLb = resolveBodyweightLb(baselines);
+      liftUnit = baselines?.units === 'metric' ? 'kg' : 'lb';
       // FTP via the resolver (learned-first) so week-view power ranges match every other surface — was
       // manual-only `performance_numbers.ftp` (CAPABILITY-MAP straggler).
       userFtp = resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers }).value;
@@ -1723,6 +1729,7 @@ Deno.serve(async (req)=>{
     const warningsOut = errors.concat(debugNotes);
     const responseData = {
       items: itemsWithPlannedWorkout,
+      ...(liftUnit ? { lift_unit: liftUnit } : {}),
       weekly_stats: {
         planned: workloadPlanned,
         completed: workloadCompleted,

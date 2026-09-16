@@ -27,7 +27,7 @@
  */
 import { matchExercises, normalizeExerciseName, type ExerciseMatch } from '../strength/match-exercises.ts';
 import { canonicalize } from '../canonicalize.ts';
-import { completedStrengthVolume, isPerformedSet } from '../strength/session-volume.ts';
+import { completedStrengthVolume, isPerformedSet, liftInAthletesUnit } from '../strength/session-volume.ts';
 import type { SessionDetailV1 } from './types.ts';
 import { isAssistanceSlot } from '../../../../src/lib/assistance-slot.ts';
 import { normalizeCompletedStrengthSet } from '../../../../src/lib/normalize-strength-set.ts';
@@ -209,9 +209,9 @@ export type StrengthSlotsFields = Pick<SessionDetailV1, 'strength_slots' | 'stre
 export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFields {
   const none: StrengthSlotsFields = { strength_slots: null, strength_counts: null, strength_totals: null };
   if (input.type !== 'strength' && input.type !== 'mobility') return none;
-  /** A stored pound weight as the athlete reads it. 1 lb = 0.45359237 kg, by definition. */
+  /** A stored pound weight as the athlete reads it — the one rule the logger's box reads (Stage 4 session 4). */
   const setWeightText = (lb: number): string =>
-    input.athleteMetric === true ? `${Math.round(lb * 0.45359237)} kg` : `${Math.round(lb)} lb`;
+    `${liftInAthletesUnit(lb, input.athleteMetric === true)} ${input.athleteMetric === true ? 'kg' : 'lb'}`;
   const rawCompleted = Array.isArray(input.completedStrengthExercises) ? input.completedStrengthExercises : [];
   const { rows: planned, fromSteps } = plannedRows(input.plannedRowRaw);
   if (planned.length === 0 && rawCompleted.length === 0) return none;

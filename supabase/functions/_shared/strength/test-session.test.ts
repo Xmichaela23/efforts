@@ -81,6 +81,7 @@ Deno.test('⛔ A NON-PLAN RETEST TAKES THE SAME PRETEST OFF THE TYPED MAX, AND A
   assertEquals(weights(rows[0]), [45, 170, 185, 195]);
   assertEquals(rows[1], {
     name: 'Hanging Leg Raise', planned_name: 'Hanging Leg Raise', target_reps: '8-10', target_rir: 2, notes: 'Slow.',
+    unit: 'lb',
     sets: [{ weight: 0, set_type: 'working' }, { weight: 0, set_type: 'working' }, { weight: 0, set_type: 'working' }],
   });
   assertEquals(isTestedLift({ name: 'Hanging Leg Raise', sets: 3, reps: '8-10' }), false);
@@ -115,4 +116,18 @@ Deno.test('⛔ THE PHONE NO LONGER BUILDS A TEST, AND NO DELETED NUMBER OR CUE S
   for (const gone of ['RPE 9', 'aim ~3', 'Add 25', '0.88', '0.57', '0.80', 'barStart']) {
     assert(!server.includes(gone), `${gone} was moved instead of deleted`);
   }
+});
+
+Deno.test('⛔ A METRIC ACCOUNT READS KILOGRAMS: every step keeps its pounds and gains the kilogram figure (Stage 4 session 4)', () => {
+  const [squat] = launcherTestSession('lower', { squat: 225 }, undefined, true);
+  // The steps' pounds are untouched — the same steps an imperial account gets; the empty bar is the 20 kg bar.
+  assertEquals(squat.sets.slice(1).map((s) => s.weight), [170, 185, 195]);
+  // 20 kg bar; 170 → 77.11 → 77; 185 → 83.91 → 84; 195 → 88.45 → 88.5 (nearest quarter).
+  assertEquals(squat.sets.map((s) => s.weight_in_unit), [20, 77, 84, 88.5]);
+  assertEquals(squat.unit, 'kg');
+  assertEquals(/on file: 102 kg/.test(String(squat.notes)), true);
+  // No max on file: the anchor rounds in kilograms.
+  const [, dead] = launcherTestSession('lower', {}, undefined, true);
+  assertEquals(dead.anchor_round_to, 2.5);
+  assertEquals(launcherTestSession('lower', {})[1].anchor_round_to, 5);
 });

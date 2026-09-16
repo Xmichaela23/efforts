@@ -12,7 +12,7 @@
  */
 import { capabilitiesForExercise } from '../../../src/lib/exercise-role.ts';
 import { canonicalDisplayName } from '../_shared/canonicalize.ts';
-import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
+import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 import type { LoggedLift, LoggedSetRow } from '../_shared/state-trend/logged-sets.ts';
 
 /** OURS — the main rows are capped at five (the four slots, plus a variant such as the trap bar). */
@@ -67,7 +67,9 @@ export function buildStrengthLoggedSets(
         canonical: l.canonical_name,
         display_name: canonicalDisplayName(l.canonical_name),
         sets,
-        set_lines: sets.map((e) => `${inAthletesUnit(Number(e.weight))} ${unit} × ${e.reps}`),
+        // ⛔ A LOGGED SET READS THROUGH THE ONE RULE the logger's box and Performance's rows read (Stage 4
+        // session 4) — whole numbers printed a typed 82.5 kg as 83 here.
+        set_lines: sets.map((e) => `${liftInAthletesUnit(Number(e.weight), metric)} ${unit} × ${e.reps}`),
         e1rm_lines: sets.map((e) => (e.e1rm != null && Number(e.e1rm) > 0
           ? `e1RM ${inAthletesUnit(Number(e.e1rm))} ${unit}`
           : null)),
@@ -84,7 +86,7 @@ export function buildStrengthLoggedSets(
         weight: l.heaviest!.weight,
         reps: l.heaviest!.reps,
         sessions: l.sessions,
-        set_line: `${inAthletesUnit(Number(l.heaviest!.weight))} ${unit} × ${l.heaviest!.reps}`,
+        set_line: `${liftInAthletesUnit(Number(l.heaviest!.weight), metric)} ${unit} × ${l.heaviest!.reps}`,
       })),
   };
 }

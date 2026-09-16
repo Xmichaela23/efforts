@@ -22,6 +22,7 @@
 // none), so objects under <uid>/ older than 24 h are removed here, on the athlete's next export.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
+import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -208,7 +209,14 @@ function workoutsCsv(rows: Row[]): string {
   return csv(header, out);
 }
 
-function setsCsv(rows: Row[]): { text: string; count: number } {
+/**
+ * ⛔ THE WEIGHT COLUMN IS IN THE ATHLETE'S UNIT (2026-09-16, Stage 4 session 4). `profile.json` says
+ * `weight_unit: kg` on a metric account while every stored set is pounds, so the file said kg over pound
+ * figures. The column now converts through the one rule the logger's box and Performance's rows read — a
+ * Strong export is in the lifter's own unit too. An exercise stored with `unit: 'kg'` (an older shape) is
+ * already kilograms and is read as such.
+ */
+function setsCsv(rows: Row[], metric: boolean): { text: string; count: number } {
   // Copied from a real Strong export; Hevy imports this layout.
   const header = ['Date', 'Workout Name', 'Duration', 'Exercise Name', 'Set Order', 'Weight', 'Reps', 'Distance', 'Seconds', 'Notes', 'Workout Notes', 'RPE'];
   const out: Cell[][] = [];
@@ -222,7 +230,9 @@ function setsCsv(rows: Row[]): { text: string; count: number } {
       for (const s of sets as Row[]) {
         if (!isLogged(s)) continue;
         order += 1;
-        const weight = num(s.weight);
+        const raw = num(s.weight);
+        const lb = raw == null ? null : (String(ex.unit ?? 'lb').toLowerCase().startsWith('kg') ? raw / KG_PER_LB : raw);
+        const weight = lb == null ? null : liftInAthletesUnit(lb, metric);
         const band = typeof s.resistance_level === 'string' && s.resistance_level.trim() ? `band ${s.resistance_level.trim()}` : '';
         const exNotes = [typeof ex.notes === 'string' ? ex.notes : '', band].filter(Boolean).join('; ');
         // RIR is what the logger records; Strong/Hevy carry RPE. RPE = 10 − RIR is the field convention
@@ -342,7 +352,7 @@ Deno.serve(async (req) => {
         .eq('user_id', userId).maybeSingle().then(({ data, error }) => { if (error) throw new Error(error.message); return data as Row | null; }),
     ]);
 
-    const sets = setsCsv(workouts);
+    const sets = setsCsv(workouts, baselines?.units === 'metric');
     const planRows = plansCsv(plans, planned);
     const enc = new TextEncoder();
     const zip = zipStore([

@@ -53,6 +53,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
 import { executionHowTo, executionName } from '../_shared/strength-grid/grid.ts';
 import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
+import { liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 
@@ -1209,6 +1210,31 @@ export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string
  * Returns undefined for any row without an authored `set_plan` — which is every row that is not a
  * the previous program main lift, so nothing else changes shape.
  */
+/**
+ * ⛔ THE LOGGER'S NUMBERS, IN THE ATHLETE'S UNIT (2026-09-16, Stage 4 session 4). Every weight on a
+ * strength step stays POUNDS — the analyzers, the volume and the progression read these fields — and each
+ * one gains a `weight_in_unit` beside it, with the unit on the step. The logger opens its boxes on those
+ * and prints the unit; it converts nothing on the way out of the plan. A step written before this carries
+ * no `unit`, and the logger reads its numbers as the pounds they are.
+ */
+function stampAthleteUnit(strength: any, metric: boolean): void {
+  const inUnit = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? liftInAthletesUnit(n, metric) : undefined;
+  };
+  strength.unit = metric ? 'kg' : 'lb';
+  const w = inUnit(strength.weight);
+  if (w != null) strength.weight_in_unit = w;
+  const sug = inUnit(strength.weight_suggested);
+  if (sug != null) strength.weight_suggested_in_unit = sug;
+  if (Array.isArray(strength.set_plan)) {
+    strength.set_plan = strength.set_plan.map((p: any) => {
+      const pw = inUnit(p?.weight);
+      return pw != null ? { ...p, weight_in_unit: pw } : p;
+    });
+  }
+}
+
 export function carrySetPlan(ex: any, finalWeight: number | null | undefined): any[] | undefined {
   const authored = Array.isArray(ex?.set_plan) ? ex.set_plan : null;
   if (!authored || authored.length === 0) return undefined;
@@ -2717,7 +2743,9 @@ export function expandTokensForRow(
           if (finalWeight != null) {
             const config = getExerciseConfig(name);
             // ⛔ THE ATHLETE'S UNIT ON THE LABEL (2026-09-10, audit H-T06) — it read "lb" for every athlete.
-            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
+            // ⛔ AND THE NUMBER IN IT (2026-09-16, Stage 4 session 4): a metric account read the POUND figure
+            // with "kg" beside it. `finalWeight` stays pounds on the step; only the words convert.
+            finalWeightDisplay = formatWeightDisplay(liftInAthletesUnit(finalWeight, !!(baselines as any)?.isMetric), config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
           }
           // D-071: prevent raw "% 1RM" strings from leaking to athlete UI when
           // the resolution chain bailed (no 1RM baseline). Override with an
@@ -2867,6 +2895,7 @@ export function expandTokensForRow(
           if (!(strength as any).notes && typeof (ex as any)?.notes === 'string' && String((ex as any).notes).trim()) {
             (strength as any).notes = String((ex as any).notes).trim();
           }
+          stampAthleteUnit(strength, !!(baselines as any)?.isMetric);
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
@@ -3136,7 +3165,9 @@ export function expandTokensForRow(
           if (finalWeight != null) {
             const config = getExerciseConfig(name);
             // ⛔ THE ATHLETE'S UNIT ON THE LABEL (2026-09-10, audit H-T06) — it read "lb" for every athlete.
-            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
+            // ⛔ AND THE NUMBER IN IT (2026-09-16, Stage 4 session 4): a metric account read the POUND figure
+            // with "kg" beside it. `finalWeight` stays pounds on the step; only the words convert.
+            finalWeightDisplay = formatWeightDisplay(liftInAthletesUnit(finalWeight, !!(baselines as any)?.isMetric), config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
           }
           // D-071: mirror first call site — RIR-anchored fallback when
           // resolution bailed on a "% 1RM" prescription and 1RM is missing.
@@ -3284,6 +3315,7 @@ export function expandTokensForRow(
           if (!(strength as any).notes && typeof (ex as any)?.notes === 'string' && String((ex as any).notes).trim()) {
             (strength as any).notes = String((ex as any).notes).trim();
           }
+          stampAthleteUnit(strength, !!(baselines as any)?.isMetric);
           if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }

@@ -18,6 +18,7 @@
 import { strengthSetVolume, barLbForExercise } from '../workload.ts';
 import { typeForExercise } from '../../../../src/lib/exercise-role.ts';
 import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
+import { KG_PER_LB } from '../../../../src/lib/bar-types.ts';
 
 export function isPerformedSet(s: any): boolean {
   return s && typeof s === 'object'
@@ -44,9 +45,28 @@ export type CompletedStrengthVolume = {
  * for a metric account's Adjust and Baselines rows, and a second copy of a definition constant is
  * exactly the shape this work order exists to remove.
  */
-export const KG_PER_LB = 0.45359237;
-// FIELD — definition (1 lb = 0.45359237 kg, international pound)
+/**
+ * ⛔ DEFINED IN `src/lib/bar-types.ts` SINCE 2026-09-16 (Stage 4 session 4) and re-exported here, so every
+ * importer above keeps its import. The logger converts a typed kilogram to pounds on the way in with the
+ * same constant, and the bar table needs it too; `bar-types.ts` imports nothing, so the phone takes the
+ * constant from there without pulling this file (and `workload.ts` behind it) into a cycle with the table.
+ */
+export { KG_PER_LB };
 const LB_PER_KG = 1 / KG_PER_LB;
+
+/**
+ * ⛔ A STORED POUND WEIGHT AS THE ATHLETE READS IT (2026-09-16, Stage 4 session 4). Sets, prescriptions and
+ * seeds are pounds everywhere; this is the one rule that turns one into the number a screen prints, so the
+ * logger's box, Performance's set rows and State's logged sets show the same figure for one stored set.
+ * Kilograms by the definition constant on a metric account, then to the nearest quarter in either unit.
+ * OURS — the quarter: the smallest fractional plate sold (0.25 kg / 0.25 lb); whole numbers turned a typed
+ * 82.5 kg into 83 on the next screen. Every value typed in a quarter comes back exactly. Ledger row in
+ * docs/STATE-SOURCES.md.
+ */
+export function liftInAthletesUnit(lb: number, metric: boolean): number {
+  const v = metric ? lb * KG_PER_LB : lb;
+  return Math.round(v * 4) / 4;
+}
 
 export function completedStrengthVolume(
   exercises: any[] | null | undefined,

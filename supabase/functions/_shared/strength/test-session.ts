@@ -23,9 +23,14 @@
 import { strengthTestKey } from '../strength-test-key.ts';
 import { pretestSession, type TestedLift } from '../standing-plan/working-number.ts';
 import { DEFAULT_BAR_LB } from '../standing-plan/warmup.ts';
+import { liftInAthletesUnit } from './session-volume.ts';
+import { BAR_TYPES } from '../../../../src/lib/bar-types.ts';
 
 export type TestSessionSet = {
+  /** POUNDS, as stored. */
   weight: number;
+  /** The same weight as the athlete reads it, in the row's `unit` (Stage 4 session 4). */
+  weight_in_unit?: number;
   reps?: number;
   set_type: 'warmup' | 'working';
   amrap?: true;
@@ -44,8 +49,10 @@ export type TestSessionRow = {
   target_reps?: string;
   target_rir?: number;
   notes?: string;
-  /** On a row with an anchor set: the increment `pretestStepWeights` rounds A and the steps to. */
+  /** On a row with an anchor set: the increment `pretestStepWeights` rounds A and the steps to, in `unit`. */
   anchor_round_to?: number;
+  /** The athlete's unit: every `weight_in_unit` and `anchor_round_to` on the row is in it. */
+  unit?: 'kg' | 'lb';
   sets: TestSessionSet[];
 };
 
@@ -64,6 +71,26 @@ export const LAUNCHER_LIFTS: Record<LauncherTestType, string[]> = {
  * is OURS (see `pretestSession`).
  */
 export const TEST_ROUND_TO_LB = 5;
+/**
+ * The anchor's increment on a metric account: "the weight of the barbell must always be a multiple of 2.5 kg"
+ * — IPF Technical Rules Book 2023, rules of performance (https://www.powerlifting.sport/fileadmin/ipf/data/rules/technical-rules/english/IPF_Technical_Rules_Book_2023__1_.pdf).
+ * The phone types A in kilograms, so the steps round in kilograms.
+ */
+export const TEST_ROUND_TO_KG = 2.5;
+
+/**
+ * ⛔ THE ROWS IN THE ATHLETE'S UNIT (2026-09-16, Stage 4 session 4). Every `weight` stays pounds; each set
+ * gains `weight_in_unit`, the row carries `unit`, and an anchor row's increment is the unit's. The logger
+ * opens its boxes on these and converts nothing.
+ */
+function inAthletesUnit(rows: TestSessionRow[], metric: boolean): TestSessionRow[] {
+  return rows.map((r) => ({
+    ...r,
+    unit: metric ? 'kg' : 'lb',
+    ...(r.anchor_round_to != null ? { anchor_round_to: metric ? TEST_ROUND_TO_KG : r.anchor_round_to } : {}),
+    sets: r.sets.map((st) => (st.weight > 0 ? { ...st, weight_in_unit: liftInAthletesUnit(st.weight, metric) } : st)),
+  }));
+}
 
 // Moved word for word from StrengthLogger.tsx.
 const EMPTY_BAR_HINT = 'Empty bar — a few easy reps to groove the movement.';
@@ -80,9 +107,9 @@ const PULLUP_TEST_HINT =
 const stepHint = (i: number): string =>
   i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.`;
 
-const fileNoteFor = (name: string, onFile: number | undefined, hasSteps: boolean): string =>
+const fileNoteFor = (name: string, onFile: number | undefined, hasSteps: boolean, metric: boolean): string =>
   onFile && onFile > 0
-    ? `${name} on file: ${Math.round(onFile)} lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
+    ? `${name} on file: ${Math.round(liftInAthletesUnit(onFile, metric))} ${metric ? 'kg' : 'lb'} (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
     : hasSteps
       ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
       : '';
@@ -137,6 +164,7 @@ function barbellTestRow(
   onFile: number | undefined,
   composerNote: string,
   roundTo: number,
+  metric: boolean,
 ): TestSessionRow {
   const hasSteps = !!steps && steps.length > 0;
   const stepSets: TestSessionSet[] = hasSteps
@@ -156,7 +184,7 @@ function barbellTestRow(
         { weight: 0, reps: 5, set_type: 'working' },
         { weight: 0, set_type: 'working', amrap: true },
       ];
-  const notes = [fileNoteFor(name, onFile, hasSteps), composerNote].filter(Boolean).join(' ');
+  const notes = [fileNoteFor(name, onFile, hasSteps, metric), composerNote].filter(Boolean).join(' ');
   return {
     name,
     ...(notes ? { notes } : {}),
@@ -164,7 +192,9 @@ function barbellTestRow(
     sets: [
       // ⚠️ THE BAR'S WEIGHT IS `DEFAULT_BAR_LB`, the standard-bar assumption the plan's own ramp uses.
       // The logger wrote 0 here on the overhead press; an empty bar weighs the same on every lift.
-      { weight: DEFAULT_BAR_LB, set_type: 'warmup', set_hint: EMPTY_BAR_HINT },
+      // ⛔ A metric account's empty bar is the 20 kg bar (the bar table's `standard_kg`, IWF), not 45 lb read in
+      // kilograms (20.5). Stored as that bar's pounds, like every weight (Stage 4 session 4).
+      { weight: metric ? BAR_TYPES.standard_kg.weight : DEFAULT_BAR_LB, set_type: 'warmup', set_hint: EMPTY_BAR_HINT },
       ...stepSets,
     ],
   };
@@ -180,14 +210,15 @@ export function launcherTestSession(
   type: LauncherTestType,
   perf: Record<string, unknown> | null | undefined,
   roundTo = TEST_ROUND_TO_LB,
+  metric = false,
 ): TestSessionRow[] {
-  return (LAUNCHER_LIFTS[type] ?? []).map((name) => {
+  return inAthletesUnit((LAUNCHER_LIFTS[type] ?? []).map((name) => {
     const key = strengthTestKey(name);
     if (key === 'pullupMaxReps') return pullUpRow(name);
     const lift = key ? TESTED_LIFT_BY_KEY[key] : undefined;
     const onFile = typedMaxFor(name, perf);
-    return barbellTestRow(name, lift ? stepsFromPretest(lift, onFile, roundTo) : null, onFile, '', roundTo);
-  });
+    return barbellTestRow(name, lift ? stepsFromPretest(lift, onFile, roundTo) : null, onFile, '', roundTo, metric);
+  }), metric);
 }
 
 /**
@@ -200,9 +231,10 @@ export function plannedTestSession(
   tags: unknown,
   perf: Record<string, unknown> | null | undefined,
   roundTo = TEST_ROUND_TO_LB,
+  metric = false,
 ): TestSessionRow[] {
   const standing = (Array.isArray(tags) ? tags : []).map((t) => String(t).toLowerCase()).includes('standing_plan');
-  return rows.map((ex) => {
+  return inAthletesUnit(rows.map((ex) => {
     const rowName = String(ex?.name || '').trim();
     if (!isTestedLift(ex)) {
       // An accessory, as prescribed: its own planned sets, name, target and reserve.
@@ -240,6 +272,6 @@ export function plannedTestSession(
     const steps = standing
       ? planSteps
       : (planSteps && planSteps.some((p) => p.amrap) ? planSteps : (lift ? stepsFromPretest(lift, onFile, roundTo) : null));
-    return barbellTestRow(standing ? rowName : liftName, steps, onFile, standing ? String(ex?.notes || '').trim() : '', roundTo);
-  });
+    return barbellTestRow(standing ? rowName : liftName, steps, onFile, standing ? String(ex?.notes || '').trim() : '', roundTo, metric);
+  }), metric);
 }
