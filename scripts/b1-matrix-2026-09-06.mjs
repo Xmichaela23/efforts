@@ -7,6 +7,7 @@
 // a/b/d run first for every function; B's row counts (every table with a user_id column) must be unchanged
 // afterwards and no response may carry B's id. Then c runs per function and must reach B.
 //   node scripts/b1-matrix-2026-09-06.mjs run        setup → matrix → teardown (leftover check at the end)
+//   node scripts/b1-matrix-2026-09-06.mjs run fn1,fn2   the same, for the named functions only
 //   node scripts/b1-matrix-2026-09-06.mjs teardown   delete whatever a crashed run left (reads .b1-matrix/state.json)
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -76,8 +77,6 @@ const BODIES = {
   'process-workouts-batch': (t) => ({ workout_ids: [t.workoutId] }),
   'recompute-athlete-memory': () => ({}),
   'adapt-plan': () => ({ action: 'suggest' }),
-  'backfill-planned-workload': () => ({ dry_run: true }),
-  'backfill-strength-load': () => ({ dry_run: true, limit: 1 }),
   'coach': () => ({ skip_cache: true }),
   'compute-core-verdict': () => ({ dry_run: true }),
   'delete-goal': (t) => ({ goal_id: t.goalId }),
@@ -86,8 +85,16 @@ const BODIES = {
   'readiness': () => ({}),
   'recompute-workout': (t) => ({ workout_id: t.workoutId, include_summary: false }),
   'save-imported-workout': () => ({ workout: importWorkout() }),
+  // Added 2026-09-16 (missed by the 09-06 conversion). A dummy Strava token: Strava answers 401, and the
+  // function writes that answer onto the acting user's Strava connection before it fails — that write is the signal.
+  'import-strava-history': () => ({ accessToken: 'b1-matrix-not-a-strava-token', importType: 'recent', maxActivities: 1 }),
 };
-const FUNCTIONS = Object.keys(BODIES);
+// Functions whose only trace on an account is an UPDATE (row counts cannot see it): read that state per account.
+const PROBES = {
+  'import-strava-history': async (t) => { const r = await rest('GET', `/rest/v1/device_connections?user_id=eq.${t.userId}&provider=eq.strava&select=health,last_error`); return JSON.stringify(r.json?.[0] ?? null); },
+};
+const ONLY = (process.argv[3] || '').split(',').filter(Boolean);
+const FUNCTIONS = Object.keys(BODIES).filter((f) => !ONLY.length || ONLY.includes(f));
 
 async function setup() {
   const stamp = Date.now();
@@ -104,6 +111,8 @@ async function setup() {
     const g = await insert('goals', { user_id: userId, name: `B1 matrix goal ${key}`, goal_type: 'capacity', sport: 'run', status: 'active', target_metric: '5k_time', target_value: 1500 });
     if (!g.ok) throw new Error(`goal ${key} failed ${g.status}: ${JSON.stringify(g.json).slice(0, 300)}`);
     accounts[key].workoutId = w.json[0].id; accounts[key].goalId = g.json[0].id;
+    const dc = await insert('device_connections', { user_id: userId, provider: 'strava', provider_user_id: `b1-matrix-${key}-${stamp}`, health: 'ok', last_error: null, connection_data: {} });
+    if (!dc.ok) throw new Error(`strava connection ${key} failed ${dc.status}: ${JSON.stringify(dc.json).slice(0, 300)}`);
     accounts[key].token = await signIn(email, password);
   }
   saveState({ accounts });
@@ -116,6 +125,7 @@ async function matrix(acc) {
   const A = acc.A, B = acc.B;
   const tables = await tablesWithUserId();
   const before = await countRows(tables, B.userId);
+  const probeBefore = {}; for (const fn of Object.keys(PROBES)) probeBefore[fn] = await PROBES[fn](B);
   const rows = [];
   const leak = (text) => text.includes(B.userId);
   console.log(`\n── cells a / b / d (A's token, then anon) ──`);
@@ -131,15 +141,22 @@ async function matrix(acc) {
   const after = await countRows(tables, B.userId);
   const changed = Object.keys(after).filter((t) => after[t] !== before[t]);
   const bGoalStill = await goalExists(B.goalId);
+  for (const fn of Object.keys(PROBES)) {
+    const bNow = await PROBES[fn](B), aNow = await PROBES[fn](A);
+    if (bNow !== probeBefore[fn]) changed.push(`${fn}: B state ${probeBefore[fn]}→${bNow}`);
+    console.log(`${fn} state after a/b/d — A: ${aNow} · B: ${bNow}${bNow === probeBefore[fn] ? ' (unchanged)' : ' ⛔ CHANGED'}`);
+  }
   console.log(`\nB rows after a/b/d: ${changed.length ? `CHANGED in ${changed.map((t) => `${t} ${before[t]}→${after[t]}`).join(', ')}` : 'unchanged across ' + Object.keys(after).length + ' tables'} · B's goal ${bGoalStill ? 'still there' : 'GONE'}`);
 
   console.log(`\n── cell c (service key + B's id) ──`);
   const cRows = [];
   for (const fn of FUNCTIONS) {
     const pre = await countRows(tables, B.userId);
+    const probePre = PROBES[fn] ? await PROBES[fn](B) : null;
     const c = await callFn(fn, SVC, { ...BODIES[fn](B), user_id: B.userId });
     const post = await countRows(tables, B.userId);
     const touched = Object.keys(post).filter((t) => post[t] !== pre[t]);
+    if (PROBES[fn]) { const probePost = await PROBES[fn](B); if (probePost !== probePre) touched.push(`state ${probePre}→${probePost}`); }
     const reachedB = c.text.includes(B.userId) || touched.length > 0 || (fn === 'delete-goal' && !(await goalExists(B.goalId)));
     cRows.push({ fn, c: c.status, reachedB, touched, cNote: c.text.slice(0, 90).replace(/\s+/g, ' ') });
     console.log(`${fn.padEnd(28)} c=${c.status} ${reachedB ? 'B reached' : 'no B signal'}${touched.length ? ` (${touched.join(',')})` : ''}`);

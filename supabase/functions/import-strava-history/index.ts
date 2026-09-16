@@ -2,6 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { recordProviderResult } from '../_shared/connection-health.ts';
 import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 import { localDayOf, localDayInRange, paddedEpochBounds } from './date-window.ts';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY =
@@ -41,7 +42,8 @@ interface StravaActivity {
 }
 
 interface ImportRequest {
-  userId: string;
+  user_id?: string;
+  userId?: string;
   accessToken: string;
   refreshToken?: string;
   importType: 'historical' | 'recent';
@@ -654,8 +656,20 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
-    const { userId, accessToken, refreshToken, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
-    if (!userId || !accessToken) {
+    const body: ImportRequest = await req.json();
+    const { accessToken, refreshToken, maxActivities = 200, startDate, endDate } = body;
+    // B1: identity comes from the verified JWT; the service key may name a user in the body. Body user_id is otherwise ignored.
+    const bodyUserId = typeof body?.user_id === 'string' ? body.user_id : typeof body?.userId === 'string' ? body.userId : null;
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, bodyUserId));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      throw e;
+    }
+    if (!accessToken) {
       return new Response('Missing required fields', { status: 400, headers: cors });
     }
 
