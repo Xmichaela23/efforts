@@ -122,6 +122,7 @@ function goalWorkoutDisciplineAndDistanceMatch(g: GoalForPhaseInference, w: W): 
   }
   const m = workoutDistanceMeters(w);
   const durMin = minutes(w) / 60;
+  // OURS — `goalWorkoutDisciplineAndDistanceMatch` distance and hour windows per race (5k 4.2-8 km, 10k 8-13 km, half 18-25 km, marathon 38-200 km, century 80 km, tri 3 km / 0.5 h): tolerance bands, no source
   if (gSport === 'tri' || distKey === '70.3' || distKey === '140.6' || distKey === 'sprint_tri') {
     if (m != null && m > 3_000) return true;
     if (durMin >= 0.5) return true;
@@ -190,6 +191,7 @@ export function inferAthleteIdentityV1(
   goalsForPhase: GoalForPhaseInference[] | null | undefined = null,
 ): AthleteIdentityV1 {
   const now = new Date();
+  // OURS — `inferAthleteIdentityV1` 90-day window; active at 8 % of sessions (strength 5 %); dormant after 2.5 months; identity shares 55 / 35 / 20 / 15 / 12 / 10 / 8 %: no source, kept as found
   const d90 = new Date(now);
   d90.setDate(d90.getDate() - 90);
   const iso90 = d90.toLocaleDateString('en-CA');
@@ -266,6 +268,7 @@ export function inferAthleteIdentityV1(
   const nname = (w: W) => ((w.name || '') + '').toLowerCase();
   const raceNameHints = recent.filter((w) => /\brace\b|\b5k|\b10k|half|marathon|triathlon|ironman|event\b/i.test(nname(w))).length;
 
+  // OURS — `training_personality` shares 25 % workouts / 20 % races / 10 % × 3 disciplines / 8 % strength / 12 %: no source, kept as found
   let training_personality: AthleteIdentityV1['training_personality'] = 'varied';
   if (wtN > 0 && (workoutN / wtN > 0.25 || (raceN + raceNameHints) / wtN > 0.2)) {
     training_personality = (raceN + raceNameHints) / wtN > 0.2 ? 'race_focused' : 'structured';
@@ -306,6 +309,7 @@ export function inferAthleteIdentityV1(
     phase_signal = 'post_race';
   } else if (m7 > 0 && m8_14 > 0) {
     const ratio = m7 / m8_14;
+    // OURS — `inferAthleteIdentityV1` last 7 days vs the 7 before: under 0.72 recovery, over 1.18 build: no source, kept as found
     if (ratio < 0.72) {
       current_phase = 'recovery';
       phase_signal = 'volume_down_vs_prior7d';
@@ -334,6 +338,7 @@ export function inferAthleteIdentityV1(
     if (normType(workoutTypeForNorm(w)) !== 'run') return false;
     const nm = nname(w);
     const keyword = /\b(marathon|road race|20\s*miler|20mi|ultra|half marathon|\b20k\b)/i.test(nm) || /\brace\b|event|triathlon|ironman/i.test(nm);
+    // OURS — `postKeyRace` 90 min and a 2-day window read as a key race; 3 days for the taper hint: no source
     const longEnough = longRunMins(w) >= 90 || /marathon|20\s*mi|32\s*k|ultra|half marathon/i.test(nm);
     return keyword && (longEnough || stravaWorkoutType(w) === 1);
   });
@@ -379,6 +384,7 @@ export function inferTrainingBackgroundSentence(
   identity: AthleteIdentityV1,
 ): string {
   const top = Object.entries(identity.discipline_mix)
+    // OURS — `inferTrainingBackgroundSentence` disciplines at 12 %+, top 3: no source
     .filter(([, v]) => v >= 0.12)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)

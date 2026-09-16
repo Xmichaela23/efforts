@@ -32,6 +32,7 @@ export interface LoadedLegsDiagnosis {
   suggestion: string;
 }
 
+// OURS — `NOVEL_GENERIC_SUGGESTION` / `SORE_BASE_SUGGESTION` "2–3 days": general repeated-bout physiology (see above), no named source
 const NOVEL_GENERIC_SUGGESTION = 'Expect this to ease over 2–3 days — easy movement helps more than rest.';
 const NON_NOVEL_SUGGESTION = 'Normal loading response — keep efforts easy if legs still feel heavy.';
 const SORE_BASE_SUGGESTION = 'Soreness like this typically eases in 2–3 days — easy movement helps more than rest.';

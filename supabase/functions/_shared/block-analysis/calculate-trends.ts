@@ -14,15 +14,18 @@ import { parseLocalDate } from '../parse-local-date.ts';
 // =============================================================================
 
 // Maximum realistic % change in 2 weeks (anything higher = different workout types)
+// OURS — `MAX_BIKE_CHANGE_PERCENT` 25 / `MAX_RUN_CHANGE_PERCENT` 15: sanity cut-offs, no page or field source, kept as found
 const MAX_BIKE_CHANGE_PERCENT = 25;
 const MAX_RUN_CHANGE_PERCENT = 15;
 
 // Minimum workouts needed per period for reliable comparison
 const MIN_WORKOUTS_PER_PERIOD = 2;
+// OURS — `MIN_WORKOUTS_PER_PERIOD` 2: sample floor per 2-week half, no source, kept as found
 
 // HR change thresholds for efficiency signal
 const HR_IMPROVING_THRESHOLD = -3;  // 3+ bpm lower = improving
 const HR_FATIGUED_THRESHOLD = 5;    // 5+ bpm higher = potential fatigue
+// OURS — `HR_IMPROVING_THRESHOLD` -3 / `HR_FATIGUED_THRESHOLD` 5 bpm: no page or field source, kept as found
 
 // =============================================================================
 // MAIN FUNCTION
@@ -31,6 +34,7 @@ const HR_FATIGUED_THRESHOLD = 5;    // 5+ bpm higher = potential fatigue
 export function calculatePerformanceTrends(
   workouts: Workout[],
   userBaselines: UserBaselines,
+  // OURS — `calculatePerformanceTrends` weeksBack 4 (two 2-week halves): no source, kept as found
   weeksBack: number = 4
 ): PerformanceTrends {
   const now = new Date();
@@ -238,6 +242,7 @@ function calculateEfficiency(
   const previousWithHR = previousPeriod.filter(w => w.avg_heart_rate && w.avg_heart_rate > 0);
   
   // Need at least 2 workouts with HR in each period
+  // OURS — `calculateEfficiency` 2 sessions with HR per half: no source, kept as found
   if (currentWithHR.length < 2 || previousWithHR.length < 2) {
     return undefined;
   }

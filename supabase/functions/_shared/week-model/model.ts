@@ -136,6 +136,7 @@ export type Cost = {
  * it blocks nothing that has already happened. A carve-out ("this rule does not apply
  * when coupled") would be the second hiding place this table exists to prevent.
  */
+// OURS — `COST` 48 h heavy_legs / 48 h long_effort clearances and hard_cardio 24 h: Michael's rulings (2026-08-17/18, D-453), no page prints an hour count
 export const COST: Record<Load, Cost> = {
   heavy_lower: { emits: { heavy_legs: 48 }, needs: ['heavy_legs', 'long_effort'] },
   long_run: { emits: { long_effort: 48 }, needs: ['heavy_legs'] },
@@ -222,6 +223,7 @@ export const PAIRING: Record<string, Sport> = {
 
 /** Barbell in the AM, intervals in the PM. Michael: "leave 6 to 8 hours." */
 export const COUPLED_GAP_HOURS = 6;
+// Viada p108: 6-8 h between two-a-days (corpus "CONFIRMED OFF THE PAGE" table); 6 is the low end
 
 /** A unit is what the resolver actually places: one or more sessions on ONE day. */
 export type Unit = {
@@ -321,6 +323,7 @@ export function needsOf(u: Unit): SystemId[] {
 
 /** The hours of the repeating week. A block's week is a CYCLE, not a line. */
 export const WEEK_HOURS = 168;
+// FIELD — definition (7 days × 24 h)
 
 /**
  * ⛔ EVERY SESSION GETS ITS OWN HOUR, AND THAT IS THE FIX FOR THE SECOND BUG I WROTE.

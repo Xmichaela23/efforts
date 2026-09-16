@@ -69,8 +69,10 @@ export const TEST_ROUND_TO_LB = 5;
 const EMPTY_BAR_HINT = 'Empty bar — a few easy reps to groove the movement.';
 const TEST_LAST_SET_HINT =
   'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.';
+// OURS — `ANCHOR_HINT` "8 to 10 reps near failure": a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count
 const ANCHOR_HINT = 'A weight for 8 to 10 reps near failure. Enter it here.';
 const PULLUP_SCAP_HINT = 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.';
+// OURS — `PULLUP_EASY_HINT` 2–3 easy pull-ups and ~2 min rest: moved from the logger, no source
 const PULLUP_EASY_HINT = '2–3 easy pull-ups, then rest ~2 min before the test set.';
 const PULLUP_TEST_HINT =
   'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.';

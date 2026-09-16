@@ -305,6 +305,7 @@ type Relaxation = 'strict' | 'no_rest_day' | 'clearance_as_penalty';
 const RELAXATION_ORDER: Relaxation[] = ['strict', 'no_rest_day', 'clearance_as_penalty'];
 
 export const MAX_ACTIVE_DAYS_DEFAULT = 6;
+// OURS — `MAX_ACTIVE_DAYS_DEFAULT` 6 (one full rest day, §5 of the scheduling spec): no page, kept as found
 
 // ── The core: is this candidate day legal for this lift? ────────────────────
 
@@ -528,6 +529,7 @@ function scoreKey(
       // Which one is "before" depends on the calendar order of the two days.
       const [first, second] = anchors[i].dayIndex === (anchors[j].dayIndex + 1) % 7
         ? [anchors[j], anchors[i]] : [anchors[i], anchors[j]];
+      // OURS — `shapePenalty` +1 per adjacent anchor pair, +3 when the law names the pair: no source
       if (adjacencyPenaltyReason(first.kind, second.kind)) shapePenalty += 3;
     }
   }
@@ -593,6 +595,7 @@ function scoreKey(
   for (let i = 0; i < assignment.length; i++) {
     for (let j = i + 1; j < assignment.length; j++) {
       if (lifts[i].isLower || lifts[j].isLower) continue; // upper↔upper only — this is the whole point
+      // OURS — `pressAdjacencyShortfall` presses preferred 3 days apart (also the note below): no source
       pressAdjacencyShortfall += Math.max(0, 3 - gapDays(assignment[i], assignment[j]));
     }
   }
@@ -1284,6 +1287,7 @@ export function solve(input: SolverInput): SolverResult {
               ? {
                   stackedWith: {
                     label: anchorHere.label,
+                    // Viada p108: 6-8 h between two-a-days; 6 is the low end (same as `COUPLED_GAP_HOURS`)
                     gapHours: stackNeedsRecoveryGap(anchorHere.kind, kind) ? 6 : 0,
                     // §4.1 / Eddens — always, and it is not a courtesy. It is why the stack is safe.
                     order: 'lift_first' as const,

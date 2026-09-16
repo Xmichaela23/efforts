@@ -24,6 +24,7 @@ import {
 import type { BlockAdaptation } from '../block-adaptation/index.ts';
 import { computeCrossDomain } from './cross-domain.ts';
 
+// OURS — `trendFromPct` default 2 % band: no source, kept as found
 function trendFromPct(pct: number | null, threshold: number = 2): TrendDirection {
   if (pct == null) return 'stable';
   if (pct >= threshold) return 'improving';
@@ -122,6 +123,7 @@ function blockStrength(adaptation: BlockAdaptation): BlockResponseState['strengt
       ? ((last.estimated_1rm - first.estimated_1rm) / first.estimated_1rm) * 100
       : null;
 
+    // OURS — `blockStrength` ±3 % e1RM and ±0.5 RIR over the block: no source, kept as found
     const e1rm_trend: TrendDirection = !sufficient ? 'stable'
       : e1rmDelta != null && e1rmDelta >= 3 ? 'improving'
       : e1rmDelta != null && e1rmDelta <= -3 ? 'declining'
@@ -256,6 +258,7 @@ function blockAssessment(
   const decliningNames = signals.filter((s) => s.trend === 'declining').map((s) => s.name);
   const improvingNames = signals.filter((s) => s.trend === 'improving').map((s) => s.name);
 
+  // OURS — `blockAssessment` 2 declining signals reads as overreaching: no source, kept as found
   if (concerning >= 2) {
     return make('overreaching', decliningNames[0] || null, 'high',
       `${decliningNames.join(' and ')} are declining over this block. The current training stimulus may be too high.`);

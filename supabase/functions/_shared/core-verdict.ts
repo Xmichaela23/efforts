@@ -61,6 +61,7 @@ function daysBefore(asOf: string, ymd: string): number {
 }
 
 export function computeCoreVerdict(efforts: CoreEffortRow[], opts: CoreVerdictOpts): CoreVerdict {
+  // OURS — `computeCoreVerdict` 183-day window and 8-effort floor (DESIGN-segments §5 set N≥8): no field source
   const windowDays = opts.windowDays ?? 183;
   const minEfforts = opts.minEfforts ?? 8;
   const temp = opts.heatNeutralTempF ?? 60;

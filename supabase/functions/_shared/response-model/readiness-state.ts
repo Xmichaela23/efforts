@@ -50,6 +50,7 @@ export function computeReadinessState(args: {
 
   // Body signals are the primary read: execution, HR drift, RPE, cardiac efficiency.
   const bodySignalsConcerning = args.signalsConcerning > 0;
+  // OURS — `bodySignalsImproving` needs 2 available signals: no source, kept as found
   const bodySignalsImproving = args.signalsAvailable >= 2 &&
     args.signalsConcerning === 0 &&
     args.assessmentLabel === 'responding';

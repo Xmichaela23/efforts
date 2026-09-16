@@ -45,6 +45,7 @@ export function computeTotalLoadStatus(
   const easy = isEasyPhase(phase);
   const isBuild = phase === 'build';
   if (totalAcwr != null) {
+    // FIELD — Blanch & Gabbett 2016: 0.8-1.3 sweet spot, >1.5 high (the default row). OURS — `computeTotalLoadStatus` build 1.4/1.6, easy 1.15/1.3 shifts and the +30 % / −20 % plan fallback: no source
     const highBand = easy ? 1.3 : isBuild ? 1.6 : 1.5;
     const elevBand = easy ? 1.15 : isBuild ? 1.4 : 1.3;
     if (totalAcwr > highBand) return { status: 'high', interp: 'total load ramping quickly' };
@@ -91,6 +92,7 @@ function observeEnduranceSession(
   // HR observation — in recovery/taper, suppress mild elevations
   if (session.avg_hr != null && norms.easy_hr_at_pace != null) {
     const delta = session.avg_hr - norms.easy_hr_at_pace;
+    // OURS — `observeEnduranceSession` HR ±3 bpm (8 in an easy week), drift 3 % / 6 %, execution +5 / −8 (−15 easy), RPE ≥ 6 easy / ≤ 4 hard: no source, kept as found
     if (Math.abs(delta) >= 3) {
       if (delta > 0) {
         if (easy && delta < 8) {
@@ -169,6 +171,7 @@ function observeStrengthSession(
     const avgTarget = withTarget.reduce((s, e) => s + e.target_rir!, 0) / withTarget.length;
     const delta = avgActual - avgTarget;
 
+    // OURS — `observeStrengthSession` RIR bands: ±0.5 on target (±1.0 easy), ±1.0 off, per-lift 1.5 (2.0 easy), average < 1.5 / > 3.5, −1 vs norm: no source, kept as found
     if (Math.abs(delta) <= (easy ? 1.0 : 0.5)) {
       if (easy) {
         obs.push(`Recovery compliance — averaged ${avgActual.toFixed(1)} RIR against target ${Math.round(avgTarget)}.`);
@@ -335,6 +338,7 @@ function makeTrend(
   const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
   const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
   const delta = avgSecond - avgFirst;
+  // OURS — `makeTrend` 5 % of the first half (floor 1) moves a trend; 2 values minimum: no source, kept as found
   const threshold = Math.abs(avgFirst) * 0.05 || 1;
 
   let trend: TrendSummary['trend'];
@@ -477,6 +481,7 @@ export function buildBodyResponse(
     const xParts: string[] = [];
     for (const [t, info] of byType) {
       const w = getRunningFatigueWeight({ type: t });
+      // OURS — `buildBodyResponse` impact words at weight 0.3 / 0.5: no source, kept as found
       const impact = w <= 0.3 ? 'low' : w <= 0.5 ? 'moderate' : 'notable';
       const dp = disciplineProfiles?.find(p => p.discipline === t || (t === 'ride' && p.discipline === 'bike'));
       const maturityTag = dp && dp.maturity !== 'established'

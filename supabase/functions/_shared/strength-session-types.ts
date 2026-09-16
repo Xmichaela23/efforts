@@ -73,6 +73,7 @@ export function strengthFocusFromWorkout(wAny: any): StrengthFocus {
 }
 
 /** execution_score (0..100) → tone band, aligned with the run/ride interval-execution branch (>=85 / >=70). */
+// OURS — `execTone` 85 / 70 execution bands (same bands as the run/ride interval grade): no source, kept as found
 function execTone(score: number | null): StrengthSessionType7d['efficiency_tone'] {
   if (score == null) return 'neutral';
   if (score >= 85) return 'positive';
@@ -133,6 +134,7 @@ export function buildStrengthSessionTypes7d(workouts: any[]): StrengthSessionTyp
         sample_size: agg[k].n,
         avg_execution_score: avg,
         efficiency_label: avg != null
+          // OURS — 85 / 70 bands, as `execTone` above
           ? (avg >= 85 ? 'Strong execution' : avg >= 70 ? 'Solid execution' : 'Needs adjustment')
           : (agg[k].tests > 0 ? 'Test — not graded' : null),
         efficiency_tone: execTone(avg),

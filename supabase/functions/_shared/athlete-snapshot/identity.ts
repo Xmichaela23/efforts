@@ -128,6 +128,7 @@ export function buildPlanPosition(opts: {
   let phase: string | null = null;
   if (weekIndex != null && totalWeeks != null) {
     const pct = weekIndex / totalWeeks;
+    // OURS — `buildPlanPosition` phase cut-offs at 25 % / 70 % / 90 % of the plan: no source, kept as found
     if (pct <= 0.25) phase = 'base';
     else if (pct <= 0.70) phase = 'build';
     else if (pct <= 0.90) phase = 'peak';

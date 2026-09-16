@@ -86,6 +86,7 @@ export function hasCompound1RMSignals(performanceNumbers: unknown): boolean {
     ok(p.bench ?? p.bench_press ?? p.benchPress),
     ok(p.overheadPress1RM ?? p.ohp ?? p.overhead_press ?? p.overhead),
   ].filter(Boolean).length;
+  // OURS — `hasCompound1RMSignals` 2 of the 4 main lifts on file: no source, kept as found
   return hits >= 2;
 }
 

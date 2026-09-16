@@ -70,6 +70,7 @@ export function generateFocusAreas(
   }
   
   // Sort by priority and limit to 3
+  // OURS — `generateFocusAreas` at most 3 focus areas: display cap, no source, kept as found
   areas.sort((a, b) => a.priority - b.priority);
   const topAreas = areas.slice(0, 3);
   

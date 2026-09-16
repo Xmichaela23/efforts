@@ -86,6 +86,7 @@ export function recordSwimPace(args: Baselines): RecordSwimPace {
   const lr = args.learnedFitness?.swim_pace_per_100m;
   if (baseYd == null || !lr || !(Number(lr.value) > 0)) return { value, suggestion: null };
   // learned s/100m → s/100yd to compare with the typed 100yd pace (100 yd = 91.44 m — a unit, not a tuning number)
+  // FIELD — definition (100 yd = 91.44 m)
   const sug = suggestBaselineUpdate({
     key: 'swimPace100', label: 'Swim 100yd', baseline: baseYd,
     learned: { value: Math.round(Number(lr.value) * 0.9144), confidence: lr.confidence, sample_count: Number(lr.sample_count) },

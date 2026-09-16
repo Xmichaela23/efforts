@@ -40,6 +40,7 @@ function normType(t: string | null | undefined): string {
   return s || 'other';
 }
 
+// FIELD — definition (1 mi = 1609.344 m; this file divides by 1609.34)
 function metersToMi(m: number): number { return m / 1609.34; }
 function secToMin(s: number): number { return Math.round(s / 60); }
 
@@ -295,6 +296,7 @@ function enduranceMatchQuality(planned: PlannedSession, actual: ActualSession): 
   const aDist = actual.distance_meters;
 
   // Use distance as primary comparison if both available, else duration
+  // OURS — `enduranceMatchQuality` ratios: under 0.70 shorter, over 1.30 longer, 0.85-1.15 followed: no source, kept as found
   if (pDist && pDist > 0 && aDist && aDist > 0) {
     const ratio = aDist / pDist;
     if (ratio < 0.70) return 'shorter';
@@ -328,6 +330,7 @@ function strengthMatchQuality(planned: PlannedSession, actual: ActualSession): S
   // Plan-relative path: compare actual RIR against prescribed RIR
   if (withTarget.length > 0) {
     const avgDelta = withTarget.reduce((s, e) => s + e.rir_delta!, 0) / withTarget.length;
+    // OURS — `strengthMatchQuality` ±0.5 on target, ±1.0 off; unplanned mean < 1.5 / > 3.5 RIR: no source, kept as found
     if (Math.abs(avgDelta) <= 0.5) return 'on_target';
     if (avgDelta > 1.0) return 'under_intensity';
     if (avgDelta < -1.0) return 'over_intensity';

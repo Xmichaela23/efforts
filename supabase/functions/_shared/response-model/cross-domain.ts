@@ -15,6 +15,7 @@ import {
 const HR_ELEVATION_THRESHOLD = 4;   // bpm above baseline to flag
 const EXECUTION_DROP_THRESHOLD = 6; // % below baseline to flag
 const MIN_PAIRS = 3;
+// OURS — `HR_ELEVATION_THRESHOLD` 4 bpm, `EXECUTION_DROP_THRESHOLD` 6 %, `MIN_PAIRS` 3: no page or field source, kept as found
 
 export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainResponse {
   if (!pairs.length || pairs.length < MIN_PAIRS) {

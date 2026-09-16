@@ -110,6 +110,7 @@ export function performedLedgerFor(week: PerformedSession[]): DoseLedger {
 export const HEAVY_REPS_PER_WEEK = { lo: 4, hi: 6 } as const;
 export const VELOCITY_REPS_PER_WEEK = { lo: 15, hi: 20 } as const;
 export const HEAVY_PCT = 0.90;
+// Viada p80 (corpus B4d quotes 4-6 reps over 90% and 15-20 at 70-85% on p80; the p084 above is the older B1 note).
 export const VELOCITY_PCT = { lo: 0.70, hi: 0.85 } as const;
 
 export type PatternDose = {

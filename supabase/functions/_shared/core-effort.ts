@@ -106,6 +106,7 @@ function hrOver(points: EffortPoint[], hrByT: Map<number, number> | null | undef
  */
 export function computeCoreEffort(input: CoreEffortInput, opts: CoreEffortOpts = {}): CoreEffort | null {
   const { gps, hrByT, corePolyline, tempF } = input;
+  // OURS — `computeCoreEffort` 0.5 HR coverage for hr_aligned and 0.5 m/s moving speed: no source, kept as found
   const hrCoverageThreshold = opts.hrCoverageThreshold ?? 0.5;
   const movingSpeedMinMps = opts.movingSpeedMinMps ?? 0.5;
   if (!gps || gps.length < 2 || !corePolyline || corePolyline.length < 2) return null;

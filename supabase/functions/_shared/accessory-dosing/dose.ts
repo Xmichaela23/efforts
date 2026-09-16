@@ -30,6 +30,7 @@ import { setsFor, VIADA_INTENTS, type Range, type ViadaIntent } from '../strengt
  * ⚠️ **THE FIGURE IS QUOTED AT 1 RIR.** It is not a constant of nature and it is not "4 per set
  * whatever you do" — it is what a set taken to one rep in reserve buys. A set left further from
  * failure buys fewer, and he gives no second figure, so this module does not scale it and says so.
+ * (Viada p086.)
  */
 export const EFFECTIVE_REPS_PER_SET = 4;
 export const EFFECTIVE_REPS_CONDITION =
@@ -126,6 +127,7 @@ export function verdictForWeeklySets(sets: number, floor: number): MuscleVerdict
  */
 export const SESSION_SETS_RECOVERS: Range = { lo: 6, hi: 8 };
 export const SESSION_SETS_COSTLY = 14;
+// Viada p086 (quoted above): 6-8 recovers, 14+ costly.
 export const SESSION_CEILING_NOTE =
   'A session of 6 to 8 work sets leaves only marginal deficits a day later and few at two days, so '
   + 'the next day in another discipline is still productive. At 14 or more, performance in other '
@@ -148,6 +150,7 @@ export type SessionVerdict = 'recovers' | 'above_recovers' | 'costly';
  * high-intensity work sets, effective reps per muscle. Today only the two lifting buckets are
  * compared (`state-trend/assemble.ts`, `ViadaWeekChange`); the endurance three are a separate
  * decision and this constant is theirs too when it comes.
+ * Viada p148 (corpus "CONFIRMED OFF THE PAGE" table: "less than 10 percent per week").
  */
 export const WEEK_CHANGE_FLAG_PCT = 10;
 

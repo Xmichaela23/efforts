@@ -13,6 +13,7 @@
 
 export const CARRYOVER_WINDOW_DAYS = 3; // ≤72h; supersedes crossDomainPairs' 2d + loaded-legs' 4d. FIXED —
                                         // novelty weights CONFIDENCE, not duration (never extends the window).
+// Viada p086 prints "up to seventy-two hours" for a lifting session's cost to other modalities; the whole-day cut at 3 is ours.
 
 export type CarryoverDiscipline = 'run' | 'ride' | 'swim';
 export type StrengthFocus = 'upper' | 'lower' | 'full' | 'unknown';
@@ -131,6 +132,7 @@ export function detectCrossDomainCarryover(input: CarryoverInput): CarryoverResu
 
   // ── The two-way declared RPE gauge — ONLY when the comparable-effort baseline is solid (else it's noise:
   //    silence-on-uncertain applies to the baseline quality itself). ──
+  // OURS — `detectCrossDomainCarryover` 1.0 RPE-point gap, and a residual ≥ 2 × threshold counts as strong: no source, kept as found
   const rpeThreshold = input.rpeThreshold ?? 1.0;
   const rpeGap = (input.declaredBaselineOk && input.declaredRpeGap != null) ? input.declaredRpeGap : null;
   const rpeVeto = (rpeGap != null && rpeGap <= -rpeThreshold) || input.declaredEasy === true; // felt EASIER than output
@@ -213,6 +215,7 @@ export function buildCarryoverClause(r: CarryoverResult | null, discipline: Carr
 // ── Soreness scale (D-234): Hooper 1–7 app-wide. 1 = none, 4 = moderate, 7 = extremely sore. ──────────
 export const SORENESS_SCALE_MIN = 1;
 export const SORENESS_SCALE_MAX = 7;
+// FIELD — Hooper index 1-7 soreness scale (D-234); the 1-10 rescale below is linear arithmetic
 /** Linear rescale a legacy 1–10 soreness value to the 1–7 Hooper scale: round(1 + (v−1)·6/9). 7→5 exactly. */
 export function rescaleSoreness10to7(v10: number): number {
   return Math.round(1 + (v10 - 1) * (6 / 9));
@@ -239,6 +242,7 @@ export function resolveCarriedInSoreness(
   target: { workoutId: string; startTime: string },
   opts?: { windowDays?: number; minBaseline?: number },
 ): { elevated: boolean; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; diag: string } {
+  // OURS — `resolveCarriedInSoreness` 2-day recent window, 5-entry baseline, z ≥ 1 and +1 point: our z-score on Hooper's scale, no source
   const windowDays = opts?.windowDays ?? 2;
   const minBaseline = opts?.minBaseline ?? 5;
   const tStart = new Date(target.startTime).getTime();
@@ -288,6 +292,7 @@ export function resolveCurrentSoreness(
   entries: SorenessEntry[],
   opts?: { recentDays?: number; minBaseline?: number; asOf?: string },
 ): { level: 'normal' | 'elevated' | null; recent: number | null; mean: number | null; z: number | null; baselineOk: boolean; logged: number; recentCount: number; elevatedCount: number; countWindow: number; diag: string } {
+  // OURS — `resolveCurrentSoreness` 7-day recent window, 5-entry baseline, z ≥ 1 and +1 point, last 6 sessions counted: no source
   const recentDays = opts?.recentDays ?? 7;
   const minBaseline = opts?.minBaseline ?? 5;
   const now = opts?.asOf ? new Date(opts.asOf).getTime() : null;
@@ -323,6 +328,7 @@ export function resolveCurrentSoreness(
   // count asks the monitoring-standard question directly: how many of the last N sessions were above
   // this athlete's own normal. `longitudinal-signals.ts` uses 4-of-6 with an ABSOLUTE floor and its own
   // header says that floor should become baseline-relative once history exists — this is that shape.
+  // OURS — `COUNT_WINDOW` 6 sessions: the 4-of-6 shape from longitudinal-signals.ts, no outside source
   const COUNT_WINDOW = 6;
   const recentSix = rows.slice(0, COUNT_WINDOW).map((x) => x.e.soreness);
   const highBar = mean + sd;   // above the athlete's own spread, not a fixed number

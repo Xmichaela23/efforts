@@ -101,6 +101,7 @@ export type StrengthProtocolProfile = {
 // minimum     – maintenance; progression only when clearly underloaded
 // ---------------------------------------------------------------------------
 
+// OURS — `PROTOCOL_PROFILES` target RIR, progression deviation / e1RM-gain and deload deviation / session counts: hand-set per protocol, no page
 export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfile> = {
   durability: {
     defaultTargetRir: { lower: 2.5, upper: 2.5 },
@@ -250,6 +251,7 @@ export type PhaseRule = {
   targetRirOffset: number;
 };
 
+// OURS — `PHASE_RULES` sensitivities and RIR offsets: the RP/RTS shape (RIR falls toward the peak), our numbers
 export const PHASE_RULES: Record<PlanPhaseId, PhaseRule> = {
   base:     { allowProgress: true,  deloadSensitivity: 1.0,  targetRirOffset:  0.0 },
   build:    { allowProgress: true,  deloadSensitivity: 1.0,  targetRirOffset: -0.5 },
@@ -261,6 +263,7 @@ export const PHASE_RULES: Record<PlanPhaseId, PhaseRule> = {
 /** Clamp a target RIR to a sane band — never prescribe true failure by default, never absurdly easy. */
 const MIN_TARGET_RIR = 0.5;
 const MAX_TARGET_RIR = 4;
+// OURS — `MIN_TARGET_RIR` 0.5 / `MAX_TARGET_RIR` 4: clamp band, no page
 
 // ─── TARGET RIR FROM THE PRESCRIPTION ITSELF (D-322) ──────────────────────────
 //
@@ -286,6 +289,7 @@ const MAX_TARGET_RIR = 4;
 // signal the RIR loop exists to produce.
 
 /** Tuchscherer/Helms RPE chart: %1RM by reps (index) and RPE. Rows are reps 1-12. */
+// FIELD — Tuchscherer (RTS) / Helms RPE chart, reps 1-12 × RPE 6-10; RIR = 10 − RPE
 const RPE_COLUMNS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10] as const;
 const RPE_CHART_PCT: Record<number, number[]> = {
   1:  [86.3, 87.8, 89.2, 90.7, 92.2, 93.9, 95.5, 97.8, 100.0],
@@ -381,6 +385,7 @@ const DEFAULT_PHASE_RULE: PhaseRule = PHASE_RULES.build;
 // These are intentionally wider than the adapt-plan thresholds to avoid
 // flip-flopping the UI week-to-week. ±0.5 RIR is noise, ±1.0 is signal.
 
+// OURS — `VERDICT_DEVIATION` ±1.0 RIR: chosen to stop week-to-week flip-flop (above), no source
 export const VERDICT_DEVIATION = {
   ADD_WEIGHT: 1.0,    // deviation >= +1.0 → "add weight"
   BACK_OFF:  -1.0,    // deviation <= -1.0 → "back off weight"

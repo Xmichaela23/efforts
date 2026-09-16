@@ -46,6 +46,7 @@ export interface CoreMatchOpts {
   windowSteps?: number;
 }
 
+// FIELD — definition (mean Earth radius 6,371 km, the haversine convention)
 const R_EARTH_M = 6371000;
 
 /** Great-circle distance in metres. */
@@ -95,6 +96,7 @@ export function resample(pts: LatLng[], spacingM: number): Resampled[] {
     need -= segLen - covered;
   }
   const last = pts[pts.length - 1];
+  // OURS — `resample` keeps the last point when it is more than 0.25 × spacing past the last sample: no source
   if (haversineM(out[out.length - 1], last) > spacingM * 0.25) {
     out.push({ lat: last.lat, lng: last.lng, srcIdx: pts.length - 1 });
   }
@@ -115,6 +117,7 @@ export function matchCore(
   core: LatLng[],
   opts: CoreMatchOpts = {},
 ): CoreMatch | null {
+  // OURS — `matchCore` defaults: 10 m spacing, 30 m buffer, 0.9 coverage, gap 2 × buffer, 4-step window. Strava's ordered-segment idea, our numbers (DESIGN-segments §4.1 gives ~25-40 m)
   const S = opts.spacingM ?? 10;
   const buffer = opts.bufferM ?? 30;
   const minCoverage = opts.minCoverage ?? 0.9;

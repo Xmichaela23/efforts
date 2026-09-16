@@ -52,6 +52,7 @@ function isLongTriDistance(dist: string | null | undefined): boolean {
   );
 }
 
+// OURS — `completedEventStrength` tri races within 400 days, long 2 points / short 1, capped at 4: no source, kept as found
 function completedEventStrength(events: CompletedEvent[] | null | undefined): number {
   if (!events?.length) return 0;
   let score = 0;
@@ -116,6 +117,7 @@ export function inferTrainingFitnessLevel(opts: {
     return { level: 'advanced', source: 'wizard_advanced', reasons: ['wizard_explicit_advanced'] };
   }
 
+  // OURS — `inferTrainingFitnessLevel` score: CTL 58 / 42 / 22 / 16, FTP 265 / 215 W, run threshold ≤ 258 s/km, 14 / 1 swims in 90 days, race points 3 / 1, ±2 to change tier: no source, kept as found
   let score = 0;
   const ctl = Number(opts.currentCtl);
   if (Number.isFinite(ctl)) {

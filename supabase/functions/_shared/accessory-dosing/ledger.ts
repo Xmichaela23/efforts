@@ -167,6 +167,7 @@ export type DoseLedger = {
  * is what the picker can produce today; the fix is not a promise of his solid range, and the ledger
  * reports `light` rather than pretending otherwise.
  */
+// OURS — `MUSCLE_FLOOR_IS_ONE_SLOT` one slot (3 sets) per muscle a week: the low end of Viada p218's HYP 3-4 band, but the floor itself is ours (no page states one)
 export const MUSCLE_FLOOR_IS_ONE_SLOT =
   'The floor is one accessory slot per muscle group — three sets, the low end of the source\'s own '
   + 'hypertrophy band. It is not his 8-to-12 solid range: ten muscle groups at eight sets is eighty '
@@ -645,6 +646,7 @@ export function fillMuscleFloor(
      * thrust sets"), and a rule that held on one chip only is the asymmetry that invites a third.
      */
     const MAX_DISTINCT_PER_TARGET = 2;
+    // OURS — `MAX_DISTINCT_PER_TARGET` 2 movements per chip: Michael's ruling (2026-08-24), no page
     /**
      * ⛔ SEEDED FROM WHAT THE WEEK ALREADY HOLDS FOR THIS MUSCLE, INCLUDING THE FLOOR'S OWN ROW —
      * and that seeding is the whole fix, not a detail. The floor runs FIRST and places the athlete's

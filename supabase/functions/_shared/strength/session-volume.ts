@@ -45,6 +45,7 @@ export type CompletedStrengthVolume = {
  * exactly the shape this work order exists to remove.
  */
 export const KG_PER_LB = 0.45359237;
+// FIELD — definition (1 lb = 0.45359237 kg, international pound)
 const LB_PER_KG = 1 / KG_PER_LB;
 
 export function completedStrengthVolume(

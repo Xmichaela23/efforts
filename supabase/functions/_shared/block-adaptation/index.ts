@@ -83,6 +83,7 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+// OURS — `pctToSignal` 6 % saturates the signal: no source, kept as found
 function pctToSignal(pctChange: number | null | undefined, capPct = 6): number {
   if (pctChange == null || !Number.isFinite(pctChange)) return 0;
   return clamp(pctChange / capPct, -1, 1);
@@ -97,6 +98,7 @@ function deriveFocusFromCounts(counts: { aero: number; strength: number; long: n
   return 'unknown';
 }
 
+// OURS — `deriveFocusFromCounts` 6 strength / 2 long samples and `focusWeights` blends per focus: no source, kept as found
 function focusWeights(focus: BlockFocus): { aerobic: number; strength: number; longRun: number } {
   switch (focus) {
     case 'base':
@@ -127,6 +129,7 @@ function computeStrengthSampleCount(byExercise: BlockAdaptation['strength_progre
   }
 }
 
+// OURS — `computeSignalQualityFromSamples` 16 high / 8 medium: no source, kept as found
 function computeSignalQualityFromSamples(totalSamples: number): ConfidenceLabel {
   if (totalSamples >= 16) return 'high';
   if (totalSamples >= 8) return 'medium';
@@ -190,6 +193,7 @@ function computeOverview(
   // - -3% => ~0.75 coefficient
   // - -6% => ~0.50 coefficient
   // - -10% => ~0.20 coefficient (floor)
+  // OURS — `computeOverview` hybrid rules: strength drop past −2 % damps by 1 + drop/12 (floor 0.2), ×1.12 bonus, long-run coverage 4 samples, score 50 ± 50: no source
   let coeff = 1;
   if (isStrengthBadInHybrid && strengthDropPct != null) {
     coeff = clamp(1 + strengthDropPct / 12, 0.2, 1); // strengthDropPct is negative
@@ -224,6 +228,7 @@ function weekOfBlock(dateISO: string, blockStartISO: string): number {
   return clamp(Math.floor(d / 7) + 1, 1, 4);
 }
 
+// OURS — `confidenceLabelFromWeeklyCounts` 3 high / 2 medium per week: no source, kept as found
 function confidenceLabelFromWeeklyCounts(counts: number[]): ConfidenceLabel {
   const min = counts.length ? Math.min(...counts) : 0;
   if (min >= 3) return 'high';
@@ -243,6 +248,7 @@ function parseMmSsPerMiToSeconds(val: any): number | null {
   return mm * 60 + ss;
 }
 
+// OURS — `confidenceToNumber` high 0.9 / medium 0.65 / low 0.4: no source, kept as found
 function confidenceToNumber(conf: any): number {
   if (conf == null) return 0;
   if (typeof conf === 'number') return clamp(conf, 0, 1);
@@ -516,6 +522,7 @@ export async function getBlockAdaptation(
     // "use my number", repeating the suggestion every block is nagging them to reverse a decision they made.
     // (It deliberately does NOT use resolveCurrentRunEasyPace: that returns ONE value, and this needs BOTH.)
     const athleteChoseManual = (perf as any)?.easy_pace_source === 'manual';
+    // OURS — `getBlockAdaptation` recommends a baseline change at confidence ≥ 0.7 and ≥ 5 % apart, at most 2 shown: no source. 1.60934 km per mile is the definition, rounded
     if (!athleteChoseManual && manualEasy != null && Number.isFinite(learnedEasySecPerKm) && learnedEasyConf >= 0.7) {
       const learnedSecPerMi = learnedEasySecPerKm * 1.60934;
       const deltaPct = Math.abs(learnedSecPerMi - manualEasy) / manualEasy;

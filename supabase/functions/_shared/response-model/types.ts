@@ -13,6 +13,8 @@ export type { OverloadVerdict };
 export const MIN_SAMPLES_FOR_SIGNAL = 3;
 export const MIN_SAMPLES_FOR_TREND = 2; // per-lift minimum for strength trends
 export const BASELINE_WINDOW_DAYS = 28;
+// OURS — `MIN_SAMPLES_FOR_SIGNAL` 3, `MIN_SAMPLES_FOR_TREND` 2: sample floors, no source, kept as found.
+// OURS — `BASELINE_WINDOW_DAYS` 28: the chronic window the 7-vs-28 read compares against; no page, kept as found
 
 // ---------------------------------------------------------------------------
 // Signal trend labels

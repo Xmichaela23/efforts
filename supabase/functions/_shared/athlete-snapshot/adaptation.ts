@@ -106,6 +106,7 @@ function assessEnduranceAdaptation(weeks: WeekBucket[]): AdaptationSignal {
   const avgSecond = second.reduce((s, w) => s + w.avgHr, 0) / second.length;
   const hrDelta = avgSecond - avgFirst;
 
+  // OURS — `assessEnduranceAdaptation` easy-run HR −2 bpm absorbing / +3 bpm overreaching, 2 weeks minimum, RPE ≤ 5 as easy: no source, kept as found
   if (hrDelta < -2) {
     sig.trend = 'absorbing';
     sig.evidence = `Easy-run HR trending down: ${Math.round(avgFirst)} → ${Math.round(avgSecond)} bpm over ${sig.weeks_compared} weeks.`;
@@ -169,6 +170,7 @@ function assessStrengthAdaptation(weeks: WeekBucket[]): AdaptationSignal {
     // More weight at same/higher RIR = progressing
     // Same weight at higher RIR = getting easier = absorbing
     // Same weight at lower RIR = getting harder = possible overreach
+    // OURS — `assessStrengthAdaptation` ±3 % weight and ±0.5 RIR per lift, 2 lifts to call it: no source, kept as found
     if (weightPct > 3 && rirDelta >= -0.5) {
       trends.push({ exercise: name, direction: 'up', detail: `+${weightPct.toFixed(0)}% weight, similar RIR` });
     } else if (Math.abs(weightPct) <= 3 && rirDelta > 0.5) {

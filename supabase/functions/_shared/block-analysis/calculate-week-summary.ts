@@ -144,6 +144,7 @@ function isKeyWorkout(workout: PlannedWorkout): boolean {
   }
   
   // Check by duration (long workouts are usually key)
+  // OURS — `isKeyWorkout` 90 min marks a key workout: no source, kept as found
   if (workout.target_duration && workout.target_duration >= 90) {
     return true;
   }
@@ -172,6 +173,7 @@ function identifyMissedWorkouts(plannedWorkouts: PlannedWorkout[]): MissedWorkou
 function estimatePlannedWorkload(plannedWorkouts: PlannedWorkout[]): number {
   // Rough estimate: 50 workload per hour for moderate intensity
   const WORKLOAD_PER_HOUR = 50;
+  // OURS — `WORKLOAD_PER_HOUR` 50 and the 45/45/60-min type defaults below: rough estimates, no source, kept as found
   
   let totalMinutes = 0;
   
@@ -238,6 +240,7 @@ function detectWeekPatterns(
     }
     
     // Report if 3+ consecutive weeks skipped (including this week)
+    // OURS — `detectWeekPatterns` 3 / 2 skipped weeks for the pattern lines: no source, kept as found
     if (consecutiveWeeksSkipped >= 3) {
       patterns.push(`${capitalize(discipline)} skipped ${consecutiveWeeksSkipped} consecutive weeks`);
     } else if (consecutiveWeeksSkipped === 2) {

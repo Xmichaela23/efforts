@@ -12,6 +12,7 @@ import { DataQuality, Workout, UserBaselines } from './types.ts';
 // =============================================================================
 
 const MIN_WORKOUTS_FOR_TREND = 4; // 2 per period minimum
+// OURS — `MIN_WORKOUTS_FOR_TREND` 4 (and 2 strength sessions for `canTrend`): no source, kept as found
 
 // =============================================================================
 // MAIN FUNCTION

@@ -50,6 +50,7 @@ export const SECONDS_PER_REP_ESTIMATE_IS_OURS =
   + 'He gives no tempo anywhere.';
 const SEC_PER_REP_LOW = 2;
 const SEC_PER_REP_HIGH = 4;
+// OURS — `SEC_PER_REP_LOW` 2 s / `SEC_PER_REP_HIGH` 4 s: no page gives a tempo (see above; ledger row exists)
 
 /** A planned strength row. Only the fields this file reads. */
 type StrengthRow = {
@@ -156,6 +157,7 @@ export function strengthSessionSeconds(rows: unknown): SessionMinutes | null {
  * contains the computed figure rather than trimming it.
  */
 const STEP_MIN = 5;
+// OURS — `STEP_MIN` 5-minute steps: a display rounding for an estimate, no source
 const floorTo = (m: number) => Math.max(STEP_MIN, Math.floor(m / STEP_MIN) * STEP_MIN);
 const ceilTo = (m: number) => Math.max(STEP_MIN, Math.ceil(m / STEP_MIN) * STEP_MIN);
 

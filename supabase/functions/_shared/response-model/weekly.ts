@@ -96,6 +96,7 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
   const rpeSufficient = makeSufficient(signals.rpe_sample_size_7d);
   const effSufficient = makeSufficient(signals.cardiac_efficiency_sample_size);
 
+  // OURS — `computeEndurance` trend bands: efficiency 0.3 s/mi per bpm, drift 2 bpm, execution 4 points, RPE 0.5: no source, kept as found
   return {
     cardiac_efficiency: {
       // Lower pace/HR = faster at same HR = improving
@@ -151,6 +152,7 @@ import { isLowerBodyLift } from '../strength-profiles.ts';
 // D-231: a working weight at or below this fraction of the tested 1RM has clear headroom — a RIR-driven
 // back-off there is normal sub-max training, not overreach, so we keep the label but drop the alarm tone.
 const ANCHOR_HEADROOM_FRAC = 0.90;
+// OURS — `ANCHOR_HEADROOM_FRAC` 0.90 of the tested max (D-231): no page, kept as found
 
 /**
  * ⛔ Q-254 SLICE 2b — THE STATUS WORDS THE ALL-OUT SET EARNS, AND NOTHING MORE.
@@ -280,6 +282,7 @@ export function computeSuggestedWeight(
   if (bestWeight == null || bestWeight <= 0) return null;
   const lower = isLowerBodyLift(canonical);
 
+  // OURS — `computeSuggestedWeight` +10 lb lower / +5 lb upper, × 0.9 to back off, capped at 0.95 × the tested max, 5-lb steps (D-231): no page
   let suggested: number | null = null;
   if (verdict === 'add weight') {
     const increment = lower ? 10 : 5;
@@ -315,6 +318,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
     // `previous_e1rm` delta was structurally dead (previous_e1rm always null → always 'stable', so the
     // "getting stronger/slipping" verdict never fired, Q-107 H2); it's kept only for the delta_pct receipt.
     // Fallback (spine null: needs_data, or a snapshot written before this deploy) → the old behavior.
+    // OURS — `computeStrength` fallback: ±3 % e1RM and ±0.5 RIR move a lift's trend: no source, kept as found
     const e1rm_trend: TrendDirection = l.spine_e1rm_direction
       ?? (!sufficient ? 'stable'
         : e1rmDelta != null && e1rmDelta >= 3 ? 'improving'
@@ -422,6 +426,7 @@ function computeLoad(
   chronic28: number | null,
 ): LoadContext {
   let acwr_status: LoadContext['acwr_status'] = 'unknown';
+  // FIELD — Blanch & Gabbett 2016: 0.8-1.3 sweet spot, >1.5 overreaching (as cited in acwr-state.ts). OURS — `computeLoad` 0.7 'detrained' cut, no source
   if (acwr != null) {
     if (acwr < 0.7) acwr_status = 'detrained';
     else if (acwr < 0.8) acwr_status = 'undertrained';
@@ -496,6 +501,7 @@ function computeAssessment(
     signals_concerning: concerning,
   });
 
+  // OURS — `computeAssessment` counts: 2 signals to assess, 2 declining / 2 improving to call it, 3 for higher confidence: no source, kept as found
   if (available < 2) {
     return make('insufficient_data', null, 'low', 'Not enough data to assess your response. Keep logging workouts — we need at least 3 sessions per signal.');
   }
@@ -572,6 +578,7 @@ function trendTone(t: TrendDirection): VisibleSignal['trend_tone'] {
 
 function humanDetail(delta: number | null, unit: string, improving: string, declining: string, stable: string): string {
   if (delta == null) return stable;
+  // OURS — `humanDetail` stable bands: 2 %, 1 bpm, 0.4 RPE, 0.2 s/mi: no source, kept as found
   const abs = Math.abs(delta);
   if (unit === '%') {
     if (abs < 2) return stable;
@@ -615,6 +622,7 @@ export function rpeFeelVerdict(
   // worst-case "Noticeably"). The cross-discipline + window detail lives in the tap-expand (rpeProvenance).
   const receipt = `you rated ${currentAvg.toFixed(1)} avg vs ${baselineAvg.toFixed(1)} typical`;
   const abs = Math.abs(delta);
+  // OURS — `rpeFeelVerdict` 0.5 / 1.0 RPE-point bands (D-232): no source
   if (abs < 0.5) return `About as hard as usual — ${receipt}`;
   const mag = abs >= 1.0 ? 'Noticeably' : 'A bit';
   const dir = delta > 0 ? 'harder' : 'easier';
@@ -643,6 +651,7 @@ export function rpeProvenance(currentAvg: number | null, baselineAvg: number | n
 export function rpeFeelTone(delta: number | null): VisibleSignal['trend_tone'] {
   if (delta == null) return 'neutral';
   const abs = Math.abs(delta);
+  // OURS — `rpeFeelTone` 0.5 / 1.0 RPE-point bands (D-416): no source
   if (abs < 0.5) return 'neutral';
   if (delta < 0) return 'positive';               // easier — don't alarm on easy weeks
   return abs >= 1.0 ? 'danger' : 'warning';        // harder: ≥1.0 red, 0.5–1.0 amber (D-416, reversed from D-232)
@@ -831,6 +840,7 @@ function computeWeekHeadline(
   }
   // Slice 1: the day-count is a FACT and still shows. "rest soon" is a prescription and only survives
   // when the verdict says overloaded — a 6-day streak the plan asked for is the plan, not a warning.
+  // OURS — `computeWeekHeadline` 5 days in a row before the day-count line: no source, kept as found
   if (load.consecutive_training_days >= 5) {
     subparts.push(overload.overloaded
       ? `${load.consecutive_training_days} days straight — rest soon.`
@@ -866,6 +876,7 @@ function computeContextPrompt(
     return { show: false, question: null, tags: CONTEXT_TAGS };
   }
 
+  // OURS — `computeContextPrompt` 2 missed sessions or under 50 % completion opens the prompt: no source, kept as found
   if (totalSessionsGaps >= 2) {
     return {
       show: true,

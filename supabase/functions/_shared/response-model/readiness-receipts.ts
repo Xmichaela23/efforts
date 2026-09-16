@@ -158,6 +158,7 @@ export function crossTrainingStressReceipt(
   const { rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned } = input;
   const stressSignals =
     [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
+  // OURS — `crossTrainingStressReceipt` needs 2 stress signals: no source, kept as found
   if (stressSignals < 2) return null;
   // RPE-sole: the ≥2 was reached only via the bodyConcerned double-count of RPE.
   if (rpeRising && !driftWorsening && !strengthFading && !rirDropping) return null;

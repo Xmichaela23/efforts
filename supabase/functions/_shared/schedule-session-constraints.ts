@@ -131,6 +131,7 @@ export type LegLoadedKind = (typeof LEG_LOADED_KINDS)[number];
  * the builder below asserts it, because a half-filled asymmetric grid is exactly how the two lists
  * drifted apart from the same-day matrix in the first place.
  */
+// FIELD — 48 h: exercise-induced muscle damage peaks 24-48 h; 24 h: Robineau 2016 and Schumann 2022 (see the header above)
 const ADJACENCY_HOURS_ROWS: Record<LegLoadedKind, Record<LegLoadedKind, number>> = {
   // Heavy legs. 48h from itself (a second heavy day needs the damage window) and from the long run.
   // 24h from quality, which loads the same movers without the damage. Nothing from the long ride —
@@ -408,6 +409,7 @@ export type SameDayCompatContext = {
 
 /** Yards above this for `new`-tier swimmers → treat session as quality_swim for same-day matrix. */
 export const LEARNER_HEAVY_SWIM_YARDS = 1500;
+// OURS — `LEARNER_HEAVY_SWIM_YARDS` 1500 yd: no page or field source, kept as found
 
 export function learnerSwimExperience(exp: string | undefined): boolean {
   const s = String(exp ?? '').trim().toLowerCase();

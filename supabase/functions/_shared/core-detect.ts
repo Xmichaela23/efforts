@@ -189,6 +189,7 @@ function buildConsensus(
 
 /** Detect all cores across a user's runs. Pure — proposes geometry; the caller freezes it. */
 export function detectCores(runs: DetectRun[], opts: DetectOpts = {}): DetectedCore[] {
+  // OURS — `detectCores` / `groupStats` defaults: K 5 runs (DESIGN-segments §4.2 K≈5), 75 m trailhead, 25 m corridor, 20 m step, 45° bucket, 200 m heading, 100 m min core, 0.75 coverage; no field source
   const K = opts.minRuns ?? 5;
   const trailheadRadiusM = opts.trailheadRadiusM ?? 75;
   const corridorM = opts.corridorM ?? 25;
@@ -266,6 +267,7 @@ export interface GroupStat {
  * detectCores; it just records outcomes for the sub-K and failed-consensus groups too.
  */
 export function groupStats(runs: DetectRun[], opts: DetectOpts = {}): GroupStat[] {
+  // OURS — `detectCores` / `groupStats` defaults: K 5 runs (DESIGN-segments §4.2 K≈5), 75 m trailhead, 25 m corridor, 20 m step, 45° bucket, 200 m heading, 100 m min core, 0.75 coverage; no field source
   const K = opts.minRuns ?? 5;
   const trailheadRadiusM = opts.trailheadRadiusM ?? 75;
   const corridorM = opts.corridorM ?? 25;

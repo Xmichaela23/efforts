@@ -38,6 +38,7 @@ export function runThresholdTestRow(date: string): BaselineTestRow {
     type: 'run',
     date,
     description: 'Threshold time trial. PREPARATION: flat route or track; heart rate strap on. WARM-UP: 6–8 min easy jog; 2 x 100 m strides, slow to near full tilt; 3 x 30 s at your fast (mile-PR) pace with 1 min easy walk/jog between; then 1 min rest. TRIAL: press lap and run 12 minutes (under 2 years of training), 10 minutes (2–4 years) or 8 minutes (4+ years) — start at 9.5 out of 10, finish at 10 out of 10, even the whole way; press lap at the end. COOL-DOWN: 8–10 min easy. RESULT: the app reads the trial lap, takes 88% of that speed as your threshold pace and sets it.',
+    // OURS — `runThresholdTestRow` 45-min duration and the 8–10 min cool-down: the corpus's p210 steps list no cool-down or total
     duration: 45,
     // p210, step for step: easy jog · 2 × 100 m strides · 3 × 30 s fast with 1 min easy · 1 min rest ·
     // the trial (12 min default; 10 / 8 by training age, see description) · cool-down.
@@ -55,6 +56,7 @@ export function ftpTestRow(date: string): BaselineTestRow {
     type: 'ride',
     date,
     description: 'FTP test — the 20-minute protocol. PREPARATION: indoor trainer recommended; a power meter or smart trainer. WARM-UP: 5–10 min easy; 3 x 1 min at low resistance and high turnover with 1 min rest between; 3 min easy; 3 min at 9 out of 10; 6–8 min easy. TEST: press lap and ride 20 minutes at your best even effort; press lap at the end. COOL-DOWN: 5–10 min easy. RESULT: your FTP is the 20-minute average power x 0.95; the app reads the lap and sets it.',
+    // OURS — `ftpTestRow` 60-min duration; the corpus's p212 steps print no cool-down length, the 5–10 min is ours
     duration: 60,
     // p212, step for step (2026-09-02): easy · 3 × 1 min high turnover / 1 min rest · 3 min easy ·
     // 3 min at 9/10 · 6–8 min easy · 20 min best effort · easy.
@@ -88,6 +90,7 @@ export function ftp5MinTestRow(date: string): BaselineTestRow {
     type: 'ride',
     date,
     description: 'FTP test — the 5-minute all-out protocol. PREPARATION: indoor trainer recommended; a power meter or smart trainer is required. The test: start as hard as you can hold and hang on until five minutes are up. There is no pacing strategy, which is what makes it repeatable. Your 5-minute power feeds the power curve the FTP estimate is fitted from.',
+    // OURS — `ftp5MinTestRow` 40-min duration and the warm-up / cool-down presets: no page
     duration: 40,
     steps_preset: [
       'warmup_bike_quality_8min_fastpedal',

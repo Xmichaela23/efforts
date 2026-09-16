@@ -64,6 +64,7 @@ export function novelMovementNames(novels: NovelMovement[]): string[] {
  */
 export function novelMovementsNames(novels: NovelMovement[]): string | null {
   if (!novels?.length) return null;
+  // OURS — `novelMovementsNames` names at most 2 movements: display cap, no source
   const named = [...novels].sort((a, b) => (b.reps || 0) - (a.reps || 0)).slice(0, 2);
   return named.map((n) => pluralize(n.name).toLowerCase()).join(' and ');
 }

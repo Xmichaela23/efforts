@@ -73,6 +73,7 @@ export type IntentSource = 'answered' | 'default';
 export const RIDE_DAYS_CHOICES = [1, 2, 3, 4] as const;
 export const RIDE_DAYS_MIN = RIDE_DAYS_CHOICES[0];
 export const RIDE_DAYS_MAX = RIDE_DAYS_CHOICES[RIDE_DAYS_CHOICES.length - 1];
+// OURS — `RIDE_DAYS_CHOICES` 1-4: the picker's range, no page sets a ride-count ceiling
 
 /**
  * ⛔ THE ONLY NUMBER IN THIS FILE THAT IS OURS RATHER THAN THE ATHLETE'S, and the only reason it is
@@ -83,6 +84,7 @@ export const RIDE_DAYS_MAX = RIDE_DAYS_CHOICES[RIDE_DAYS_CHOICES.length - 1];
  * what guarantees a dropped answer can never surface (§2.0).
  */
 export const RIDE_DAYS_DEFAULT = 2;
+// OURS — `RIDE_DAYS_DEFAULT` 2: nominal split when hours were given and no count; stamped 'default'
 
 /**
  * ⛔ TWO HOURS, AND IT IS NO LONGER A NUMBER NOBODY CHOSE (Michael, 2026-08-21).
@@ -105,6 +107,7 @@ export const RIDE_DAYS_DEFAULT = 2;
  * athlete's own number always wins.
  */
 export const RIDE_HOURS_DEFAULT = 2;
+// OURS — `RIDE_HOURS_DEFAULT` 2 h: two Viada p239 Level 1 easy rides at their 60-min bottom; the doubling is ours
 
 /**
  * ⛔ THE RUN COUNT'S RANGE. Same 1-4 as the ride, and 1 IS A REAL ANSWER (Michael, 2026-08-19): the
@@ -120,6 +123,7 @@ export const RIDE_HOURS_DEFAULT = 2;
 export const RUN_DAYS_CHOICES = [1, 2, 3, 4] as const;
 export const RUN_DAYS_MIN = RUN_DAYS_CHOICES[0];
 export const RUN_DAYS_MAX = RUN_DAYS_CHOICES[RUN_DAYS_CHOICES.length - 1];
+// OURS — `RUN_DAYS_CHOICES` 1-4: the picker's range, same as the ride's, no page
 
 /**
  * ⛔ TWO RUNS, AND IT WAS THE OUTERMOST OF A FOUR-DEEP DEFAULT CHAIN (Q-270). The same 2 was supplied
@@ -131,6 +135,7 @@ export const RUN_DAYS_MAX = RUN_DAYS_CHOICES[RUN_DAYS_CHOICES.length - 1];
  * defensible number and still ours. `askedDaysSource: 'default'` says so, and the door logs it.
  */
 export const RUN_DAYS_DEFAULT = 2;
+// OURS — `RUN_DAYS_DEFAULT` 2: Hickson's maintenance frequency as a default count; no page, stamped 'default'
 
 /**
  * ⛔ SWIM STAYS MINIMAL BY STANDING DECISION (D-323 §5 — booked, not coached). The app holds the
@@ -144,6 +149,7 @@ export const RUN_DAYS_DEFAULT = 2;
  */
 export const SWIM_DAYS_CHOICES = [1, 2, 3] as const;
 export const SWIM_DAYS_MAX = 4;
+// OURS — `SWIM_DAYS_CHOICES` 1-3 and `SWIM_DAYS_MAX` 4: picker range and the wire's wider cap for older goal rows, no page
 
 /**
  * The athlete's ride week, resolved. ⛔ READ-ONLY DOWNSTREAM — nothing below the builder recomputes

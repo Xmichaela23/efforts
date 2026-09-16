@@ -112,6 +112,7 @@ function violatesMinimumSwimSpread(candidate: DayName, existingSwimDays: DayName
  *
  * The +4 weights are ours and uncited — tuning params, not literature. The RULE they encode is
  * the cited part.
+ * OURS — `easyAnchorAdjacencyPenalty` +4 per touching anchor day: tuning weight, no source
  */
 export function easyAnchorAdjacencyPenalty(
   d: DayName,
@@ -168,6 +169,7 @@ function easyAnchorMinGap(
  * placed. Without this, "disperse" only means "away from the hard days" — two easy runs would
  * happily land on consecutive days, which is the clumping half of the 2026-08-07 report.
  */
+// OURS — `easySelfAdjacencyPenalty` +8 same day / +4 next day: tuning weights, no source
 function easySelfAdjacencyPenalty(d: DayName, alreadyPlaced: DayName[]): number {
   let p = 0;
   for (const a of alreadyPlaced) {
@@ -807,11 +809,13 @@ const BALANCER_RELOCATABLE_KINDS: readonly SessionKind[] = [
 const BALANCER_LOAD_THRESHOLD_HIGH = 5;
 const BALANCER_LOAD_THRESHOLD_LOW = 1;
 const BALANCER_MAX_ITER = 48;
+// OURS — `BALANCER_LOAD_THRESHOLD_HIGH` 5 / `BALANCER_LOAD_THRESHOLD_LOW` 1 fatigue points, `BALANCER_MAX_ITER` 48 moves: no source, kept as found
 
 /** Same sport on consecutive calendar days (incl. Sun↔Mon wrap). */
 const ADJ_SAME_SPORT_EDGE = 4;
 /** Extra cost when easy_bike sits the day before quality_bike (recovery buffer overlap). */
 const ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE = 3;
+// OURS — `ADJ_SAME_SPORT_EDGE` 4 / `ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE` 3: balancer weights, no source, kept as found
 
 type SportFamily = 'swim' | 'bike' | 'run' | 'strength';
 
@@ -828,6 +832,7 @@ type BalancerContext = {
   restDays?: Set<DayName>;
 };
 
+// OURS — `balancerFatigueWeight` HIGH 3 / MODERATE 2 / LOW 1: no source, kept as found
 function balancerFatigueWeight(f: SessionSlot['fatigue']): number {
   if (f === 'HIGH') return 3;
   if (f === 'MODERATE') return 2;
@@ -1428,6 +1433,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   // ── easy_bike (mid-week) ─────────────────────────────────────────────────
   // §SESSION-FREQUENCY-DEFAULTS §2: when bikes_per_week < 3, only long_ride + quality_bike are
   // budgeted for the week; easy_bike is dropped entirely (not flagged as conflict — intentional).
+  // OURS — `bikesPerWeek` default 3, easy ride only at 3+: SESSION-FREQUENCY-DEFAULTS §2 (our spec), no outside source
   const bikesPerWeek = inputs.preferences.bikes_per_week ?? 3;
   let easyBikeDay: DayName | undefined;
   if (bikesPerWeek < 3) {
@@ -1489,6 +1495,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   const easyRunDaysPlaced: DayName[] = [];
   // §SESSION-FREQUENCY-DEFAULTS §2: when runs_per_week < 3, only long_run + quality_run are
   // budgeted for the week; easy_run is dropped entirely. The placeEasyRun closure short-circuits.
+  // OURS — `runsPerWeek` default 3, easy run only at 3+: SESSION-FREQUENCY-DEFAULTS §2 (our spec), no outside source
   const runsPerWeek = inputs.preferences.runs_per_week ?? 3;
   const skipEasyRun = runsPerWeek < 3;
   /**
@@ -1500,6 +1507,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
    * on top of the quality run in 100% of run-only plans. Moving the day-choice here is the fix;
    * the COUNT stays the caller's, so no plan's run volume changes as a side effect.
    */
+  // OURS — `easyRunCount` clamped 1-3: no source, kept as found
   const easyRunCount = Math.max(1, Math.min(3, inputs.preferences.easy_run_count ?? 1));
 
   const placeEasyRun = (): void => {
@@ -2046,6 +2054,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       const slots = days[d];
       let load = slots.length;
       // Heavy penalty for days already carrying any HIGH session — avoid 3-session stacks.
+      // OURS — `dayLoad` +5 swim-placement load for a day holding a HIGH session: no source, kept as found
       if (slots.some((s) => s.fatigue === 'HIGH')) load += 5;
       return load;
     };

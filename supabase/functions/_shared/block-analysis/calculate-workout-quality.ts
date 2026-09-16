@@ -32,6 +32,7 @@ export interface WorkoutQuality {
 // =============================================================================
 
 // Delta thresholds (seconds per mile)
+// OURS — `THRESHOLDS` 15/30/45 s/mi and `TREND_THRESHOLD_S` 10 s/mi: no page or field source, kept as found
 const THRESHOLDS = {
   good: 15,      // Within 15s/mi of target = good
   warning: 30,   // 15-30s off = slight concern
@@ -40,6 +41,7 @@ const THRESHOLDS = {
 
 // Trend detection threshold
 const TREND_THRESHOLD_S = 10;  // 10s/mi change = meaningful trend
+// OURS — `TREND_THRESHOLD_S` 10 s/mi: no source, kept as found
 
 // Workout type detection patterns
 const WORKOUT_PATTERNS: Record<string, RegExp> = {
@@ -69,6 +71,7 @@ export function calculateWorkoutQuality(
   
   console.log(`📊 [WORKOUT QUALITY] Found ${runsWithQuality.length} runs with quality data`);
   
+  // OURS — `calculateWorkoutQuality` 2 runs minimum (and 2 per type, max 3 items shown): no source, kept as found
   if (runsWithQuality.length < 2) {
     return { items: [], has_issues: false };
   }
@@ -138,6 +141,7 @@ function analyzeWorkoutType(
       } else if (perf?.pace_adherence != null) {
         // Rough estimate: each 10% off ≈ 15s/mi deviation
         // This is approximate - pace_adherence of 70% ≈ 45s off
+        // OURS — `analyzeWorkoutType` 1.5 s/mi per adherence point: rough conversion, no source, kept as found
         const offPercent = 100 - perf.pace_adherence;
         paceDeltaS = offPercent * 1.5;  // Rough conversion
       }
@@ -170,6 +174,7 @@ function analyzeWorkoutType(
   let message: string;
   
   // Use pace adherence as primary signal
+  // OURS — `analyzeWorkoutType` 80% / 50% pace adherence cut-offs (2 deltas minimum above): no source, kept as found
   if (avgPaceAdherence >= 80) {
     status = 'good';
     icon = '✅';
@@ -213,6 +218,7 @@ function analyzeWorkoutType(
 function detectTrend(
   dataPoints: { date: string; delta: number }[]
 ): 'improving' | 'stable' | 'worsening' | null {
+  // OURS — `detectTrend` 3 points minimum: no source, kept as found
   if (dataPoints.length < 3) return null;
   
   const sorted = dataPoints.sort((a, b) => a.date.localeCompare(b.date));

@@ -394,3 +394,130 @@ One table per file group of the load-bearing scope (DESIGN-one-truth-guard §2.1
 | Levels placed evenly along a band (level 1 = 0, 2 = 0.5, 3 = 1); size 0.5 when none is asked; the middle of a stated recovery or between-sets rest band | `endurance-library/generate.ts levelT`, `buildEnduranceSession`, `recoveryStep` | **OURS** — the bands and levels are Viada pp229-241; the placement inside them is ours | 2026-09-16 |
 | Rep distances rounded to whole 25 m (at least 25 m); swim opener split across the drills in 50 m pieces (at least 50 m); a slow swimmer's distance scaled down up to 6 times at 98% of the ceiling ratio | `endurance-library/generate.ts buildDistanceIntervals`, `buildEnduranceSession` | **OURS** — no page; the 90-minute swim ceiling is Viada p240 and the 15% opener share is arithmetic on pp240-241 | 2026-09-16 |
 | A below-X% run step's slow end set at 1% of threshold ("no slower limit"); a descending ladder with no printed rungs gets 2 to 12 rungs; stride seconds rounded to 5 | `endurance-library/generate.ts resolveTarget`, `buildDescending`, `STRIDES_DOSE_IS_OURS` | **OURS** — no page | 2026-09-16 |
+
+### _shared strength, strength-grid, accessory-dosing, response-model, block-analysis, week-model, athlete-snapshot, week placement
+
+| Number | Where | Source | Date |
+|---|---|---|---|
+| `MIN_STEADY_SESSIONS_FOR_BASELINE` 3, `DRIFT_ELEVATED_MARGIN_BPM` 4, `DRIFT_STRONG_MARGIN_BPM` 8 | `absorption.ts MIN_STEADY_SESSIONS_FOR_BASELINE` | **OURS** — tuned by hand (D-255/D-265), no page or field source | 2026-09-16 |
+| `HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART` 8 / `HR_DRIFT_STRONG_BPM_STEADY_COLDSTART` 14 | `absorption.ts HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART` | **OURS** — set against one athlete's drift history (see above), no page or field source | 2026-09-16 |
+| `MUSCLE_FLOOR_IS_ONE_SLOT` one slot (3 sets) per muscle a week | `accessory-dosing/ledger.ts MUSCLE_FLOOR_IS_ONE_SLOT` | **OURS** — the low end of Viada p218's HYP 3-4 band, but the floor itself is ours (no page states one) | 2026-09-16 |
+| `MAX_DISTINCT_PER_TARGET` 2 movements per chip | `accessory-dosing/ledger.ts MAX_DISTINCT_PER_TARGET` | **OURS** — Michael's ruling (2026-08-24), no page | 2026-09-16 |
+| `goalWorkoutDisciplineAndDistanceMatch` distance and hour windows per race (5k 4.2-8 km, 10k 8-13 km, half 18-25 km, marathon 38-200 km, century 80 km, tri 3 km / 0.5 h) | `athlete-identity-inference.ts goalWorkoutDisciplineAndDistanceMatch` | **OURS** — tolerance bands, no source | 2026-09-16 |
+| `inferAthleteIdentityV1` 90-day window; active at 8 % of sessions (strength 5 %); dormant after 2.5 months; identity shares 55 / 35 / 20 / 15 / 12 / 10 / 8 % | `athlete-identity-inference.ts inferAthleteIdentityV1` | **OURS** — no source, kept as found | 2026-09-16 |
+| `training_personality` shares 25 % workouts / 20 % races / 10 % × 3 disciplines / 8 % strength / 12 % | `athlete-identity-inference.ts training_personality` | **OURS** — no source, kept as found | 2026-09-16 |
+| `inferAthleteIdentityV1` last 7 days vs the 7 before | `athlete-identity-inference.ts inferAthleteIdentityV1` | **OURS** — under 0.72 recovery, over 1.18 build: no source, kept as found | 2026-09-16 |
+| `postKeyRace` 90 min and a 2-day window read as a key race; 3 days for the taper hint | `athlete-identity-inference.ts postKeyRace` | **OURS** — no source | 2026-09-16 |
+| `inferTrainingBackgroundSentence` disciplines at 12 %+, top 3 | `athlete-identity-inference.ts inferTrainingBackgroundSentence` | **OURS** — no source | 2026-09-16 |
+| `assessEnduranceAdaptation` easy-run HR −2 bpm absorbing / +3 bpm overreaching, 2 weeks minimum, RPE ≤ 5 as easy | `athlete-snapshot/adaptation.ts assessEnduranceAdaptation` | **OURS** — no source, kept as found | 2026-09-16 |
+| `assessStrengthAdaptation` ±3 % weight and ±0.5 RIR per lift, 2 lifts to call it | `athlete-snapshot/adaptation.ts assessStrengthAdaptation` | **OURS** — no source, kept as found | 2026-09-16 |
+| `computeTotalLoadStatus` build 1.4/1.6, easy 1.15/1.3 shifts and the +30 % / −20 % plan fallback | `athlete-snapshot/body-response.ts computeTotalLoadStatus` | FIELD — Blanch & Gabbett 2016: 0.8-1.3 sweet spot, >1.5 high (the default row). **OURS** — no source | 2026-09-16 |
+| `observeEnduranceSession` HR ±3 bpm (8 in an easy week), drift 3 % / 6 %, execution +5 / −8 (−15 easy), RPE ≥ 6 easy / ≤ 4 hard | `athlete-snapshot/body-response.ts observeEnduranceSession` | **OURS** — no source, kept as found | 2026-09-16 |
+| `observeStrengthSession` RIR bands | `athlete-snapshot/body-response.ts observeStrengthSession` | **OURS** — ±0.5 on target (±1.0 easy), ±1.0 off, per-lift 1.5 (2.0 easy), average < 1.5 / > 3.5, −1 vs norm: no source, kept as found | 2026-09-16 |
+| `makeTrend` 5 % of the first half (floor 1) moves a trend; 2 values minimum | `athlete-snapshot/body-response.ts makeTrend` | **OURS** — no source, kept as found | 2026-09-16 |
+| `buildBodyResponse` impact words at weight 0.3 / 0.5 | `athlete-snapshot/body-response.ts buildBodyResponse` | **OURS** — no source, kept as found | 2026-09-16 |
+| `enduranceMatchQuality` ratios | `athlete-snapshot/daily-ledger.ts enduranceMatchQuality` | **OURS** — under 0.70 shorter, over 1.30 longer, 0.85-1.15 followed: no source, kept as found | 2026-09-16 |
+| `strengthMatchQuality` ±0.5 on target, ±1.0 off; unplanned mean < 1.5 / > 3.5 RIR | `athlete-snapshot/daily-ledger.ts strengthMatchQuality` | **OURS** — no source, kept as found | 2026-09-16 |
+| `buildPlanPosition` phase cut-offs at 25 % / 70 % / 90 % of the plan | `athlete-snapshot/identity.ts buildPlanPosition` | **OURS** — no source, kept as found | 2026-09-16 |
+| `RIDE_DAYS_CHOICES` 1-4 | `athlete-weekly-intent.ts RIDE_DAYS_CHOICES` | **OURS** — the picker's range, no page sets a ride-count ceiling | 2026-09-16 |
+| `RIDE_DAYS_DEFAULT` 2 | `athlete-weekly-intent.ts RIDE_DAYS_DEFAULT` | **OURS** — nominal split when hours were given and no count; stamped 'default' | 2026-09-16 |
+| `RIDE_HOURS_DEFAULT` 2 h | `athlete-weekly-intent.ts RIDE_HOURS_DEFAULT` | **OURS** — two Viada p239 Level 1 easy rides at their 60-min bottom; the doubling is ours | 2026-09-16 |
+| `RUN_DAYS_CHOICES` 1-4 | `athlete-weekly-intent.ts RUN_DAYS_CHOICES` | **OURS** — the picker's range, same as the ride's, no page | 2026-09-16 |
+| `RUN_DAYS_DEFAULT` 2 | `athlete-weekly-intent.ts RUN_DAYS_DEFAULT` | **OURS** — Hickson's maintenance frequency as a default count; no page, stamped 'default' | 2026-09-16 |
+| `SWIM_DAYS_CHOICES` 1-3 and `SWIM_DAYS_MAX` 4 | `athlete-weekly-intent.ts SWIM_DAYS_CHOICES` | **OURS** — picker range and the wire's wider cap for older goal rows, no page | 2026-09-16 |
+| `runThresholdTestRow` 45-min duration and the 8–10 min cool-down | `baseline-test-rows.ts runThresholdTestRow` | **OURS** — the corpus's p210 steps list no cool-down or total | 2026-09-16 |
+| `ftpTestRow` 60-min duration | `baseline-test-rows.ts ftpTestRow` | **OURS** — the corpus's p212 steps print no cool-down length, the 5–10 min is ours | 2026-09-16 |
+| `ftp5MinTestRow` 40-min duration and the warm-up / cool-down presets | `baseline-test-rows.ts ftp5MinTestRow` | **OURS** — no page | 2026-09-16 |
+| `pctToSignal` 6 % saturates the signal | `block-adaptation/index.ts pctToSignal` | **OURS** — no source, kept as found | 2026-09-16 |
+| `deriveFocusFromCounts` 6 strength / 2 long samples and `focusWeights` blends per focus | `block-adaptation/index.ts deriveFocusFromCounts` | **OURS** — no source, kept as found | 2026-09-16 |
+| `computeSignalQualityFromSamples` 16 high / 8 medium | `block-adaptation/index.ts computeSignalQualityFromSamples` | **OURS** — no source, kept as found | 2026-09-16 |
+| `computeOverview` hybrid rules | `block-adaptation/index.ts computeOverview` | **OURS** — strength drop past −2 % damps by 1 + drop/12 (floor 0.2), ×1.12 bonus, long-run coverage 4 samples, score 50 ± 50: no source | 2026-09-16 |
+| `confidenceLabelFromWeeklyCounts` 3 high / 2 medium per week | `block-adaptation/index.ts confidenceLabelFromWeeklyCounts` | **OURS** — no source, kept as found | 2026-09-16 |
+| `confidenceToNumber` high 0.9 / medium 0.65 / low 0.4 | `block-adaptation/index.ts confidenceToNumber` | **OURS** — no source, kept as found | 2026-09-16 |
+| `getBlockAdaptation` recommends a baseline change at confidence ≥ 0.7 and ≥ 5 % apart, at most 2 shown | `block-adaptation/index.ts getBlockAdaptation` | **OURS** — no source. 1.60934 km per mile is the definition, rounded | 2026-09-16 |
+| `ADHERENCE_THRESHOLDS` 80% good / 50% warning | `block-analysis/calculate-adherence.ts ADHERENCE_THRESHOLDS` | **OURS** — no page or field source, kept as found | 2026-09-16 |
+| `detectPatterns` 2 missed weeks in a row before a pattern line | `block-analysis/calculate-adherence.ts detectPatterns` | **OURS** — no source, kept as found | 2026-09-16 |
+| `MAX_BIKE_CHANGE_PERCENT` 25 / `MAX_RUN_CHANGE_PERCENT` 15 | `block-analysis/calculate-trends.ts MAX_BIKE_CHANGE_PERCENT` | **OURS** — sanity cut-offs, no page or field source, kept as found | 2026-09-16 |
+| `MIN_WORKOUTS_PER_PERIOD` 2 | `block-analysis/calculate-trends.ts MIN_WORKOUTS_PER_PERIOD` | **OURS** — sample floor per 2-week half, no source, kept as found | 2026-09-16 |
+| `HR_IMPROVING_THRESHOLD` -3 / `HR_FATIGUED_THRESHOLD` 5 bpm | `block-analysis/calculate-trends.ts HR_IMPROVING_THRESHOLD` | **OURS** — no page or field source, kept as found | 2026-09-16 |
+| `calculatePerformanceTrends` weeksBack 4 (two 2-week halves) | `block-analysis/calculate-trends.ts calculatePerformanceTrends` | **OURS** — no source, kept as found | 2026-09-16 |
+| `calculateEfficiency` 2 sessions with HR per half | `block-analysis/calculate-trends.ts calculateEfficiency` | **OURS** — no source, kept as found | 2026-09-16 |
+| `isKeyWorkout` 90 min marks a key workout | `block-analysis/calculate-week-summary.ts isKeyWorkout` | **OURS** — no source, kept as found | 2026-09-16 |
+| `WORKLOAD_PER_HOUR` 50 and the 45/45/60-min type defaults below | `block-analysis/calculate-week-summary.ts WORKLOAD_PER_HOUR` | **OURS** — rough estimates, no source, kept as found | 2026-09-16 |
+| `detectWeekPatterns` 3 / 2 skipped weeks for the pattern lines | `block-analysis/calculate-week-summary.ts detectWeekPatterns` | **OURS** — no source, kept as found | 2026-09-16 |
+| `THRESHOLDS` 15/30/45 s/mi and `TREND_THRESHOLD_S` 10 s/mi | `block-analysis/calculate-workout-quality.ts THRESHOLDS` | **OURS** — no page or field source, kept as found | 2026-09-16 |
+| `calculateWorkoutQuality` 2 runs minimum (and 2 per type, max 3 items shown) | `block-analysis/calculate-workout-quality.ts calculateWorkoutQuality` | **OURS** — no source, kept as found | 2026-09-16 |
+| `analyzeWorkoutType` 1.5 s/mi per adherence point | `block-analysis/calculate-workout-quality.ts analyzeWorkoutType` | **OURS** — rough conversion, no source, kept as found | 2026-09-16 |
+| `analyzeWorkoutType` 80% / 50% pace adherence cut-offs (2 deltas minimum above) | `block-analysis/calculate-workout-quality.ts analyzeWorkoutType` | **OURS** — no source, kept as found | 2026-09-16 |
+| `detectTrend` 3 points minimum | `block-analysis/calculate-workout-quality.ts detectTrend` | **OURS** — no source, kept as found | 2026-09-16 |
+| `MIN_WORKOUTS_FOR_TREND` 4 (and 2 strength sessions for `canTrend`) | `block-analysis/data-quality.ts MIN_WORKOUTS_FOR_TREND` | **OURS** — no source, kept as found | 2026-09-16 |
+| `generateFocusAreas` at most 3 focus areas | `block-analysis/generate-focus-areas.ts generateFocusAreas` | **OURS** — display cap, no source, kept as found | 2026-09-16 |
+| `detectCores` / `groupStats` defaults | `core-detect.ts detectCores` | **OURS** — K 5 runs (DESIGN-segments §4.2 K≈5), 75 m trailhead, 25 m corridor, 20 m step, 45° bucket, 200 m heading, 100 m min core, 0.75 coverage; no field source | 2026-09-16 |
+| `computeCoreEffort` 0.5 HR coverage for hr_aligned and 0.5 m/s moving speed | `core-effort.ts computeCoreEffort` | **OURS** — no source, kept as found | 2026-09-16 |
+| `resample` keeps the last point when it is more than 0.25 × spacing past the last sample | `core-match.ts resample` | **OURS** — no source | 2026-09-16 |
+| `matchCore` defaults | `core-match.ts matchCore` | **OURS** — 10 m spacing, 30 m buffer, 0.9 coverage, gap 2 × buffer, 4-step window. Strava's ordered-segment idea, our numbers (DESIGN-segments §4.1 gives ~25-40 m) | 2026-09-16 |
+| `computeCoreVerdict` 183-day window and 8-effort floor (DESIGN-segments §5 set N≥8) | `core-verdict.ts computeCoreVerdict` | **OURS** — no field source | 2026-09-16 |
+| `detectCrossDomainCarryover` 1.0 RPE-point gap, and a residual ≥ 2 × threshold counts as strong | `cross-domain-carryover.ts detectCrossDomainCarryover` | **OURS** — no source, kept as found | 2026-09-16 |
+| `resolveCarriedInSoreness` 2-day recent window, 5-entry baseline, z ≥ 1 and +1 point | `cross-domain-carryover.ts resolveCarriedInSoreness` | **OURS** — our z-score on Hooper's scale, no source | 2026-09-16 |
+| `resolveCurrentSoreness` 7-day recent window, 5-entry baseline, z ≥ 1 and +1 point, last 6 sessions counted | `cross-domain-carryover.ts resolveCurrentSoreness` | **OURS** — no source | 2026-09-16 |
+| `COUNT_WINDOW` 6 sessions | `cross-domain-carryover.ts COUNT_WINDOW` | **OURS** — the 4-of-6 shape from longitudinal-signals.ts, no outside source | 2026-09-16 |
+| `completedEventStrength` tri races within 400 days, long 2 points / short 1, capped at 4 | `infer-training-fitness.ts completedEventStrength` | **OURS** — no source, kept as found | 2026-09-16 |
+| `inferTrainingFitnessLevel` score | `infer-training-fitness.ts inferTrainingFitnessLevel` | **OURS** — CTL 58 / 42 / 22 / 16, FTP 265 / 215 W, run threshold ≤ 258 s/km, 14 / 1 swims in 90 days, race points 3 / 1, ±2 to change tier: no source, kept as found | 2026-09-16 |
+| `novelMovementsNames` names at most 2 movements | `novel-movements.ts novelMovementsNames` | **OURS** — display cap, no source | 2026-09-16 |
+| `trendFromPct` default 2 % band | `response-model/block.ts trendFromPct` | **OURS** — no source, kept as found | 2026-09-16 |
+| `blockStrength` ±3 % e1RM and ±0.5 RIR over the block | `response-model/block.ts blockStrength` | **OURS** — no source, kept as found | 2026-09-16 |
+| `blockAssessment` 2 declining signals reads as overreaching | `response-model/block.ts blockAssessment` | **OURS** — no source, kept as found | 2026-09-16 |
+| `HR_ELEVATION_THRESHOLD` 4 bpm, `EXECUTION_DROP_THRESHOLD` 6 %, `MIN_PAIRS` 3 | `response-model/cross-domain.ts HR_ELEVATION_THRESHOLD` | **OURS** — no page or field source, kept as found | 2026-09-16 |
+| `NOVEL_GENERIC_SUGGESTION` / `SORE_BASE_SUGGESTION` "2–3 days" | `response-model/loaded-legs.ts NOVEL_GENERIC_SUGGESTION` | **OURS** — general repeated-bout physiology (see above), no named source | 2026-09-16 |
+| `crossTrainingStressReceipt` needs 2 stress signals | `response-model/readiness-receipts.ts crossTrainingStressReceipt` | **OURS** — no source, kept as found | 2026-09-16 |
+| `bodySignalsImproving` needs 2 available signals | `response-model/readiness-state.ts bodySignalsImproving` | **OURS** — no source, kept as found | 2026-09-16 |
+| `MIN_SAMPLES_FOR_SIGNAL` 3, `MIN_SAMPLES_FOR_TREND` 2 | `response-model/types.ts MIN_SAMPLES_FOR_SIGNAL` | **OURS** — sample floors, no source, kept as found | 2026-09-16 |
+| `BASELINE_WINDOW_DAYS` 28 | `response-model/types.ts BASELINE_WINDOW_DAYS` | **OURS** — the chronic window the 7-vs-28 read compares against; no page, kept as found | 2026-09-16 |
+| `computeEndurance` trend bands | `response-model/weekly.ts computeEndurance` | **OURS** — efficiency 0.3 s/mi per bpm, drift 2 bpm, execution 4 points, RPE 0.5: no source, kept as found | 2026-09-16 |
+| `ANCHOR_HEADROOM_FRAC` 0.90 of the tested max (D-231) | `response-model/weekly.ts ANCHOR_HEADROOM_FRAC` | **OURS** — no page, kept as found | 2026-09-16 |
+| `computeSuggestedWeight` +10 lb lower / +5 lb upper, × 0.9 to back off, capped at 0.95 × the tested max, 5-lb steps (D-231) | `response-model/weekly.ts computeSuggestedWeight` | **OURS** — no page | 2026-09-16 |
+| `computeStrength` fallback | `response-model/weekly.ts computeStrength` | **OURS** — ±3 % e1RM and ±0.5 RIR move a lift's trend: no source, kept as found | 2026-09-16 |
+| `computeLoad` ACWR words: under 0.7 detrained, under 0.8 undertrained, to 1.3 optimal, to 1.5 elevated, above high risk | `response-model/weekly.ts computeLoad` | FIELD — Blanch & Gabbett 2016: 0.8-1.3 sweet spot, >1.5 overreaching (as cited in acwr-state.ts). **OURS** — the 0.7 'detrained' cut, no source | 2026-09-16 |
+| `computeAssessment` counts | `response-model/weekly.ts computeAssessment` | **OURS** — 2 signals to assess, 2 declining / 2 improving to call it, 3 for higher confidence: no source, kept as found | 2026-09-16 |
+| `humanDetail` stable bands | `response-model/weekly.ts humanDetail` | **OURS** — 2 %, 1 bpm, 0.4 RPE, 0.2 s/mi: no source, kept as found | 2026-09-16 |
+| `rpeFeelVerdict` 0.5 / 1.0 RPE-point bands (D-232) | `response-model/weekly.ts rpeFeelVerdict` | **OURS** — no source | 2026-09-16 |
+| `rpeFeelTone` 0.5 / 1.0 RPE-point bands (D-416) | `response-model/weekly.ts rpeFeelTone` | **OURS** — no source | 2026-09-16 |
+| `computeWeekHeadline` 5 days in a row before the day-count line | `response-model/weekly.ts computeWeekHeadline` | **OURS** — no source, kept as found | 2026-09-16 |
+| `computeContextPrompt` 2 missed sessions or under 50 % completion opens the prompt | `response-model/weekly.ts computeContextPrompt` | **OURS** — no source, kept as found | 2026-09-16 |
+| `LEARNER_HEAVY_SWIM_YARDS` 1500 yd | `schedule-session-constraints.ts LEARNER_HEAVY_SWIM_YARDS` | **OURS** — no page or field source, kept as found | 2026-09-16 |
+| `hasCompound1RMSignals` 2 of the 4 main lifts on file | `strength-equipment-tier.ts hasCompound1RMSignals` | **OURS** — no source, kept as found | 2026-09-16 |
+| `PROTOCOL_PROFILES` target RIR, progression deviation / e1RM-gain and deload deviation / session counts | `strength-profiles.ts PROTOCOL_PROFILES` | **OURS** — hand-set per protocol, no page | 2026-09-16 |
+| `PHASE_RULES` sensitivities and RIR offsets | `strength-profiles.ts PHASE_RULES` | **OURS** — the RP/RTS shape (RIR falls toward the peak), our numbers | 2026-09-16 |
+| `MIN_TARGET_RIR` 0.5 / `MAX_TARGET_RIR` 4 | `strength-profiles.ts MIN_TARGET_RIR` | **OURS** — clamp band, no page | 2026-09-16 |
+| `VERDICT_DEVIATION` ±1.0 RIR | `strength-profiles.ts VERDICT_DEVIATION` | **OURS** — chosen to stop week-to-week flip-flop (above), no source | 2026-09-16 |
+| `SEC_PER_REP_LOW` 2 s / `SEC_PER_REP_HIGH` 4 s | `strength-session-minutes.ts SEC_PER_REP_LOW` | **OURS** — no page gives a tempo (see above; ledger row exists) | 2026-09-16 |
+| `STEP_MIN` 5-minute steps | `strength-session-minutes.ts STEP_MIN` | **OURS** — a display rounding for an estimate, no source | 2026-09-16 |
+| `execTone` 85 / 70 execution bands (same bands as the run/ride interval grade) | `strength-session-types.ts execTone` | **OURS** — no source, kept as found | 2026-09-16 |
+| `ANCHOR_HINT` "8 to 10 reps near failure" | `strength/test-session.ts ANCHOR_HINT` | **OURS** — a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count | 2026-09-16 |
+| `PULLUP_EASY_HINT` 2–3 easy pull-ups and ~2 min rest | `strength/test-session.ts PULLUP_EASY_HINT` | **OURS** — moved from the logger, no source | 2026-09-16 |
+| `COST` 48 h heavy_legs / 48 h long_effort clearances and hard_cardio 24 h | `week-model/model.ts COST` | **OURS** — Michael's rulings (2026-08-17/18, D-453), no page prints an hour count | 2026-09-16 |
+| `overCap` 2 stressors a day | `week-model/resolve.ts overCap` | **OURS** — Michael's cap (2026-08-19), no page | 2026-09-16 |
+| `STREAK_ALLOWANCE` 3 consecutive stressor days | `week-model/resolve.ts STREAK_ALLOWANCE` | **OURS** — Michael's ruling (2026-08-19), no page | 2026-09-16 |
+| `score` weights (recovery 4, blank day 40, crowding 6 × n², bunching 3 days, adjacency 4, doubles 20, long doubles 25, cap 60, locked 24, streak 8, weekend long 5) | `week-model/resolve.ts score` | **OURS** — tuned against the sweep, no page | 2026-09-16 |
+| `REST_FLOOR` 1 day off paid for | `week-model/resolve.ts REST_FLOOR` | **OURS** — no page, kept as found | 2026-09-16 |
+| `violationsOf` 3 stressors names a day overloaded | `week-model/resolve.ts violationsOf` | **OURS** — one past the cap of 2, no page | 2026-09-16 |
+| `resolve` search penalties 1000 per unmet clearance, 500 per missing rest day | `week-model/resolve.ts resolve` | **OURS** — sized to outrank every score term, no page | 2026-09-16 |
+| `easyAnchorAdjacencyPenalty` +4 per touching anchor day | `week-optimizer.ts easyAnchorAdjacencyPenalty` | **OURS** — tuning weight, no source | 2026-09-16 |
+| `easySelfAdjacencyPenalty` +8 same day / +4 next day | `week-optimizer.ts easySelfAdjacencyPenalty` | **OURS** — tuning weights, no source | 2026-09-16 |
+| `BALANCER_LOAD_THRESHOLD_HIGH` 5 / `BALANCER_LOAD_THRESHOLD_LOW` 1 fatigue points, `BALANCER_MAX_ITER` 48 moves | `week-optimizer.ts BALANCER_LOAD_THRESHOLD_HIGH` | **OURS** — no source, kept as found | 2026-09-16 |
+| `ADJ_SAME_SPORT_EDGE` 4 / `ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE` 3 | `week-optimizer.ts ADJ_SAME_SPORT_EDGE` | **OURS** — balancer weights, no source, kept as found | 2026-09-16 |
+| `balancerFatigueWeight` HIGH 3 / MODERATE 2 / LOW 1 | `week-optimizer.ts balancerFatigueWeight` | **OURS** — no source, kept as found | 2026-09-16 |
+| `bikesPerWeek` default 3, easy ride only at 3+ | `week-optimizer.ts bikesPerWeek` | **OURS** — SESSION-FREQUENCY-DEFAULTS §2 (our spec), no outside source | 2026-09-16 |
+| `runsPerWeek` default 3, easy run only at 3+ | `week-optimizer.ts runsPerWeek` | **OURS** — SESSION-FREQUENCY-DEFAULTS §2 (our spec), no outside source | 2026-09-16 |
+| `easyRunCount` clamped 1-3 | `week-optimizer.ts easyRunCount` | **OURS** — no source, kept as found | 2026-09-16 |
+| `dayLoad` +5 swim-placement load for a day holding a HIGH session | `week-optimizer.ts dayLoad` | **OURS** — no source, kept as found | 2026-09-16 |
+| `MAX_ACTIVE_DAYS_DEFAULT` 6 (one full rest day, §5 of the scheduling spec) | `week-solver.ts MAX_ACTIVE_DAYS_DEFAULT` | **OURS** — no page, kept as found | 2026-09-16 |
+| `shapePenalty` +1 per adjacent anchor pair, +3 when the law names the pair | `week-solver.ts shapePenalty` | **OURS** — no source | 2026-09-16 |
+| `pressAdjacencyShortfall` presses preferred 3 days apart (also the note below) | `week-solver.ts pressAdjacencyShortfall` | **OURS** — no source | 2026-09-16 |
+| `REP_RECORD_WINDOW_SESSIONS` 40 strength sessions (~10 weeks) for a rep record | `strength/all-out-set.ts REP_RECORD_WINDOW_SESSIONS` | **OURS** — a window, not all-time; widened 10 → 40 on 2026-07-30 so a record spans the anchor cycles; no page (pre-existing marker, TRUTH-MAP §6 row 179 "no ledger row") | 2026-09-16 |
+| `TEST_ROUND_TO_LB` 5 lb; pull-up test warm-ups 5 scap pulls + 3 easy pull-ups; 3 sets on an accessory row that names no count | `strength/test-session.ts TEST_ROUND_TO_LB`, `pullUpRow`, `plannedTestSession` | **OURS** — loadable increment (same 5 the standing block's pretest uses); counts carried from the logger with no source (pre-existing markers; TRUTH-MAP §7.8 "pretest rounding, pull-up test counts, 3-set accessory default") | 2026-09-16 |
+| `ESTIMATE_TRUSTED_MAX_REPS` 8, `ESTIMATE_TRUSTED_MAX_REPS_DEADLIFT` 5 — the all-out read's trusted-rep ceiling | `strength/trusted-reps.ts ESTIMATE_TRUSTED_MAX_REPS`, `trustedMaxRepsFor` | FIELD — LeSuer et al. 1997, Reynolds et al. 2006, Mayhew et al. 2008 give the degradation zone (best 3-5, degrades past ~10; deadlift estimates run low). **OURS** — the lines 8 and 5 inside that zone (pre-existing markers). ⚠️ State's chart and the learned max use a different ceiling, 10 on every lift (`src/lib/estimate-1rm.ts trustedMaxReps`) | 2026-09-16 |
+| Any rest clock beside the strength rest rule (the rule has no minutes) | `strength-grid/intents.ts REST_BETWEEN_SETS_RULE`, `REST_BETWEEN_SETS_RULE_HYP` | Viada p78 (strength rule) / p84 (hypertrophy rule). **OURS** — every number of seconds shown beside them; the seconds live in `strength/rest-seconds.ts` (its own row). Pre-existing markers, no number in this file | 2026-09-16 |
+| Category headings and the "what is his and what is ours" split (no number) | `strength-grid/taxonomy.ts CATEGORY_DEFINITION` | Viada pp218-223, p226. **OURS** — running his definitions as a classifier over our own catalogue (pre-existing markers, no number) | 2026-09-16 |
+| `glutes` as a tenth muscle group | `accessory-dosing/muscles.ts GLUTES_IS_OURS` | Viada p222/p223 name nine groups. **OURS** — glutes split out as the tenth (pre-existing marker, no number) | 2026-09-16 |
+| Pre-existing "OURS" wording in the ride/run defaults header | `athlete-weekly-intent.ts RIDE_DAYS_DEFAULT`, `RIDE_HOURS_DEFAULT` | covered by the rows above for this file; lines 317 and 463 say "NOT OURS" (the caller's day vocabulary) and hold no number | 2026-09-16 |

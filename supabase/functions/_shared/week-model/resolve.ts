@@ -139,6 +139,7 @@ export function recoveryDaysOf(placements: Placement[]): number[] {
  * ⛔ SCORED, NOT FORBIDDEN — the same call `longDoubles` records and for the same reason. A week
  * with more demand than legal slots must still return a week the athlete can see, not a refusal.
  * Weighted above every other shape term so it only loses to the law.
+ * OURS — `overCap` 2 stressors a day: Michael's cap (2026-08-19), no page
  */
 export function overCap(placements: Placement[]): number {
   return stressorsPerDay(placements).reduce((n, c) => n + Math.max(0, c - 2), 0);
@@ -173,6 +174,7 @@ export function lockedDayExtras(placements: Placement[]): number {
 
 /** How many consecutive stressor days a run may hold before the score starts charging. */
 const STREAK_ALLOWANCE = 3;
+// OURS — `STREAK_ALLOWANCE` 3 consecutive stressor days: Michael's ruling (2026-08-19), no page
 
 /**
  * ⛔ CONSECUTIVE STRESSOR DAYS, CYCLIC — the term that breaks a five-day block when an empty day
@@ -303,6 +305,7 @@ export function score(placements: Placement[]): number {
    *
    * At 4 the two weeks in the report separate by 12 points where they used to tie at 54.
    */
+  // OURS — `score` weights (recovery 4, blank day 40, crowding 6 × n², bunching 3 days, adjacency 4, doubles 20, long doubles 25, cap 60, locked 24, streak 8, weekend long 5): tuned against the sweep, no page
   return recovery * 4 + blank * 40 - crowding - bunching
     - sportAdjacency(placements) * 4
     - sameSportDoubles(placements) * 20
@@ -347,6 +350,7 @@ function sameSportDoubles(placements: Placement[]): number {
 
 /** One day off. ⚠️ A FLOOR the score stops paying past — see `score`. */
 const REST_FLOOR = 1;
+// OURS — `REST_FLOOR` 1 day off paid for: no page, kept as found
 
 
 /**
@@ -613,6 +617,7 @@ export function violationsOf(placements: Placement[], opts: { minRestDays?: numb
   const perDay = [0, 1, 2, 3, 4, 5, 6].map((d) =>
     placements.filter((p) => p.day === d).reduce((n, p) => n + stressorsOf(p.unit), 0));
   for (let d = 0; d < 7; d++) {
+    // OURS — `violationsOf` 3 stressors names a day overloaded: one past the cap of 2, no page
     if (perDay[d] >= 3) push({ tier: 'tradeoff', rule: 'day_overloaded', subject: DAY_NAMES[d], days: [d] });
   }
 
@@ -885,6 +890,7 @@ export function resolve(
 
     const unmet = unmetNeeds(withFree);
     const recovery = recoveryDaysOf(withFree).length;
+    // OURS — `resolve` search penalties 1000 per unmet clearance, 500 per missing rest day: sized to outrank every score term, no page
     const s = score(withFree) - unmet.length * 1000 - Math.max(0, minRest - recovery) * 500;
     if (!best || s > best.score) best = { placements: withFree, unmet, score: s };
   };

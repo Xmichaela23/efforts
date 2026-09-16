@@ -30,6 +30,7 @@
 export const MIN_STEADY_SESSIONS_FOR_BASELINE = 3;
 /** Drift is `elevated` (describe-level) at typical + this many bpm. */
 export const DRIFT_ELEVATED_MARGIN_BPM = 4;
+// OURS — `MIN_STEADY_SESSIONS_FOR_BASELINE` 3, `DRIFT_ELEVATED_MARGIN_BPM` 4, `DRIFT_STRONG_MARGIN_BPM` 8: tuned by hand (D-255/D-265), no page or field source
 /** Drift is `strong` (solo-escalation-level) at typical + this many bpm. */
 export const DRIFT_STRONG_MARGIN_BPM = 8;
 /** COLD-START fallback (no personal baseline yet). STEADY-STATE ONLY — never apply to
@@ -41,6 +42,7 @@ export const DRIFT_STRONG_MARGIN_BPM = 8;
  *  personal baseline matures (and self-corrects for a high-drift-baseline athlete). */
 export const HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART = 8;
 export const HR_DRIFT_STRONG_BPM_STEADY_COLDSTART = 14;
+// OURS — `HR_DRIFT_ELEVATED_BPM_STEADY_COLDSTART` 8 / `HR_DRIFT_STRONG_BPM_STEADY_COLDSTART` 14: set against one athlete's drift history (see above), no page or field source
 
 export type ResponseState = 'responding_well' | 'responding_strained' | 'partial' | 'unavailable';
 export type DriftExcludedReason = 'negative' | 'non_steady' | 'thin_anchor' | 'no_data' | null;

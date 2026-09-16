@@ -13,6 +13,7 @@ import { parseLocalDate } from '../parse-local-date.ts';
 // CONFIGURATION
 // =============================================================================
 
+// OURS — `ADHERENCE_THRESHOLDS` 80% good / 50% warning: no page or field source, kept as found
 const ADHERENCE_THRESHOLDS = {
   good: 80,      // >= 80% = good
   warning: 50,   // >= 50% = warning
@@ -205,6 +206,7 @@ function detectPatterns(
         consecutiveMisses++;
       } else {
         // Reset on any completed workout
+        // OURS — `detectPatterns` 2 missed weeks in a row before a pattern line: no source, kept as found
         if (consecutiveMisses >= 2) {
           patterns.push(`${capitalize(discipline)} missed ${consecutiveMisses} weeks in a row`);
         }
