@@ -49,6 +49,7 @@ HARD BAN (${opts.mode}) — backward temporal anchors:
 // the existing "never lead with days_since" prompt rule was ignored by the LLM. If the fact never leaves
 // the data, the model can't recite "71 days post-marathon". `runs_since_race_estimate` stays available
 // to is_first_post_race_run's own (separate, tighter) gate.
+// OURS — `RACE_ANCHOR_RELEVANCE_DAYS` 42 days: the recovery reasoning above has no page or paper behind it; kept as found
 export const RACE_ANCHOR_RELEVANCE_DAYS = 42; // ~6 weeks — acute + residual recovery
 export function raceAnchorStillRelevant(nc: ArcNarrativeContextV1): boolean {
   const d = nc.days_since_last_goal_race;
@@ -149,6 +150,7 @@ Avoid inventing prescriptions not evidenced in data.${backwardAnchorHardBan(nc, 
       // the forbidden patterns + correct framing template.
       const ng = nc.next_primary_goal;
       const dUntilRace = nc.days_until_next_goal_race;
+      // OURS — `forwardEligible` 14–180 days to the next goal race: no source, kept as found
       const forwardEligible = ng && dUntilRace != null && dUntilRace > 14 && dUntilRace <= 180;
       const forwardFraming = forwardEligible
         ? backwardAnchorHardBan(nc, { mode: 'unstructured_read' })

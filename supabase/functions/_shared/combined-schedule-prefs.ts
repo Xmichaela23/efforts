@@ -69,6 +69,7 @@ export function readDaysPerWeekFromPrefs(
 ): number | undefined {
   if (!prefs) return undefined;
   const v = prefs.days_per_week ?? prefs.daysPerWeek;
+  // OURS — `readDaysPerWeekFromPrefs` 4–7 training days: the range the setup offers, no source
   if (typeof v === 'number' && Number.isFinite(v)) {
     const n = Math.round(v);
     if (n >= 4 && n <= 7) return n;
@@ -99,6 +100,7 @@ export function deriveRestDaysForBudget(
     if (existingRestDays?.length) return sortU(existingRestDays);
     return [];
   }
+  // OURS — `deriveRestDaysForBudget` 4-day floor, and the off-day order Mon, Thu, Tue, Fri, Wed, Sun, Sat below: no source, kept as found
   if (n < 4) return sortU(existingRestDays ?? []);
   const need = 7 - n;
   if (existingRestDays && existingRestDays.length === need) {
@@ -111,6 +113,7 @@ export function deriveRestDaysForBudget(
   if (longRideSunFirst != null && longRideSunFirst >= 0 && longRideSunFirst <= 6) {
     avoid.add(longRideSunFirst);
   }
+  // OURS — off-day pick order (Sun-first indices): no source, kept as found
   const order = [1, 4, 2, 5, 3, 0, 6];
   const picked: number[] = [];
   for (const d of order) {

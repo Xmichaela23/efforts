@@ -469,6 +469,7 @@ type ProjectionDirection = FitnessVerdictDivergence['projection_direction'];
 
 function projectionDirectionFromDelta(predictedSec: number, targetSec: number): ProjectionDirection {
   const pctOff = (predictedSec - targetSec) / targetSec; // + = predicted slower than target
+  // OURS — `projectionDirectionFromDelta` bands −5 % / +3 % / +8 %: copied from race-readiness, which cites no source either; kept as found
   if (pctOff <= -0.05) return 'ahead';
   if (pctOff <= 0.03) return 'on_track';
   if (pctOff <= 0.08) return 'behind';
@@ -548,6 +549,7 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
 // replaced by machinery that already existed; see `ArcFiveKLearnedDivergence`.
 // (`THR_SEC_KM_MIN` / `THR_SEC_KM_MAX` went with it — the resolver's own sanity bands cover this.)
 /** Reject only obvious bad inputs (seconds full race time, typos, etc.) */
+// OURS — `FIVEK_TOTAL_SEC_SANE` 7–80 min: an input sanity bound for a typed 5K, not a training number
 const FIVEK_TOTAL_SEC_SANE = { min: 7 * 60, max: 80 * 60 };
 
 function formatRaceClockSec(totalSec: number): string {
@@ -610,6 +612,7 @@ function formatGapDurationSec(gap: number): string {
 }
 
 /** Strava/Garmin-style: `avg_pace` and learned paces = seconds per km. */
+// FIELD — definition (1 mi = 1.60934 km)
 const PACE_KM_TO_MI = 1.60934;
 
 function formatMmSsPaceFromSecPerUnit(totalSeconds: number): string {
@@ -838,6 +841,7 @@ export function buildFiveKNudge(
   };
 }
 
+// OURS — `GEAR_NOTES_MAX_LEN` 160 characters: a length cap on gear notes, no source, kept as found
 const GEAR_NOTES_MAX_LEN = 160;
 
 function truncateNotes(s: unknown): string | null {
@@ -954,6 +958,7 @@ function resolveTemporalPlanRow(planRows: Record<string, unknown>[], focusYmd: s
       : {};
     const durRaw = row.duration_weeks ?? cfg.duration_weeks;
     const durW = Number(durRaw);
+    // OURS — 52 weeks: the length assumed for a plan row with no duration, no source, kept as found
     const weeks = Number.isFinite(durW) && durW > 0 ? durW : 52;
     const endExclusive = arcAddDaysYmd(start, weeks * 7);
     if (focus >= start && focus < endExclusive) return row;
@@ -971,10 +976,12 @@ function resolveTemporalPlanRow(planRows: Record<string, unknown>[], focusYmd: s
   return best;
 }
 
+// OURS — `EIGHT_WEEKS_DAYS` 56 days: how far back recently completed race goals are read, no source, kept as found
 const EIGHT_WEEKS_DAYS = 56;
 // Readiness check-in trailing window for Arc (Q-049 Phase 1). 14 days = enough to
 // surface the current state plus a within-week trend ("soreness climbing all week")
 // without dragging in stale weeks. Absent days are omitted, never fabricated (Q3).
+// OURS — `READINESS_WINDOW_DAYS` 14 days: reason above (Q-049); no page, no outside source
 const READINESS_WINDOW_DAYS = 14;
 
 async function buildRecentCompletedEvents(
@@ -1058,6 +1065,7 @@ function buildSwimTrainingFromWorkouts(
   focusYmd: string
 ): SwimTrainingFromWorkouts | null {
   const rows = Array.isArray(data) ? data : [];
+  // OURS — 28 days: the swim-count window sent as `completed_swim_sessions_last_28_days`, no source, kept as found
   const start28 = addDaysYmd(focusYmd, -28);
   const swimRows = rows.filter((r) => isSwimWorkoutType(r.type));
   let c28 = 0;
@@ -1091,8 +1099,10 @@ export async function getArcContext(
   start8w.setUTCDate(start8w.getUTCDate() - EIGHT_WEEKS_DAYS);
   const start8wYmd = start8w.toISOString().slice(0, 10);
 
+  // OURS — 90 days: the swim query window, wide enough for the 28-day count and the swim re-test nudge; kept as found
   const start90Ymd = addDaysYmd(focusYmd, -90);
 
+  // OURS — 6 weeks: the longitudinal signals window, the default in longitudinal-signals.ts; kept as found
   const longitudinalSignalsPromise = computeLongitudinalSignals(supabase, userId, focusYmd, 6).catch((err) => {
     console.warn('[getArcContext] longitudinal_signals', err instanceof Error ? err.message : String(err));
     return null;
@@ -1338,6 +1348,7 @@ export async function getArcContext(
     const cfg = temporalPlanRow.config && typeof temporalPlanRow.config === 'object' && !Array.isArray(temporalPlanRow.config)
       ? (temporalPlanRow.config as Record<string, unknown>) : {};
     const durW = Number(temporalPlanRow.duration_weeks ?? cfg.duration_weeks);
+    // OURS — 52 weeks: the length assumed for a plan row with no duration (same as above), kept as found
     const weeks = Number.isFinite(durW) && durW > 0 ? durW : 52;
     const endExclusive = arcAddDaysYmd(start, weeks * 7);
     const focus = focusYmd.slice(0, 10);
@@ -1372,6 +1383,7 @@ export async function getArcContext(
         ctl: Math.round(ctl),
         atl: Math.round(atl),
         tsb,
+        // OURS — `cycling_fitness.form` +5 / −10: the numbers are Friel's TSB zone edges (fitness-fatigue.ts formZone), but the words "fresh" / "fatigued" and the on-the-line rule are ours
         form: tsb >= 5 ? 'fresh' : tsb <= -10 ? 'fatigued' : 'neutral',
       };
     }

@@ -32,6 +32,7 @@ export const runAdapter: DisciplineAdapter = {
     const notableLeadSignals: NotableLeadSignal[] = [];
     const tempF = num(weather?.temperature_f);
     const heatStress = typeof weather?.heat_stress_level === 'string' ? weather.heat_stress_level : null;
+    // OURS — 75 °F: the heat lead-signal cut, no source, kept as found
     if ((tempF != null && tempF >= 75) || (heatStress != null && heatStress !== 'none')) {
       notableLeadSignals.push({
         signal: 'heat',
@@ -49,6 +50,7 @@ export const runAdapter: DisciplineAdapter = {
     const typical = num(der?.hr_drift_typical) ?? 0;
     const decoup = num(der?.cardiac_decoupling_pct);
     if (normDrift != null) {
+      // OURS — drift atypical over 8 bpm and 6 over typical; raw over 20 bpm with decoupling ≥ 10 %: no source, kept as found
       if (normDrift > 8 && normDrift > typical + 6) {
         atypicalSignals.push({ signal: 'HR drift', state: 'elevated', detail: `${normDrift} bpm pace-normalized vs typical ${typical}` });
       }

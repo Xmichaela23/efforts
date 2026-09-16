@@ -31,6 +31,7 @@ export const swimAdapter: DisciplineAdapter = {
     // RPE×HR incoherence: low RPE but HR genuinely high for the athlete's zone (only flag WITH an anchor).
     const rpe = num(packet?.rpe);
     const easyZone = packet?.hr_is_easy === true;
+    // OURS — RPE ≤ 3 counts as low: no source, kept as found
     if (hasZones && rpe != null && rpe <= 3 && easyZone === false) {
       atypicalSignals.push({ signal: 'HR', state: 'high-for-zone', detail: `RPE ${rpe} but HR above the easy zone` });
     }

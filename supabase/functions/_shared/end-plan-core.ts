@@ -53,6 +53,7 @@ export async function executeEndPlan(
 
   if (userId) {
     const eightWeeksAgo = new Date(today);
+    // OURS — 56 days: the snapshot window for the tombstone peaks, no source, kept as found
     eightWeeksAgo.setDate(today.getDate() - 56);
     const fromDate = eightWeeksAgo.toISOString().slice(0, 10);
 

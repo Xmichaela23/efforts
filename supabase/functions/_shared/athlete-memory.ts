@@ -26,6 +26,7 @@ export type RuleResult<T> =
 
 type ExplainMode = 'server' | 'user';
 
+// OURS — `DEFAULT_RULE_CONFIG` confidence 0.5, sufficiency 3, required 8: no source, kept as found
 const DEFAULT_RULE_CONFIG: RuleConfig = {
   confidenceThreshold: 0.5,
   sufficiencyThreshold: 3,
@@ -33,6 +34,7 @@ const DEFAULT_RULE_CONFIG: RuleConfig = {
   allowLowConfidence: false,
 };
 
+// OURS — `RULE_CONFIGS` every confidence / sufficiency / required count in this table: no source, kept as found
 export const RULE_CONFIGS: Record<string, RuleConfig> = {
   'strength.injury_hotspots': {
     confidenceThreshold: 0.55,
@@ -108,6 +110,7 @@ export const RULE_CONFIGS: Record<string, RuleConfig> = {
   },
 };
 
+// OURS — `NAMESPACE_SESSION_THRESHOLDS` bike 3, swim 3 sessions: no source, kept as found
 export const NAMESPACE_SESSION_THRESHOLDS: Record<'run' | 'bike' | 'swim' | 'strength', number> = {
   run: RULE_CONFIGS['run.aerobic_floor_hr'].sufficiencyThreshold,
   bike: 3,
@@ -342,6 +345,7 @@ function clampInt(n: number, min: number, max: number): number {
 }
 
 function modeFromWeeksOut(weeksOut: number): MarathonReadinessState {
+  // OURS — `modeFromWeeksOut` 2 / 6 / 10 weeks out: no source, kept as found
   if (weeksOut <= 2) return 'race_support';
   if (weeksOut <= 6) return 'bridge_peak';
   if (weeksOut <= 10) return 'compressed_build';
@@ -353,6 +357,7 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
   input: AdaptiveMarathonInputs,
 ): AdaptiveMarathonDecision {
   const memoryConfidence = Number(memory?.confidence_score ?? 0);
+  // OURS — confidence 0.35, sufficiency 4, required 8 for the four marathon rules below: no source, kept as found
   const minWeeksResult = getRuleOrInsufficient<number>(memory, 'run.minimum_feasible_weeks', {
     confidenceThreshold: 0.35,
     sufficiencyThreshold: 4,
@@ -378,6 +383,7 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
     allowLowConfidence: true,
   });
 
+  // OURS — `fallbackRecByFitness` 12 / 10 / 8 weeks, `fallbackMinByFitness` 6 / 4 / 3 weeks, spacing fallbacks 12 / 8 weeks: no source, kept as found
   const fallbackRecByFitness: Record<string, number> = { beginner: 12, intermediate: 10, advanced: 8 };
   const fallbackMinByFitness: Record<string, number> = { beginner: 6, intermediate: 4, advanced: 3 };
   const recWeeks = recWeeksResult.status === 'ok' || recWeeksResult.status === 'low_confidence'
@@ -393,6 +399,7 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
     ? Number(minSpacingResult.value)
     : 8;
 
+  // OURS — clamps 4–20 build weeks, 6–24 and 4+ spacing weeks: no source, kept as found
   const recommendedBuildWeeks = clampInt(recWeeks, 4, 20);
   const minimumFeasibleWeeks = clampInt(minWeeks, 1, recommendedBuildWeeks);
   const recommendedSpacingWeeks = clampInt(recSpacing, 6, 24);
@@ -403,6 +410,7 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
     input.weeksOut <= minimumFeasibleWeeks
       ? 'race_support'
       : input.weeksOut < recommendedBuildWeeks
+        // OURS — 6 weeks: the same bridge-peak cut as `modeFromWeeksOut`
         ? (input.weeksOut <= 6 ? 'bridge_peak' : 'compressed_build')
         : 'full_build';
 
@@ -424,12 +432,14 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
 
   let risk_tier: MarathonRiskTier = 'low';
   if (input.weeksOut < minimumFeasibleWeeks) risk_tier = 'high';
+  // OURS — 2 weeks out and memory confidence under 0.35 (below): no source, kept as found
   if (input.weeksOut <= 2) risk_tier = 'moderate';
   if (input.spacingWeeks != null && input.spacingWeeks < minimumFeasibleSpacingWeeks) {
     risk_tier = input.weeksOut < minimumFeasibleWeeks ? 'very_high' : 'high';
   } else if (input.spacingWeeks != null && input.spacingWeeks < recommendedSpacingWeeks && risk_tier === 'low') {
     risk_tier = 'moderate';
   }
+  // OURS — 0.35 memory confidence: no source, kept as found
   if (!Number.isFinite(memoryConfidence) || memoryConfidence < 0.35) {
     why.push('Memory confidence is limited; recommendations use conservative fallback bounds.');
   }
@@ -544,6 +554,7 @@ export function resolveMemoryContextForPlanning(
       strength1RMs[key] = {
         value: Number(rule.value),
         confidence: Number(rule.confidence ?? 0),
+        // OURS — 999 days: stands for "no date on the rule", not a training number
         days_since: Number(rule.days_since ?? 999),
         last_logged: rule.last_logged ?? null,
       };

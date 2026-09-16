@@ -68,6 +68,7 @@ export function classifyTrainingTransition(opts: {
   const endedAt = tombstone.ended_at ? new Date(String(tombstone.ended_at)) : null;
   const weeksSinceEnd = endedAt
     ? Math.floor((Date.now() - endedAt.getTime()) / (7 * 24 * 60 * 60 * 1000))
+    // OURS — 999 weeks: stands for "no end date", not a training number
     : 999;
 
   const completionPct = Number(tombstone.completion_pct ?? 0);
@@ -77,6 +78,7 @@ export function classifyTrainingTransition(opts: {
 
   const wOut = weeksOut ?? 999;
 
+  // OURS — `classifyTrainingTransition` peak bridge: ≥ 40 % complete, ≥ 14 mi long run, ≤ 3 weeks since, ≤ 12 weeks out; rebuild: ≥ 20 %, 4–12 weeks since: no source, kept as found
   if (
     sameDiscipline &&
     completionPct >= 40 &&
@@ -113,6 +115,7 @@ export function classifyTrainingTransition(opts: {
 export function recentLongRunMilesFromCompletedEvent(distance: string, sport: string): number {
   const d = (distance || '').toLowerCase();
   const s = (sport || '').toLowerCase();
+  // OURS — `recentLongRunMilesFromCompletedEvent` 16 / 18 / 20 mi stand-ins (26.2 and 13.1 are race distances): no source, kept as found
   if (d.includes('marathon') && !d.includes('half') && !d.includes('70')) return 26.2;
   if (d.includes('half') || d.includes('13.1') || d.includes('21k') || d.includes('half marathon')) return 13.1;
   if (d.includes('70.3') || d.includes('half iron') || s.includes('tri')) return 16;
@@ -141,6 +144,7 @@ export type PostRaceRecoveryResult =
  * - **moderate** (≤21d): half marathon 15–20d; sprint/olympic tri; 5K/10K; other run
  */
 export function classifyPostRaceRecoveryTier(e: CompletedEvent): PostRaceRecoverySeverity | null {
+  // OURS — `classifyPostRaceRecoveryTier` 21-day window, half marathon "full" under 14 days: no source, kept as found
   if (e.days_ago >= 21) return null;
   const d = (e.distance || '').toLowerCase();
   const s = (e.sport || '').toLowerCase();
@@ -268,6 +272,7 @@ function readSwimCssSecPer100Yd(lf: Record<string, unknown> | null | undefined):
   const o = css as Record<string, unknown>;
   const v = Number(o.value);
   const c = String(o.confidence || '').toLowerCase();
+  // OURS — CSS sanity band 40–300 s/100 m; FIELD — definition (1 yd = 0.9144 m)
   if (Number.isFinite(v) && v >= 40 && v <= 300 && (c === 'moderate' || c === 'high')) return v * (91.44 / 100);
   return null;
 }
@@ -280,6 +285,7 @@ function readSwimMedianSecPer100Yd(lf: Record<string, unknown> | null | undefine
   const o = m as Record<string, unknown>;
   const sc = Number(o.sample_count) || 0;
   const c = String(o.confidence || '').toLowerCase();
+  // OURS — at least 3 samples (5 when low confidence), pace sanity band 50–600 s/100 m: no source, kept as found
   if (sc >= 3 && !(c === 'low' && sc < 5)) {
     const v = Number(o.value);
     if (Number.isFinite(v) && v >= 50 && v <= 600) return v * (91.44 / 100);
@@ -298,6 +304,7 @@ function readSwimManualSecPer100Yd(perf: Record<string, unknown> | null | undefi
   }
   const numRaw = perf['swimPacePer100'] ?? perf['swim_pace_per_100_sec'];
   const n = typeof numRaw === 'number' ? numRaw : Number(numRaw);
+  // OURS — 600 s/100 yd typed-pace ceiling: an input sanity bound
   if (!Number.isFinite(n) || n <= 0 || n > 600) return null;
   return String(units || '').toLowerCase() === 'metric' ? n * (91.44 / 100) : n;
 }
@@ -343,6 +350,7 @@ export function swimVolumeMultiplierFromArcWorkouts(
   opts?: SwimVolumeMultiplierOpts,
 ): number {
   let m: number;
+  // OURS — `swimVolumeMultiplierFromArcWorkouts` 0.5 / 0.42 / 0.52 / 0.68 / 0.85 by swims in 90 days (2 / 6 / 14), pace floors 0.82 at ≥ 2:30 and 0.74 at ≥ 2:15 per 100 yd: no source, kept as found
   if (!st) m = 0.5;
   else {
     const n90 = st.completed_swim_sessions_last_90_days ?? 0;
@@ -388,6 +396,7 @@ export function computeRunPlanningSignals(
 
   const current_weekly_miles = snapshot?.workload_by_discipline &&
       typeof (snapshot.workload_by_discipline as any)?.run === 'number'
+    // OURS — run workload ÷ 10 taken as weekly miles: no source, kept as found
     ? Math.round(Number((snapshot.workload_by_discipline as any).run) / 10)
     : undefined;
 
@@ -429,6 +438,7 @@ export function computeRunPlanningSignals(
       current_acwr = Number(latestAcwr);
     }
 
+    // OURS — ±10 % change oldest → newest snapshot for building / declining: no source, kept as found
     if (recentSnapshots.length >= 2) {
       const newest = Number(recentSnapshots[0]?.workload_total ?? 0);
       const oldest = Number(recentSnapshots[recentSnapshots.length - 1]?.workload_total ?? 0);

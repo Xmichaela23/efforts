@@ -15,6 +15,7 @@ export class AnalysisBuilder {
   static interference(nextWorkout: PlannedWorkout) {
     const workoutType = nextWorkout.type || 'workout';
     return {
+      // OURS — ~60 % glycogen, 48 hours, 24 hours in these lines: no source is cited for them
       physiological: `A long run depletes muscle glycogen by ~60% and causes structural micro-tears. Your body physiogically requires 48 hours to restore fuel for high-intensity efforts like ${workoutType}.`,
       scheduling: `This move places a high-volume session 24 hours before a high-intensity session. This violates the 'Hard/Easy' principle essential for performance.`,
       verdict: `Strongly advised against. You will likely be too fatigued to hit your target paces for the ${workoutType}, turning a key workout into 'junk miles'.`
@@ -28,6 +29,7 @@ export class AnalysisBuilder {
   static optimization() {
     return {
       physiological: "Completing volume early allows for a longer period of passive recovery (lower cortisol, reduced inflammation) before the next training block begins.",
+      // OURS — 24 hours: no source, kept as found
       scheduling: "You create a 24-hour buffer between weeks. This separation ensures you enter the next week's quality work with 'fresh legs'.",
       verdict: "Highly Recommended. This is the gold standard for rescheduling as it prioritizes recovery."
     };

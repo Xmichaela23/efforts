@@ -216,6 +216,7 @@ export function normalizePlanPhase(phaseRaw: string | null | undefined): ArcPlan
 
 function defaultBlockLeadWeeks(distance: string | null | undefined, phaseBucket: ArcPlanPhaseBucket): number {
   const d = String(distance || '').toLowerCase();
+  // OURS — `defaultBlockLeadWeeks` 20 / 17 / 13 / 11 weeks before the race by distance: no source, kept as found
   if (/\b140\.|full|iron\b|ironman\b/.test(d)) return 20;
   if (/70\.3|half\s*iron|middle/.test(d)) return 17;
   if (/marathon|42/.test(d)) return 13;
@@ -259,6 +260,7 @@ export function selectArcNarrativeMode(params: {
   const pri = String(nextGoalPriority || 'A').toUpperCase();
 
   /** Post–goal-race horizons first: athlete truth is “coming back from X” until that window closes. */
+  // OURS — `selectArcNarrativeMode` race debrief 0–7 days, recovery read 8–21 days, taper read ≤ 14 days to an A race: no source, kept as found
   if (dSince != null && dSince >= 0 && dSince <= 7) {
     return 'race_debrief';
   }
@@ -338,6 +340,7 @@ export function buildArcNarrativeContextV1(inp: BuildArcNarrativeContextInput): 
   // to false (no race on record → not a post-race session; same for missing
   // run count).
   const is_first_post_race_run =
+    // OURS — first run back: at most 1 run and 60 days since the goal race: no source, kept as found
     (runs_since_last_race ?? 999) <= 1 && (days_since_last_goal_race ?? 999) <= 60;
 
   return {

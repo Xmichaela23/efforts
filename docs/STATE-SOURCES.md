@@ -251,3 +251,65 @@ One table per file group of the load-bearing scope (DESIGN-one-truth-guard §2.1
 | Max HR from a session peak: peak ÷ 0.95; age valid 1–119 | `src/lib/resolve-current-max-hr.ts PEAK_TO_MAX` / `ageFromBirthday` | **OURS** — 0.95 is the more conservative of the two divisors the app shipped (D-299 records the choice); the age bound is a validity check | 2026-09-16 |
 | 5K sanity: race time 7:00–80:00; pace 3:00–20:00/mi | `src/lib/resolve-current-5k-pace.ts RACE_TIME_SANE_SEC` / `PACE_SANE_SEC_PER_MI` | **OURS** — race-time band copied from arc-context `FIVEK_TOTAL_SEC_SANE`; no source for either | 2026-09-16 |
 | Age max HR: 208 − 0.7 × age; female 206 − 0.88 × age | `src/lib/resolve-current-max-hr.ts ageEstimateMaxHr` | FIELD — Tanaka (208 − 0.7 × age); Gulati (206 − 0.88 × age). Code matches both formulas | 2026-09-16 |
+
+### _shared top-level files, narrative-core, coaching, strava, intervals, calendar-sync
+
+| Number | Where | Source | Date |
+|---|---|---|---|
+| Indoor session = never leaves a 100 m circle | `_shared/indoor-session.ts INDOOR_RADIUS_M` | **OURS** — no source gives a figure for "did this activity move"; chosen against consumer GPS error (5–10 m open sky, 30–40 m indoors); pre-existing marker, row was missing | 2026-09-16 |
+| Intervals.icu sign-in state goes stale after 30 minutes | `_shared/intervals/oauth.ts STATE_TTL_MS` | **OURS** — how long the athlete may spend on the sign-in and consent page; pre-existing marker, row was missing | 2026-09-16 |
+| Coach payload version 211 | `_shared/coach-payload-version.ts COACH_PAYLOAD_VERSION` | **OURS** — a payload version counter, not a training number; bumped by hand when the payload shape changes | 2026-09-16 |
+| Race goal on-track bands: ≤ −5 % ahead, ≤ +3 % on track, ≤ +8 % behind, else well behind | `_shared/arc-context.ts projectionDirectionFromDelta` | **OURS** — copied from race-readiness, which cites no source either | 2026-09-16 |
+| Typed 5K accepted only between 7 and 80 minutes | `_shared/arc-context.ts FIVEK_TOTAL_SEC_SANE` | **OURS** — input sanity bound, not a training number | 2026-09-16 |
+| Gear notes cut at 160 characters | `_shared/arc-context.ts GEAR_NOTES_MAX_LEN` | **OURS** — length cap, kept as found | 2026-09-16 |
+| A plan row with no duration is assumed to run 52 weeks | `_shared/arc-context.ts resolveTemporalPlanRow` / `activePlanCoversFocus` | **OURS** — no source, kept as found | 2026-09-16 |
+| Recently completed race goals read from the last 56 days | `_shared/arc-context.ts EIGHT_WEEKS_DAYS` | **OURS** — no source, kept as found | 2026-09-16 |
+| Readiness check-ins read from the last 14 days | `_shared/arc-context.ts READINESS_WINDOW_DAYS` | **OURS** — Q-049: current state plus a within-week trend; no page, no outside source | 2026-09-16 |
+| Swim count window 28 days; swim query window 90 days; longitudinal signals window 6 weeks | `_shared/arc-context.ts buildSwimTrainingFromWorkouts` / `start90Ymd` / `computeLongitudinalSignals` | **OURS** — no source, kept as found | 2026-09-16 |
+| Bike form word: fresh at TSB ≥ +5, fatigued at ≤ −10, else neutral | `_shared/arc-context.ts cycling_fitness.form` | **OURS** — the numbers are Friel's TSB zone edges (row for `fitness-fatigue.ts formZone`), but the words and the on-the-line rule are ours | 2026-09-16 |
+| A past goal race stays in the narrator's facts for 42 days | `_shared/arc-narrative-ai-appendix.ts RACE_ANCHOR_RELEVANCE_DAYS` | **OURS** — recovery reasoning in the comment has no page or paper | 2026-09-16 |
+| Forward-framing ban fires 14–180 days before the next goal race | `_shared/arc-narrative-ai-appendix.ts forwardEligible` | **OURS** — no source, kept as found | 2026-09-16 |
+| Block lead weeks before a race: 20 (full IM) / 17 (70.3) / 13 (marathon, or peak/build) / 11 | `_shared/arc-narrative-state.ts defaultBlockLeadWeeks` | **OURS** — no source, kept as found | 2026-09-16 |
+| Narrative mode: race debrief 0–7 days after a goal race, recovery read 8–21 days, taper read ≤ 14 days to an A race | `_shared/arc-narrative-state.ts selectArcNarrativeMode` | **OURS** — no source, kept as found | 2026-09-16 |
+| First run back: at most 1 run and within 60 days of the goal race | `_shared/arc-narrative-state.ts is_first_post_race_run` | **OURS** — no source, kept as found | 2026-09-16 |
+| Same route when path overlap ≥ 0.9 at any length | `_shared/route-match.ts CONTAINMENT_FULL` | **OURS** — no outside source | 2026-09-16 |
+| Partial-overlap routes merge only within 2.5× length | `_shared/route-match.ts ROUTE_LENGTH_MAX_RATIO` | **OURS** — no outside source | 2026-09-16 |
+| Same route at ≥ 0.6 path overlap | `_shared/route-match.ts ROUTE_MATCH_MIN_OVERLAP` | **OURS** — tolerates GPS jitter; no outside source | 2026-09-16 |
+| A route's stored path capped at 400 cells | `_shared/route-match.ts mergeGeohashes` | **OURS** — keeps storage bounded | 2026-09-16 |
+| Geohash precision 7 for route paths | `_shared/geohash.ts encodeGeohash` / `trackToGeohashSet` | FIELD — geohash definition (precision 7 ≈ 153 m cell). **OURS** — choosing 7 | 2026-09-16 |
+| Route fingerprint buckets 200 m distance / 10 m climb / 3-decimal start-end; shortest route 1000 m; path match needs ≥ 8 cells; a distance under 1000 read as km | `_shared/route-intelligence.ts buildRouteFingerprint` / `resolveRouteCluster` / `distanceMeters` | **OURS** — no source, kept as found | 2026-09-16 |
+| Route fallback match: ±20 % distance (at least 600 m); score 0.5 distance + 0.3 start + 0.2 end, 2 km scale, 0.4 when no point | `_shared/route-intelligence.ts resolveRouteCluster` | **OURS** — no source, kept as found | 2026-09-16 |
+| Group ride climb hints: notice ≥ 12 m/km; aggressive ≥ 16 m/km or ≥ 500 m | `_shared/group-ride-route-snapshot.ts CLIMB_NOTICE_MIN_MK` / `CLIMB_AGGRESSIVE_MIN_MK` / `CLIMB_AGGRESSIVE_MIN_GAIN_M` | **OURS** — no source; the phone copy `src/lib/group-ride-route-snapshot.ts` holds the same numbers by hand | 2026-09-16 |
+| Group ride high climbing ≥ 80 ft/mi | `_shared/group-ride-route-snapshot.ts GROUP_RIDE_HIGH_CLIMB_FT_PER_MI` | **OURS** — no source | 2026-09-16 |
+| Group ride bike TSS floor 85 (aggressive) / 65 (notice) | `_shared/group-ride-route-snapshot.ts groupRideBikeTssFloor` | **OURS** — no source | 2026-09-16 |
+| Swim phase midpoint yardage tables (base / build / race-specific × distance × level) | `_shared/swim-program-templates.ts MID_BASE_YD` / `MID_BUILD_YD` / `MID_RACE_SPEC_YD` | **OURS** — docs/SWIM-PROTOCOL.md volume tables; no outside source | 2026-09-16 |
+| Swim base 0.8× build yards, taper 0.6×, build ramp 6 weeks, race-specific ramp 4 weeks | `_shared/swim-program-templates.ts BASE_VS_BUILD_YARD_SCALE` / `TAPER_YARD_SCALE` / `BUILD_RAMP_WEEKS` / `RACE_SPECIFIC_RAMP_WEEKS` | **OURS** — SWIM-PROTOCOL §4.5; no outside source | 2026-09-16 |
+| Swim slot start / peak yards (70.3 focus 2200/2000/1800 → 2800/2600/2600; race build 2200/2000 → 2600/2400; race-specific 2200/1500 → 2600/2500) | `_shared/swim-program-templates.ts FOCUS_70_3_BUILD_START_YDS` / `RACE_70_3_BUILD_START_YDS` / `RACE_70_3_RACE_SPEC_START_YDS` (and the PEAK pairs) | **OURS** — SWIM-PROTOCOL; no outside source | 2026-09-16 |
+| Swim yards rounded to 50, never under 200 | `_shared/swim-program-templates.ts roundYards` | **OURS** — no outside source | 2026-09-16 |
+| Swim 4-week slot rotations; build weeks 2/4 and race-specific weeks 1/2/3 swap in time trial, fartlek, open water, race pace; pull/kick alternation, race-specific pull week 2 and every 10th; Full IM advanced endurance slot build week ≥ 4 / race-specific ≤ 2 | `_shared/swim-program-templates.ts raceTwoSwimRotationSlotMeta` / `raceTwoSwimRotationSlotMetaForBeginner` / `phaseSpecificMetaSubstitution` | **OURS** — SWIM-PROTOCOL; no outside source | 2026-09-16 |
+| Swim set shapes in notes: 400 + 200 yd test (CSS = 200 ÷ (T400 − T200)), sighting every 6 strokes, 4×400, 3–4×600 yd with 45 s rest | `_shared/swim-program-templates.ts TIME_TRIAL_META` / `OPEN_WATER_SKILLS_META` / `MIXED_FARTLEK_META` / `RACE_PACE_SUSTAINED_META` | **OURS** — SWIM-PROTOCOL §5.7–§5.10; no outside source written in the repo | 2026-09-16 |
+| Swim recovery week 1200 yd; learner recovery 1000 yd (full) / 800 yd; focus rotation needs 3 swim days | `_shared/swim-program-templates.ts getRecoverySwimTemplate` / `getTwoSlotRecoveryLearnerSwimTemplates` / `swimProgramIntentForAnchorSlots` | **OURS** — no outside source | 2026-09-16 |
+| Athlete memory rule gates (confidence / sufficiency / required counts), default 0.5 / 3 / 8 | `_shared/athlete-memory.ts DEFAULT_RULE_CONFIG` / `RULE_CONFIGS` | **OURS** — no source | 2026-09-16 |
+| Memory session thresholds bike 3, swim 3 | `_shared/athlete-memory.ts NAMESPACE_SESSION_THRESHOLDS` | **OURS** — no source | 2026-09-16 |
+| Marathon mode by weeks out: ≤ 2 race support, ≤ 6 bridge peak, ≤ 10 compressed build | `_shared/athlete-memory.ts modeFromWeeksOut` | **OURS** — no source | 2026-09-16 |
+| Marathon memory rules gate 0.35 / 4 / 8; fallback build weeks 12/10/8, minimum 6/4/3, spacing 12/8; clamps 4–20 and 6–24; risk moderate at ≤ 2 weeks; confidence note under 0.35 | `_shared/athlete-memory.ts resolveAdaptiveMarathonDecisionFromMemory` / `fallbackRecByFitness` / `fallbackMinByFitness` | **OURS** — no source | 2026-09-16 |
+| Missing rule date read as 999 days; missing plan end read as 999 weeks | `_shared/athlete-memory.ts days_since` / `planning-context.ts weeksSinceEnd` | **OURS** — stands for "no date", not a training number | 2026-09-16 |
+| Training transition: peak bridge at ≥ 40 % complete, ≥ 14 mi long run, ≤ 3 weeks since, ≤ 12 weeks out; rebuild at ≥ 20 %, 4–12 weeks since | `_shared/planning-context.ts classifyTrainingTransition` | **OURS** — no source | 2026-09-16 |
+| Long-run stand-ins from a completed event: 16 / 18 / 20 mi | `_shared/planning-context.ts recentLongRunMilesFromCompletedEvent` | **OURS** — no source | 2026-09-16 |
+| Post-race recovery tier window 21 days; half marathon full tier under 14 days | `_shared/planning-context.ts classifyPostRaceRecoveryTier` | **OURS** — no source | 2026-09-16 |
+| Swim pace sanity bands: CSS 40–300 s/100 m, median 50–600 s/100 m with ≥ 3 samples (5 when low), typed ≤ 600 s | `_shared/planning-context.ts readSwimCssSecPer100Yd` / `readSwimMedianSecPer100Yd` / `readSwimManualSecPer100Yd` | **OURS** — input sanity bounds | 2026-09-16 |
+| Swim volume multiplier 0.5 / 0.42 / 0.52 / 0.68 / 0.85 / 1.0 by swims in 90 days; tri pace floors 0.82 (≥ 2:30/100 yd), 0.74 (≥ 2:15) | `_shared/planning-context.ts swimVolumeMultiplierFromArcWorkouts` | **OURS** — no source | 2026-09-16 |
+| Run workload ÷ 10 taken as weekly miles; volume trend ±10 % | `_shared/planning-context.ts computeRunPlanningSignals` | **OURS** — no source | 2026-09-16 |
+| Training days per week 4–7; off-day pick order Mon, Thu, Tue, Fri, Wed, Sun, Sat | `_shared/combined-schedule-prefs.ts readDaysPerWeekFromPrefs` / `deriveRestDaysForBudget` | **OURS** — no source | 2026-09-16 |
+| Run token pace bands: easy and long run ±10 %, intervals and others ±5 % | `_shared/token-parser.ts easyPaceTarget` / `parseLongRunToken` / `parseIntervalToken` | **OURS** — no source | 2026-09-16 |
+| Coaching context: recent sessions from the last 2 days; intensity-pattern line at ≥ 75 % / ≥ 50 % easy time | `_shared/build-coaching-context.ts buildCoachingContext` | **OURS** — no source | 2026-09-16 |
+| Plan progress: verdict only when ≥ 50 % of planned sessions matched; behind under 85 %, ahead over 115 % | `_shared/adherence-plan.ts matchConfidence` | **OURS** — no source | 2026-09-16 |
+| Plan transition window = weeks 1–2 | `_shared/plan-week.ts isPlanTransitionWindowByWeekIndex` | **OURS** — no source | 2026-09-16 |
+| A planned duration under 1000 read as minutes | `_shared/planned-duration.ts resolvePlannedDurationSeconds` | **OURS** — unit guess, kept as found | 2026-09-16 |
+| Tombstone peaks read from the last 56 days of snapshots | `_shared/end-plan-core.ts eightWeeksAgo` | **OURS** — no source | 2026-09-16 |
+| Reschedule option ranks 1–5 | `_shared/coaching/engines/performance-engine.ts rank` | **OURS** — ordering of options, no source | 2026-09-16 |
+| Reschedule copy: "~60 %" glycogen, "48 hours", "24 hours" | `_shared/coaching/analysis-builder.ts interference` / `optimization` | **OURS** — no source cited for these printed claims | 2026-09-16 |
+| Run narrative: heat lead signal at ≥ 75 °F; drift atypical over 8 bpm and 6 over typical, or raw over 20 bpm with ≥ 10 % decoupling | `_shared/narrative-core/adapters/run.ts heat` / `normDrift` | **OURS** — no source | 2026-09-16 |
+| Swim narrative: RPE ≤ 3 counts as low | `_shared/narrative-core/adapters/swim.ts rpe` | **OURS** — no source | 2026-09-16 |
+| Narrative validator looks 28 characters back for a hedge word | `_shared/narrative-core/validate.ts HEDGE` | **OURS** — no source | 2026-09-16 |
+| Off-plan banner fires at run load 50 % under plan | `_shared/off-plan-banner.ts offPlanAdherenceResult` | **OURS** — D-147 records the choice, no outside source | 2026-09-16 |

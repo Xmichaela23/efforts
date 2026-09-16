@@ -63,6 +63,7 @@ function stepSeconds(st: Record<string, unknown>): number {
   const meters = positive(st?.distanceMeters);
   if (meters == null) return 0;
 
+  // FIELD — definition (1 mi = 1609.34 m, as used below)
   const secPerMeter = (() => {
     const pr = st?.pace_range as unknown;
     if (Array.isArray(pr) && pr.length === 2) {
@@ -149,6 +150,7 @@ export function resolvePlannedDurationSeconds(planned: any): number | null {
     if (fromIntervals != null) return fromIntervals;
 
     const dur = positive(planned?.duration);
+    // OURS — a duration under 1000 is read as minutes, otherwise seconds: a unit guess, kept as found
     if (dur != null) return Math.round(dur < 1000 ? dur * 60 : dur);
 
     return null;

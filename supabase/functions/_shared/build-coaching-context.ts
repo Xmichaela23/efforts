@@ -56,6 +56,7 @@ export async function buildCoachingContext(
   const priorWeek = priorWeekDate.toISOString().slice(0, 10);
 
   const fortyEightHoursAgo = new Date(wDate);
+  // OURS — 2 days: the recent-sessions window, no source, kept as found
   fortyEightHoursAgo.setDate(fortyEightHoursAgo.getDate() - 2);
   const recentCutoff = fortyEightHoursAgo.toISOString().slice(0, 10);
 
@@ -157,6 +158,7 @@ export async function buildCoachingContext(
     if (currentSnapshot.intensity_distribution) {
       const id = currentSnapshot.intensity_distribution;
       lines.push(`  Intensity distribution: ${id.zone1_2_pct}% easy (Z1-2: ${id.zone1_2_minutes} min), ${100 - id.zone1_2_pct}% hard (Z3+: ${id.zone3_plus_minutes} min)`);
+      // OURS — 75 % / 50 % easy-time cuts for the intensity-pattern line: no source, kept as found
       if (id.zone1_2_pct >= 75) {
         lines.push(`  → Polarized / 80-20 pattern — mostly easy volume this week.`);
       } else if (id.zone1_2_pct >= 50) {

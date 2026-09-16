@@ -23,6 +23,7 @@ export class PerformancePlanRescheduleEngine implements RescheduleEngine {
     const isLongRun = this.isLongRun(missedWorkout);
     const isQualityRun = this.isQualityRun(missedWorkout);
 
+    // OURS — the `rank` numbers below order the reschedule options (1 = first choice): no source, kept as found
     // --- OPTION 1: The "Early Bird" (Day X-1) ---
     // Principle: Optimization / Buffer Creation
     if (dayIndex > 0) {

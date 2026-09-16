@@ -4,6 +4,7 @@
 
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
+// FIELD — geohash definition (base32, 5 bits a character; precision 7 ≈ 153 m cell). OURS — choosing precision 7, reason above
 export function encodeGeohash(lat: number, lng: number, precision = 7): string {
   let idx = 0;
   let bit = 0;

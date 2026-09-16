@@ -24,6 +24,7 @@ function hashGeohashes(cells: string[]): string {
   return h.toString(36);
 }
 function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  // FIELD — definition (mean Earth radius 6371 km, haversine)
   const R = 6371;
   const dLat = (bLat - aLat) * Math.PI / 180;
   const dLng = (bLng - aLng) * Math.PI / 180;
@@ -57,6 +58,7 @@ export type RouteFeatures = {
 
 function distanceMeters(w: RouteWorkout): number {
   if (typeof w.distance === "number" && w.distance > 0) {
+    // OURS — a distance under 1000 is read as km, not m: a unit guess, kept as found
     return w.distance < 1000 ? w.distance * 1000 : w.distance;
   }
   const compDist = w.computed?.overall?.distance_m;
@@ -105,6 +107,7 @@ export function deriveRouteFeatures(w: RouteWorkout): RouteFeatures {
 }
 
 export function buildRouteFingerprint(f: RouteFeatures): string {
+  // OURS — `buildRouteFingerprint` 200 m distance bucket, 10 m climb bucket, 3-decimal start/end: no source, kept as found
   const distBucket = Math.round(f.distance_m / 200);
   const elevBucket = Math.round((f.elevation_gain_m || 0) / 10);
   const sLat = f.start_lat != null ? f.start_lat.toFixed(3) : "na";
@@ -130,6 +133,7 @@ export interface RouteResolveResult {
  */
 export async function resolveRouteCluster(supabase: any, w: RouteWorkout): Promise<RouteResolveResult | null> {
   const features = deriveRouteFeatures(w);
+  // OURS — `resolveRouteCluster` 1000 m shortest route, geohash precision 7, at least 8 cells for a path match: no source, kept as found
   if (!features.distance_m || features.distance_m < 1000) return null;
 
   const fingerprint = buildRouteFingerprint(features);
@@ -162,6 +166,7 @@ export async function resolveRouteCluster(supabase: any, w: RouteWorkout): Promi
       const { data: candidates } = await supabase
         .from("route_clusters").select(CLUSTER_COLS)
         .eq("user_id", w.user_id).eq("is_active", true)
+        // OURS — fallback match: distance within ±20 % (at least 600 m), score 0.5 distance + 0.3 start + 0.2 end, 2 km start/end scale, 0.4 when no start/end: no source, kept as found
         .gte("distance_m", Math.max(1000, features.distance_m - Math.max(600, features.distance_m * 0.2)))
         .lte("distance_m", features.distance_m + Math.max(600, features.distance_m * 0.2))
         .limit(30);

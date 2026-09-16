@@ -99,6 +99,7 @@ function parseToken(token: string, baselines: UserBaselines): RunSegment[] {
 function easyPaceTarget(baselines: UserBaselines): RunSegment['target_pace'] | undefined {
   const targetPace = parsePaceString(baselines.easyPace) ?? null;
   if (targetPace == null || !(targetPace > 0)) return undefined;   // unknown -> no target. Never a literal.
+  // OURS — `easyPaceTarget` ±10 % pace band: no source, kept as found
   const tolerance = 0.10;
   return {
     target: targetPace,
@@ -142,6 +143,7 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
     const restSeconds = (restUnit === 'm' || restUnit === 'min') ? restDuration * 60 : restDuration;
     const targetPace = getPaceFromReference(paceRef, baselines);
     if (!targetPace) return segments;
+    // OURS — interval ±5 % pace band: no source, kept as found
     const tolerance = 0.05;
     for (let i = 0; i < reps; i++) {
       segments.push({ type: 'work', distance, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } });
@@ -155,10 +157,12 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
   const paceRef = intervalMatch[4];
   const restDuration = parseInt(intervalMatch[5]);
   const restUnit = intervalMatch[6] || 's';
+  // FIELD — definition (1 mi ≈ 1609 m, rounded)
   const distance = distanceUnit === 'mi' ? distanceValue * 1609 : distanceValue;
   const restSeconds = (restUnit === 'm' || restUnit === 'min') ? restDuration * 60 : restDuration;
   const targetPace = getPaceFromReference(paceRef, baselines);
   if (!targetPace) return segments;
+  // OURS — interval ±5 % pace band: no source, kept as found
   const tolerance = 0.05;
   for (let i = 0; i < reps; i++) {
     const expectedDuration = Math.round((distance / 1609) * targetPace);
@@ -175,6 +179,7 @@ function parseTempoToken(token: string, baselines: UserBaselines): RunSegment | 
     const basePace = getPaceFromReference(durationMatch[2], baselines);
     if (!basePace) return null;
     const targetPace = basePace + parseInt(durationMatch[3]) * 60 + parseInt(durationMatch[4]);
+    // OURS — ±5 % pace band: no source, kept as found
     const tolerance = 0.05;
     return { type: 'work', duration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
   }
@@ -184,6 +189,7 @@ function parseTempoToken(token: string, baselines: UserBaselines): RunSegment | 
     const basePace = getPaceFromReference(distanceMatch[2], baselines);
     if (!basePace) return null;
     const targetPace = basePace + parseInt(distanceMatch[3]) * 60 + parseInt(distanceMatch[4]);
+    // OURS — ±5 % pace band: no source, kept as found
     const tolerance = 0.05;
     return { type: 'work', distance, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
   }
@@ -196,6 +202,7 @@ function parseLongRunToken(token: string, baselines: UserBaselines): RunSegment 
   const duration = parseInt(durationMatch[1]) * 60;
   const targetPace = getPaceFromReference(durationMatch[2], baselines);
   if (!targetPace) return null;
+  // OURS — `parseLongRunToken` ±10 % pace band: no source, kept as found
   const tolerance = 0.10;
   return { type: 'work', duration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
 }

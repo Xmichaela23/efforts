@@ -122,6 +122,7 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
   const causalMatch = text.match(CAUSAL);
   if (causalMatch) {
     const idx = causalMatch.index ?? 0;
+    // OURS — 28 characters before the causal word are searched for a hedge: no source, kept as found
     const hedged = HEDGE.test(text.slice(Math.max(0, idx - 28), idx));
     if (!hedged) {
       const factorRe = new RegExp(`\\b(${NON_DET_FACTORS.join('|')})\\b`, 'i');
@@ -136,6 +137,7 @@ export function validateNarrative(summary: string, ctx: NarrativeContext): Valid
   const stateMatch = text.match(STATE_DIAGNOSIS);
   if (stateMatch) {
     const idx = stateMatch.index ?? 0;
+    // OURS — 28 characters, as above
     const hedged = HEDGE.test(text.slice(Math.max(0, idx - 28), idx));
     if (!hedged) {
       failures.push({ rule: 4, code: 'state_diagnosed', why: `"${stateMatch[0]}" is a physiological-state diagnosis the data can't prove. Observe the pattern instead (e.g. "load climbed while readiness dipped"), or hedge it ("may be", "signals suggest").` });

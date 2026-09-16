@@ -66,6 +66,7 @@ export function offPlanAdherenceResult(opts: OffPlanBannerOpts): { line: string;
   // D-147 firing conditions (unchanged): a real run shortfall on a normal training
   // week; excluded on intents meant to be light.
   if (!(loadStatus === 'under' || loadStatus === 'on_target')) return null;
+  // OURS — run load 50 % under plan fires the banner (D-147 records the choice, no outside source)
   if (runLoadPct == null || runLoadPct > -50) return null;
   if (['recovery', 'taper', 'deload', 'peak'].includes(weekIntent)) return null;
 

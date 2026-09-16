@@ -63,6 +63,7 @@ export function resolvePlanWeekIndex(
 export function isPlanTransitionWindowByWeekIndex(weekIndex: number | null | undefined): boolean {
   const w = Number(weekIndex);
   if (!Number.isFinite(w)) return false;
+  // OURS — `isPlanTransitionWindowByWeekIndex` weeks 1–2: no source, kept as found
   return w >= 1 && w <= 2;
 }
 

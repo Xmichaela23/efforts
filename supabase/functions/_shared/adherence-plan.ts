@@ -148,6 +148,7 @@ export function computePlanProgressSummary(args: {
   if (plannedToDateTotal > 0 && plannedSessionsToDate > 0) {
     const ratio = completedToDateTotal / plannedToDateTotal;
     pct = Math.round(ratio * 100);
+    // OURS — plan progress: 50 % of planned sessions matched before a verdict; behind under 85 %, ahead over 115 % of planned load: no source, kept as found
     if (matchConfidence >= 0.5) {
       if (ratio < 0.85) status = 'behind';
       else if (ratio > 1.15) status = 'ahead';

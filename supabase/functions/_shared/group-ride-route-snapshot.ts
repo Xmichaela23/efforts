@@ -24,11 +24,13 @@ export type GroupRideRouteSnapshot = {
 };
 
 /** Align with ArcSetup / scheduling hints (see product discussion). */
+// OURS — `CLIMB_NOTICE_MIN_MK` 12 m/km, `CLIMB_AGGRESSIVE_MIN_MK` 16 m/km, `CLIMB_AGGRESSIVE_MIN_GAIN_M` 500 m: no source; the phone copy in src/lib holds the same numbers
 export const CLIMB_NOTICE_MIN_MK = 12;
 export const CLIMB_AGGRESSIVE_MIN_MK = 16;
 export const CLIMB_AGGRESSIVE_MIN_GAIN_M = 500;
 
 /** Imperial density — routes above this behave like sustained climbing stress for scheduling/copy. */
+// OURS — `GROUP_RIDE_HIGH_CLIMB_FT_PER_MI` 80 ft/mi: no source, kept as found
 export const GROUP_RIDE_HIGH_CLIMB_FT_PER_MI = 80;
 
 /** True when vertical gain per mile exceeds `GROUP_RIDE_HIGH_CLIMB_FT_PER_MI` (wizard route snapshot). */
@@ -36,6 +38,7 @@ export function groupRideRouteHighVerticalStress(
   snapshot: GroupRideRouteSnapshot | null | undefined,
 ): boolean {
   if (!snapshot) return false;
+  // FIELD — definition (1 mi = 1609.344 m; 1 m = 3.28084 ft)
   const mi = snapshot.distance_m / 1609.344;
   if (!(mi > 0)) return false;
   const ft = snapshot.elevation_gain_m * 3.28084;
@@ -124,6 +127,7 @@ export function climbNoticeTier(snapshot: GroupRideRouteSnapshot): 'none' | 'not
 export function groupRideBikeTssFloor(snapshot: GroupRideRouteSnapshot | null | undefined): number | undefined {
   if (!snapshot) return undefined;
   const tier = climbNoticeTier(snapshot);
+  // OURS — `groupRideBikeTssFloor` 85 TSS (aggressive) / 65 TSS (notice): no source, kept as found
   if (tier === 'aggressive') return 85;
   if (tier === 'notice') return 65;
   return undefined;

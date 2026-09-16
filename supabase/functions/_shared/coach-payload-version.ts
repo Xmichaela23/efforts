@@ -10,4 +10,5 @@
  * it and never asked the server — State kept "across 8 sessions" and no "last 7 days" after the
  * 209 deploy. The version history stays beside the import in `coach/index.ts`.
  */
+// OURS — payload version counter, not a training number (`COACH_PAYLOAD_VERSION`)
 export const COACH_PAYLOAD_VERSION = 211;

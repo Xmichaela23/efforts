@@ -46,6 +46,7 @@ type NormalizedPhase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery'
 type SwimFitnessKey = 'beginner' | 'intermediate' | 'advanced';
 
 /** Midpoints (yd) from revised protocol volume tables — reference = 70.3 intermediate for each phase. */
+// OURS — `MID_BASE_YD` base-phase midpoints (yd) by distance and swim level: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const MID_BASE_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
   sprint: { beginner: 1250, intermediate: 1600, advanced: 1800 },
   olympic: { beginner: 1850, intermediate: 2200, advanced: 2700 },
@@ -53,6 +54,7 @@ const MID_BASE_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
   full: { beginner: 2800, intermediate: 3300, advanced: 3800 },
 };
 
+// OURS — `MID_BUILD_YD` build-phase midpoints (yd): no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const MID_BUILD_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
   sprint: { beginner: 1500, intermediate: 1750, advanced: 2100 },
   olympic: { beginner: 2200, intermediate: 2500, advanced: 3200 },
@@ -60,6 +62,7 @@ const MID_BUILD_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
   full: { beginner: 3300, intermediate: 3800, advanced: 4400 },
 };
 
+// OURS — `MID_RACE_SPEC_YD` race-specific midpoints (yd): no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const MID_RACE_SPEC_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
   sprint: { beginner: 1650, intermediate: 2000, advanced: 2300 },
   olympic: { beginner: 2400, intermediate: 2750, advanced: 3400 },
@@ -85,10 +88,12 @@ function protocolMidVolumeMultiplier(
   return MID_RACE_SPEC_YD[distanceKey][fit] / REF_MID_703_INTERMEDIATE.race_specific;
 }
 
+// OURS — `BASE_VS_BUILD_YARD_SCALE` 0.8, `TAPER_YARD_SCALE` 0.6, `BUILD_RAMP_WEEKS` 6, `RACE_SPECIFIC_RAMP_WEEKS` 4 (SWIM-PROTOCOL §4.5): no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const BASE_VS_BUILD_YARD_SCALE = 0.8;
 const TAPER_YARD_SCALE = 0.6;
 
 /** Weeks over which build targets ramp from start → peak (1-indexed weekInPhase). */
+// OURS — `BUILD_RAMP_WEEKS` 6, `RACE_SPECIFIC_RAMP_WEEKS` 4: see the OURS line above
 export const BUILD_RAMP_WEEKS = 6;
 export const RACE_SPECIFIC_RAMP_WEEKS = 4;
 // ── 70.3 focus: slot order = [quality day, easy/technique day, third day] ─────
@@ -110,6 +115,7 @@ const FOCUS_70_3_SLOT_META: Omit<SwimSlotTemplate, 'target_yards'>[] = [
   },
 ];
 
+// OURS — `FOCUS_70_3_BUILD_START_YDS` / `FOCUS_70_3_BUILD_PEAK_YDS` slot yards: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const FOCUS_70_3_BUILD_START_YDS: [number, number, number] = [2200, 2000, 1800];
 const FOCUS_70_3_BUILD_PEAK_YDS: [number, number, number] = [2800, 2600, 2600];
 
@@ -127,6 +133,7 @@ const RACE_70_3_SLOT_META: Omit<SwimSlotTemplate, 'target_yards'>[] = [
   },
 ];
 
+// OURS — `RACE_70_3_BUILD_START_YDS` / `RACE_70_3_BUILD_PEAK_YDS` slot yards: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const RACE_70_3_BUILD_START_YDS: [number, number] = [2200, 2000];
 const RACE_70_3_BUILD_PEAK_YDS: [number, number] = [2600, 2400];
 
@@ -137,6 +144,7 @@ const RACE_70_3_BUILD_PEAK_YDS: [number, number] = [2600, 2400];
 // vs spec target of 2500 by peak race-spec. Slot 0 (threshold/optional)
 // stays on the BUILD_*_YDS endpoints (the §4.3 optional-threshold band of
 // 2000-2500 is already covered by the existing 2200→2600 lerp).
+// OURS — `RACE_70_3_RACE_SPEC_START_YDS` / `RACE_70_3_RACE_SPEC_PEAK_YDS` slot yards (SWIM-PROTOCOL §5.4): no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const RACE_70_3_RACE_SPEC_START_YDS: [number, number] = [2200, 1500];
 const RACE_70_3_RACE_SPEC_PEAK_YDS: [number, number] = [2600, 2500];
 
@@ -196,6 +204,7 @@ export function phaseProgress(weekInPhase: number, rampWeeks: number): number {
 }
 
 export function roundYards(n: number): number {
+  // OURS — `roundYards` 50-yd step, 200-yd minimum: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
   return Math.max(200, Math.round(n / 50) * 50);
 }
 
@@ -294,6 +303,7 @@ function focusTemplatesFromYardsBeginner(yards: [number, number, number]): SwimS
  *   0 → [css_aerobic, technique_aerobic]
  */
 export function raceTwoSwimRotationSlotMetaForBeginner(planWeek: number): Omit<SwimSlotTemplate, 'target_yards'>[] {
+  // OURS — `raceTwoSwimRotationSlotMetaForBeginner` 4-week rotation: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
   const c = ((Math.floor(planWeek) % 4) + 4) % 4;
   if (c === 1) {
     return [
@@ -346,6 +356,7 @@ export function raceTwoSwimRotationSlotMetaForBeginner(planWeek: number): Omit<S
  * Week 4 % 4 === 0: threshold + speed (turnover)
  */
 export function raceTwoSwimRotationSlotMeta(planWeek: number): Omit<SwimSlotTemplate, 'target_yards'>[] {
+  // OURS — `raceTwoSwimRotationSlotMeta` 4-week rotation: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
   const c = ((Math.floor(planWeek) % 4) + 4) % 4;
   if (c === 1) {
     return [
@@ -386,21 +397,25 @@ export function raceTwoSwimRotationSlotMeta(planWeek: number): Omit<SwimSlotTemp
 
 // D-052 / Item 3 — SWIM-PROTOCOL §5.7-§5.10 META constants. Wired in below
 // via phaseSpecificMetaSubstitution.
+// OURS — the set shapes in the four notes below (400 + 200 yd test, sighting every 6 strokes, 4×400, 3-4×600 with 45 s rest), SWIM-PROTOCOL §5.7-§5.10: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
 const TIME_TRIAL_META: Omit<SwimSlotTemplate, 'target_yards'> = {
   session_type: 'time_trial',
   drill_emphasis: false,
   notes: 'Time Trial — CSS measurement (§5.8). 400yd max + 4min rest + 200yd max; new CSS = 200 / (T400 − T200).',
 };
+// OURS — set shape in this note (every 6 strokes, 100 yd bouts): see above
 const OPEN_WATER_SKILLS_META: Omit<SwimSlotTemplate, 'target_yards'> = {
   session_type: 'open_water_skills',
   drill_emphasis: false,
   notes: 'Open Water Skills (§5.9) — sighting every 6 strokes throughout; race-start hard 100yd bouts. Skip-optional if no OW access.',
 };
+// OURS — set shape in this note (4×400): see above
 const MIXED_FARTLEK_META: Omit<SwimSlotTemplate, 'target_yards'> = {
   session_type: 'mixed_fartlek',
   drill_emphasis: false,
   notes: 'Mixed/Fartlek (§5.7) — 4×400 Z2-Z4 building, pace variation breaks monotony.',
 };
+// OURS — set shape in this note (3-4×600 yd, 45 s rest): see above
 const RACE_PACE_SUSTAINED_META: Omit<SwimSlotTemplate, 'target_yards'> = {
   session_type: 'race_pace_sustained',
   drill_emphasis: false,
@@ -433,6 +448,7 @@ function phaseSpecificMetaSubstitution(
   if (isBeginner) return meta;
   if (meta.length < 2) return meta;
   if (phase === 'build') {
+    // OURS — `phaseSpecificMetaSubstitution` build weeks 2 / 4 and race-specific weeks 1 / 2 / 3: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
     if (weekInPhase === 2) return [meta[0]!, MIXED_FARTLEK_META];
     if (weekInPhase === 4) return [meta[0]!, TIME_TRIAL_META];
   }
@@ -457,6 +473,7 @@ function applyTaperScale(slots: SwimSlotTemplate[]): SwimSlotTemplate[] {
 export function getRecoverySwimTemplate(): SwimSlotTemplate {
   return {
     session_type: 'easy',
+    // OURS — `getRecoverySwimTemplate` 1200 yd: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
     target_yards: 1200,
     drill_emphasis: false,
     notes: 'Recovery: one easy aerobic swim — frequency without structural load.',
@@ -532,6 +549,7 @@ export function shouldMaintainTwoSwimsInRecovery(
  */
 export function getTwoSlotRecoveryLearnerSwimTemplates(distanceKey: SwimDistanceKey): SwimSlotTemplate[] {
   const isFull = distanceKey === 'full';
+  // OURS — `getTwoSlotRecoveryLearnerSwimTemplates` 1000 yd (full) / 800 yd: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
   const y = isFull ? 1000 : 800;
   return [
     {
@@ -563,6 +581,7 @@ export function swimProgramIntentForAnchorSlots(
 ): 'focus' | 'race' {
   const raw = String(swimIntent ?? 'race').trim().toLowerCase();
   if (raw !== 'focus') return 'race';
+  // OURS — `swimProgramIntentForAnchorSlots` 3 swim days for the focus rotation: reason in the doc comment above, kept as found
   return swimAnchorSlots >= 3 ? 'focus' : 'race';
 }
 
@@ -671,6 +690,7 @@ export function getSwimSlotTemplates(
     }
     const slots = isBeginner ? focusTemplatesFromYardsBeginner(yards) : focusTemplatesFromYards(yards);
     // Build: pull (even week_in_phase) alternates with kick (odd). Race-specific: ~10% pull — week 2 each RS block plus week_in_phase divisible by 10 for long blocks.
+    // OURS — pull / kick alternation by week, race-specific pull on week 2 and every 10th week: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
     if ((ph === 'build' || ph === 'race_specific') && slots[1]) {
       const rsPullWeek =
         ph === 'race_specific' && (weekInPhase === 2 || weekInPhase % 10 === 0);
@@ -706,6 +726,7 @@ export function getSwimSlotTemplates(
     if (
       distanceKey === 'full' &&
       athleteFitness === 'advanced' &&
+      // OURS — Full IM advanced endurance slot from build week 4 and race-specific weeks 1-2: no outside source (docs/SWIM-PROTOCOL.md is ours), kept as found
       ((ph === 'build' && weekInPhase >= 4) || (ph === 'race_specific' && weekInPhase <= 2)) &&
       slots[2]
     ) {

@@ -12,10 +12,12 @@ export interface RouteClusterLite {
 // When one run's roads are almost fully inside the other's (this overlap or higher), it's the SAME
 // route at ANY length — an out-and-back run further/shorter on the same roads, the core Michael builds
 // on. Length is NOT checked in that case. The length guard below only kicks in for PARTIAL overlaps.
+// OURS — `CONTAINMENT_FULL` 0.9: reason above; no outside source, kept as found
 export const CONTAINMENT_FULL = 0.9;
 
 // For PARTIAL overlaps only: a run sharing some-but-not-most roads with a route must also be a
 // comparable length to merge — otherwise it's a different route that just clips a few shared roads.
+// OURS — `ROUTE_LENGTH_MAX_RATIO` 2.5: reason above; no outside source, kept as found
 export const ROUTE_LENGTH_MAX_RATIO = 2.5;
 
 /** Are two runs close enough in distance to be the same route? (null distances → not a blocker.) */
@@ -41,6 +43,7 @@ export function pathOverlap(a: string[] | null | undefined, b: string[] | null |
 
 // Two runs sharing ≥ this fraction of the smaller one's roads are the same route. 0.6 tolerates GPS
 // jitter and partial-overlap (a slightly different finish) without merging genuinely different routes.
+// OURS — `ROUTE_MATCH_MIN_OVERLAP` 0.6: reason above; no outside source, kept as found
 export const ROUTE_MATCH_MIN_OVERLAP = 0.6;
 
 /**
@@ -73,6 +76,7 @@ export function bestRouteMatch(
  * Merge a run's path into a cluster's stored signature (union), capped so a heavily-used route's
  * signature can't grow unbounded. Keeps the cluster's cells representative of the shared roads.
  */
+// OURS — `mergeGeohashes` cap 400 cells: keeps a route's stored path bounded; no source, kept as found
 export function mergeGeohashes(existing: string[] | null | undefined, incoming: string[] | null | undefined, cap = 400): string[] {
   const set = new Set(Array.isArray(existing) ? existing : []);
   for (const g of (Array.isArray(incoming) ? incoming : [])) set.add(g);
