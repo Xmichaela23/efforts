@@ -10,6 +10,7 @@
 import type { OverloadVerdict } from '../load-status-reconcile.ts';
 export type { OverloadVerdict };
 
+// OURS — `MIN_SAMPLES_FOR_SIGNAL` 3 (reason on the marker below; ledger row)
 export const MIN_SAMPLES_FOR_SIGNAL = 3;
 export const MIN_SAMPLES_FOR_TREND = 2; // per-lift minimum for strength trends
 export const BASELINE_WINDOW_DAYS = 28;

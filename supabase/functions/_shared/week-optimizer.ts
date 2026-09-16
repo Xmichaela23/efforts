@@ -806,6 +806,7 @@ const BALANCER_RELOCATABLE_KINDS: readonly SessionKind[] = [
   'upper_body_strength',
 ];
 
+// OURS — `BALANCER_LOAD_THRESHOLD_HIGH` 5 (reason on the marker below; ledger row)
 const BALANCER_LOAD_THRESHOLD_HIGH = 5;
 const BALANCER_LOAD_THRESHOLD_LOW = 1;
 const BALANCER_MAX_ITER = 48;

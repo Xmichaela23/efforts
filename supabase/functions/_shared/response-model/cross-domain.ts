@@ -12,6 +12,7 @@ import {
   type CrossDomainPattern,
 } from './types.ts';
 
+// OURS — `HR_ELEVATION_THRESHOLD` 4 bpm (reason on the marker below; ledger row)
 const HR_ELEVATION_THRESHOLD = 4;   // bpm above baseline to flag
 const EXECUTION_DROP_THRESHOLD = 6; // % below baseline to flag
 const MIN_PAIRS = 3;

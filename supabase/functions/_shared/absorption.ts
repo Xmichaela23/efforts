@@ -27,6 +27,7 @@
 
 // ── Named calibration constants (tunable per D-255; NOT per-user) ──────────
 /** Gate-passing steady sessions needed before the personal typical-drift baseline is trusted. */
+// OURS — `MIN_STEADY_SESSIONS_FOR_BASELINE` 3 (reason on the marker below; ledger row)
 export const MIN_STEADY_SESSIONS_FOR_BASELINE = 3;
 /** Drift is `elevated` (describe-level) at typical + this many bpm. */
 export const DRIFT_ELEVATED_MARGIN_BPM = 4;

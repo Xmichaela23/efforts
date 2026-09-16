@@ -204,6 +204,7 @@ export type ProgressionVerdict =
  * ⚠️ WHAT IS STILL GENERIC AND SAYS SO: nothing logged = no evidence = hold, and a miss holds.
  * Neither is a threshold; both are the refusal to read silence as a result.
  */
+// Viada p245 — two readings in a row ("if the ME lifts underperform 2 weeks in a row"), quoted below
 export const STALL_CONFIRMATIONS = 2;
 export const PROGRESSION_DEADBAND_IS_HIS =
   'Nothing moves on one session. Two readings in a row is the source\'s own evidence bar for this '

@@ -112,6 +112,7 @@ export function testedLiftName(
  * ⛔ THE RATIO IS WHAT MATTERS, NOT THE HAND-MATCH: 195/225 = 86.7%, against his 190/225 = 84.4%,
  * and against the old code's 90%.
  */
+// Viada p215 — pretest step 1 at ~75% of the predicted max for 6 (SOURCE-viada Part H1)
 export const PRETEST_WARMUP_FRACTION = 0.75;
 
 /**
