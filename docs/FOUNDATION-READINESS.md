@@ -56,6 +56,20 @@ The pure-math `_shared/` core (ACWR, workload, reconcile, week-optimizer) is wel
 
 ---
 
+## B1-class — `import-strava-history` was missed by the 2026-09-06 conversion (found 2026-09-16, Stage 7 session 1)
+
+**CLOSED 2026-09-16 (853deee9)** — `import-strava-history` now runs `requireUserOrService`; a body `user_id` / `userId`
+is honoured only under the service key. Deployed 2026-09-16 20:29 UTC. `scripts/b1-matrix-2026-09-06.mjs run
+import-strava-history` (a dummy Strava token; the connection-health write on the acting account is the signal):
+a = A's token + B's id → A's connection marked, B's unchanged · b = A's own · d = anon + B's id → 401 · c = service
+key + B's id → B's connection marked · B's rows unchanged across 44 tables after a/b/d · teardown left zero rows.
+a/b/c answer 500 because the dummy token fails at Strava, after the identity check. The phone's three callers
+(Strava connect, Connections import, the recent pull) already send the signed-in session; no phone change.
+
+History: `supabase/functions/import-strava-history/index.ts:657` read `userId` and `accessToken` from the request
+body and never called `requireUser` / `requireUserOrService`. Anyone with the function URL and a Strava token could
+write workouts into any account.
+
 ## B1-class — `compute-snapshot` accepts any `user_id` with the public anon key (found 2026-09-01)
 
 **CLOSED 2026-09-06 with B1** — `compute-snapshot` now runs `requireUserOrService`; anon key + any `user_id` → 401 (matrix cell d), a signed-in caller gets their own snapshot whatever id they send (cell a).
