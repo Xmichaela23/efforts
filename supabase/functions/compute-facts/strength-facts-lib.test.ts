@@ -13,6 +13,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildStrengthFacts, aggregateLearnedStrengthMaxes } from './strength-facts-lib.ts';
+import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
 
 /** A completed heavy set. `completed: true` so D-204's untouched-prefill rule keeps it. */
 const set = (weight: number, reps: number) => ({ weight, reps, completed: true });
@@ -160,3 +161,18 @@ Deno.test('D-118 RIR preference survives the gate: an RIR≥5 set is fallback-on
   assertEquals(out.squat.value, 125);          // the RIR-6 150 is ignored while a real set exists
   assertEquals(out.squat.usedFallback, false);
 });
+
+Deno.test('§8.0 #16: the reserve is folded on a sub-max set and never on the scored one', () => {
+  const sets = [
+    { weight: 185, reps: 5, completed: true, rir: 2 },
+    { weight: 205, reps: 6, completed: true, rir: 1, amrap: true },
+  ];
+  // The scored set is the heaviest, so it sets the estimate — off its own six reps, with no reserve added.
+  const scored = factFor({ strength_exercises: [{ name: 'Bench Press', rir_tracked: true, sets }], moving_time: 45 }, null);
+  assertEquals(scored.avg_rir, 2);                       // the sub-max set's reserve is still collected
+  assertEquals(scored.estimated_1rm, estimate1RMRounded(205, 6));
+  // Without the scored flag the same set folds its reserve, as a reserve-tracked protocol should.
+  const subMax = factFor({ strength_exercises: [{ name: 'Bench Press', rir_tracked: true, sets: [{ weight: 205, reps: 6, completed: true, rir: 1 }] }], moving_time: 45 }, null);
+  assertEquals(subMax.estimated_1rm, estimate1RMRounded(205, 7));
+});
+

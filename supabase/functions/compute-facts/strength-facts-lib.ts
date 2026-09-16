@@ -158,6 +158,7 @@ export function buildStrengthFacts(
 
     let exVolume = 0;
     let bestWeight = 0;
+    let bestWasScored = false;
     let bestReps = 0;
     const rirValues: number[] = [];
 
@@ -183,8 +184,9 @@ export function buildStrengthFacts(
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
       exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
-      if (w > bestWeight) { bestWeight = w; bestReps = r; }
-      if (w === bestWeight && r > bestReps) { bestReps = r; }
+      const scoredSet = s.amrap === true || s.repMaxTest === true;
+      if (w > bestWeight) { bestWeight = w; bestReps = r; bestWasScored = scoredSet; }
+      if (w === bestWeight && r > bestReps) { bestReps = r; bestWasScored = scoredSet; }
       // ⛔ POSITIVE PROTOCOL GATE (2026-08-12). Fold a set's reserve into e1RM ONLY when the exercise's
       // protocol positively tracks reserve (`rir_tracked === true`). Default is DON'T fold — the same
       // safe default the estimator now carries. Why this is the fix: reserve has no business in a 1RM
@@ -194,16 +196,26 @@ export function buildStrengthFacts(
       // sub-maximal opener back as a heavier lift. the previous program (`rir_tracked:false`) and legacy (no flag) now
       // both ignore any stored reserve; only a protocol that declares it tracks reserve, and only on a
       // set the athlete actually rated (not an auto-filled suggestion), reaches the estimate.
-      if (ex.rir_tracked === true && typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
+      /**
+       * ⛔ AND NEVER ON THE SCORED SET (2026-09-15, §8.0 #16). An all-out set is taken to failure by
+       * definition — that is what makes it the measuring set — so a reserve rated on it is not a reserve to
+       * fold. Performance's "Estimated max" reads that set's actual reps (`_shared/strength/all-out-set.ts`)
+       * and §9 Q5 ruled the tested max the same way, so folding here made State print a higher max than
+       * Performance for the same set. The fold stays for the ordinary sub-max sets of a reserve-tracked
+       * protocol, which is what `estimate-1rm.ts` says it is for.
+       */
+      if (!scoredSet && ex.rir_tracked === true && typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
     }
 
+    // The estimate is built from the best set, so the fold follows THAT set: a scored set carries no reserve
+    // to fold, whatever the sub-max sets beside it were rated (§8.0 #16).
     const avgRir = rirValues.length > 0
       ? Math.round((rirValues.reduce((a, b) => a + b, 0) / rirValues.length) * 10) / 10
       : null;
 
     // Auto-regulated protocols (reserve collected) fold RIR into effective reps HERE, outside the
     // estimator; the previous program has avgRir=null and estimates off actual reps. The formula never sees a reserve.
-    const estimateReps = avgRir != null ? effectiveRepsForReserve(bestReps, avgRir) : bestReps;
+    const estimateReps = avgRir != null && !bestWasScored ? effectiveRepsForReserve(bestReps, avgRir) : bestReps;
     const est1rm = bestWeight > 0 && bestReps > 0
       ? estimated1RM(bestWeight, estimateReps)
       : 0;
