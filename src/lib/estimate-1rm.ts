@@ -183,6 +183,10 @@ export function estimate1RMRounded(weight: number, reps: number): number {
  * ⚠️ SINGLE-VALUE SOURCE, MIRRORED: `wendler-531.ts`'s `trustedMaxRepsFor` carries the science provenance
  * (LeSuer et al. 1997 — deadlift estimates run systematically low, so its ceiling is tighter). Same
  * numbers (deadlift 5, else 8); keep the two in sync, or unify by having the previous program delegate here.
+ * ⚠️ STALE (2026-09-16, Stage 5): "deadlift 5, else 8" above predates 2026-08-29 — the function returns
+ * TEN for every lift (see the block inside). The code is the truth; the sentence above is history.
+ * OURS — `trustedMaxReps` ten reps: the formulas' ~10-rep validity range, no page (p215 averages, it
+ * does not cap). Ledger row in docs/STATE-SOURCES.md.
  */
 export function trustedMaxReps(_liftName?: string | null): number {
   /**
