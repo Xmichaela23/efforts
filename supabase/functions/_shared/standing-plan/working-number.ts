@@ -443,8 +443,11 @@ export function readTestWeek(
 
   const best = new Map<TestedLift, TestSetCandidate>();
   for (const row of rows ?? []) {
-    // ⛔ PROVABLY WEEK ONE, OR A ROW TAGGED AS A TEST — or it is not the test.
-    if (Number(row?.week_number) !== TEST_WEEK_INDEX && row?.is_test !== true) continue;
+    // ⛔ A TEST SESSION OR NOT THE TEST (Michael, 2026-09-16). The caller marks `is_test` with the one
+    // test-session rule (`save-baseline-test/pick.ts isTestSession`: the `1rm_test` tag or a "Baseline Test"
+    // name). "Week one" alone is not a test: a block that skipped the test week trains in week one, and
+    // those sets re-priced the block as if they were maxes.
+    if (row?.is_test !== true) continue;
     const rowDate = String(row?.date ?? row?.workout_date ?? '').slice(0, 10);
     const exercises = Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
     for (const ex of exercises as Record<string, unknown>[]) {

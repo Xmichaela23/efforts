@@ -178,6 +178,7 @@ const NAMES = testWeekLiftNames(defaultCompetitionLifts());
 
 const testRow = (week: number | null, name: string, set: Record<string, unknown>) => ({
   week_number: week,
+  is_test: week === TEST_WEEK_INDEX, // a week-one TEST session carries the tag (2026-09-16)
   strength_exercises: [{ name, sets: [{ weight: 100, reps: 6, warmup: true, completed: true }, set] }],
 });
 

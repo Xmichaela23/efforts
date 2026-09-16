@@ -22,6 +22,7 @@
 // keeps the prescription it is being judged against.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
+import { isTestSession } from '../save-baseline-test/pick.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
   composeBlock,
@@ -163,7 +164,8 @@ Deno.serve(async (req: Request) => {
     for (const r of plannedRows ?? []) {
       if (r?.id && typeof r.week_number === 'number') {
         const tags = (Array.isArray(r.tags) ? r.tags : []).map((t: unknown) => String(t).toLowerCase());
-        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null, isTest: tags.includes('1rm_test'), isRetest: tags.includes('retest') });
+        // ⛔ THE ONE TEST-SESSION RULE (2026-09-16) — the same function the test save and the result card use.
+        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null, isTest: isTestSession({ name: r.name, tags: r.tags }), isRetest: tags.includes('retest') });
       }
     }
     const { data: doneRows } = await supabase
@@ -177,7 +179,7 @@ Deno.serve(async (req: Request) => {
     const joined = (doneRows ?? []).map((w: Record<string, unknown>) => ({
       week_number: weekById.get(String(w?.planned_id))?.week ?? null,
       date: weekById.get(String(w?.planned_id))?.date ?? null,
-      // ⛔ A ROW TAGGED `1rm_test` IS A TEST WHATEVER ITS WEEK (the mid-block retest, 2026-09-05).
+      // ⛔ A TEST SESSION IS A TEST WHATEVER ITS WEEK (the mid-block retest, 2026-09-05); nothing else is (2026-09-16).
       is_test: weekById.get(String(w?.planned_id))?.isTest === true,
       is_retest: weekById.get(String(w?.planned_id))?.isRetest === true,
       strength_exercises: w?.strength_exercises ?? null,

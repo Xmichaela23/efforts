@@ -8,7 +8,8 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { readTestWeek, TESTED_LIFT_NAME, WORKING_MAX_FRACTION } from './working-number.ts';
 
-const week1 = (exercises: unknown[]) => [{ week_number: 1, strength_exercises: exercises }];
+// A week-one TEST session (the `1rm_test` tag → `is_test`). Week one alone is not a test (2026-09-16).
+const week1 = (exercises: unknown[]) => [{ week_number: 1, is_test: true, strength_exercises: exercises }];
 
 Deno.test('a top set without the amrap flag is still the test set — the heaviest completed set prices the lift', () => {
   const r = readTestWeek(week1([
@@ -56,7 +57,7 @@ Deno.test('a row that is not provably week one is not the test', () => {
 Deno.test('a later retest row replaces the week-one read for that lift, heavier or not; the other lifts keep week one', () => {
   const names = { squat: 'Back Squat', deadlift: 'Deadlift', bench: 'Bench Press', overheadPress: 'Overhead Press' };
   const r = readTestWeek([
-    { week_number: 1, date: '2026-09-01', strength_exercises: [
+    { week_number: 1, date: '2026-09-01', is_test: true, strength_exercises: [
       { name: 'Back Squat', sets: [{ weight: 105, reps: 6, completed: true }] },
       { name: 'Deadlift', sets: [{ weight: 170, reps: 3, completed: true, amrap: true }] },
     ] },
@@ -71,4 +72,9 @@ Deno.test('a later retest row replaces the week-one read for that lift, heavier 
   ], names);
   assertEquals(r.working.squat?.measured, { weight: 95, reps: 8 });
   assertEquals(r.working.deadlift?.measured, { weight: 170, reps: 3 });
+});
+
+Deno.test('week-one sets in a block that skipped the test are training sets, not a test (Michael, 2026-09-16)', () => {
+  const r = readTestWeek([{ week_number: 1, strength_exercises: [{ name: 'Bench Press', sets: [{ weight: 140, reps: 5, completed: true }] }] }], {});
+  assert(!r.working.bench, 'a week-one training set re-priced the lift');
 });
