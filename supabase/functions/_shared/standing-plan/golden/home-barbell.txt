@@ -315,7 +315,7 @@ WEEK 07  column=standard
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
+      ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
@@ -338,13 +338,14 @@ WEEK 07  column=standard
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · plan 45wx5 90wx5 125wx3 150wx2 165x
+      ME     Back Squat                     1x1-5        @ 160           | 90% · plan 45wx5 90wx5 120wx3 145wx2 160x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension"
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 78 min
   NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -363,7 +364,7 @@ WEEK 08  column=standard
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
+      ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
@@ -386,13 +387,14 @@ WEEK 08  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · plan 45wx5 90wx5 125wx3 150wx2 165x
+      ME     Back Squat                     1x1-5        @ 160           | 90% · plan 45wx5 90wx5 120wx3 145wx2 160x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension"
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 98 min
   NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -411,7 +413,7 @@ WEEK 09  column=standard
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
+      ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
@@ -434,13 +436,14 @@ WEEK 09  column=standard
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · plan 45wx5 90wx5 125wx3 150wx2 165x
+      ME     Back Squat                     1x1-5        @ 160           | 90% · plan 45wx5 90wx5 120wx3 145wx2 160x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension"
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 97 min
   NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.

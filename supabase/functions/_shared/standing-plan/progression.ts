@@ -39,13 +39,22 @@ export function scheduledRise(frame: FrameId, weeks: number): number {
  * one number nobody could take apart again.
  *
  * ⚠️ 3.5% is the midpoint of his own 3-4% and is the only value here that is a choice; the phase-out
- * rate and its length are his, exactly.
+ * length is his, exactly.
+ *
+ * ⛔ THE PAGE'S TWO FIGURES CANNOT BOTH HOLD, AND THE LENGTH WINS (Michael, 2026-09-16, WORKORDER §3b).
+ * "About 2 percent every three weeks" gives back 2 points at week 4 and the rest at week 7, so a 3.5%
+ * reduction was gone by week 7 — not "phased out in eight to ten weeks". Three steps of 2% is 6%, more
+ * than the 3-4% being removed. The step is now the reduction split evenly over the page's three
+ * three-week steps: 3.5% ÷ 3 ≈ 1.17 points, so the cut reads 96.5% (weeks 1-3), ≈97.7% (4-6),
+ * ≈98.8% (7-9) and 100% from week 10 — nine weeks, inside his eight to ten. The step size is derived,
+ * not a second choice.
  */
 // OURS — `LOWER_HAIRCUT_INITIAL` 3.5% is the midpoint of Viada p247's "3 to 4 percent"; the pick inside his range is ours.
 export const LOWER_HAIRCUT_INITIAL = 0.035;
-// Viada p247: "about 2 percent every three weeks for the first nine weeks" (both numbers below).
-export const LOWER_HAIRCUT_PHASE_OUT_PER_3_WEEKS = 0.02;
+// Viada p247: "phased out in eight to ten weeks … for the first nine weeks".
 export const LOWER_HAIRCUT_PHASE_OUT_WEEKS = 9;
+// Viada p247: "every three weeks" — the reduction split over the nine weeks' three steps (see above).
+export const LOWER_HAIRCUT_PHASE_OUT_PER_3_WEEKS = LOWER_HAIRCUT_INITIAL / (LOWER_HAIRCUT_PHASE_OUT_WEEKS / 3);
 export const LOWER_HAIRCUT_CITE = 'Viada p247';
 
 /**
@@ -65,7 +74,7 @@ export const LOWER_HAIRCUT_CITE = 'Viada p247';
 /**
  * What fraction of the working number a LOWER-body slot uses in a given week.
  *
- * Week 1 starts at 1 − 3.5%. Every three weeks it recovers 2 percentage points, and after nine weeks
+ * Week 1 starts at 1 − 3.5%. Every three weeks it recovers a third of that, and after nine weeks
  * the haircut is gone. ⚠️ It never overshoots above 1: the phase-out restores the reduction, it does
  * not become a bonus.
  */

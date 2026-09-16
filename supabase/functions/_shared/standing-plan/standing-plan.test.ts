@@ -491,13 +491,15 @@ Deno.test("the rate anchor is his, and it is this frame's", () => {
 });
 
 Deno.test("the lower-body haircut is his, and it phases out on his schedule", () => {
-  // ⛔ p247: a 3-4% reduction, phased out over 8-10 weeks, at about 2% every three weeks for nine.
+  // ⛔ p247: a 3-4% reduction, phased out over 8-10 weeks, in steps every three weeks for nine. The
+  // length wins over "about 2 percent" (WORKORDER §3b, 2026-09-16): a third of the cut per step.
   assertEquals(LOWER_HAIRCUT_INITIAL, 0.035);
   assertEquals(LOWER_HAIRCUT_PHASE_OUT_WEEKS, 9);
   assertEquals(Math.round(lowerBodyHaircut(1) * 1000) / 1000, 0.965);
   assertEquals(Math.round(lowerBodyHaircut(3) * 1000) / 1000, 0.965);
-  assertEquals(Math.round(lowerBodyHaircut(4) * 1000) / 1000, 0.985);
-  assertEquals(Math.round(lowerBodyHaircut(7) * 1000) / 1000, 1);
+  assertEquals(Math.round(lowerBodyHaircut(4) * 1000) / 1000, 0.977);
+  assertEquals(Math.round(lowerBodyHaircut(7) * 1000) / 1000, 0.988);
+  assertEquals(Math.round(lowerBodyHaircut(9) * 1000) / 1000, 0.988, 'still inside the cut in week nine');
   assertEquals(lowerBodyHaircut(10), 1, 'the haircut did not phase out');
   assertEquals(lowerBodyHaircut(52), 1, 'the phase-out became a bonus');
 });
