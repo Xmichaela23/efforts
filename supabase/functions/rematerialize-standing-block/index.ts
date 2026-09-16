@@ -284,6 +284,19 @@ Deno.serve(async (req: Request) => {
     const taperWeeks = (requestedTaper ?? storedTaper)
       .filter((n) => Number.isInteger(n) && n > TEST_WEEK_INDEX && n <= weeks && n >= currentWeek)
       .sort((x, y) => x - y);
+    /**
+     * ⛔ WHICH WEEK THE DELOAD TOGGLE OFFERS, AND WHETHER IT CAN (2026-09-15, one-truth workorder Stage 4
+     * session 1). Adjust worked this out on the phone — `Number(d.weeks) || 12` beside the same `|| 12`
+     * here, `currentWeek + 1`, and the `≤ weeks` gate — so the rule for "next week" lived in two places
+     * and the fallback literal in two more. The block knows its own next week; the screen prints it.
+     */
+    const nextWeek = currentWeek + 1;
+    const deloadOffer = {
+      next_week: nextWeek,
+      next_is_deload: taperWeeks.includes(nextWeek),
+      can_deload: nextWeek <= weeks,
+    };
+
     const composeBase = {
       frame: sp.frame,
       weeks,
@@ -449,6 +462,7 @@ Deno.serve(async (req: Request) => {
     if (!willWrite) {
       return json({
         success: true, applied: false, current_week: currentWeek, taper_weeks: taperWeeks, weeks,
+        ...deloadOffer,
         working_numbers: workingNamed, missing: reading.missing,
         changes: restated.changes, unmatched: restated.unmatched,
         endurance_changes: endurance.changes, endurance_unmatched: endurance.unmatched,
@@ -643,6 +657,7 @@ Deno.serve(async (req: Request) => {
     );
 
     return json({ taper_weeks: taperWeeks, weeks,
+      ...deloadOffer,
       success: true, applied: true, rows_written: written, endurance_rows_written: enduranceWritten,
       current_week: currentWeek,
       working_numbers: workingNamed, missing: reading.missing,
