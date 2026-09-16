@@ -4,6 +4,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { ageFromBirthday } from '@/lib/resolve-current-max-hr';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -157,7 +158,12 @@ interface AppContextType {
    * effort score and paces, and — when `heartRate` is passed — the heart-rate zone tables. Resolves to
    * the server's answer (`{ success, effort, performance_numbers, configured_hr_zones }`).
    */
-  saveUserBaselines: (data: BaselineData, heartRate?: Record<string, number | null>) => Promise<any>;
+  /** `extras` carries typed paces and lifts IN THE ATHLETE'S OWN UNIT; the server converts them. */
+  saveUserBaselines: (
+    data: BaselineData,
+    heartRate?: Record<string, number | null>,
+    extras?: { paces?: Record<string, string>; lifts?: Record<string, number | null> },
+  ) => Promise<any>;
   loadUserBaselines: () => Promise<BaselineData | null>;
   hasUserBaselines: () => Promise<boolean>;
   repairPlan?: (planId: string) => Promise<{ repaired: number }>;
@@ -331,7 +337,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('plans:refresh', handleRefresh);
   }, []);
 
-  const saveUserBaselines = async (data: BaselineData, heartRate?: Record<string, number | null>) => {
+  /**
+   * @param extras `paces` and `lifts` are TYPED VALUES IN THE ATHLETE'S OWN UNIT (2026-09-15). The server
+   * converts and stores them — the phone used to multiply a kilometre pace by 1.609344 in two places and
+   * saved a typed kilogram lift raw as pounds. `today` is the phone's local calendar day.
+   */
+  const saveUserBaselines = async (
+    data: BaselineData,
+    heartRate?: Record<string, number | null>,
+    extras?: { paces?: Record<string, string>; lifts?: Record<string, number | null> },
+  ) => {
     try {
       const userId = getStoredUserId();
       if (!userId) throw new Error('User must be authenticated to save baselines');
@@ -357,7 +372,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         training_status: data.training_status,
         benchmark_recency: data.benchmark_recency,
         // Existing fields
-        age: data.age,
+        // ⛔ NO `age` (2026-09-15). The birthday above is the fact; the age was a stored copy written on
+        // the first save and never refreshed, so it read a year stale after a birthday while the screen
+        // recomputed on every render. Everything that needs it works it out from the birthday
+        // (`ageFromBirthday`, src/lib/resolve-current-max-hr.ts).
         disciplines: data.disciplines,
         current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
@@ -374,7 +392,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...(data.profile !== undefined ? { profile: data.profile ?? {} } : {}),
       };
       const { data: saved, error } = await supabase.functions.invoke('save-baselines', {
-        body: { baselines: baselineRecord, ...(heartRate ? { heart_rate: heartRate } : {}) },
+        body: {
+          baselines: baselineRecord,
+          ...(heartRate ? { heart_rate: heartRate } : {}),
+          ...(extras?.paces ? { paces: extras.paces } : {}),
+          ...(extras?.lifts ? { lifts: extras.lifts } : {}),
+          today: new Date().toLocaleDateString('en-CA'),
+        },
       });
       if (error) throw error;
       if (!saved?.success) throw new Error(saved?.error || 'Could not save baselines');
@@ -430,22 +454,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       
       
-      // Calculate age from birthday if age is 0 or missing
-      let calculatedAge = data.age || 0;
-      
-      
-      if ((!data.age || data.age === 0) && formattedBirthday) {
-        const birthDate = new Date(formattedBirthday);
-        const today = new Date();
-        calculatedAge = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-          calculatedAge--;
-        }
-        
-      }
-      
-      
+      /**
+       * ⛔ THE AGE IS WORKED OUT FROM THE BIRTHDAY, EVERY READ (2026-09-15). This used to fill it only
+       * when `user_baselines.age` was 0 or missing and then write that one number back, so it never
+       * moved again — the screen recomputed on every render and the server read a stale column, and the
+       * two disagreed for a year after a birthday. One rule, `ageFromBirthday`, and nothing is stored.
+       */
+      const calculatedAge = ageFromBirthday(formattedBirthday, new Date().toLocaleDateString('en-CA')) ?? 0;
+
 
       // Coerce unitless paces on read using the stored units preference
       const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';

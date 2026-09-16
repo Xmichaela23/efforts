@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
-import { numberWord, pillClass } from '@/lib/number-word';
+import { pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -12,20 +12,14 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
-// ⛔ THE POWER AND SWIM ZONE ROWS ARE THE SERVER'S (2026-09-10, audit H-B05, H-B06). See the hook.
+// ⛔ EVERY NUMBER ON THIS SCREEN IS THE SERVER'S (2026-09-10 for the power and swim zone rows, audit
+// H-B05/H-B06; the whole readout 2026-09-15, one-truth workorder Stage 4 session 1). See the hook.
 import { useBaselineZones } from '@/hooks/useBaselineZones';
 import { supabase, getStoredUserId, getStoredAuthUser } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
-import { resolveCurrentFtp, pendingFtpProposal } from '@/lib/resolve-current-ftp';
-import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
-import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
-import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -106,19 +100,8 @@ const STRENGTH_LIFT_FIELDS = [
   { key: 'pullupMaxReps', label: 'Pull-ups', placeholder: '8', learnedKey: null, reps: true },
 ] as const;
 
-/** ⛔ ONE SWITCH FOR EVERY NUMBER (2026-09-02, Michael: "run should match how strength locks now").
- *  `auto` = the app's measured value, kept updating. `my number` = yours holds until you switch back.
- *  "locked" was the first label and read as confusing; the app already said "Use my number". */
-function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; onAuto: () => void; onMine: () => void; color: string; label: string }) {
-  const seg = 'px-2.5 h-7 text-[11px] leading-7 transition-colors whitespace-nowrap';
-  const on = 'text-white', off = 'text-white/45 hover:text-white/70';
-  return (
-    <div className="flex rounded-full border border-white/20 overflow-hidden shrink-0" role="group" aria-label={`${label}: auto or my number`}>
-      <button type="button" onClick={onAuto} aria-pressed={!mine} className={`${seg} ${!mine ? on : off}`} style={{ backgroundColor: !mine ? `${color}40` : 'transparent' }}>auto</button>
-      <button type="button" onClick={onMine} aria-pressed={mine} className={`${seg} ${mine ? on : off}`} style={{ backgroundColor: mine ? `${color}40` : 'transparent' }}>my number</button>
-    </div>
-  );
-}
+/* ⛔ `AutoMinePill` deleted (2026-09-15): defined here, rendered nowhere. `NumberRow` carries the
+   auto / my-number switch on the pill itself. */
 
 /**
  * Home-gym equipment chips. ONE list, shared by Profile and the sign-up intake (2026-09-07).
@@ -160,7 +143,7 @@ export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
-const { zones: serverZones, refresh: refreshZones } = useBaselineZones();
+const { zones: serverZones, readout, refresh: refreshZones, apply: applyZones } = useBaselineZones();
 /** Profile identity (2026-09-06): the sign-in email is shown, never stored; the photo is uploaded to the
  *  `avatars` bucket at `<user_id>/photo.jpg` (resized to 512px on the phone), its public URL saved to
  *  `profile.photo_url` at once so leaving without Save does not orphan the file. */
@@ -245,154 +228,16 @@ const acceptMeasuredFtp = async (shownWatts: number) => {
   }
 };
 const [lthrInfoOpen, setLthrInfoOpen] = useState(false);
-const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
-// FTP Test workout template - let user pick date
-// D-077: ref for the cycling FTP input so the "Edit to override" hint can
-// focus the field on tap. Previously the hint was a non-interactive <span> —
-// athletes read it as an instruction, tapped it, and got nothing.
-const ftpInputRef = useRef<HTMLInputElement | null>(null);
-const focusFtpInput = () => {
-  const el = ftpInputRef.current;
-  if (!el) return;
-  el.focus();
-  // Select-on-focus so the existing learned value is highlighted and the next
-  // keypress replaces it — matches the user mental model of "tap to override".
-  try { el.select(); } catch { /* non-fatal */ }
-};
-
-const [showFtpDatePicker, setShowFtpDatePicker] = useState(false);
-const [ftpTestDate, setFtpTestDate] = useState(() => {
-  const d = new Date();
-  d.setDate(d.getDate() + 2); // Default to 2 days out
-  return d.toISOString().split('T')[0];
-});
-const [scheduledFtpTest, setScheduledFtpTest] = useState<{id: string, date: string} | null>(null);
 /**
- * ⛔ THE RUN HAD NO WAY TO ASK FOR THE TEST (2026-08-20). The bike offers "Schedule FTP Test"; the
- * swim explains its 400/200 protocol; the run offered nothing — while the 12-minute time trial was
- * built end to end and had been for months. `materialize-plan:1334` expands the session,
- * `compute-workout-analysis:843` finds the ~720 s lap and writes the threshold pace at high
- * confidence. The app could measure it, had the protocol, and never asked. Same starved-input shape
- * as everything else: built, tested, unreachable.
+ * ⛔ THE TEST PICKERS ARE DELETED (2026-09-15, one-truth workorder Stage 4 session 1). Every symbol in
+ * this block — two date pickers defaulting to `today + 2` and `today + 3`, two `ilike '%FTP Test%'` /
+ * `'%Threshold Test%'` lookups (the run row is named "Threshold Time Trial", so that one never matched a
+ * single row), `scheduleRunTest`, `scheduleFtpTest`, `rescheduleFtpTest`, `deleteRunTest`,
+ * `deleteFtpTest` and the FTP input ref — appeared exactly once in this file: defined, never rendered.
+ * Scheduling a test lives on Adjust, detects by tag, and takes its day from the server's readout.
  */
-const [scheduledRunTest, setScheduledRunTest] = useState<{id: string, date: string} | null>(null);
-const [showRunTestDatePicker, setShowRunTestDatePicker] = useState(false);
-const [runTestDate, setRunTestDate] = useState<string>(() => {
-  const d = new Date(); d.setDate(d.getDate() + 3);
-  return d.toISOString().split('T')[0];
-});
-const [checkingFtpTest, setCheckingFtpTest] = useState(false);
 const [showSwimTest, setShowSwimTest] = useState(false);
-
-// Check for existing scheduled FTP test
-const checkScheduledFtpTest = async () => {
-  try {
-    setCheckingFtpTest(true);
-    const userId = getStoredUserId();
-    if (!userId) return;
-    
-    const { data } = await supabase
-      .from('planned_workouts')
-      .select('id, date, name')
-      .eq('user_id', userId)
-      .eq('workout_status', 'planned')
-      .ilike('name', '%FTP Test%')
-      .gte('date', new Date().toISOString().split('T')[0])
-      .order('date', { ascending: true })
-      .limit(1);
-    
-    if (data && data.length > 0) {
-      setScheduledFtpTest({ id: data[0].id, date: data[0].date });
-    } else {
-      setScheduledFtpTest(null);
-    }
-  } catch (error) {
-  } finally {
-    setCheckingFtpTest(false);
-  }
-};
-
-const checkScheduledRunTest = async () => {
-  try {
-    const userId = getStoredUserId();
-    if (!userId) return;
-    const { data } = await supabase
-      .from('planned_workouts')
-      .select('id, date, name')
-      .eq('user_id', userId)
-      .eq('workout_status', 'planned')
-      .ilike('name', '%Threshold Test%')
-      .gte('date', new Date().toISOString().split('T')[0])
-      .order('date', { ascending: true })
-      .limit(1);
-    setScheduledRunTest(data && data.length > 0 ? { id: data[0].id, date: data[0].date } : null);
-  } catch { /* non-fatal — the button just offers to schedule one */ }
-};
-
-// Check on mount
-useEffect(() => {
-  checkScheduledFtpTest();
-  checkScheduledRunTest();
-}, []);
-
-/**
- * ⛔ THE TAGS ARE THE CONTRACT, NOT THE NAME. `run_test` is what `materialize-plan:1334` expands into
- * the 12-minute protocol and what `compute-workout-analysis:843` looks for before it goes hunting for
- * the ~720 s lap. Renaming the session is safe; dropping that tag silently turns the test into an
- * ordinary hard run that measures nothing.
- */
-const scheduleRunTest = async () => {
-  try {
-    // the row lives in src/lib/baseline-tests.ts, shared with the wizard's Retest (2026-09-04)
-    await addPlannedWorkout(runThresholdTestRow(runTestDate) as any);
-    setShowRunTestDatePicker(false);
-    await checkScheduledRunTest();
-  } catch {
-    alert('Error scheduling the threshold test. Please try again.');
-  }
-};
-
-const deleteRunTest = async () => {
-  if (!scheduledRunTest) return;
-  try {
-    await supabase.from('planned_workouts').delete().eq('id', scheduledRunTest.id);
-    setScheduledRunTest(null);
-  } catch {
-    alert('Error removing the threshold test. Please try again.');
-  }
-};
-
-const scheduleFtpTest = async () => {
-  try {
-    await addPlannedWorkout(ftpTestRow(ftpTestDate) as any);
-    const displayDate = new Date(ftpTestDate + 'T12:00:00').toLocaleDateString();
-    alert(`FTP Test scheduled for ${displayDate}. Rest up - no hard training before then!`);
-  } catch (error) {
-    alert('Error scheduling FTP test. Please try again.');
-  }
-};
-
-const deleteFtpTest = async () => {
-  if (!scheduledFtpTest) return;
-  try {
-    await supabase
-      .from('planned_workouts')
-      .delete()
-      .eq('id', scheduledFtpTest.id);
-    
-    setScheduledFtpTest(null);
-  } catch (error) {
-    alert('Error deleting FTP test. Please try again.');
-  }
-};
-
-const rescheduleFtpTest = () => {
-  if (scheduledFtpTest) {
-    setFtpTestDate(scheduledFtpTest.date);
-  }
-  setShowFtpDatePicker(true);
-};
 
 const [data, setData] = useState<BaselineData>({
   age: 0,
@@ -747,52 +592,11 @@ const formatPace = (secPerKm: number | undefined): string => {
   return `${mins}:${String(secs).padStart(2, '0')}/mi`;
 };
 
-// GLASS BOX (Law 2 + Law 3). Every learned number shows its work: what it was measured from, the RULE that
-// qualified those sessions, and HOW OLD the newest one is.
-//
-// This used to print the sample count and DROP the `source` string — while the engine was already writing a
-// full plain-English basis ("pace at easy HR (5 runs; Friel Z2 — at or below 89% of your threshold HR
-// (151 bpm))"). A magnitude reaching the surface stripped of its basis is the Law 3 failure tell verbatim
-// ("a number shown without its confidence"). The copy was never missing — the surface was throwing it away.
-//
-// `as_of` (Q-173) is the newest SESSION behind the number, NOT the last time the profile was rebuilt. It
-// matters most in summer: heat lifts run HR ~4-7 bpm, so hot runs sit above the easy ceiling and (correctly)
-// do not qualify — so the learner can go quiet for a whole season while the surface keeps showing a
-// months-old pace that LOOKS current. Now it says how old it is instead of lying by omission.
-const learnedBasisLine = (
-  metric: { sample_count?: number; source?: string } | null | undefined,
-  sport: 'run' | 'ride',
-): string | null => {
-  if (!metric?.sample_count || metric.sample_count < 1) return null;
-  // Prefer the engine's own basis — it names the qualifying RULE, which is what answers "why didn't my run
-  // count?". Fall back to the bare count only when the engine did not supply one.
-  if (metric.source && String(metric.source).trim().length > 0) return String(metric.source).trim();
-  const u = sport === 'ride' ? 'rides' : 'runs';
-  return `Learned from ${metric.sample_count} ${u}`;
-};
-
-/** "as of May 27" — the newest session behind the number. null when the engine didn't stamp one (never faked). */
-const learnedAsOfLine = (metric: { as_of?: string | null } | null | undefined): string | null => {
-  const d = metric?.as_of;
-  if (!d || typeof d !== 'string' || d.length < 10) return null;
-  const dt = new Date(`${d.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(dt.getTime())) return null;
-  const days = Math.floor((Date.now() - dt.getTime()) / 86400000);
-  const pretty = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  // Only shout about age once it's genuinely stale. Under 6 weeks, the date alone is enough.
-  return days >= 42 ? `as of ${pretty} — ${days} days ago` : `as of ${pretty}`;
-};
-
-// Get confidence dots
-const getConfidenceDots = (confidence: string | undefined): string => {
-  switch (confidence) {
-    case 'high': return '●●●';
-    case 'medium': return '●●○';
-    case 'low': return '●○○';
-    default: return '○○○';
-  }
-};
-
+/**
+ * ⛔ THE LEARNED-BASIS HELPERS ARE DELETED (2026-09-15, one-truth workorder Stage 4 session 1).
+ * `learnedBasisLine`, `learnedAsOfLine` and `getConfidenceDots` each appeared exactly once in this file
+ * — defined, never rendered. Each row's provenance line is the server's `note` now.
+ */
 // Calculate age from birthday
 /** Square-crop and resize an image on the phone before upload; JPEG at 0.85. */
 async function resizeImageToJpeg(file: File, size: number): Promise<Blob> {
@@ -808,60 +612,14 @@ async function resizeImageToJpeg(file: File, size: number): Promise<Blob> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-const calculateAge = (birthday: string | undefined): number | null => {
-  if (!birthday) return null;
-  const birthDate = new Date(birthday);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age > 0 && age < 120 ? age : null;
-};
-
-// Calculate age-based HR estimates
-const getAgeBasedHREstimates = (birthday: string | undefined, gender?: string) => {
-  const age = calculateAge(birthday);
-  if (!age) return null;
-
-  // ONE age formula (Tanaka / Gulati for female) so this matches the HRZoneChart "auto" default —
-  // was 220 − age, which no other surface used (audit 2026-07-17 #5).
-  const maxHR = ageEstimateMaxHr(age, gender);
-  // ⛔ NO THRESHOLD ESTIMATE HERE (2026-09-10). An 88%-of-max threshold used to be derived for display.
-
-  return {
-    maxHR,
-    age
-  };
-};
-
 /**
- * ⛔ THE ZONE TABLE IS THE SERVER'S (2026-09-10). This file computed Friel and Karvonen zones for the
- * screen AND wrote them to `configured_hr_zones`, which `compute-workout-analysis` bins every workout on
- * first. `save-baselines` now derives and saves them (`save-baselines/derive.ts`); the screen prints the
- * stored arrays — the same ones the analysis reads — and names each row by position.
+ * ⛔ THE AGE, THE RESTING-HEART-RATE PICK AND THE ZONE TABLE ARE THE SERVER'S (2026-09-15, one-truth
+ * workorder Stage 4 session 1). `calculateAge` and `getAgeBasedHREstimates` worked out an age on every
+ * render and offered an age-estimated max the zone build refuses; `getRestingHR` chose between a typed
+ * number and the watch's; `ZONE_ROW_NAMES` named the stored rows by position and `{min}–{max}` printed
+ * the open Z5 row as "176– bpm". All of it is in `save-baselines/zones.ts` now — row names, ranges and
+ * units included.
  */
-const ZONE_ROW_NAMES = ['Z1 Recovery', 'Z2 Aerobic', 'Z3 Tempo', 'Z4 Threshold', 'Z5 VO2max'];
-
-// Citations live in the ledger, not on screen (docs/STATE-SOURCES.md: Friel %LTHR, Karvonen %HRR).
-const ZONE_MODEL_WORDS: Record<string, string> = {
-  friel: 'from your threshold heart rate',
-  karvonen: 'from your max and resting heart rate',
-  needs_resting: 'needs resting heart rate',
-};
-
-// Resting HR: only use real values (manual entry or Garmin device), never guess
-const getRestingHR = (customOverride: number | null, garminValue: number | null): { value: number | null; source: string } => {
-  if (customOverride && customOverride > 0) {
-    return { value: customOverride, source: 'manual' };
-  }
-  if (garminValue && garminValue > 0) {
-    return { value: garminValue, source: 'garmin' };
-  }
-  return { value: null, source: 'none' };
-};
-
 // ⛔ NO POWER-ZONE TABLE ON THE PHONE (2026-09-10, audit H-B05). The rows below come from `save-baselines`
 // (Coggan's seven levels, `_shared/endurance/display-zones.ts`), the table the ride analysis bins by.
 
@@ -870,7 +628,12 @@ const getRestingHR = (customOverride: number | null, garminValue: number | null)
  * data to write and on the manual heart-rate overrides, so a row's commit and an auto switch run the
  * same follow-through (endurance re-price on a watched number, restate on a lock change).
  */
-const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLthr?: number | null; rideMax?: number | null; rideLthr?: number | null; resting?: number | null }) => {
+const persist = async (
+  next: BaselineData,
+  hr?: { runMax?: number | null; runLthr?: number | null; rideMax?: number | null; rideLthr?: number | null; resting?: number | null },
+  /** Typed values IN THE ATHLETE'S OWN UNIT — the server converts and stores them (2026-09-15). */
+  extras?: { paces?: Record<string, string>; lifts?: Record<string, number | null> },
+) => {
   const m = {
     runMax: hr && hr.runMax !== undefined ? hr.runMax : manualRunMaxHR,
     runLthr: hr && hr.runLthr !== undefined ? hr.runLthr : manualRunLTHR,
@@ -907,8 +670,10 @@ const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLth
       manual_ride_lthr: m.rideLthr,
       ...(((hr && hr.resting !== undefined) || customRestingHR) ? { resting_heart_rate: restingOverride } : {}),
     };
-    const saved = await saveUserBaselines(dataToSave as any, heartRate);
+    const saved = await saveUserBaselines(dataToSave as any, heartRate, extras);
     if (saved?.configured_hr_zones) setStoredZones(saved.configured_hr_zones);
+    // Every save returns the readout rebuilt from the row it just wrote; paint that rather than ask again.
+    applyZones(saved?.zones);
     void refreshZones();
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
@@ -922,7 +687,8 @@ const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLth
       const prevPn = (JSON.parse(originalData || '{}')?.performanceNumbers ?? {}) as Record<string, unknown>;
       const nextPn = ((dataToSave as any)?.performanceNumbers ?? {}) as Record<string, unknown>;
       const WATCH = ['threshold_pace_min_per_mi', 'threshold_pace_source', 'ftp', 'ftp_source', 'fiveK', 'fiveK_source', 'threshold_heart_rate', 'lthr_source'];
-      const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(m.runLthr || m.rideLthr);
+      // A typed pace arrives outside `performance_numbers` now, so it is watched on its own.
+      const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(m.runLthr || m.rideLthr) || !!extras?.paces;
       if (changed) {
         const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
         if (rp?.success && rp?.repriced) {
@@ -936,8 +702,8 @@ const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLth
     // week-1 test; changing a lock here runs it once so the unstarted weeks move now.
     try {
       const prevLocked = JSON.stringify(JSON.parse(originalData || '{}')?.locked_baselines ?? null);
-      const nextLocked = JSON.stringify((dataToSave as any)?.locked_baselines ?? null);
-      if (prevLocked !== nextLocked) {
+      const nextLocked = JSON.stringify(saved?.locked_baselines ?? (dataToSave as any)?.locked_baselines ?? null);
+      if (prevLocked !== nextLocked || !!extras?.lifts) {
         const { data: rs } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
         if (rs?.success) repriceNote += ' · weights updated';
       }
@@ -1120,11 +886,15 @@ const DISCIPLINE_TO_STRIP: Record<string, StripSport> = { running: 'run', cyclin
 const stripSport: StripSport | null = activeSport ? (DISCIPLINE_TO_STRIP[activeSport] ?? null) : null;
 const activeColour = activeSport ? getDisciplineColor(stripSport ?? '') : 'rgba(255,255,255,0.7)';
 /** A row's commit: update the screen, then run the old Save routine on the result. */
-const commitData = async (updater: (d: BaselineData) => BaselineData, hr?: Parameters<typeof persist>[1]) => {
+const commitData = async (
+  updater: (d: BaselineData) => BaselineData,
+  hr?: Parameters<typeof persist>[1],
+  extras?: Parameters<typeof persist>[2],
+) => {
   const next = updater(data);
   setData(next);
   setLastSavedSport(activeSport ?? 'you');
-  await persist(next, hr);
+  await persist(next, hr, extras);
 };
 const goToAdjust = () => { setPendingStateLens('adjust'); window.dispatchEvent(new CustomEvent('open:state')); };
 const SectionHead = ({ id, Icon, label, colour, info }: { id: string; Icon: React.ComponentType<any>; label: string; colour: string; info?: string }) => {
@@ -1140,58 +910,50 @@ const SectionHead = ({ id, Icon, label, colour, info }: { id: string; Icon: Reac
     </>
   );
 };
-const parsePaceText = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
-const paceToText = (secPerMi: number | null | undefined): string | null => { if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null; const v = metric ? secPerMi / 1.609344 : secPerMi; return `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}/${metric ? 'km' : 'mi'}`; };
+/* ⛔ `parsePaceText`, `paceToText` and `baselinesLike` deleted (2026-09-15). The pace formatter picked the
+   unit and divided by 1.609344 on the phone; `baselinesLike` fed the resolvers a two-key heart-rate object
+   built from screen state, which is why this screen and Adjust could answer differently for one athlete. */
 const pnAny = (data.performanceNumbers || {}) as any;
-const baselinesLike = { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers, configured_hr_zones: { manual_run_lthr: manualRunLTHR, manual_ride_lthr: manualRideLTHR } } as any;
 /** The sport's sections — Numbers · Zones · Equipment (swim: Numbers · Settings · Zones · Equipment). */
 const sportSections = (): Array<{ id: string; label: string; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode }> => {
-  const ageEstimates = getAgeBasedHREstimates(data.birthday, data.gender);
-  const restingInfo = getRestingHR(customRestingHR, garminRestingHR);
+  /**
+   * ⛔ THE HEART-RATE ROWS AND THE ZONE TABLE ARE THE SERVER'S (2026-09-15). This screen ran its own
+   * `manual || learned || age estimate` chain for the max and printed an age estimate the zone build
+   * refuses, then said underneath that zones need a max (§8.0 #24); and it fed the threshold resolver a
+   * two-key object built from screen state while Adjust fed it the stored row, so an athlete with only a
+   * bike threshold typed read two different run numbers (§8.0 #23). One payload, both screens.
+   */
   const hrRows = (sport: 'run' | 'ride') => {
     const isRun = sport === 'run';
-    const manualMax = isRun ? manualRunMaxHR : manualRideMaxHR;
-    const manualLthr = isRun ? manualRunLTHR : manualRideLTHR;
-    const learnedMax = (isRun ? learnedFitness?.run_max_hr_observed?.value : learnedFitness?.ride_max_hr_observed?.value) || null;
-    const lthr = resolveCurrentLthr(baselinesLike, { sport });
-    const effMax = manualMax || learnedMax || (ageEstimates ? ageEstimates.maxHR : null);
-    // ⛔ THE STORED THRESHOLD OR NOTHING (Michael, 2026-09-10). This fell back to 88% of max heart rate, then
-    // to an age estimate — a number the engine refuses to use (`resolve-current-lthr.ts`), shown as if it were one.
-    const effLthr = lthr.bpm ?? null;
-    const lthrMine = isRun ? pnAny.lthr_source === 'manual' : manualLthr != null;
-    const lthrNote = lthrMine ? 'your number' : lthr.bpm != null ? (String(lthr.source ?? '').includes('estimate') || String(lthr.source ?? '').includes('max') ? 'estimated from max heart rate' : `from ${isRun ? 'runs' : 'rides'}`) : null;
-    const maxNote = manualMax ? 'your number' : learnedMax ? `observed in ${isRun ? 'runs' : 'rides'}` : ageEstimates ? 'age estimate' : null;
+    const side = isRun ? readout?.run : readout?.bike;
     const rows: React.ReactNode[] = [];
     rows.push(
-      <NumberRow key="lthr" id={`${sport}-lthr`} name="Threshold heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={effLthr != null ? `${Math.round(effLthr)} bpm · ${numberWord(lthr.source, lthrMine)}` : null} note={lthrNote} mine={lthrMine}
+      <NumberRow key="lthr" id={`${sport}-lthr`} name="Threshold heart rate" hint={side?.lthr.hint ?? 'bpm'} inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={side?.lthr.value ?? null} note={side?.lthr.note ?? null} mine={side?.lthr.mine === true}
         onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; if (isRun) { setManualRunLTHR(v); void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, lthr_source: 'manual' } }), { runLthr: v }); } else { setManualRideLTHR(v); void commitData((d) => d, { rideLthr: v }); } }}
         onAuto={() => { if (isRun) { setManualRunLTHR(null); void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, lthr_source: 'learned' } }), { runLthr: null }); } else { setManualRideLTHR(null); void commitData((d) => d, { rideLthr: null }); } }} />,
     );
     rows.push(
-      <NumberRow key="max" id={`${sport}-max`} name="Max heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={effMax ? `${Math.round(effMax)} bpm · ${manualMax ? 'your number' : 'auto'}` : null} note={maxNote} mine={!!manualMax}
+      <NumberRow key="max" id={`${sport}-max`} name="Max heart rate" hint={side?.max_hr.hint ?? 'bpm'} inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={side?.max_hr.value ?? null} note={side?.max_hr.note ?? null} mine={side?.max_hr.mine === true}
         onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; if (isRun) { setManualRunMaxHR(v); void commitData((d) => d, { runMax: v }); } else { setManualRideMaxHR(v); void commitData((d) => d, { rideMax: v }); } }}
         onAuto={() => { if (isRun) { setManualRunMaxHR(null); void commitData((d) => d, { runMax: null }); } else { setManualRideMaxHR(null); void commitData((d) => d, { rideMax: null }); } }} />,
     );
     rows.push(
-      <NumberRow key="rest" id={`${sport}-rest`} name="Resting heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={restingInfo.value ? `${restingInfo.value} bpm · ${customRestingHR ? 'your number' : 'auto'}` : null} note={customRestingHR ? 'your number' : restingInfo.value ? 'from your watch' : null} mine={!!customRestingHR}
-        onSave={(t) => { const v = parseInt(t); if (!(v > 30)) return; setCustomRestingHR(v); void commitData((d) => d, { resting: v }); }}
+      <NumberRow key="rest" id={`${sport}-rest`} name="Resting heart rate" hint={side?.resting_hr.hint ?? 'bpm'} inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={side?.resting_hr.value ?? null} note={side?.resting_hr.note ?? null} mine={side?.resting_hr.mine === true}
+        onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; setCustomRestingHR(v); void commitData((d) => d, { resting: v }); }}
         onAuto={() => { setCustomRestingHR(null); void commitData((d) => d, { resting: null }); }} />,
     );
-    // ⛔ THE STORED ARRAYS, IN THE ORDER THE ANALYSIS READS THEM: the sport's own, else the shared one.
-    const zones = (isRun ? (storedZones?.zones_run ?? storedZones?.zones) : (storedZones?.zones_ride ?? storedZones?.zones)) as
-      Array<{ min: number; max: number | null }> | undefined;
-    const model = ZONE_MODEL_WORDS[String(isRun ? storedZones?.zones_run_model : storedZones?.zones_ride_model)] ?? '';
-    const table = Array.isArray(zones) && zones.length > 0 ? (
+    const zt = side?.zones;
+    const table = zt && zt.rows.length > 0 ? (
       <div className="mt-1 space-y-0.5">
-        {zones.map((z, i) => (
-          <div key={ZONE_ROW_NAMES[i] ?? i} className="flex items-baseline justify-between text-[12px] px-1">
-            <span className="text-white/60">{ZONE_ROW_NAMES[i] ?? `Z${i + 1}`}</span>
-            <span className="tabular-nums text-white/75">{z.min}–{z.max} bpm</span>
+        {zt.rows.map((z) => (
+          <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
+            <span className="text-white/60">{z.name}</span>
+            <span className="tabular-nums text-white/75">{z.range}</span>
           </div>
         ))}
-        <p className="text-[12px] text-white/50 px-1 mt-1">{model}</p>
+        {zt.basis && <p className="text-[12px] text-white/50 px-1 mt-1">{zt.basis}</p>}
       </div>
-    ) : <p className="text-[12px] text-white/50">Heart-rate zones need a threshold heart rate, or a max and a resting heart rate.</p>;
+    ) : <p className="text-[12px] text-white/50">{zt?.empty ?? 'Heart-rate zones need a threshold heart rate, or a max and a resting heart rate.'}</p>;
     return { rows, table };
   };
   const equipmentChips = (discipline: 'swimming' | 'strength', options: string[]) => (
@@ -1210,30 +972,30 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
   );
 
   if (activeSport === 'running') {
-    const thr = resolveCurrentRunThresholdPace(baselinesLike);
-    const easy = resolveCurrentRunEasyPace(baselinesLike);
-    const thrMine = pnAny.threshold_pace_source === 'manual';
-    const thrSamples = Number(learnedFitness?.run_threshold_pace_sec_per_km?.sample_count);
-    const thrAccepted = learnedFitness?.run_threshold_pace_accepted?.value != null;
-    const thrNote = thrMine ? 'your number' : thr.source === 'learned' ? (thrAccepted ? 'accepted from runs' : `from runs${Number.isFinite(thrSamples) && thrSamples > 0 ? `, ${thrSamples} best efforts` : ''}`) : thr.sec_per_mi != null ? 'typed, until your runs measure' : null;
-    const thrProposal = pendingRunThresholdProposal(baselinesLike);
+    const rd = readout?.run ?? null;
+    const thrProposal = rd?.threshold_proposal ?? null;
     const fiveKMine = pnAny.fiveK_source !== 'learned';
     const implied = arcFiveKNudge?.implied_5k_label ?? null;
     const hr = hrRows('run');
     return [
       { id: 'run-numbers', label: 'Paces', Icon: Activity, info: 'Threshold pace is the fastest pace you could hold for about an hour; hard sessions are set from it. Easy pace is your zone 2 pace, worked out from threshold pace. Typing a number makes it your number; auto uses what your runs measure.', body: (
         <div className="space-y-1.5">
-          <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run" value={thr.sec_per_mi != null ? `${paceToText(thr.sec_per_mi)} · ${numberWord(thr.source, thrMine)}` : null} note={thrNote} mine={thrMine}
-            onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } as any })); }}
+          {/* ⛔ THE TYPED PACE GOES OVER AS TYPED (2026-09-15) — per km on a metric account. This screen
+              multiplied by 1.609344 and re-serialised per mile before the save, so the server never saw
+              the number the athlete entered, and Adjust held a second copy of the same conversion. */}
+          <NumberRow id="threshold" name="Threshold pace" hint={rd?.threshold.hint ?? (metric ? 'm:ss/km' : 'm:ss/mi')} inputMode="numeric" sport="run" value={rd?.threshold.value ?? null} note={rd?.threshold.note ?? null} mine={rd?.threshold.mine === true}
+            onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => d, undefined, { paces: { threshold: t.trim() } }); }}
             onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_source: 'learned' } as any }))} />
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">Your runs measure {paceToText(thrProposal.measuredSecPerKm * 1.609344)}</span>
-              <button type="button" disabled={thrAccepting} onClick={() => void acceptThr(thrProposal.measuredSecPerKm)} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{thrAccepting ? 'Applying…' : `use ${paceToText(thrProposal.measuredSecPerKm * 1.609344)}`}</button>
+              <span className="text-[13px] text-white/70">{thrProposal.text}</span>
+              <button type="button" disabled={thrAccepting} onClick={() => void acceptThr(thrProposal.accept_value)} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{thrAccepting ? 'Applying…' : thrProposal.button}</button>
             </div>
           )}
-          <NumberRow id="easy" name="Easy pace" editable={false} sport="run" value={paceToText(easy.range_lo_sec_per_mi) && paceToText(easy.range_hi_sec_per_mi) ? `${paceToText(easy.range_lo_sec_per_mi)!.replace(/\/(mi|km)$/, '')}–${paceToText(easy.range_hi_sec_per_mi)} · from threshold` : null} note={easy.range_lo_sec_per_mi != null ? 'Your zone 2 pace, worked out from your threshold pace. Easy days run by heart rate; this is the pace that usually lands there. Heat and hills slow it at the same heart rate.' : 'follows threshold pace'} />
-          <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run" value={pnAny.fiveK ? `${pnAny.fiveK} · ${fiveKMine ? 'your number' : 'auto'}` : (!fiveKMine && implied ? `${implied} · auto` : null)} note={fiveKMine ? (implied && arcFiveKNudge?.should_prompt ? `your number. Your runs suggest about ${implied}.` : (pnAny.fiveK ? 'your number' : null)) : 'from runs'} mine={fiveKMine && !!pnAny.fiveK} seed={pnAny.fiveK || ''}
+          <NumberRow id="easy" name="Easy pace" editable={false} sport="run" value={rd?.easy.value ?? null} note={rd?.easy.note ?? null} />
+          {/* The 5K row's own number is the server's; the implied clock and its nudge come from
+              `get-arc-context`, which already works both out (`arc-context.ts` five_k_nudge). */}
+          <NumberRow id="fiveK" name="5K time" hint={rd?.five_k.hint ?? 'mm:ss'} inputMode="numeric" sport="run" value={rd?.five_k.value ?? (!fiveKMine && implied ? `${implied} · auto` : null)} note={rd?.five_k.note != null && arcFiveKNudge?.should_prompt && implied && fiveKMine ? `your number. Your runs suggest about ${implied}.` : (rd?.five_k.note ?? null)} mine={rd?.five_k.mine === true} seed={pnAny.fiveK || ''}
             onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK: t.trim(), fiveK_source: 'manual' } as any })); }}
             onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK_source: 'learned' } as any }))} />
           {hr.rows[0]}
@@ -1249,23 +1011,20 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     ];
   }
   if (activeSport === 'cycling') {
-    const ftp = resolveCurrentFtp(baselinesLike);
-    const ftpMine = pnAny.ftp_source === 'manual';
-    const proposal = pendingFtpProposal(baselinesLike);
-    const ftpAccepted = learnedFitness?.ride_ftp_accepted?.value != null;
-    const ftpNote = ftpMine ? 'your number' : ftp.source === 'learned' ? (ftpAccepted ? 'accepted from your rides' : 'from your rides') : ftp.value != null ? 'typed, until your rides measure' : null;
+    const bd = readout?.bike ?? null;
+    const proposal = bd?.ftp_proposal ?? null;
     const hr = hrRows('ride');
     const powerZones = serverZones?.power?.rows ?? [];
     return [
       { id: 'bike-numbers', label: 'FTP', Icon: Bike, info: 'FTP is the most power you could hold for about an hour. It sets your power zones and the targets on rides. Typing a number makes it your number; auto uses what your rides measure.', body: (
         <div className="space-y-1.5">
-          <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike" value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null} note={ftpNote} mine={ftpMine}
+          <NumberRow id="ftp" name="FTP" hint={bd?.ftp.hint ?? 'W'} inputMode="numeric" sport="bike" value={bd?.ftp.value ?? null} note={bd?.ftp.note ?? null} mine={bd?.ftp.mine === true}
             onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, ftp: v, ftp_source: 'manual' } as any })); }}
             onAuto={() => void commitData((d) => { const pn: any = { ...d.performanceNumbers }; delete pn.ftp_source; return { ...d, performanceNumbers: pn }; })} />
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
-              <button type="button" disabled={ftpAccepting} onClick={() => void acceptMeasuredFtp(proposal.measured)} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{ftpAccepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+              <span className="text-[13px] text-white/70">{proposal.text}</span>
+              <button type="button" disabled={ftpAccepting} onClick={() => void acceptMeasuredFtp(proposal.accept_value)} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{ftpAccepting ? 'Applying…' : proposal.button}</button>
             </div>
           )}
           {ftpAcceptNote && <p className="text-[12px] text-white/60">{ftpAcceptNote}</p>}
@@ -1293,13 +1052,14 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     ];
   }
   if (activeSport === 'swimming') {
+    const swimRow = readout?.swim.threshold_100 ?? null;
     const swim100 = pnAny.swimPace100 as string | undefined;
     // ⛔ THE SERVER'S BANDS (audit H-B06), from the stored threshold 100 pace.
     const bands = serverZones?.swim_pace?.rows ?? [];
     return [
       { id: 'swim-numbers', label: 'Pace', Icon: Waves, info: 'Your hard, steady 100 pace: the effort you could hold for a strong continuous swim. Sets your swim pace zones.', body: (
         <div className="space-y-1.5">
-          <NumberRow id="swim100" name="Threshold 100 pace" hint="m:ss" inputMode="numeric" sport="swim" value={swim100 ? `${swim100}/100 · your number` : null} note={swim100 ? 'your number' : null} seed={swim100 || ''}
+          <NumberRow id="swim100" name="Threshold 100 pace" hint={swimRow?.hint ?? 'm:ss'} inputMode="numeric" sport="swim" value={swimRow?.value ?? null} note={swimRow?.note ?? null} seed={swim100 || ''}
             onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, swimPace100: t.trim() } as any })); }} />
         </div>
       ) },
@@ -1321,18 +1081,18 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     ];
   }
   if (activeSport === 'strength') {
+    /**
+     * ⛔ A LIFT IS TYPED IN THE ATHLETE'S OWN UNIT AND STORED IN POUNDS (2026-09-15, §8.0 #7). This screen
+     * printed "kg" beside the pound number on a metric account while the logger printed "lb" for the same
+     * set, and a typed kilogram number went to the database raw. The server converts both ways now; the
+     * row below is the server's, unit and all.
+     */
     const liftRows = STRENGTH_LIFT_FIELDS.map((lift) => {
-      const r = resolveStrengthCapacity({ key: lift.key, typed: data.performanceNumbers as any, learnedStrength1rms: learnedFitness?.strength_1rms ?? null, locked: data.locked_baselines ?? null, asOf: new Date().toISOString().slice(0, 10) });
-      const locked = data.locked_baselines?.[lift.key] != null;
-      const learnedEntry = lift.learnedKey ? learnedFitness?.strength_1rms?.[lift.learnedKey] : null;
-      const sets = Number(learnedEntry?.sample_count);
-      const unit = lift.reps ? 'reps' : (metric ? 'kg' : 'lb');
-      const note = locked ? 'your number' : r.source === 'learned' ? `from your lifts${Number.isFinite(sets) && sets > 0 ? `, ${sets} sessions` : ''}` : r.source === 'typed' ? (lift.reps ? 'typed' : 'typed, until your lifts measure') : null;
-      const sug = r.suggestion && r.suggestion.divergencePct > 0 ? ` Your lifts suggest ${Math.round(r.suggestion.computed)}.` : '';
+      const lr = readout?.strength.lifts.find((l) => l.key === lift.key) ?? null;
       return (
-        <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={unit} inputMode="numeric" sport="strength" value={r.value != null ? `${Math.round(r.value)} ${unit} · ${numberWord(r.source, locked)}` : null} note={note ? note + sug : null} mine={locked}
-          onSave={(t) => { const n = lift.reps ? Math.max(0, parseInt(t) || 0) : Math.round(Number(t)); if (!(lift.reps ? Number.isFinite(n) : n > 0)) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, [lift.key]: n } as any, locked_baselines: lift.reps ? (d.locked_baselines ?? null) : { ...(d.locked_baselines ?? {}), [lift.key]: n } })); }}
-          onAuto={lift.reps ? undefined : () => void commitData((d) => { const next = { ...(d.locked_baselines ?? {}) } as Record<string, number>; delete next[lift.key]; return { ...d, locked_baselines: Object.keys(next).length ? next : null }; })} />
+        <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={lr?.row.hint ?? (lift.reps ? 'reps' : 'lb')} inputMode="numeric" sport="strength" value={lr?.row.value ?? null} note={lr?.row.note ?? null} mine={lr?.row.mine === true}
+          onSave={(t) => { const n = lift.reps ? Math.max(0, parseInt(t) || 0) : Number(t); if (!Number.isFinite(n) || (lift.reps ? n < 0 : n <= 0)) return; void commitData((d) => d, undefined, { lifts: { [lift.key]: n } }); }}
+          onAuto={lift.reps ? undefined : () => void commitData((d) => d, undefined, { lifts: { [lift.key]: null } })} />
       );
     });
     return [
@@ -1581,7 +1341,11 @@ return (
                           {photoNote && <p className="text-[12px] text-white/60 mt-1">{photoNote}</p>}
                         </div>
                       </div>
-                      <NumberRow id="birthday" name="Birthday" inputType="date" value={data.birthday ? `${fmtBirthday(data.birthday)}${calculateAge(data.birthday) != null ? ` · ${calculateAge(data.birthday)} yrs` : ''}` : null} seed={data.birthday || ''} onSave={(t) => { if (/^\d{4}-\d{2}-\d{2}$/.test(t)) void commitData((d) => ({ ...d, birthday: t })); }} />
+                      {/* ⛔ THE AGE IS THE SERVER'S, WORKED OUT FROM THE BIRTHDAY (2026-09-15). This line
+                          recomputed it on every render while `user_baselines.age` held a copy written once
+                          and never refreshed, so the screen and three server readers disagreed for a year
+                          after a birthday. One rule, nothing stored. */}
+                      <NumberRow id="birthday" name="Birthday" inputType="date" value={data.birthday ? `${fmtBirthday(data.birthday)}${readout?.you.age.value ? ` · ${readout.you.age.value}` : ''}` : null} seed={data.birthday || ''} onSave={(t) => { if (/^\d{4}-\d{2}-\d{2}$/.test(t)) void commitData((d) => ({ ...d, birthday: t })); }} />
                       <NumberRow id="units" name="Units" value={null} right={(
                         <span className="inline-flex shrink-0 rounded-xl border border-white/15 overflow-hidden" role="group" aria-label="Units">
                           {(['imperial', 'metric'] as const).map((u, i) => {
@@ -1595,9 +1359,11 @@ return (
                           })}
                         </span>
                       )} />
-                      <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} value={data.height ? `${data.height} ${metric ? 'cm' : 'in'}` : null} seed={data.height ? String(data.height) : ''} inputMode="numeric"
+                      {/* Height and body weight are stored in the athlete's own unit already (the server
+                          reads the value and the units flag together), so the readout carries the label. */}
+                      <NumberRow id="height" name="Height" hint={readout?.you.height.hint ?? (metric ? 'cm' : 'in')} value={readout?.you.height.value ?? null} seed={data.height ? String(data.height) : ''} inputMode="numeric"
                         onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, height: v })); }} />
-                      <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} value={data.weight ? `${data.weight} ${metric ? 'kg' : 'lb'}` : null} seed={data.weight ? String(data.weight) : ''} inputMode="numeric"
+                      <NumberRow id="weight" name="Weight" hint={readout?.you.weight.hint ?? (metric ? 'kg' : 'lb')} value={readout?.you.weight.value ?? null} seed={data.weight ? String(data.weight) : ''} inputMode="numeric"
                         onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, weight: v })); }} />
                       {saveMessage && lastSavedSport === 'you' && <p className="text-[13px] text-white/75 mt-1.5">{saveMessage}</p>}
                     </div>

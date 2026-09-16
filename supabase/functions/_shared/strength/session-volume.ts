@@ -39,7 +39,13 @@ export type CompletedStrengthVolume = {
  * and Today counted (body weight + added) × reps. One pricing now: the kilogram sets convert here and go
  * through `strengthSetVolume` like every other set. Body weight is pounds, so there is nothing to keep apart.
  */
-const LB_PER_KG = 1 / 0.45359237;
+/**
+ * ⛔ EXPORTED 2026-09-15 (Stage 4 session 1): `save-baselines/zones.ts` converts a lift to kilograms
+ * for a metric account's Adjust and Baselines rows, and a second copy of a definition constant is
+ * exactly the shape this work order exists to remove.
+ */
+export const KG_PER_LB = 0.45359237;
+const LB_PER_KG = 1 / KG_PER_LB;
 
 export function completedStrengthVolume(
   exercises: any[] | null | undefined,

@@ -9,32 +9,26 @@
 import React, { useEffect, useState } from 'react';
 import { Dumbbell, Activity, Bike, Layers, Feather, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
-import { numberWord, pillClass } from '@/lib/number-word';
+import { pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
-import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
-import { resolveCurrentFtp, pendingFtpProposal } from '@/lib/resolve-current-ftp';
-import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
+import { canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/lib/baseline-tests';
+import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow } from '@/lib/baseline-tests';
+// ⛔ EVERY NUMBER ON THIS SCREEN IS THE SERVER'S (2026-09-15, one-truth workorder Stage 4 session 1).
+import { useBaselineZones } from '@/hooks/useBaselineZones';
 
-// The numbers the block is priced from, read through the SAME resolvers Training Baselines and the plan
-// builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
+// The numbers the block is priced from — the SAME server readout Training Baselines prints, so the two
+// screens cannot show two numbers for one fact (Michael, 2026-09-05: "add the current e1RM, FTP, running
+// threshold pace, easy pace").
 // While the server re-prices row by row (30 rows on a full block), the screen says so — leaving mid-way is not
 // guaranteed to finish (Michael, 2026-09-05).
 const REPRICE_WAIT = 'Updating your upcoming sessions…';
-const sourceWord = numberWord;
 // The heading carries LOAD's ⓘ (LoadBar.tsx): one line stays under the sport, the rest opens here.
-const fmtPace = (secPerMi: number | null | undefined, metric: boolean): string | null => {
-  if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null;
-  const s = metric ? secPerMi / 1.609344 : secPerMi;
-  return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}/${metric ? 'km' : 'mi'}`;
-};
 
 type Lift = { canonical_name: string; display_name?: string };
 
@@ -95,38 +89,35 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     return () => { cancelled = true; };
   }, [loadUserBaselines]);
   const pn = baselines ? (baselines.performanceNumbers ?? baselines.performance_numbers ?? null) : null;
-  const lf = baselines?.learned_fitness ?? null;
-  const metric = baselines?.units === 'metric';
+  /**
+   * ⛔ THE READOUT IS THE SERVER'S (2026-09-15). Every row below — the lift and its unit, the FTP, the
+   * threshold pace, the threshold heart rate, the easy range, the two "your runs/rides measure" lines and
+   * the day a retest lands on — arrives finished, already in the athlete's own unit, from `save-baselines`.
+   * This screen ran six resolvers and did its own kilogram labels, its own kilometre conversion and its own
+   * `today + 3`; Training Baselines ran the same six against different inputs, which is how one athlete
+   * could read two threshold heart rates. One payload, both screens.
+   */
+  const { readout, refresh: refreshReadout, apply: applyReadout } = useBaselineZones();
   /**
    * The four lifts the block prices from are always listed, whether or not a set has been logged:
    * a fresh account with numbers typed on the profile page saw "Logged lifts show up here." and no
    * rows, while the profile page showed all four (throwaway check, 2026-09-05). Logged lifts beyond
    * the four (the State screen's list, `perLift`) follow them; the same lift is not listed twice.
    */
-  const liftRows: Lift[] = (() => {
-    const four: Lift[] = [
-      { canonical_name: 'squat', display_name: 'Squat' },
-      { canonical_name: 'deadlift', display_name: 'Deadlift' },
-      { canonical_name: 'bench', display_name: 'Bench press' },
-      { canonical_name: 'overheadPress1RM', display_name: 'Overhead press' },
-    ];
-    const seen = new Set(four.map((l) => canonicalizeLiftKey(l.canonical_name)));
-    const extra = perLift.filter((l) => { const k = canonicalizeLiftKey(l.canonical_name); if (!k || seen.has(k)) return false; seen.add(k); return true; });
-    return [...four, ...extra];
+  const FOUR: string[] = ['squat', 'deadlift', 'bench', 'overheadPress1RM'];
+  const liftRows = (() => {
+    const all = readout?.strength.lifts ?? [];
+    const extraKeys = new Set(
+      perLift.map((l) => canonicalizeLiftKey(l.canonical_name)).filter((k): k is NonNullable<typeof k> => k != null).map(String),
+    );
+    return all.filter((l) => FOUR.includes(l.key) || extraKeys.has(l.key))
+      .sort((a, b) => (FOUR.indexOf(a.key) + 1 || 99) - (FOUR.indexOf(b.key) + 1 || 99));
   })();
-  const liftNumber = (canonical: string): string | null => {
-    if (!baselines) return null;
-    const r = resolveStrengthCapacity({ key: canonical, typed: pn, learnedStrength1rms: lf?.strength_1rms ?? null, locked: baselines.locked_baselines ?? null, asOf: new Date().toISOString().slice(0, 10) });
-    if (r.value == null) return null;
-    const w = sourceWord(r.source, mine(canonical));
-    return `${Math.round(r.value)} ${metric ? 'kg' : 'lb'}${w ? ` · ${w}` : ''}`;
-  };
-  const ftp = baselines ? resolveCurrentFtp({ learned_fitness: lf, performance_numbers: pn } as any) : null;
-  const thr = baselines ? resolveCurrentRunThresholdPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
-  const easy = baselines ? resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const run = readout?.run ?? null;
+  const bike = readout?.bike ?? null;
   // The FTP the rides measured, waiting on acceptance (TrainerRoad's proposed-then-accepted). Same write as
   // Training Baselines' "use it": accept into learned_fitness, then re-price the unstarted endurance rows.
-  const proposal = baselines ? pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const proposal = bike?.ftp_proposal ?? null;
   const [accepting, setAccepting] = useState(false);
   const acceptFtp = () => {
     void (async () => {
@@ -135,9 +126,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       try {
         // ⛔ The shown number goes to save-baselines, which saves the accept and clears the manual flag (2026-09-10).
         if (!proposal) return;
-        const res = await acceptMeasuredNumber(supabase, 'ftp', proposal.measured);
+        const res = await acceptMeasuredNumber(supabase, 'ftp', proposal.accept_value);
         if (!res.ok) throw new Error(res.error);
-        let note = `${Math.round(res.acceptedValue)} W in use.`;
+        // The wattage the button showed, which is the number now in use. The phone rounds nothing.
+        let note = `${proposal.button.replace(/^use /, '')} in use.`;
         try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();
@@ -145,7 +137,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       finally { setAccepting(false); }
     })();
   };
-  const thrProposal = baselines ? pendingRunThresholdProposal({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const thrProposal = run?.threshold_proposal ?? null;
   const [acceptingThr, setAcceptingThr] = useState(false);
   const acceptThr = () => {
     void (async () => {
@@ -154,9 +146,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       try {
         // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and the flag (2026-09-10).
         if (!thrProposal) return;
-        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.measuredSecPerKm);
+        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.accept_value);
         if (!res.ok) throw new Error(res.error);
-        let note = `${fmtPace(res.acceptedValue * 1.609344, metric)} in use.`;
+        // The pace the server now prints on the row, not a second conversion of the accepted value.
+        let note = `${thrProposal.button.replace(/^use /, '')} in use.`;
         try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();
@@ -164,8 +157,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       finally { setAcceptingThr(false); }
     })();
   };
-  const lthr = baselines ? resolveCurrentLthr({ learned_fitness: lf, performance_numbers: pn, configured_hr_zones: baselines.configured_hr_zones ?? null } as any) : null;
-  const withSource = (id: string, num: string | null, src: string | null | undefined) => { const w = sourceWord(src, mine(id)); return num ? `${num}${w ? ` · ${w}` : ''}` : null; };
+
   // ⛔ EDIT IN PLACE (Michael, 2026-09-05: "lost the edit option — the whole point"). Tap a number, type, save.
   // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
   // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
@@ -174,30 +166,36 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // ⛔ DELOAD — the book's TAPER/DELOAD column (p274), deployed by the athlete, never scheduled (p120 rejects
   // overreach-to-deload). Read the plan's current week + deload weeks from the rebuild's dry run; toggling
   // next week calls the same rebuild with `taper_weeks` and applies.
-  const [deload, setDeload] = useState<{ currentWeek: number; weeks: number; taperWeeks: number[] } | null>(null);
+  // ⛔ WHICH WEEK, AND WHETHER IT CAN — THE BLOCK'S ANSWER (2026-09-15). The screen worked out "next week"
+  // as `current + 1`, gated it on `≤ weeks`, and carried its own `|| 12` beside the server's. The dry run
+  // returns `next_week`, `next_is_deload` and `can_deload`; this prints them.
+  type Deload = { nextWeek: number; nextIsDeload: boolean; canDeload: boolean; taperWeeks: number[] };
+  const [deload, setDeload] = useState<Deload | null>(null);
   const [deloadBusy, setDeloadBusy] = useState(false);
   const [deloadNote, setDeloadNote] = useState<string | null>(null);
+  const readDeload = (d: any): Deload | null =>
+    d?.success && typeof d.next_week === 'number'
+      ? { nextWeek: d.next_week, nextIsDeload: d.next_is_deload === true, canDeload: d.can_deload === true, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [] }
+      : null;
   useEffect(() => {
     let cancelled = false;
     void supabase.functions.invoke('rematerialize-standing-block', { body: { apply: false } }).then(({ data }) => {
-      const d = data as any;
-      if (cancelled || !d?.success || typeof d.current_week !== 'number') return;
-      setDeload({ currentWeek: d.current_week, weeks: Number(d.weeks) || 12, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [] });
+      const next = readDeload(data);
+      if (!cancelled && next) setDeload(next);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
-  const nextWeek = deload ? deload.currentWeek + 1 : null;
-  const nextIsDeload = !!(deload && nextWeek != null && deload.taperWeeks.includes(nextWeek));
+  const nextWeek = deload?.nextWeek ?? null;
+  const nextIsDeload = deload?.nextIsDeload === true;
   const toggleDeload = () => {
-    if (!deload || nextWeek == null || nextWeek > deload.weeks) return;
+    if (!deload || !deload.canDeload || nextWeek == null) return;
     const next = nextIsDeload ? deload.taperWeeks.filter((w) => w !== nextWeek) : [...deload.taperWeeks, nextWeek];
     void (async () => {
       setDeloadBusy(true); setDeloadNote(null);
       try {
         const { data: rs, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true, taper_weeks: next } });
         if (error) throw error;
-        const d = rs as any;
-        setDeload({ ...deload, taperWeeks: Array.isArray(d?.taper_weeks) ? d.taper_weeks.map(Number) : next });
+        setDeload(readDeload(rs) ?? { ...deload, taperWeeks: next, nextIsDeload: !nextIsDeload });
         setDeloadNote(nextIsDeload ? `Week ${nextWeek} is back to the standard week.` : `Week ${nextWeek} is a deload week. Sessions rebuilt.`);
       } catch (e) {
         setDeloadNote('Could not change it. Try again.');
@@ -206,15 +204,16 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   // ⛔ RETEST (Michael, 2026-09-05: tests live on Adjust, not a tab). Run threshold and FTP tests are the SAME
-  // rows Training Baselines and the wizard schedule (`baseline-tests.ts`, same helper), 3 and 2 days out as
-  // Baselines defaults them. The lifts open the logger's test flow (Lower / Upper / Full Body), the same
+  // rows Training Baselines and the wizard schedule (`baseline-tests.ts`, same helper), on the day the
+  // server's readout names (today; the athlete moves it on the calendar if it does not suit). The lifts open the logger's test flow (Lower / Upper / Full Body), the same
   // entry Baselines uses. A scheduled test is detected by its tag (`run_test` / `ftp_test`), the contract.
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
   const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null; ftp5: { id: string; date: string } | null }>({ run: null, ftp: null, ftp5: null });
   const [testBusy, setTestBusy] = useState<string | null>(null);
   const refreshScheduled = async () => {
     const uid = getStoredUserId(); if (!uid) return;
-    const today = new Date().toISOString().slice(0, 10);
+    // The athlete's own calendar day, not UTC (§8.0 #42) — a test scheduled for today must still list.
+    const today = new Date().toLocaleDateString('en-CA');
     const { data } = await supabase.from('planned_workouts').select('id, date, tags').eq('user_id', uid).eq('workout_status', 'planned').gte('date', today).order('date');
     const rows = (data ?? []) as Array<{ id: string; date: string; tags?: string[] | null }>;
     const find = (tag: string, not?: string) => { const r = rows.find((x) => Array.isArray(x.tags) && x.tags.includes(tag) && !(not && x.tags.includes(not))); return r ? { id: r.id, date: r.date } : null; };
@@ -225,8 +224,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     void (async () => {
       setTestBusy(kind);
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const row = kind === 'run' ? runThresholdTestRow(addDaysISO(today, 3)) : kind === 'ftp5' ? ftp5MinTestRow(addDaysISO(today, 2)) : ftpTestRow(addDaysISO(today, 2));
+        // ⛔ THE SERVER SAYS WHICH DAY (2026-09-15). This screen counted `today + 3` for the run and
+        // `today + 2` for the bike off a UTC clock, and week one in a new block counted its own two days
+        // somewhere else. The readout carries the day; the athlete moves it on the calendar if it suits.
+        const date = readout?.retest.date;
+        if (!date) return;
+        const row = kind === 'run' ? runThresholdTestRow(date) : kind === 'ftp5' ? ftp5MinTestRow(date) : ftpTestRow(date);
         await addPlannedWorkout(row as any);
         await refreshScheduled();
       } catch (e) { console.warn('[StateAdjustLens] schedule test failed:', e); }
@@ -270,30 +273,39 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // Which sport's section shows the note — the one whose number was just saved.
   const [lastSaved, setLastSaved] = useState<'strength' | 'run' | 'bike' | null>(null);
   const sportOf = (id: string): 'strength' | 'run' | 'bike' => id === 'ftp' ? 'bike' : id === 'threshold' || id === 'lthr' ? 'run' : 'strength';
-  const reload = () => loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
-  const parsePace = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
+  const reload = async () => {
+    await loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
+    await refreshReadout();
+  };
+  /**
+   * ⛔ WHAT WAS TYPED, IN THE ATHLETE'S OWN UNIT (2026-09-15). A pace and a lift go over as typed and
+   * `save-baselines` converts and stores them. This screen used to multiply a kilometre pace by 1.609344
+   * itself — the server never saw the number the athlete entered — and a typed kilogram lift was stored
+   * raw as pounds, which is how 100 kg became 100 lb everywhere the plan priced from it.
+   */
   const commit = async (id: string, text: string) => {
     if (!baselines) return;
     const t = text.trim();
     setLastSaved(sportOf(id));
     try {
+      let saved: any = null;
       if (id === 'ftp') {
         const v = Math.round(Number(t)); if (!(v > 0)) return;
-        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), ftp: v, ftp_source: 'manual' } });
+        saved = await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), ftp: v, ftp_source: 'manual' } });
       } else if (id === 'threshold') {
-        const sec = parsePace(t); if (sec == null) return;
-        const secPerMi = metric ? sec * 1.609344 : sec;
-        const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`;
-        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } });
+        if (!/^\d{1,2}:\d{2}$/.test(t)) return;
+        saved = await saveUserBaselines(baselines, undefined, { paces: { threshold: t } });
       } else if (id === 'lthr') {
         const v = Math.round(Number(t)); if (!(v > 0)) return;
         // ⛔ The typed threshold only (2026-09-10). `save-baselines` stores it and rebuilds the zone tables
         // from it — this wrote the object itself and left the old zone arrays standing beside the new number.
-        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } }, { manual_run_lthr: v });
+        saved = await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } }, { manual_run_lthr: v });
       } else {
-        const key = canonicalizeLiftKey(id); const v = Math.round(Number(t)); if (!key || !(v > 0)) return;
-        await saveUserBaselines({ ...baselines, locked_baselines: { ...(baselines.locked_baselines ?? {}), [key]: v } });
+        const key = canonicalizeLiftKey(id); const v = Number(t);
+        if (!key || !Number.isFinite(v) || !(key === 'pullupMaxReps' ? v >= 0 : v > 0)) return;
+        saved = await saveUserBaselines(baselines, undefined, { lifts: { [key]: v } });
       }
+      applyReadout(saved?.zones);
       setSaveNote(await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength'));
       await reload();
     } catch (e) {
@@ -363,17 +375,18 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'learned' } });
       } else {
         const key = canonicalizeLiftKey(id); if (!key) return;
-        const next = { ...(baselines.locked_baselines ?? {}) } as Record<string, number>; delete next[key];
-        await saveUserBaselines({ ...baselines, locked_baselines: Object.keys(next).length ? next : null });
+        // `null` clears that lift's lock — the server's one write shape, same as a typed value.
+        await saveUserBaselines(baselines, undefined, { lifts: { [key]: null } });
       }
       setSaveNote((await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength')).replace('Saved.', 'Auto.'));
       await reload();
     } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
   const pill = pillClass;
-  const Row = ({ id, name, value, editable = true, hint, sport, note }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike'; note?: string }) => (
-    <NumberRow id={id} name={name} value={value} editable={editable} hint={hint} sport={sport} note={note} mine={mine(id)}
-      inputMode={id === 'threshold' ? 'numeric' : 'decimal'} onEditStart={() => setSaveNote(null)} onSave={(t) => commit(id, t)} onAuto={() => setAuto(id)} />
+  /** One server row, rendered. Nothing here decides a value, a unit or a word. */
+  const Row = ({ id, name, row, sport, editable = true }: { id: string; name: string; row?: { value: string | null; hint: string; note: string | null; mine: boolean } | null; sport: 'strength' | 'run' | 'bike'; editable?: boolean }) => (
+    <NumberRow id={id} name={name} value={row?.value ?? null} editable={editable} hint={row?.hint} sport={sport} note={row?.note ?? undefined} mine={row?.mine === true}
+      inputMode={id === 'threshold' ? 'numeric' : 'decimal'} onEditStart={() => setSaveNote(null)} onSave={(t) => commit(id, t)} onAuto={editable ? () => setAuto(id) : undefined} />
   );
   const rebuild = () => {
     void (async () => {
@@ -390,8 +403,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started take the new number. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
-  const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is your zone 2 pace, worked out from threshold pace. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
-  const BIKE_INFO = "The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
+  const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is your zone 2 pace, worked out from threshold pace. The threshold test goes on the calendar today; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
+  const BIKE_INFO = "The FTP tests go on the calendar today; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
   type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
   const sections: Section[] = [
@@ -402,7 +415,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         {rebuildNote && <p className="text-[13px] text-white/75 mt-1.5">{rebuildNote}</p>}
       </>
     ) },
-    ...(deload && nextWeek != null && nextWeek <= deload.weeks ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
+    ...(deload?.canDeload && nextWeek != null ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
       <>
         <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
@@ -414,7 +427,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       <>
         <div className="space-y-1.5">
           {liftRows.map((lt) => (
-            <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} sport="strength" />
+            <Row key={lt.key} id={lt.key} name={lt.label} row={lt.row} sport="strength" />
           ))}
         </div>
         <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
@@ -431,19 +444,15 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     { id: 'run', label: 'Run', sport: 'run', Icon: Activity, info: RUN_INFO, body: (
       <>
         <div className="space-y-1.5">
-          <Row id="threshold" name="Threshold pace" value={withSource('threshold', fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
+          <Row id="threshold" name="Threshold pace" row={run?.threshold} sport="run" />
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">Your runs measure {fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}</span>
-              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : `use ${fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}`}</button>
+              <span className="text-[13px] text-white/70">{thrProposal.text}</span>
+              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : thrProposal.button}</button>
             </div>
           )}
-          <Row id="lthr" name="Threshold heart rate" value={withSource('lthr', lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
-          <Row id="easy" name="Easy pace" editable={false} sport="run"
-            value={fmtPace(easy?.range_lo_sec_per_mi, metric) && fmtPace(easy?.range_hi_sec_per_mi, metric)
-              ? `${fmtPace(easy?.range_lo_sec_per_mi, metric)!.replace(/\/(mi|km)$/, '')}–${fmtPace(easy?.range_hi_sec_per_mi, metric)} · from threshold`
-              : null}
-            note="Your zone 2 pace, worked out from your threshold pace. Easy days run by heart rate; this is the pace that usually lands there. Heat and hills slow it at the same heart rate." />
+          <Row id="lthr" name="Threshold heart rate" row={run?.lthr} sport="run" />
+          <Row id="easy" name="Easy pace" editable={false} row={run?.easy} sport="run" />
           <div className="flex items-center justify-between py-1 gap-3">
             <span className="text-[14px] text-white/85">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">
@@ -455,18 +464,18 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">The threshold test goes on the calendar three days out.</p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">The threshold test goes on the calendar today.</p>
         {saveNote && lastSaved === 'run' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </>
     ) },
     { id: 'bike', label: 'Bike', sport: 'bike', Icon: Bike, info: BIKE_INFO, body: (
       <>
         <div className="space-y-1.5">
-          <Row id="ftp" name="FTP" value={withSource('ftp', ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
+          <Row id="ftp" name="FTP" row={bike?.ftp} sport="bike" />
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
-              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+              <span className="text-[13px] text-white/70">{proposal.text}</span>
+              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : proposal.button}</button>
             </div>
           )}
           <div className="flex items-center justify-between py-1 gap-3">
@@ -485,7 +494,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">The FTP tests go on the calendar two days out.</p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">The FTP tests go on the calendar today.</p>
         {saveNote && lastSaved === 'bike' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </>
     ) },

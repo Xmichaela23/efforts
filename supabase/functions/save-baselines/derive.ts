@@ -12,6 +12,8 @@
 import { calculateEffortScore, getPacesFromScore, type TrainingPaces } from '../generate-run-plan/effort-score.ts';
 import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { canonicalizeLiftKey } from '../_shared/state-trend/capacity-resolver.ts';
+import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { hrZones } from '../_shared/endurance/hr-zones.ts';
 import { acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
@@ -260,4 +262,82 @@ export function hrZoneConfigForSave(input: {
   if (zonesRun) cfg.zones_run = zonesRun;
   if (zonesRide) cfg.zones_ride = zonesRide;
   return cfg;
+}
+
+// ── what the athlete typed, in their own unit ───────────────────────────────────────────────────
+
+/**
+ * A TYPED PACE ARRIVES IN THE ATHLETE'S OWN UNIT (2026-09-15, one-truth workorder Stage 4 session 1).
+ *
+ * ⛔ THE PHONE NO LONGER MULTIPLIES. `StateAdjustLens` and `TrainingBaselines` each held their own
+ * `metric ? sec * 1.609344 : sec` before the save, so the server never saw the kilometre value the
+ * athlete actually typed and the conversion existed twice. The wire now carries `m:ss` as typed plus the
+ * account's unit flag — the same shape the quick calibration's 5K pace has always used — and the per-mile
+ * string that `performance_numbers.threshold_pace_min_per_mi` holds is written here.
+ *
+ * An absent key changes nothing. An explicitly null key is not a clear: a threshold pace is cleared by
+ * switching the row back to auto, which sets `threshold_pace_source`, not by blanking the number.
+ */
+export function pacesForSave(
+  paces: { threshold?: unknown } | null | undefined,
+  perf: Record<string, unknown>,
+  metric: boolean,
+): Record<string, unknown> {
+  if (!paces || typeof paces !== 'object') return perf;
+  const out = { ...perf };
+  if (Object.prototype.hasOwnProperty.call(paces, 'threshold')) {
+    const sec = parseClock(paces.threshold);
+    if (sec) {
+      const secPerMi = metric ? sec * 1.609344 : sec;
+      out.threshold_pace_min_per_mi = formatClock(secPerMi);
+      out.threshold_pace_source = 'manual';
+    }
+  }
+  return out;
+}
+
+/**
+ * A TYPED 1RM ARRIVES IN THE ATHLETE'S OWN UNIT and is stored in POUNDS (2026-09-15, §8.0 #7).
+ *
+ * ⛔ EVERY LIFT CONSUMER IS POUND-NATIVE — the 45 lb bar, the 5 lb warm-up step, the nearest-5-lb e1RM,
+ * the logger's own "Saved: N lb". Adjust and Baselines printed "kg" beside that pound number on a metric
+ * account and stored a typed kilogram number raw, so 100 kg became 100 lb. The conversion is here, by the
+ * definition constant, and the screens print what this file sends back.
+ *
+ * ⛔ ONE WRITE SHAPE FOR ONE TAP. Baselines wrote `performance_numbers[key]` AND `locked_baselines[key]`;
+ * Adjust wrote only the lock, so the seed a new block starts from moved on one screen and not the other.
+ * Both move now — which is what the Baselines row already tells the athlete it does.
+ *
+ * `null` for a lift clears its lock (back to auto) and leaves the seed alone. Pull-up reps are reps: 0 is
+ * a valid value and nothing is converted.
+ */
+export function liftsForSave(
+  lifts: Record<string, unknown> | null | undefined,
+  perf: Record<string, unknown>,
+  lockedStored: Record<string, unknown> | null | undefined,
+  metric: boolean,
+): { performance_numbers: Record<string, unknown>; locked_baselines: Record<string, unknown> | null } | null {
+  if (!lifts || typeof lifts !== 'object') return null;
+  const perfOut = { ...perf };
+  const locked: Record<string, unknown> = { ...(lockedStored ?? {}) };
+  let touched = false;
+  for (const [rawKey, rawValue] of Object.entries(lifts)) {
+    const key = canonicalizeLiftKey(rawKey);
+    if (!key) continue;
+    touched = true;
+    if (rawValue == null) { delete locked[key]; continue; }
+    const n = Number(rawValue);
+    if (!Number.isFinite(n)) continue;
+    const reps = key === 'pullupMaxReps';
+    if (reps ? n < 0 : n <= 0) continue;
+    const stored = reps ? Math.round(n) : Math.round(metric ? n / KG_PER_LB : n);
+    perfOut[key] = stored;
+    // Pull-ups are reps and are never locked — the row has no auto to switch back to (D-229).
+    if (!reps) locked[key] = stored;
+  }
+  if (!touched) return null;
+  return {
+    performance_numbers: perfOut,
+    locked_baselines: Object.keys(locked).length > 0 ? locked : null,
+  };
 }

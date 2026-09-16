@@ -20,10 +20,22 @@
  *                 { kind: 'lift', lift, value } | { kind: 'swim_pace', value } — My Record's "Logged suggests …
  *                 Update" (2026-09-10, audit H-B12): the logged lift in pounds, or seconds per 100 yd. Checked
  *                 against `_shared/baseline-suggestions.ts`, which respects locked lifts.
- *   zones?:       true, alone — READ ONLY: the zone rows Profile and Welcome print (2026-09-10, audit
- *                 H-B04–H-B06). Nothing is saved. See `zones.ts`.
+ *   paces?:       { threshold: 'm:ss' } — a typed PACE, IN THE ATHLETE'S OWN UNIT. Per km for a metric
+ *                 account, per mile otherwise; converted and stored per mile here. Same shape as
+ *                 `heart_rate`: a present key sets it, an absent key leaves the stored one alone.
+ *                 ⛔ The phone used to do this multiplication (`× 1.609344`, two copies) and the server
+ *                 never saw the kilometre value. It does now, and the phone multiplies nothing.
+ *   lifts?:       { squat: 102, … } — a typed 1RM IN THE ATHLETE'S OWN UNIT (kilograms on a metric
+ *                 account), or pull-up reps. Converted to pounds here — every lift consumer is pound-native
+ *                 — and written to `locked_baselines` (your number) AND `performance_numbers` (the seed a
+ *                 new block starts from). `null` clears the lock for that lift, which is "auto".
+ *   zones?:       true, alone — READ ONLY: everything Adjust and Training Baselines print (2026-09-10 for
+ *                 the zone rows, audit H-B04–H-B06; the whole readout 2026-09-15). Nothing is saved. Send
+ *                 `today` (the athlete's own YYYY-MM-DD) with it. See `zones.ts`.
+ *   today?:       the phone's LOCAL date, `YYYY-MM-DD`. Drives lift freshness, the age, and the day a
+ *                 retest lands on. Absent falls back to UTC, which is a day ahead after 5 pm Pacific.
  * }
- * → { success, effort, performance_numbers, configured_hr_zones, zones }
+ * → { success, effort, performance_numbers, configured_hr_zones, locked_baselines, zones }
  *   accept → { success, accepted: { kind, value }, learned_fitness, performance_numbers, zones }, or 409 with
  *            `error: 'nothing_to_accept' | 'value_changed'`
  *            lift / swim_pace → { success, accepted: { kind, lift, value, locked }, performance_numbers, locked_baselines }
@@ -32,6 +44,8 @@
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import {
   acceptMeasuredForSave,
+  liftsForSave,
+  pacesForSave,
   effortFieldsForPerformanceNumbers,
   effortFieldsFromFiveKTimeSec,
   fiveKClockFromCalibration,
@@ -58,6 +72,16 @@ const NOT_TYPED = [
   'configured_hr_zones', 'learned_fitness',
 ];
 
+/** Every column the readout is built from — one list, used by all three reads below. */
+const READOUT_COLUMNS =
+  'performance_numbers, learned_fitness, configured_hr_zones, locked_baselines, units, birthday, gender, height, weight, updated_at';
+
+/** The readout, built from the stored row as it now stands. One read, one builder, three callers. */
+async function readoutFor(supabase: { from: (t: string) => any }, userId: string, today: string) {
+  const { data } = await supabase.from('user_baselines').select(READOUT_COLUMNS).eq('user_id', userId).maybeSingle();
+  return zonesForBaselinesRow(data, { today });
+}
+
 const parseJson = (v: unknown) => {
   if (typeof v !== 'string') return v ?? null;
   try { return JSON.parse(v); } catch { return null; }
@@ -72,15 +96,25 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const nowIso = new Date().toISOString();
 
-    // ⛔ THE ZONE READ. Profile and Welcome print these rows; the phone no longer builds any of them.
-    if (body?.zones === true && !body?.baselines && !body?.heart_rate && !body?.calibration && !body?.accept) {
+    /**
+     * ⛔ THE ATHLETE'S OWN DATE, NOT UTC. `toISOString()` is UTC, so after 5 pm in Los Angeles it reads
+     * as tomorrow — which dated a retest a day ahead and could age a lift out of its freshness window a
+     * day early. The phone sends its local day; absent, UTC stands and says so by being the fallback.
+     */
+    const today = typeof body?.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.today)
+      ? body.today.slice(0, 10)
+      : nowIso.slice(0, 10);
+
+    // ⛔ THE READOUT READ. Adjust, Profile and Welcome print these rows; the phone builds none of them.
+    if (body?.zones === true && !body?.baselines && !body?.heart_rate && !body?.calibration && !body?.accept
+        && !body?.paces && !body?.lifts) {
       const { data: cur, error: zErr } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, learned_fitness, configured_hr_zones')
+        .select(READOUT_COLUMNS)
         .eq('user_id', userId)
         .maybeSingle();
       if (zErr) throw zErr;
-      return json({ success: true, zones: zonesForBaselinesRow(cur) });
+      return json({ success: true, zones: zonesForBaselinesRow(cur, { today }) });
     }
 
     const calibration = body?.calibration && typeof body.calibration === 'object' ? body.calibration : null;
@@ -133,6 +167,7 @@ Deno.serve(async (req) => {
           accepted: { kind, lift: kind === 'lift' ? String(accept.lift) : null, value: rec.accepted_value, locked: rec.locked },
           performance_numbers: rec.performance_numbers,
           locked_baselines: rec.locked_baselines,
+          zones: await readoutFor(supabase, userId, today),
         });
       }
       const { data: cur, error: curErr } = await supabase
@@ -159,11 +194,7 @@ Deno.serve(async (req) => {
         accepted: { kind, value: res.accepted_value },
         learned_fitness: res.learned_fitness,
         performance_numbers: res.performance_numbers,
-        zones: zonesForBaselinesRow({
-          performance_numbers: res.performance_numbers,
-          learned_fitness: res.learned_fitness,
-          configured_hr_zones: cur?.configured_hr_zones,
-        }),
+        zones: await readoutFor(supabase, userId, today),
       });
     }
 
@@ -171,11 +202,13 @@ Deno.serve(async (req) => {
       body?.baselines && typeof body.baselines === 'object' ? { ...body.baselines } : null;
     if (typed) for (const k of NOT_TYPED) delete typed[k];
     const heartRate = body?.heart_rate && typeof body.heart_rate === 'object' ? body.heart_rate : null;
-    if (!typed && !heartRate && !calClock) return json({ error: 'nothing to save' }, 400);
+    const typedPaces = body?.paces && typeof body.paces === 'object' ? body.paces : null;
+    const typedLifts = body?.lifts && typeof body.lifts === 'object' ? body.lifts : null;
+    if (!typed && !heartRate && !calClock && !typedPaces && !typedLifts) return json({ error: 'nothing to save' }, 400);
 
     const { data: existing, error: readErr } = await supabase
       .from('user_baselines')
-      .select('id, units, performance_numbers, learned_fitness, configured_hr_zones')
+      .select('id, units, performance_numbers, learned_fitness, configured_hr_zones, locked_baselines')
       .eq('user_id', userId)
       .maybeSingle();
     if (readErr) throw readErr;
@@ -192,11 +225,16 @@ Deno.serve(async (req) => {
       perfTyped = { ...storedPerf };
     }
     if (calClock) perfTyped = { ...(perfTyped ?? storedPerf), fiveK: calClock.clock };
+    // A typed pace or a typed lift arrives in the athlete's own unit and is converted on the way in.
+    if (typedPaces || typedLifts) perfTyped = { ...(perfTyped ?? storedPerf) };
 
     const row: Record<string, unknown> = { ...(typed ?? {}) };
     let effort = null;
     if (perfTyped) {
-      const perf = performanceNumbersForSave(perfTyped, storedPerf, metric);
+      let perf = performanceNumbersForSave(perfTyped, storedPerf, metric);
+      perf = pacesForSave(typedPaces, perf, metric);
+      const lifted = liftsForSave(typedLifts, perf, parseJson(existing?.locked_baselines) as Record<string, unknown> | null, metric);
+      if (lifted) { perf = lifted.performance_numbers; row.locked_baselines = lifted.locked_baselines; }
       row.performance_numbers = perf;
       effort = effortFieldsForPerformanceNumbers(perf, nowIso);
       if (effort) Object.assign(row, effort);
@@ -228,12 +266,11 @@ Deno.serve(async (req) => {
       success: true,
       effort,
       performance_numbers: row.performance_numbers ?? null,
+      locked_baselines: row.locked_baselines ?? null,
       configured_hr_zones: zonesCfg ?? parseJson(existing?.configured_hr_zones) ?? null,
-      zones: zonesForBaselinesRow({
-        performance_numbers: row.performance_numbers ?? storedPerf,
-        learned_fitness: existing?.learned_fitness,
-        configured_hr_zones: zonesCfg ?? existing?.configured_hr_zones,
-      }),
+      // ⛔ BUILT FROM THE ROW THAT WAS JUST WRITTEN, not from a hand-assembled copy of it — the screens
+      // re-render off this and a stitched object is how the two drift apart for one render.
+      zones: await readoutFor(supabase, userId, today),
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ error: 'unauthorized' }, 401);
