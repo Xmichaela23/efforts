@@ -13,7 +13,12 @@ export type ArcContextPayload = {
 export async function fetchArcContext(focusDate?: string): Promise<ArcContextPayload | null> {
   const userId = getStoredUserId();
   if (!userId) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  /**
+   * ⛔ THE ATHLETE'S OWN DATE, NOT UTC (2026-09-15, §8.0 #42). `toISOString()` is UTC, so after 5 pm in
+   * Los Angeles this asked the server about tomorrow — and the READINESS row, which counts days from it,
+   * called a check-in logged this evening "yesterday". `en-CA` prints YYYY-MM-DD in local time.
+   */
+  const today = new Date().toLocaleDateString('en-CA');
   const { data, error } = await supabase.functions.invoke('get-arc-context', {
     body: { user_id: userId, focus_date: focusDate ?? today },
   });

@@ -345,6 +345,13 @@ export interface ArcReadiness {
   recent: ArcReadinessCheckin[];
   /** Trailing window length in days (READINESS_WINDOW_DAYS). */
   window_days: number;
+  /**
+   * ⛔ HOW MANY DAYS AGO THE LATEST CHECK-IN WAS (2026-09-15, §8.0 #42), counted here against the athlete's
+   * OWN date — `focusDateISO`, which the phone sends as its local date. The State row built this from
+   * `new Date().toISOString()`, a UTC date, so a check-in logged this evening in Los Angeles read
+   * "yesterday". 0 = today. Null when there is no check-in.
+   */
+  latest_days_ago: number | null;
 }
 
 /**
@@ -1386,10 +1393,16 @@ export async function getArcContext(
       recent.push({ date, energy, soreness, sleep });
     }
     // Query orders date DESC → recent[0] is the most recent check-in in window.
+    const latest = recent.length > 0 ? recent[0] : null;
+    const daysAgo = latest
+      ? Math.round((Date.parse(`${focusYmd}T00:00:00Z`) - Date.parse(`${latest.date}T00:00:00Z`)) / 86400000)
+      : null;
     readiness = {
-      latest: recent.length > 0 ? recent[0] : null,
+      latest,
       recent,
       window_days: READINESS_WINDOW_DAYS,
+      // Both dates are plain YYYY-MM-DD read at UTC midnight, so this is a calendar-day difference, not a clock one.
+      latest_days_ago: daysAgo != null && Number.isFinite(daysAgo) ? Math.max(0, daysAgo) : null,
     };
   }
 

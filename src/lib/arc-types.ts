@@ -73,6 +73,8 @@ export type ArcReadiness = {
   latest: ArcReadinessCheckin | null;
   recent: ArcReadinessCheckin[];
   window_days: number;
+  /** Days since the latest check-in, counted on the SERVER against the athlete's local date (§8.0 #42). 0 = today. */
+  latest_days_ago?: number | null;
 };
 
 export type ClientArcContext = {

@@ -14,11 +14,14 @@ import { Row, Chip, Dot } from './state-primitives';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function StateReadinessRow({ checkinReadiness }: { checkinReadiness: any }) {
   const L = checkinReadiness.latest!;
-  const today = new Date().toISOString().slice(0, 10);
-  const dayDiff = Math.round(
-    (Date.parse(today + 'T00:00:00Z') - Date.parse(L.date + 'T00:00:00Z')) / 86400000,
-  );
-  const whenLabel = dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'yesterday' : `${dayDiff}d ago`;
+  /**
+   * ⛔ THE SERVER'S DAY COUNT (2026-09-15, §8.0 #42) — `readiness.latest_days_ago`, counted against the
+   * athlete's local date. This worked it out here from `new Date().toISOString()`, a UTC date, so a check-in
+   * logged after 5 pm in Los Angeles read "yesterday". No date arithmetic on the phone.
+   */
+  const dayDiff: number | null = Number.isFinite(Number(checkinReadiness.latest_days_ago))
+    ? Number(checkinReadiness.latest_days_ago) : null;
+  const whenLabel = dayDiff == null ? null : dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'yesterday' : `${dayDiff}d ago`;
   const arrow = (k: 'energy' | 'soreness' | 'sleep') => {
     if (checkinReadiness.recent.length < 3) return '';
     const newest = checkinReadiness.recent[0][k];
@@ -33,8 +36,8 @@ export default function StateReadinessRow({ checkinReadiness }: { checkinReadine
         <Chip label="soreness" value={`${L.soreness}${arrow('soreness')}`} />
         <Dot />
         <Chip label="sleep" value={`${L.sleep}${arrow('sleep')}`} />
-        <Dot />
-        <Chip value={whenLabel} valueClass="text-white/65" />
+        {whenLabel && <Dot />}
+        {whenLabel && <Chip value={whenLabel} valueClass="text-white/65" />}
       </Row>
     </div>
   );
