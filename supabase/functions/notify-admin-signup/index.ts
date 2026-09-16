@@ -79,6 +79,15 @@ Deno.serve(async (req) => {
   }
 
   const email = record.email;
+  // Throwaway accounts from scripts/_burner-* — don't spend Resend quota on them.
+  const lower = email.toLowerCase();
+  if (lower.endsWith('@example.com') || lower.startsWith('burner-')) {
+    return new Response(JSON.stringify({ ok: true, skipped: true, reason: 'test_account' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   const name = record.full_name || '(no name)';
   const id = record.id || '?';
   const approved = record.approved;
