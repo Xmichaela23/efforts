@@ -43,6 +43,7 @@ import { buildStrengthSlots } from './strength-slots.ts';
 // same pounds for the done card and the Week row that this contract prints on Performance.
 import { completedStrengthVolume } from '../strength/session-volume.ts';
 
+import { clock, displayFormat, durationClock, M_PER_MI, M_PER_YD, wholeMinutes } from '../display-format.ts';
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
 // headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
 // efficiency-over-time read on the SAME metric State uses. null (< 4 comparable runs) → familiarity only.
@@ -426,46 +427,16 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
    * ⚠️ M:SS IS ROUNDED WHOLE, THEN SPLIT — rounding the remainder alone is what printed "7:60/mi".
    * ──────────────────────────────────────────────────────────────────────────────────────────── */
   const sdMetric = athleteMetricIn === true;
-  const SD_M_PER_MI = 1609.344;   // 1 mi, by definition
-  const SD_KG_PER_LB = 0.45359237; // 1 lb, by definition
-  const sdClock = (sec: number): string => {
-    const v = Math.max(0, Math.round(sec));
-    return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
-  };
+  // The formatters live in `_shared/display-format.ts` (Stage 7 session 1) — one set for every reply.
+  const sdFmt = displayFormat(sdMetric);
+  const sdClock = clock;
   /** H:MM:SS over an hour, M:SS under it — the shape the header line prints. */
-  const sdDuration = (sec: number | null | undefined): string | null => {
-    const v = Number(sec);
-    if (!Number.isFinite(v) || v <= 0) return null;
-    const t = Math.round(v);
-    const h = Math.floor(t / 3600);
-    const m = Math.floor((t % 3600) / 60);
-    const ss = t % 60;
-    return h > 0
-      ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
-      : `${m}:${String(ss).padStart(2, '0')}`;
-  };
+  const sdDuration = durationClock;
   /** Whole minutes — the shape the Duration chip prints. */
-  const sdMinutes = (sec: number | null | undefined): number | null => {
-    const v = Number(sec);
-    return Number.isFinite(v) && v > 0 ? Math.round(v / 60) : null;
-  };
-  /**
-   * A distance as the athlete reads it. ⚠️ A SWIM READS SHORT — yards or metres, never miles — which is
-   * the split the swim card made on the phone with its own 0.9144.
-   */
-  const SD_M_PER_YD = 0.9144;   // 1 yd, by definition
-  const sdDistance = (metres: number | null | undefined, swim = false): string | null => {
-    const v = Number(metres);
-    if (!Number.isFinite(v) || v <= 0) return null;
-    if (swim) return sdMetric ? `${Math.round(v)} m` : `${Math.round(v / SD_M_PER_YD)} yd`;
-    return sdMetric ? `${(v / 1000).toFixed(1)} km` : `${(v / SD_M_PER_MI).toFixed(1)} mi`;
-  };
-  /** A lift is stored in pounds and converts for a metric account by the definition constant (§8.0 #7). */
-  const sdWeight = (lb: number | null | undefined): string | null => {
-    const v = Number(lb);
-    if (!Number.isFinite(v) || v <= 0) return null;
-    return sdMetric ? `${Math.round(v * SD_KG_PER_LB)} kg` : `${Math.round(v)} lb`;
-  };
+  const sdMinutes = wholeMinutes;
+  /** A distance as the athlete reads it. ⚠️ A SWIM READS SHORT — yards or metres, never miles. */
+  const sdDistance = sdFmt.distance;
+  const sdWeight = sdFmt.weight;
   // Q-097/Q-102 phase 2: a 1RM/baseline TEST is measurement, not training. When flagged by the analyzer
   // (top-level or session_state_v1), the Performance screen renders the test-result frame INSTEAD of the
   // training table + execution/volume — so suppress the execution score + training narrative here.
@@ -940,7 +911,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   completedTotals.avg_pace_display = (() => {
     const v = Number(completedTotals.avg_pace_s_per_mi);
     if (!Number.isFinite(v) || v <= 0) return null;
-    return `${sdClock(sdMetric ? v / (SD_M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
+    return `${sdClock(sdMetric ? v / (M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
   })();
   if (type === 'swim') {
     const per100AthleteUnit = swimPacePer100Seconds(swimDurS, swimDistM, sdMetric ? 'm' : 'yd');
@@ -1219,16 +1190,16 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const perMiToUnit = (perMi: number | null | undefined): string | null => {
       const v = Number(perMi);
       if (!Number.isFinite(v) || v <= 0) return null;
-      return `${sdClock(sdMetric ? v / (SD_M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
+      return `${sdClock(sdMetric ? v / (M_PER_MI / 1000) : v)}${sdMetric ? '/km' : '/mi'}`;
     };
     iv.executed.pace_display = perMiToUnit(iv.executed.actual_pace_sec_per_mi);
     iv.executed.gap_display = perMiToUnit(iv.executed.actual_gap_sec_per_mi);
     iv.executed.distance_display = (() => {
       const m = Number(iv.executed.distance_m);
       if (!Number.isFinite(m) || m <= 0) return null;
-      if (type === 'swim') return sdMetric ? `${Math.round(m)} m` : `${Math.round(m / SD_M_PER_YD)} yd`;
+      if (type === 'swim') return sdMetric ? `${Math.round(m)} m` : `${Math.round(m / M_PER_YD)} yd`;
       if (sdMetric) return `${(m / 1000).toFixed(m < 1000 ? 2 : 1)} km`;
-      const mi = m / SD_M_PER_MI;
+      const mi = m / M_PER_MI;
       return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
     })();
   }

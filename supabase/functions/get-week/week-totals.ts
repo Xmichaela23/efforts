@@ -15,6 +15,7 @@
  *   · lifts — counted, not timed: planned lifts, and executed ones.
  * ⚠️ PER SESSION, MINUTES ARE ROUNDED BEFORE THEY ARE ADDED, as the bar did.
  */
+import { clock, displayFormat, durationClock, M_PER_MI, M_PER_YD, type DisplayFormat } from '../_shared/display-format.ts';
 
 // deno-lint-ignore no-explicit-any
 type Item = Record<string, any>;
@@ -26,6 +27,9 @@ export type WeekBarTotals = {
   done_meters: number;
   lifts_planned: number;
   lifts_done: number;
+  /** "18 mi" / "29 km"; null under 0.05 of the unit. */
+  planned_distance_display: string | null;
+  done_distance_display: string | null;
 };
 
 const num = (v: unknown): number => {
@@ -33,8 +37,11 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
-export function weekBarTotals(items: ReadonlyArray<Item> | null | undefined): WeekBarTotals {
-  const out: WeekBarTotals = { planned_minutes: 0, done_minutes: 0, planned_meters: 0, done_meters: 0, lifts_planned: 0, lifts_done: 0 };
+export function weekBarTotals(items: ReadonlyArray<Item> | null | undefined, fmt: DisplayFormat = displayFormat(false)): WeekBarTotals {
+  const out: WeekBarTotals = {
+    planned_minutes: 0, done_minutes: 0, planned_meters: 0, done_meters: 0, lifts_planned: 0, lifts_done: 0,
+    planned_distance_display: null, done_distance_display: null,
+  };
   for (const it of items ?? []) {
     const type = String(it?.type ?? '').toLowerCase();
     const planned = it?.planned && typeof it.planned === 'object' ? it.planned : null;
@@ -51,10 +58,100 @@ export function weekBarTotals(items: ReadonlyArray<Item> | null | undefined): We
     }
     if (done) {
       out.done_minutes += Math.round(num(it?.moving_seconds) / 60);
-      out.done_meters += num(it?.executed?.overall?.distance_m);
+      out.done_meters += doneDistanceMeters(it) ?? 0; // the one distance each row prints
     }
   }
   out.planned_meters = Math.round(out.planned_meters);
   out.done_meters = Math.round(out.done_meters);
+  // ⛔ THE BAR'S DISTANCE, IN THE ATHLETE'S UNIT, PRINTED HERE (2026-09-16, Stage 7 session 1) — the Week tab converted it.
+  out.planned_distance_display = fmt.distanceWhole(out.planned_meters, WEEK_BAR_MIN_DISTANCE_UNITS);
+  out.done_distance_display = fmt.distanceWhole(out.done_meters, WEEK_BAR_MIN_DISTANCE_UNITS);
   return out;
+}
+
+// OURS — the bar hides a distance under 0.05 mi / km so a week with no distance reads no "0 mi"; the Week tab's display rule, no outside source.
+const WEEK_BAR_MIN_DISTANCE_UNITS = 0.05;
+
+const pos = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * ═══ A FINISHED SESSION'S LINES, PRINTED ON THE SERVER (2026-09-16, Stage 7 session 1) ══════════════
+ *
+ * ⛔ THREE SCREENS CONVERTED THESE ON THE PHONE: Today's metric line, the done session card's headline and
+ * the Week row. Each picked its own distance and its own unit maths. The item now carries the words.
+ *   · `done_metrics`  — Today: distance · pace / speed / per-100 · bpm · climb (up to four).
+ *   · `done_distance` — "5.0 mi" (1 dp mi / km); the session card and the Week row.
+ *   · `done_volume`   — a lift's "3,725 lb"; the Week row.
+ *   · `done_headline` — the session card: "5.0 mi · 48:00" or "3,725 lb · 3 lifts".
+ * ⚠️ ONE DISTANCE: `session_detail_v1.completed_totals.distance_m` first (what Performance prints), then
+ * `executed.overall.distance_m` for a session whose detail has not been built.
+ */
+export type DoneLines = {
+  done_metrics: string[];
+  done_distance: string | null;
+  done_volume: string | null;
+  done_headline: string | null;
+};
+
+export function doneDistanceMeters(item: Item): number | null {
+  const totals = item?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
+  return pos(totals?.distance_m) ?? pos(item?.executed?.overall?.distance_m);
+}
+
+export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
+  const none: DoneLines = { done_metrics: [], done_distance: null, done_volume: null, done_headline: null };
+  // ⚠️ NOT GATED ON STATUS: each screen prints these only on a row it shows as done, and the lift's pounds and
+  // the moving time are already gated on `completed` in `unify`.
+  const type = String(item?.type ?? '').toLowerCase();
+
+  if (type === 'strength') {
+    const done_volume = fmt.weightGrouped(item?.strength_volume_lb);
+    const exercises = Array.isArray(item?.executed?.strength_exercises) ? item.executed.strength_exercises : [];
+    const lifts = exercises.filter((ex: Item) => Array.isArray(ex?.sets) && ex.sets.length > 0).length;
+    const parts = [done_volume, lifts > 0 ? `${lifts} ${lifts === 1 ? 'lift' : 'lifts'}` : null].filter(Boolean);
+    return { ...none, done_volume, done_headline: parts.length ? parts.join(' · ') : null };
+  }
+
+  const totals = item?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
+  const overall = item?.executed?.overall ?? {};
+  const distM = doneDistanceMeters(item);
+  const done_distance = fmt.distance(distM);
+  const headParts = [done_distance, durationClock(item?.moving_seconds)].filter(Boolean);
+
+  const durS = pos(totals?.moving_s) ?? pos(item?.moving_seconds);
+  const avgHr = pos(totals?.avg_hr) ?? pos(overall?.avg_hr);
+  const elevM = pos(overall?.elevation_gain_m);
+  const isRun = type === 'run' || type === 'walk';
+  const isRide = type === 'ride' || type === 'bike' || type === 'cycling';
+  const metrics: string[] = [];
+  if (distM != null) metrics.push((type === 'swim' ? fmt.swimDistanceGrouped(distM) : done_distance) as string);
+  if (durS != null && distM != null) {
+    if (isRun) {
+      const paceMi = pos(totals?.avg_pace_s_per_mi);
+      const p = fmt.pacePerUnit(paceMi != null ? paceMi / (M_PER_MI / 1000) : durS / (distM / 1000));
+      if (p) metrics.push(p);
+    } else if (isRide) {
+      const s = fmt.speedFromMpsShort(pos(overall?.avg_speed_mps) ?? distM / durS);
+      if (s) metrics.push(s);
+    } else if (type === 'swim') {
+      // The server's per-100 (built in the athlete's unit) when the detail exists; the division otherwise.
+      const per100 = pos(totals?.swim_pace_per_100_s) ?? durS / ((fmt.metric ? distM : distM / M_PER_YD) / 100);
+      metrics.push(`${clock(per100)} /100${fmt.metric ? 'm' : 'yd'}`);
+    }
+  }
+  if (avgHr != null) metrics.push(`${Math.round(avgHr)} bpm`);
+  if ((isRun || isRide) && elevM != null) {
+    const e = fmt.elevation(elevM);
+    if (e) metrics.push(e);
+  }
+
+  return {
+    done_metrics: metrics.filter(Boolean).slice(0, 4),
+    done_distance,
+    done_volume: null,
+    done_headline: headParts.length ? headParts.join(' · ') : null,
+  };
 }

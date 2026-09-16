@@ -33,3 +33,15 @@ Deno.test('nothing on file: nothing to print', () => {
   assertEquals(zonesForBaselinesRow({}), { power: null, swim_pace: null, run_easy_hr: null });
   assertEquals(zonesForBaselinesRow(null), { power: null, swim_pace: null, run_easy_hr: null });
 });
+
+Deno.test('run threshold proposal: both paces in the athlete unit, and which way it moved', () => {
+  const row = (units: string) => ({
+    units,
+    performance_numbers: { threshold_pace_sec_per_km: 280, threshold_pace_source: 'manual' },
+    learned_fitness: { run_threshold_pace_sec_per_km: { value: 432 / 1.609344, confidence: 'medium' } },
+  });
+  const imp = zonesForBaselinesRow(row('imperial')).readout?.run.threshold_proposal;
+  assertEquals([imp?.measured_display, imp?.applied_display, imp?.faster, imp?.button], ['7:12/mi', '7:31/mi', true, 'use 7:12/mi']);
+  const met = zonesForBaselinesRow(row('metric')).readout?.run.threshold_proposal;
+  assertEquals([met?.measured_display, met?.applied_display, met?.faster], ['4:28/km', '4:40/km', true]);
+});

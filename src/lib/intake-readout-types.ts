@@ -17,6 +17,8 @@ export type IntakeReadout = {
   lifts: Record<IntakeLiftKey, LiftOnFile | null>;
   barbell_lifts_on_file: 'all' | 'some' | 'none';
   strength_default: 'use' | 'test';
+  /** The run threshold on file in the athlete's unit (`7:12/mi` / `4:28/km`); null when none. */
+  run_threshold_display: string | null;
   /** Present only when the request sent `session_frequency`. Keyed by the hours option value. */
   session_frequency_by_tier?: Record<string, { swims: number; bikes: number; runs: number }>;
   /** The three plans' setup rows, defaults, options and wording (`setup-readout.ts`, 2026-09-13). */

@@ -57,7 +57,7 @@
   "truth": {
     "severity": {
       "0": "warn",
-      "1": "warn",
+      "1": "fail",
       "2": "warn",
       "2-ledger": "fail",
       "3": "warn",

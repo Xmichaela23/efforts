@@ -9,6 +9,8 @@ import { SPORT_COLORS } from '@/lib/context-utils';
 export type SegmentEffort = {
   name: string;
   distance?: number;
+  /** 2 dp in the athlete's unit, from the server (display_metrics.segments). */
+  distance_display?: string | null;
   elapsed_time?: number;
   moving_time?: number;
   pr_rank?: number | null;
@@ -27,19 +29,9 @@ export type MapEffortProps = {
   className?: string;
   onMapReady?: () => void;
   // New props for enhancements
-  currentMetric?: { value: string; label: string };
-  currentTime?: string;
   activeMetricTab?: string;
   onRouteClick?: (distance_m: number) => void;
   useMiles?: boolean; // For imperial/metric preference
-  // Thumb scrubbing props
-  discipline?: 'run' | 'bike';
-  currentSpeed?: string;
-  currentPower?: string;
-  currentHR?: string;
-  currentGrade?: string;
-  currentDistance?: string;
-  onScrub?: (distance_m: number) => void;
   // Strava segments
   segments?: SegmentEffort[];
   onSegmentClick?: (segment: SegmentEffort) => void;
@@ -91,19 +83,9 @@ export default function MapEffort({
   height = 160,
   className,
   onMapReady,
-  currentMetric,
-  currentTime,
   activeMetricTab,
   onRouteClick,
   useMiles = true,
-  // Thumb scrubbing props
-  discipline,
-  currentSpeed,
-  currentPower,
-  currentHR,
-  currentGrade,
-  currentDistance,
-  onScrub,
   // Strava segments
   segments,
   onSegmentClick,
@@ -122,7 +104,6 @@ export default function MapEffort({
   const themeAppliedRef = useRef<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [isManualScrubbing, setIsManualScrubbing] = useState(false);
   const zoomingRef = useRef(false); // Flag to block onResize during zoom operation
   const lastCollapsedHeightRef = useRef<number | null>(null);
 
@@ -886,9 +867,6 @@ export default function MapEffort({
     const p = pointAtDistance(coords, lineCum, Math.max(0, Math.min(cursorDist_m, total)));
     src.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: p } } as any);
     
-    // Don't follow cursor during manual scrubbing
-    if (isManualScrubbing) return;
-    
     if (followCursor && fittedRef.current && !expanded) {
       try { 
         map.easeTo({ center: p as any, duration: 250 }); 
@@ -919,75 +897,6 @@ export default function MapEffort({
       }
     }
   }, [cursorDist_m, dTotal, coords, lineCum, followCursor, ready, expanded]);
-
-  // Thumb scrubbing touch handlers (expanded only)
-  useEffect(() => {
-    if (true || !expanded || !onScrub || !coords.length) return;
-
-    let lastTouchY = 0;
-    let isScrubbing = false;
-    let throttleTimeout: NodeJS.Timeout | null = null;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        lastTouchY = e.touches[0].clientY;
-        isScrubbing = true;
-        setIsManualScrubbing(true);
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isScrubbing || e.touches.length !== 1) return;
-      
-      e.preventDefault(); // Prevent page scroll
-      
-      if (throttleTimeout) return; // Throttle to 60fps
-      
-      throttleTimeout = setTimeout(() => {
-        const currentY = e.touches[0].clientY;
-        const deltaY = currentY - lastTouchY;
-        
-        // Map vertical movement to distance along route
-        const totalDistance = dTotal || 1;
-        const sensitivity = 0.5; // Adjust for feel
-        const distanceDelta = deltaY * sensitivity;
-        
-        // Calculate new distance (clamp to route bounds)
-        const newDistance = Math.max(0, Math.min(totalDistance, cursorDist_m + distanceDelta));
-        
-        onScrub(newDistance);
-        lastTouchY = currentY;
-        throttleTimeout = null;
-      }, 16); // 60fps
-    };
-
-    const handleTouchEnd = () => {
-      isScrubbing = false;
-      setIsManualScrubbing(false);
-      if (throttleTimeout) {
-        clearTimeout(throttleTimeout);
-        throttleTimeout = null;
-      }
-    };
-
-    const mapContainer = divRef.current;
-    if (mapContainer) {
-      mapContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-      mapContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-      mapContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
-    }
-
-    return () => {
-      if (mapContainer) {
-        mapContainer.removeEventListener('touchstart', handleTouchStart);
-        mapContainer.removeEventListener('touchmove', handleTouchMove);
-        mapContainer.removeEventListener('touchend', handleTouchEnd);
-      }
-      if (throttleTimeout) {
-        clearTimeout(throttleTimeout);
-      }
-    };
-  }, [expanded, onScrub, coords.length, dTotal, cursorDist_m]);
 
   // Theme switching only when `theme` changes — not on coords/ready (those used to retrigger setStyle and flash the map).
   useEffect(() => {
@@ -1182,8 +1091,9 @@ export default function MapEffort({
               <div>
                 <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', marginBottom: 2 }}>Distance</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>
+                  {/* ⛔ The server's length, in the athlete's unit (2026-09-16, Stage 7 session 1) — this printed miles on every account. */}
                   {hoveredSegment.segment.distance 
-                    ? `${(hoveredSegment.segment.distance / 1609.34).toFixed(2)} mi`
+                    ? (hoveredSegment.segment.distance_display ?? '--')
                     : '--'}
                 </div>
               </div>
@@ -1219,90 +1129,6 @@ export default function MapEffort({
           </div>
         )}
         
-        {/* Enhancement 4: Metrics card - Only show when expanded */}
-        {false && expanded && coords.length > 1 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 20, // Position at top-left to avoid thumb
-              left: 10,
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(8px)',
-              border: '1px solid #e5e7eb',
-              borderRadius: 8,
-              padding: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              fontSize: 12,
-              fontWeight: 500,
-              color: '#1f2937',
-              zIndex: 10,
-              minWidth: 140
-            }}
-          >
-            {discipline === 'run' ? (
-              // Run layout: Speed (large) + HR + Grade (grid) + Distance
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937' }}>
-                  {currentSpeed || '--'}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>HR</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentHR || '--'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>Grade</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentGrade || '--'}</div>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>Distance</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentDistance || '--'}</div>
-                </div>
-              </div>
-            ) : discipline === 'bike' ? (
-              // Bike layout: Speed (large) + Power + HR (grid) + Grade (full-width) + Distance
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937' }}>
-                  {currentSpeed || '--'}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>Power</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentPower || '--'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>HR</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentHR || '--'}</div>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>Grade</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentGrade || '--'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>Distance</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{currentDistance || '--'}</div>
-                </div>
-              </div>
-            ) : (
-              // Fallback: show current metric if no discipline specified
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#FF5722' }}>
-                  {currentMetric?.value || '--'}
-                </div>
-                <div style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase' }}>
-                  {currentMetric?.label || '--'}
-                </div>
-                {currentTime && (
-                  <div style={{ fontSize: 11, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 4, marginTop: 2 }}>
-                    {currentTime}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
       
       {/* Close button - LOWERED for mobile */}

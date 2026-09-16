@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
-import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
+import { displayDisciplineOf } from '@/lib/utils';
 import { extractSessionDetailV1FromWorkout } from '@/hooks/useWorkoutDetail';
 import AdherenceChips from './AdherenceChips';
 import { ProviderAttributionLine } from './ProviderAttribution';
@@ -494,43 +494,14 @@ const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSPrope
 });
 
 /** `5.0 mi · 48:00` for a run or ride; `3,725 lb · 3 lifts` for a lift session. */
-export function doneHeadline(workout: Record<string, unknown>, useImperial: boolean): string | null {
+export function doneHeadline(workout: Record<string, unknown>): string | null {
   /**
-   * ⛔ BOTH NUMBERS ARE THE SERVER'S (2026-09-10, audit H-D10 / H-T04).
-   *   · The weight moved is `strength_volume_lb`. This summed reps × weight here and skipped every 0 lb
-   *     set, so a chin-up, a band or an empty bar counted nothing on the card and something on the
-   *     Performance tab for the same session.
-   *   · The time is `moving_seconds`. It was the phone's moving-time resolver with the Performance
-   *     payload's `completed_totals.duration_s` behind it — two readers, one number. A row the server
-   *     sent no time for prints none.
+   * ⛔ THE HEADLINE IS THE SERVER'S (2026-09-16, Stage 7 session 1) — get-week's `done_headline`, in the athlete's
+   * unit: the weight moved (`strength_volume_lb`) and the lift count, or the distance and the moving time. The
+   * pound-to-kilogram and kilometre-to-mile conversions that lived here are deleted.
    */
-  const parts: string[] = [];
-  if (String(workout?.type ?? '').toLowerCase() === 'strength') {
-    const exercises = Array.isArray((workout as { executed?: { strength_exercises?: unknown } })?.executed?.strength_exercises)
-      ? ((workout as { executed: { strength_exercises: Array<{ sets?: unknown[] }> } }).executed.strength_exercises)
-      : Array.isArray(workout?.strength_exercises)
-        ? (workout.strength_exercises as Array<{ sets?: unknown[] }>)
-        : [];
-    const volume = Number(workout?.strength_volume_lb) || 0;
-    const lifts = exercises.filter((ex) => Array.isArray(ex?.sets) && ex.sets.length > 0).length;
-    if (volume > 0) parts.push(`${Math.round(useImperial ? volume : volume * 0.453592).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);
-    if (lifts > 0) parts.push(`${lifts} ${lifts === 1 ? 'lift' : 'lifts'}`);
-    return parts.length ? parts.join(' · ') : null;
-  }
-
-  const km = normalizeDistanceKm(workout as never);
-  if (km != null && Number.isFinite(km) && km > 0) {
-    parts.push(useImperial ? `${(km * 0.621371).toFixed(1)} mi` : `${km.toFixed(1)} km`);
-  }
-  const secs = Number(workout?.moving_seconds);
-  if (Number.isFinite(secs) && secs > 0) {
-    const s = Math.round(secs);
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const ss = s % 60;
-    parts.push(h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`);
-  }
-  return parts.length ? parts.join(' · ') : null;
+  const h = workout?.done_headline;
+  return typeof h === 'string' && h ? h : null;
 }
 
 /**
@@ -558,7 +529,8 @@ export const CompletedSessionCard: React.FC<{
   const sport = displayDisciplineOf(workout as never);
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
-  const headline = doneHeadline(workout, useImperial);
+  const headline = doneHeadline(workout);
+  void useImperial; // the headline arrives in the athlete's unit (2026-09-16, Stage 7 session 1)
 
   const sd = extractSessionDetailV1FromWorkout(workout) as Parameters<typeof AdherenceChips>[0]['sessionDetail'];
   /* ⚠️ THE SAME GATE THE PERFORMANCE TAB APPLIES. `noPlannedCompare` is what turns the tiles off for

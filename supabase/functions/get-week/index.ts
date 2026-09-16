@@ -41,7 +41,8 @@ import { completedStrengthVolume, isPerformedSet } from '../_shared/strength/ses
 import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE "WAS IT DONE" AND THE WEEK BAR'S TOTALS (2026-09-10, audit H-T10 / H-T03).
 import { isExecutedWorkout } from '../_shared/is-executed.ts';
-import { weekBarTotals } from './week-totals.ts';
+import { doneLines, weekBarTotals } from './week-totals.ts';
+import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -484,10 +485,13 @@ Deno.serve(async (req)=>{
      * the athlete adds by hand has no plan step to carry a unit, and the logger's boxes are typed in this one.
      */
     let liftUnit = null;
+    // ⛔ THE ATHLETE'S DISTANCE UNIT, FOR THE WORDS EACH ROW AND THE WEEK BAR PRINT (2026-09-16, Stage 7 session 1).
+    let fmt = displayFormat(false);
     try {
       const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, weight, units').eq('user_id', userId).maybeSingle();
       bodyweightLb = resolveBodyweightLb(baselines);
       liftUnit = baselines?.units === 'metric' ? 'kg' : 'lb';
+      fmt = displayFormat(baselines?.units === 'metric');
       // FTP via the resolver (learned-first) so week-view power ranges match every other surface — was
       // manual-only `performance_numbers.ftp` (CAPABILITY-MAP straggler).
       userFtp = resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers }).value;
@@ -964,6 +968,8 @@ Deno.serve(async (req)=>{
         ? executed.strength_exercises.reduce((n: number, ex: any) =>
           n + (Array.isArray(ex?.sets) ? ex.sets.filter((s: any) => isPerformedSet(s) && (Number(s?.reps) || 0) > 0).length : 0), 0)
         : null;
+      // ⛔ THE FINISHED SESSION'S WORDS, IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 1) — see `doneLines`.
+      const lines = doneLines({ type, status, executed, moving_seconds: movingSeconds, strength_volume_lb: strengthVolumeLb, workout_analysis: w?.workout_analysis ?? null }, fmt);
       return {
         id: w.id,
         date,
@@ -974,6 +980,7 @@ Deno.serve(async (req)=>{
         moving_seconds: movingSeconds,
         strength_volume_lb: strengthVolumeLb,
         strength_sets_completed: strengthSetsCompleted,
+        ...lines,
         // ⛔ THE ONE "WAS THIS DONE" (audit H-T10) — the drawer's rule, run here on the stored row.
         is_executed: isExecutedWorkout({ ...w, workout_status: w?.workout_status || status }),
         planned_id: w.planned_id || null,
@@ -1712,6 +1719,10 @@ Deno.serve(async (req)=>{
         moving_seconds: item.moving_seconds ?? null,
         strength_volume_lb: item.strength_volume_lb ?? null,
         strength_sets_completed: item.strength_sets_completed ?? null,
+        done_metrics: item.done_metrics ?? [],
+        done_distance: item.done_distance ?? null,
+        done_volume: item.done_volume ?? null,
+        done_headline: item.done_headline ?? null,
         is_executed: item.is_executed === true,
         day_order: item.day_order ?? null,
       };
@@ -1739,8 +1750,8 @@ Deno.serve(async (req)=>{
         // `strength_volume_lb`, so Today's week line adds up the numbers its cards print.
         strength_volume_lb: itemsWithAI.reduce((s, it) => s + (typeof it?.strength_volume_lb === 'number' ? it.strength_volume_lb : 0), 0),
         // ⛔ THE WEEK BAR (audit H-T03): planned_minutes, done_minutes, planned_meters, done_meters,
-        // lifts_planned, lifts_done — see week-totals.ts for what each counts.
-        ...weekBarTotals(itemsWithAI),
+        // lifts_planned, lifts_done, planned_distance_display, done_distance_display — see week-totals.ts.
+        ...weekBarTotals(itemsWithAI, fmt),
         distances: {
           run_meters: runMeters,
           swim_meters: swimMeters,

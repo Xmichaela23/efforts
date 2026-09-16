@@ -63,7 +63,7 @@ export type StepKey =
   | 'level' | 'intent'
   | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
-  | 'days' | 'accessory' | 'run' | 'bike' | 'swim'
+  | 'days' | 'accessory' | 'swim'
   /**
    * ⛔ THE ENDURANCE WEEK — ONE SCREEN, REPLACING `volume` + `hardday` ON THE STRENGTH PATH
    * (Michael's flow, 2026-08-24). Those two asked one question in two places: how much, then how
@@ -163,10 +163,10 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
     // on p278 that is the Day 1 focused pull + focused push and the Day 2 accessory lower lift.
     if (strengthDevelop) out.push('accessory');
     out.push('schedule');
-  } else {
-    if (kept('run')) out.push('run');
-    if (kept('bike')) out.push('bike');
   }
+  // ⛔ The `run` and `bike` screens for other goals are gone (2026-09-16, Stage 7 session 1): every live
+  // route is `get_stronger` or `marathon`, the race flow is declared whole in `getSteps`, so no route
+  // reached them.
   // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
   // ⛔ UNGATED FOR A RACE GOAL (2026-08-04). The condition was `strengthDevelop && swim === 'maintain'`,
   // so on a marathon block the athlete could opt the swim IN on the posture card and then never be

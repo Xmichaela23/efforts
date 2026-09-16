@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { MobileHeader } from './MobileHeader';
 import { SPORT_COLORS } from '@/lib/context-utils';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import { useVisualViewportKeyboardInset } from '@/hooks/useVisualViewportKeyboardInset';
 
 // Icons for gear types
@@ -38,6 +38,8 @@ interface GearItem {
   total_distance: number;
   retired: boolean;
   notes?: string;
+  /** Whole miles / km in the athlete's unit, from `gear-list`. */
+  distance_whole_display?: string;
 }
 
 interface GearProps {
@@ -175,15 +177,9 @@ export default function Gear({ onClose }: GearProps) {
   const loadGear = async () => {
     try {
       setLoading(true);
-      const userId = getStoredUserId();
-      if (!userId) return;
-
-      const { data, error } = await supabase
-        .from('gear')
-        .select('*')
-        .eq('user_id', userId)
-        .order('is_default', { ascending: false })
-        .order('name');
+      // ⛔ The list comes from `gear-list` with each distance already in the athlete's unit
+      // (2026-09-16, Stage 7 session 1); the writes below still go to the table directly.
+      const { data, error } = await invokeFunction<{ gear: GearItem[] }>('gear-list', {});
 
       if (error) {
         console.error('Error loading gear:', error);
@@ -193,7 +189,7 @@ export default function Gear({ onClose }: GearProps) {
         return;
       }
 
-      const gearItems = (data || []) as GearItem[];
+      const gearItems = data?.gear ?? [];
       setShoes(gearItems.filter(g => g.type === 'shoe' && !g.retired));
       setBikes(gearItems.filter(g => g.type === 'bike' && !g.retired));
     } catch (e) {
@@ -239,11 +235,8 @@ export default function Gear({ onClose }: GearProps) {
         return;
       }
 
-      if (activeTab === 'shoes') {
-        setShoes([...shoes, data as GearItem]);
-      } else {
-        setBikes([...bikes, data as GearItem]);
-      }
+      // The new row's distance line is written by `gear-list`, so the list is read again rather than appended.
+      await loadGear();
 
       setNewGear({ name: '', brand: '', model: '', purchase_date: '', starting_miles: '', notes: '' });
       setShowAddForm(false);
@@ -300,11 +293,6 @@ export default function Gear({ onClose }: GearProps) {
     } catch (e) {
       console.error('Error retiring gear:', e);
     }
-  };
-
-  const formatDistance = (meters: number) => {
-    const miles = meters / 1609.34;
-    return `${miles.toFixed(0)} mi`;
   };
 
   const getGearColor = () => activeTab === 'shoes' ? SPORT_COLORS.run : SPORT_COLORS.cycling;
@@ -453,7 +441,7 @@ export default function Gear({ onClose }: GearProps) {
                             )}
                             <div className="flex items-center gap-4 mt-2">
                               <span className="text-sm" style={{ color: getGearColor() }}>
-                                {formatDistance(item.total_distance)}
+                                {item.distance_whole_display}
                               </span>
                               {item.total_distance > (activeTab === 'shoes' ? 643738 : 8046720) && (
                                 <span className="flex items-center gap-1 text-xs text-amber-400">

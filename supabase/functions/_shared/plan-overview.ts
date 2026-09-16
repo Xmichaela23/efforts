@@ -163,6 +163,9 @@ export function planListFields(plan: PlanRowLike, asOfIso: string) {
     progress_pct: planProgressPct(current, total),
     starts_on: planStartsOn(plan),
     has_started: planHasStarted(plan?.config ?? {}, asOfIso),
+    // ⛔ An ended plan's "Ended · Week N" is the server's: the week it ended on, else the week it is
+    // in, else week 1. Past Plans worked this out itself (2026-09-16, Stage 7 session 1).
+    weeks_completed: plan?.config?.tombstone?.weeks_completed ?? current ?? 1,
   };
 }
 

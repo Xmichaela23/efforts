@@ -55,6 +55,7 @@ import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
+import { clock, displayFormat } from '../_shared/display-format.ts';
 import {
   buildArcPerformanceBridge,
   ARC_PERFORMANCE_BRIDGE_VERSION,
@@ -2065,38 +2066,13 @@ Deno.serve(async (req) => {
      * ⚠️ NOTHING HERE IS A NEW MEASUREMENT — each line is the athlete's unit and the athlete's words
      * over a number this function already had.
      * ──────────────────────────────────────────────────────────────────────────────────────────── */
-    const DM_M_PER_MI = 1609.344;   // 1 mi, by definition
-    const DM_M_PER_YD = 0.9144;     // 1 yd, by definition
-    const DM_FT_PER_M = 3.280839895;
-    /** M:SS from seconds. ⛔ The whole figure is rounded ONCE, then split — rounding the remainder on
-     *  its own is what printed "7:60/mi" (§8.0 #2). Same rule as the one pace formatter. */
-    const dmClock = (sec: number): string => {
-      const v = Math.max(0, Math.round(sec));
-      return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
-    };
-    const dmPacePerUnit = (secPerKm: number | null | undefined): string | null => {
-      const v = Number(secPerKm);
-      if (!Number.isFinite(v) || v <= 0) return null;
-      return `${dmClock(dmMetric ? v : v * (DM_M_PER_MI / 1000))}${dmMetric ? '/km' : '/mi'}`;
-    };
-    const dmSpeed = (secPerKm: number | null | undefined): string | null => {
-      const v = Number(secPerKm);
-      if (!Number.isFinite(v) || v <= 0) return null;
-      const kmh = 3600 / v;
-      return dmMetric ? `${kmh.toFixed(1)} km/h` : `${(kmh * (1000 / DM_M_PER_MI)).toFixed(1)} mph`;
-    };
-    const dmDistance = (metres: number | null | undefined): string | null => {
-      const v = Number(metres);
-      if (!Number.isFinite(v) || v <= 0) return null;
-      if (dmMetric) return `${(v / 1000).toFixed(1)} km`;
-      const mi = v / DM_M_PER_MI;
-      return mi < 1 ? `${Math.round(v / DM_M_PER_YD)} yd` : `${mi.toFixed(1)} mi`;
-    };
-    const dmElevation = (metres: number | null | undefined): string | null => {
-      const v = Number(metres);
-      if (!Number.isFinite(v)) return null;
-      return dmMetric ? `${Math.round(v)} m` : `${Math.round(v * DM_FT_PER_M)} ft`;
-    };
+    // The formatters live in `_shared/display-format.ts` (Stage 7 session 1) — one set for every reply.
+    const dmFmt = displayFormat(dmMetric);
+    const dmClock = clock;
+    const dmPacePerUnit = dmFmt.pacePerUnit;
+    const dmSpeed = dmFmt.speed;
+    const dmDistance = dmFmt.distanceDetail;
+    const dmElevation = dmFmt.elevation;
 
     // ── the swim pace, in the athlete's unit, with its label attached (§8.0 A4) ──────────────────
     // ⛔ ONE FIELD FOR BOTH TABS. Performance computed its per-100 in the PLAN's unit and labelled it
@@ -2197,11 +2173,61 @@ Deno.serve(async (req) => {
       return { line1: `${Math.round(avg)}°F (representative)`, line2: tail || null };
     })();
 
+    // ── the chart's readouts while dragging ──────────────────────────────────────────────────────
+    // ⛔ THE MAP'S DRAG READOUTS ARE WRITTEN HERE (2026-09-16, Stage 7 session 1). The chart converted
+    // distance, pace, altitude, VAM and the running climb into miles and feet itself, at the cursor. Each
+    // array below is index-aligned with `series` (same length as `series.distance_m`), in the athlete's
+    // unit, rounded as the chart printed it: distance 1 dp mi / 2 dp km, pace whole seconds, the rest whole.
+    // The chart keeps plotting `series` in metres; these are only what it prints.
+    const series_display = (() => {
+      const sr = series as Record<string, unknown> | null;
+      const arr = (k: string): unknown[] => (Array.isArray(sr?.[k]) ? sr![k] as unknown[] : []);
+      const dist = arr('distance_m');
+      if (dist.length === 0) return null;
+      const finite = (v: unknown): number | null => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+      // An empty line stays empty; a point with no value is null.
+      const perPoint = (k: string, f: (v: number) => number | null): (number | null)[] => {
+        const a = arr(k);
+        if (a.length === 0) return [];
+        return dist.map((_, i) => { const v = finite(a[i]); return v == null ? null : f(v); });
+      };
+      // The distance never steps back: the chart's running maximum, which is what its cursor read.
+      let runMax = finite(dist[0]) ?? 0;
+      const distance = dist.map((v) => {
+        runMax = Math.max(runMax, finite(v) ?? 0);
+        return dmFmt.distanceNumber(runMax, dmMetric ? 2 : 1) as number;
+      });
+      const elevLine = arr('elevation_m');
+      return {
+        distance,
+        pace_s: perPoint('pace_display_s_per_km', (v) => dmFmt.paceSecondsPerUnit(v)),
+        // A point with no altitude read "0" on the chart, and still does.
+        elevation: dist.map((_, i) => dmFmt.elevationNumber(finite(elevLine[i]) ?? 0) as number),
+        vam: perPoint('vam_m_per_h', (v) => dmFmt.elevationNumber(v)),
+        gain: perPoint('elevation_gain_cum_m', (v) => dmFmt.elevationNumber(v)),
+        loss: perPoint('elevation_loss_cum_m', (v) => dmFmt.elevationNumber(v)),
+        units: {
+          distance: dmFmt.distanceUnit,
+          distance_dp: dmMetric ? 2 : 1,
+          elevation: dmFmt.elevationUnit,
+          vam: dmMetric ? 'm/h' : 'ft/h',
+          pace: dmMetric ? '/km' : '/mi',
+        },
+      };
+    })();
+    // The VAM pill's "(avg)": `computed.overall.avg_vam` (m/h) in the athlete's unit, whole.
+    const _avgVam = d?.computed?.overall?.avg_vam;
+    const avg_vam_display = _avgVam != null && Number.isFinite(Number(_avgVam)) ? dmFmt.elevationNumber(_avgVam) : null;
+
     (detail as any).display_metrics = { gap_pace_s_per_km,
       // ⛔ EVERY LINE BELOW IS ALREADY IN THE ATHLETE'S UNIT (2026-09-16) — the screen prints them.
       unit_system: dmMetric ? 'metric' : 'imperial',
       distance_display: dmDistance(distM),
-      elevation_display: dmElevation(elevation_gain_m),
+      // The ride tile's shape: 1 dp mi / km, never yards (Stage 7 — the tile's wording is kept).
+      distance_tile_display: dmFmt.distance(distM),
+      // No climb reads "N/A" on the tile, so a zero or missing gain sends nothing.
+      elevation_display: Number(elevation_gain_m) > 0 ? dmElevation(elevation_gain_m) : null,
+      max_speed_display: dmFmt.speedFromMps(max_speed_mps),
       avg_pace_display: dmPacePerUnit(avg_pace_s_per_km),
       gap_pace_display: dmPacePerUnit(gap_pace_s_per_km),
       max_pace_display: dmPacePerUnit(max_pace_s_per_km),
@@ -2242,12 +2268,18 @@ Deno.serve(async (req) => {
         const OVERALL_RANK_SHOWN_THROUGH = 10;
         return {
           pr_count: efforts.filter((e) => Number(e?.pr_rank) === 1).length,
-          efforts: efforts.map((e) => ({
-            ...e,
-            show_overall_rank: Number(e?.kom_rank) > 0 && Number(e?.kom_rank) <= OVERALL_RANK_SHOWN_THROUGH,
-          })),
+          efforts: efforts.map((e) => {
+            // ⛔ THE SEGMENT'S LENGTH, 2 dp in the athlete's unit (2026-09-16, Stage 7 session 1) — the PR card,
+            // the popup and the map's tooltip each divided metres themselves.
+            const segM = e?.distance != null && Number.isFinite(Number(e.distance)) ? Number(e.distance) : null;
+            return {
+              ...e,
+              show_overall_rank: Number(e?.kom_rank) > 0 && Number(e?.kom_rank) <= OVERALL_RANK_SHOWN_THROUGH,
+              distance_display: segM == null ? null : `${(dmFmt.distanceNumber(segM, 2) as number).toFixed(2)} ${dmFmt.distanceUnit}`,
+            };
+          }),
         };
-      })(), distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
+      })(), distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series, series_display, avg_vam_display };
 
     if (scope === 'workout') {
       return new Response(JSON.stringify({

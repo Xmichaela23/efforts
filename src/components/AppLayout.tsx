@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Calendar } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
-import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 // Home's two tabs (work order 2026-09-09 §1): Today opens; Week is the calendar behind a tab.
@@ -14,7 +13,6 @@ import StrengthLogger from './StrengthLogger';
 import PilatesYogaLogger from './PilatesYogaLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
-import WorkoutSummary from './WorkoutSummary';
 import ContextTabs from './ContextTabs';
 import ManualEntry, { type ManualEntryType } from './ManualEntry';
 import GoalsScreen from './GoalsScreen';
@@ -226,6 +224,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     existingRpe?: number | null;
     /** The server's answer: ask the talk test (planned easy or long run). */
     talkTest?: boolean;
+    /** check-feedback-needed's distance line, already in the athlete's unit. */
+    distanceDisplay?: string | null;
   } | null>(null);
   // D-162: post-workout feedback now covers swims (feel/RPE + pool length + equipment), not just run/ride.
   const isFeedbackType = (t: unknown) => ['run', 'ride', 'swim'].includes(String(t || '').toLowerCase());
@@ -434,6 +434,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           existingGearId: workout.existing_gear_id || null,
           existingRpe: workout.existing_rpe || null,
           talkTest: data?.talk_test === true,
+          distanceDisplay: workout.distance_display ?? null,
         });
       }
     } catch (e) {
@@ -488,6 +489,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         existingGearId: w.existing_gear_id || null,
         existingRpe: w.existing_rpe || null,
         talkTest: data?.talk_test === true,
+        distanceDisplay: w.distance_display ?? null,
       });
     } catch (e) {
       console.warn('[AppLayout] check-feedback-needed for one workout failed:', e);
@@ -1832,6 +1834,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             existingGearId={feedbackWorkout.existingGearId}
             existingRpe={feedbackWorkout.existingRpe}
             talkTest={feedbackWorkout.talkTest === true}
+            distanceDisplay={feedbackWorkout.distanceDisplay ?? null}
             mode="popup"
           onAddGear={() => {
             // Open gear management, temporarily hide feedback popup

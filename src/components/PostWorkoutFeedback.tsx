@@ -12,9 +12,8 @@ import MapEffort from './MapEffort';
 import SorenessScale from './SorenessScale';
 import { readinessSorenessPatch } from '@/utils/workoutMetadata';
 import { pendingFtpProposal } from '@/lib/resolve-current-ftp';
-import { pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { formatPace } from '@/utils/workoutFormatting';
+import { localToday } from '@/hooks/useBaselineZones';
 import {
   Select,
   SelectContent,
@@ -66,6 +65,8 @@ interface PostWorkoutFeedbackProps {
   existingFeeling?: string | null;
   /** Ask the book's talk test (the server's answer: a planned easy or long run). */
   talkTest?: boolean;
+  /** The distance under the title, from check-feedback-needed, already in the athlete's unit. */
+  distanceDisplay?: string | null;
   // Callbacks
   onSave?: (data: { gear_id?: string; rpe?: number; feeling?: string }) => void;
   onClose?: () => void;
@@ -91,6 +92,7 @@ export default function PostWorkoutFeedback({
   existingGearId,
   existingRpe,
   talkTest = false,
+  distanceDisplay = null,
   existingFeeling,
   onSave,
   onClose,
@@ -110,9 +112,11 @@ export default function PostWorkoutFeedback({
   // accept is the same call Training Baselines and the Adjust tab make (the shown number to save-baselines, which
   // saves the accept; then the unstarted endurance rows re-price). Nothing is applied on its own.
   const [ftpProposal, setFtpProposal] = useState<{ measured: number; applied: number } | null>(null);
-  const [thrProposal, setThrProposal] = useState<{ measuredSecPerKm: number; measuredSecPerMi: number; appliedSecPerMi: number } | null>(null);
-  // ⛔ THE ONE PACE FORMATTER (2026-09-15, §8.0 #2). This rounded the seconds on their own and printed "7:60/mi".
-  const fmtMi = (secPerMi: number) => formatPace(secPerMi / 1.60934, true);
+  // ⛔ The threshold proposal is save-baselines' `run.threshold_proposal`, both paces already in the athlete's
+  // unit. This converted and formatted them itself, always per mile (2026-09-16, Stage 7 session 1).
+  const [thrProposal, setThrProposal] = useState<{
+    button: string; accept_value: number; measured_display: string; applied_display: string; faster: boolean;
+  } | null>(null);
   const [ftpAccepting, setFtpAccepting] = useState(false);
   const [ftpNote, setFtpNote] = useState<string | null>(null);
   useEffect(() => {
@@ -121,17 +125,19 @@ export default function PostWorkoutFeedback({
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
       try { await supabase.functions.invoke('learn-fitness-profile', { body: { user_id: uid } }); } catch { /* proposal reads whatever is on file */ }
+      if (workoutType === 'run') {
+        const { data, error } = await supabase.functions.invoke('save-baselines', { body: { zones: true, today: localToday() } });
+        if (cancelled || error || !data?.success) return;
+        const prop = data?.zones?.readout?.run?.threshold_proposal;
+        setThrProposal(prop && prop.measured_display ? prop : null);
+        return;
+      }
       const { data: row } = await supabase.from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', uid).maybeSingle();
       if (cancelled || !row) return;
       const lf = typeof row.learned_fitness === 'string' ? JSON.parse(row.learned_fitness) : row.learned_fitness;
       const pn = typeof row.performance_numbers === 'string' ? JSON.parse(row.performance_numbers) : row.performance_numbers;
-      if (workoutType === 'ride') {
-        const prop = pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any);
-        setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
-      } else {
-        const prop = pendingRunThresholdProposal({ learned_fitness: lf, performance_numbers: pn } as any);
-        setThrProposal(prop ? { measuredSecPerKm: prop.measuredSecPerKm, measuredSecPerMi: prop.measuredSecPerKm * 1.609344, appliedSecPerMi: prop.appliedSecPerKm * 1.609344 } : null);
-      }
+      const prop = pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any);
+      setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
     })();
     return () => { cancelled = true; };
   }, [workoutId, workoutType]);
@@ -143,9 +149,9 @@ export default function PostWorkoutFeedback({
         // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and clears a manual
         // choice (2026-09-10). This wrote learned_fitness and the flag itself.
         if (!thrProposal) return;
-        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.measuredSecPerKm);
+        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.accept_value);
         if (!res.ok) throw new Error(res.error);
-        let note = `${fmtMi(res.acceptedValue * 1.609344)} in use.`;
+        let note = `${thrProposal.measured_display} in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} updated.`; } } catch { /* the accept stands */ }
         setFtpNote(note); setThrProposal(null);
       } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] threshold accept failed:', e); }
@@ -504,18 +510,6 @@ export default function PostWorkoutFeedback({
     onClose?.();
   };
 
-  // Format distance for display
-  const formatDistance = (distanceKm: number | null | undefined): string | null => {
-    if (!distanceKm || !Number.isFinite(distanceKm)) return null;
-    const km = Number(distanceKm);
-    if (useImperial) {
-      const miles = km / 1.60934;
-      return miles >= 0.1 ? `${miles.toFixed(1)} mi` : `${Math.round(km * 1000)} m`;
-    } else {
-      return km >= 1 ? `${km.toFixed(1)} km` : `${Math.round(km * 1000)} m`;
-    }
-  };
-
   // Parse GPS track for map
   const getGpsTrack = (): [number, number][] => {
     if (!workoutData?.gps_track) return [];
@@ -573,7 +567,9 @@ export default function PostWorkoutFeedback({
     }
   };
 
-  const distanceText = formatDistance(workoutData?.distance);
+  // ⛔ The distance line is check-feedback-needed's `distance_display`; this converted it itself
+  // (2026-09-16, Stage 7 session 1).
+  const distanceText = distanceDisplay;
   const dateText = formatDate(workoutData?.date);
   console.log('📅 [PostWorkoutFeedback] Date formatting:', { 
     rawDate: workoutData?.date, 
@@ -647,11 +643,11 @@ export default function PostWorkoutFeedback({
           {thrProposal ? (
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[15px] text-white/95">Your runs now measure {fmtMi(thrProposal.measuredSecPerMi)} at threshold</div>
-                <div className="text-[12px] text-white/60">{thrProposal.measuredSecPerMi < thrProposal.appliedSecPerMi ? 'Faster' : 'Slower'} than the {fmtMi(thrProposal.appliedSecPerMi)} in use. Nothing changes until you take it.</div>
+                <div className="text-[15px] text-white/95">Your runs now measure {thrProposal.measured_display} at threshold</div>
+                <div className="text-[12px] text-white/60">{thrProposal.faster ? 'Faster' : 'Slower'} than the {thrProposal.applied_display} in use. Nothing changes until you take it.</div>
               </div>
               <button type="button" disabled={ftpAccepting} onClick={acceptThr} className="shrink-0 text-[13px] px-3 py-1.5 rounded-xl border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.run}99`, color: SPORT_COLORS.run }}>
-                {ftpAccepting ? 'Applying…' : `use ${fmtMi(thrProposal.measuredSecPerMi)}`}
+                {ftpAccepting ? 'Applying…' : thrProposal.button}
               </button>
             </div>
           ) : ftpProposal ? (

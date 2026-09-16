@@ -292,11 +292,13 @@ export default function StateTab({
     }
   ).plan;
   const activePlans = planRoot?.active_plans;
+  /* parked: race step, WORKORDER §3a */
   const planWizardDistance =
     (activePlanId && activePlans?.find(p => p.plan_id === activePlanId)?.distance) ??
     activePlans?.find(p => p.is_primary)?.distance ??
     activePlans?.[0]?.distance ??
     null;
+  /* parked: race step, WORKORDER §3a */
   const planWizardTargetSeconds =
     (activePlanId && activePlans?.find(p => p.plan_id === activePlanId)?.plan_target_finish_seconds) ??
     activePlans?.find(p => p.is_primary)?.plan_target_finish_seconds ??

@@ -1991,8 +1991,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           {completedPlans.map((plan: any) => {
             const isEnded = plan.status === 'ended';
             const tombstone = plan.config?.tombstone;
-            const weeksCompleted = tombstone?.weeks_completed ?? plan.currentWeek ?? 1;
-            const totalWeeks = plan.duration_weeks || plan.config?.duration_weeks || 0;
+            // ⛔ The ended week and the plan's length are plan-overview's `weeks_completed` / `total_weeks`;
+            // this worked them out itself (2026-09-16, Stage 7 session 1).
+            const weeksCompleted = plan.weeks_completed;
+            const totalWeeks = plan.total_weeks ?? 0;
             return (
               <div key={plan.id} className="p-4 bg-white/[0.05] rounded-xl border border-white/15">
                 <div className="flex items-start justify-between gap-3">

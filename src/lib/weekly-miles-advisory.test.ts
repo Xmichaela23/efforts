@@ -55,7 +55,9 @@ Deno.test('the notice is still rendered — warn-no-wall is not the same as drop
   // It must still say the number, the risk, and that carrying on is allowed.
   assert(/injury risk/.test(SRC), 'the notice no longer names the injury risk');
   assert(/milesFloorDisplay/.test(SRC), 'the notice no longer names the floor');
-  assert(/this is a note, not a stop/.test(SRC), 'the notice no longer tells the athlete they may proceed');
+  // ⛔ The run step that said "this is a note, not a stop" was on no route and came out (2026-09-16, Stage 7
+  // session 1). The live notice on the race level card says the plan opens near the floor either way.
+  assert(/either way/.test(SRC), 'the notice no longer tells the athlete they may proceed');
 });
 
 Deno.test('⛔ the TIMELINE gate stays hard — it is a different kind of claim', () => {

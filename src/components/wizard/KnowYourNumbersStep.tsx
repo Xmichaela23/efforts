@@ -60,13 +60,7 @@ export const LIFT_FIELDS = [
 ] as const;
 export type LiftKey = (typeof LIFT_FIELDS)[number]['key'];
 
-export type StrengthOnFile = Pick<IntakeReadout, 'lifts' | 'barbell_lifts_on_file' | 'strength_default'>;
-
-export function formatSecPerMi(sec: number, metric: boolean): string {
-  const s = metric ? sec / 1.609344 : sec;
-  const m = Math.floor(s / 60), r = Math.round(s - m * 60);
-  return `${m}:${String(r).padStart(2, '0')}${metric ? '/km' : '/mi'}`;
-}
+export type StrengthOnFile = Pick<IntakeReadout, 'lifts' | 'barbell_lifts_on_file' | 'strength_default' | 'run_threshold_display'>;
 
 export type NumbersInclude = { strength: boolean; run: boolean; bike: boolean; swim: boolean };
 
@@ -114,7 +108,6 @@ export function KnowYourNumbersStep({
   /** The screen's words (`builder.setup.numbers`). Until they arrive the screen shows no rows. */
   copy: NumbersCopy | null;
 }) {
-  const metric = String(row?.units ?? '').toLowerCase() === 'metric';
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
 
   // ⚠️ `overheadPress1RM` is Baselines' key for the lift the frame calls `overheadPress`.
@@ -210,7 +203,9 @@ export function KnowYourNumbersStep({
         {include.run && rowShell(
           copy.run_title,
           thr.sec_per_mi != null
-            ? <>{formatSecPerMi(thr.sec_per_mi, metric)} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? copy.source_run_typed : copy.source_run_learned}</span>
+            // ⛔ The pace is get-arc-context's `run_threshold_display`; this converted and split it itself
+            // (2026-09-16, Stage 7 session 1).
+            ? <>{strength?.run_threshold_display} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? copy.source_run_typed : copy.source_run_learned}</span>
                 {runChoice === 'test' && <div className="text-white/50 mt-1">{copy.run_test}</div>}</>
             : <>{copy.run_none}</>,
           <Toggle k="run" value={runChoice} canUse={thr.sec_per_mi != null} onSet={set} copy={copy} />,

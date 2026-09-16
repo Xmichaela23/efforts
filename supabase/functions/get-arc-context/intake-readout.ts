@@ -34,6 +34,7 @@ import {
 import { hasPaceBenchmark } from '../_shared/pace-benchmark.ts';
 import { inferLimiterSportFromArc } from '../_shared/limiter-sport.ts';
 import type { ArcContext } from '../_shared/arc-context.ts';
+import { clock, M_PER_MI } from '../_shared/display-format.ts';
 
 export type LiftOnFile = { value: number; source: 'locked' | 'learned' | 'typed' };
 
@@ -57,6 +58,11 @@ export type IntakeReadout = {
   lifts: Record<CanonicalLiftKey, LiftOnFile | null>;
   barbell_lifts_on_file: 'all' | 'some' | 'none';
   strength_default: 'use' | 'test';
+  /**
+   * ⛔ The run threshold on file in the athlete's unit, e.g. `7:12/mi` / `4:28/km`; null when none. The
+   * "Know your numbers?" row converted and split it itself (2026-09-16, Stage 7 session 1).
+   */
+  run_threshold_display: string | null;
   session_frequency_by_tier?: Record<string, { swims: number; bikes: number; runs: number }>;
   /**
    * ⛔ THE SETUP'S ROWS, DEFAULTS, OPTIONS AND WORDING FOR THE THREE PLANS (2026-09-13, punch list "Default picks
@@ -67,7 +73,7 @@ export type IntakeReadout = {
 
 type ArcSlice = Pick<
   ArcContext,
-  'learned_fitness' | 'performance_numbers' | 'locked_baselines' | 'equipment' | 'effort_paces' | 'swim_training_from_workouts'
+  'learned_fitness' | 'performance_numbers' | 'locked_baselines' | 'equipment' | 'effort_paces' | 'swim_training_from_workouts' | 'units'
 >;
 
 const BARBELL_LIFTS: CanonicalLiftKey[] = ['squat', 'bench', 'deadlift', 'overheadPress1RM'];
@@ -92,8 +98,14 @@ export function buildIntakeReadout(args: {
     learned_fitness: arc.learned_fitness,
   });
 
+  const thrSecPerMi = resolveCurrentRunThresholdPace(baselines as never).sec_per_mi;
+  const metric = String(arc.units ?? '').toLowerCase() === 'metric';
+  // The whole pace is rounded once, then split (`clock`).
+  const run_threshold_display = thrSecPerMi != null && thrSecPerMi > 0
+    ? `${clock(metric ? thrSecPerMi / (M_PER_MI / 1000) : thrSecPerMi)}${metric ? '/km' : '/mi'}`
+    : null;
   const hard_days_priceable = {
-    run: resolveCurrentRunThresholdPace(baselines as never).sec_per_mi != null,
+    run: thrSecPerMi != null,
     bike: resolveCurrentFtp(baselines as never).value != null,
   };
 
@@ -130,6 +142,7 @@ export function buildIntakeReadout(args: {
     lifts,
     barbell_lifts_on_file,
     strength_default: onFile > 0 ? 'use' : 'test',
+    run_threshold_display,
     setup: setupBlock(Array.isArray(chips) ? chips.map((c) => String(c)) : []),
   };
 

@@ -15,7 +15,7 @@ import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ THE SWAP IS THE SERVER'S (2026-09-10, audit H-T15). `swap-session` sends which swaps a session
 // offers, with the words each shows, and writes the tap; this file renders the sheet and posts it.
 import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@/hooks/useSwapSheet';
-import { formatSwimPace, formatPace } from '@/utils/workoutFormatting';
+import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
 import { LoadKeyForm } from './LoadBar';
@@ -565,77 +565,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // src/lib/provider-attribution.ts (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md) so the
   // done card, the Week tab and the drawer read the same answer. `getProviderAttribution` is imported.
 
-  // Compact metrics line for completed endurance workouts (matches the older “detail” cards)
-  const getCompactEnduranceMetrics = (w: any): string[] => {
-    try {
-      const type = String(w?.type || '').toLowerCase();
-      const overall = (w as any)?.computed?.overall || (w as any)?.overall || {};
-      /**
-       * ⛔ THE SERVER'S TOTALS FIRST (2026-09-15, §8.0 #36) — `session_detail_v1.completed_totals`, the same
-       * figures Performance prints and the same ones the share text now reads. `get-week` sends
-       * `workout_analysis`, and the session detail is persisted inside it.
-       * ⚠️ THE `overall` READS BELOW ARE THE SENT-THEN-COMPUTED FALLBACK (rule 7) for a session whose detail
-       * has never been built — the card would otherwise lose its pace line on those rows.
-       */
-      const totals = (w as any)?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
-      const posTot = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
-      const distM = posTot(totals?.distance_m) ?? Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
-      // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10) — `moving_seconds`, not a ladder over `overall`.
-      const durS = posTot(totals?.moving_s) ?? Number(w?.moving_seconds);
-      // ⛔ THE SERVER'S AVERAGE HEART RATE (D-477) — get-week resolves it into `overall.avg_hr`; no picking here.
-      const avgHr = posTot(totals?.avg_hr) ?? Number(overall?.avg_hr);
-      const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
+  /**
+   * ⛔ THE COMPACT METRICS LINE IS THE SERVER'S (2026-09-16, Stage 7 session 1) — get-week's `done_metrics`,
+   * already in the athlete's unit: distance · pace / speed / per-100 · bpm · climb. The distance, pace, speed
+   * and climb conversions that lived here are deleted.
+   */
+  const getCompactEnduranceMetrics = (w: any): string[] =>
+    (Array.isArray(w?.done_metrics) ? (w.done_metrics as unknown[]).filter((x): x is string => typeof x === 'string') : []);
 
-      const parts: string[] = [];
-
-      // distance
-      if (Number.isFinite(distM) && distM > 0) {
-        if (type === 'swim') {
-          const yards = Math.round(distM / 0.9144);
-          const meters = Math.round(distM);
-          parts.push(useImperial ? `${yards.toLocaleString()} yd` : `${meters.toLocaleString()} m`);
-        } else {
-          parts.push(useImperial ? `${(distM / 1609.34).toFixed(1)} mi` : `${(distM / 1000).toFixed(1)} km`);
-        }
-      }
-
-      // pace / speed / swim pace
-      if (Number.isFinite(durS) && durS > 0 && Number.isFinite(distM) && distM > 0) {
-        if (type === 'run' || type === 'walk') {
-          // ⛔ THE SERVER'S PACE (§8.0 #36) — `completed_totals.avg_pace_s_per_mi`; the distance-over-time sum
-          // behind it is the fallback for a session with no detail yet. One formatter either way (§8.0 #2).
-          const paceMi = posTot(totals?.avg_pace_s_per_mi);
-          parts.push(formatPace(paceMi != null ? paceMi / 1.60934 : durS / (distM / 1000), true));
-        } else if (type === 'ride' || type === 'bike' || type === 'cycling') {
-          const avgSpeedMps = Number(overall?.avg_speed_mps) || distM / durS;
-          if (Number.isFinite(avgSpeedMps) && avgSpeedMps > 0) {
-            const mph = avgSpeedMps * 2.237;
-            parts.push(`${Math.round(mph * 10) / 10} mph`);
-          }
-        } else if (type === 'swim') {
-          const preferYards = !!useImperial;
-          // The server's per-100 when the detail exists (§8.0 #36); the phone's division is the fallback.
-          const serverPer100 = posTot(totals?.swim_pace_per_100_s);
-          const denom = preferYards ? (distM / 0.9144) / 100 : distM / 100;
-          const per100 = serverPer100 ?? (denom > 0 ? durS / denom : null);
-          if (per100 != null) parts.push(`${formatSwimPace(per100)} ${preferYards ? '/100yd' : '/100m'}`);
-        }
-      }
-
-      // hr
-      if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`${Math.round(avgHr)} bpm`);
-
-      // elevation (runs/rides)
-      if ((type === 'run' || type === 'walk' || type === 'ride' || type === 'bike' || type === 'cycling') && Number.isFinite(elevM) && elevM > 0) {
-        parts.push(useImperial ? `${Math.round(elevM * 3.28084)} ft` : `${Math.round(elevM)} m`);
-      }
-
-      return parts.filter(Boolean).slice(0, 4);
-    } catch {
-      return [];
-    }
-  };
-  
   /**
    * ⛔ THE PHONE SENDS THE TAP (2026-09-10, audit H-T09). `mark-planned-complete` marks the planned row
    * done and, for a run, walk or ride, creates the finished row with the planned session's own length.

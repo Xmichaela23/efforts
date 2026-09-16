@@ -16,7 +16,7 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
-import { supabase, getStoredUserId } from '../lib/supabase';
+import { supabase, invokeFunction } from '../lib/supabase';
 import { readoutPlateStyle as readoutPlate, readoutValueStyle } from '@/lib/readout-plate';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
@@ -71,7 +71,8 @@ interface GearItem {
   brand?: string;
   model?: string;
   is_default: boolean;
-  total_distance?: number; // in meters
+  /** The picker's distance in the athlete's unit, from `gear-list`; null when nothing is logged. */
+  distance_display?: string | null;
 }
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear, isHydrating, sessionDetail }) => {
@@ -133,6 +134,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     return { ...p, ...h, computed: { ...(p?.computed || {}), ...(h?.computed || {}) } };
   }, [hydrated, workoutData]);
   const norm = useWorkoutData(merged);
+  // ⛔ Tile strings the server writes in the athlete's unit (2026-09-16, Stage 7 session 1); the hook passes
+  // `display_metrics` through whole, so these are read as they arrive.
+  const dmDisplay = norm as typeof norm & {
+    distance_tile_display?: string | null;
+    elevation_display?: string | null;
+    avg_speed_display?: string | null;
+    max_speed_display?: string | null;
+  };
 
   // NOTE: Hooks MUST run before any early returns.
   // Details screen can render this component in a loading pass first.
@@ -189,47 +198,19 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     }
   }, [workoutData.type, workoutData.id]);
 
+  // ⛔ The gear list comes from `gear-list` with each distance already in the athlete's unit
+  // (2026-09-16, Stage 7 session 1); the phone no longer reads the table or converts metres.
   const loadGear = async () => {
     try {
       setGearLoading(true);
-      const userId = getStoredUserId();
-      if (!userId) {
-        console.log('🔧 [Gear] No user, skipping load');
-        return;
-      }
-
       const wt = String(workoutData.type || '').toLowerCase();
       const gearType = wt === 'run' || wt === 'walking' ? 'shoe' : 'bike';
-      console.log('🔧 [Gear] Loading gear for type:', gearType);
-      const { data, error } = await supabase
-        .from('gear')
-        .select('id, type, name, brand, model, is_default, total_distance')
-        .eq('user_id', userId)
-        .eq('type', gearType)
-        .eq('retired', false)
-        .order('is_default', { ascending: false })
-        .order('name');
-
+      const { data, error } = await invokeFunction<{ gear: GearItem[] }>('gear-list', { type: gearType });
       if (error) {
         console.error('🔧 [Gear] Error loading gear:', error);
         return;
       }
-
-      setGear(data || []);
-      // Debug: log gear with total_distance - expand objects to see values
-      if (data && data.length > 0) {
-        console.log('🔧 [Gear] Loaded gear with distances:');
-        data.forEach(g => {
-          const distanceMeters = g.total_distance || 0;
-          const distanceMi = distanceMeters / 1609.34;
-          const distanceKm = distanceMeters / 1000;
-          console.log(`  - ${g.name}: ${distanceMeters.toFixed(0)}m (${distanceMi.toFixed(1)} mi / ${distanceKm.toFixed(1)} km)`, g);
-        });
-        // Also log the full array for inspection
-        console.log('🔧 [Gear] Full gear array:', JSON.stringify(data, null, 2));
-      } else {
-        console.log('🔧 [Gear] No gear items found');
-      }
+      setGear(data?.gear ?? []);
     } catch (e) {
       console.error('🔧 [Gear] Exception loading gear:', e);
     } finally {
@@ -278,7 +259,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
       window.dispatchEvent(new CustomEvent('workout:invalidate'));
       window.dispatchEvent(new CustomEvent('workouts:invalidate'));
 
-      // If gear_id was changed, reload gear to get updated miles (trigger updates gear.total_distance)
+      // If gear_id was changed, reload the gear list to get updated distances (trigger updates gear.total_distance)
       // Add a small delay to ensure the database trigger has completed
       if (field === 'gear_id') {
         await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms for trigger to complete
@@ -892,144 +873,8 @@ const formatMaxSpeed = (speedValue: any): string => {
 
   // primaryMetrics removed; metrics are rendered directly where needed
 
- // 🏠 ADVANCED METRICS - Dynamic based on workout type
- const getAdvancedMetrics = () => {
-   const isRun = workoutData.swim_data;
-   const isBike = workoutData.ride_data;
-   const isSwim = workoutData.swim_data;
-   const isWalk = workoutData.walk_data;
-   
-   // Walking gets minimal advanced metrics
-   if (isWalk) {
-     return [
-       {
-         label: 'Avg Pace',
-         value: (Number.isFinite(norm.avg_pace_s_per_km as any) ? formatPace(norm.avg_pace_s_per_km as number, useImperial) : 'N/A'),
-         unit: '/mi'
-       },
-      {
-        label: 'Max Pace',
-        value: (() => {
-          // Use normalized data from useWorkoutData hook (calculated_metrics)
-          const maxPaceSeconds = norm.max_pace_s_per_km;
-          if (!Number.isFinite(maxPaceSeconds as any) || !maxPaceSeconds || maxPaceSeconds <= 0) return 'N/A';
-          // Convert to per-mile if needed, then format
-          const secPerMile = maxPaceSeconds * 1.60934;
-          if (secPerMile < 360) return 'N/A'; // guard: unrealistic for walk/hike
-          return formatPace(maxPaceSeconds, useImperial);
-        })(),
-        unit: useImperial ? '/mi' : '/km'
-      }
-     ];
-   }
-   
-   const baseMetrics = [
-     {
-       label: 'Max HR',
-      value: Number.isFinite(norm.max_hr as any) ? String(norm.max_hr) : 'N/A',
-       unit: 'bpm'
-     },
-    {
-      label: isRun ? 'Max Pace' : 'Max Speed',
-      value: isRun
-       ? (Number.isFinite(norm.max_pace_s_per_km as any) && norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km as number, useImperial) : 'N/A')
-      : (Number.isFinite(norm.max_speed_mps as any) && norm.max_speed_mps
-         ? (useImperial ? `${(norm.max_speed_mps * 2.23694).toFixed(1)} mph` : `${(norm.max_speed_mps * 3.6).toFixed(1)} km/h`)
-         : 'N/A'),
-      unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
-    },
-    // Max cadence / stroke rate removed per request
-   ];
-
-   // Add discipline-specific metrics
-   if (isRun) {
-     return [
-       ...baseMetrics,
-       {
-         label: 'Steps',
-         value: workoutData.steps ? String(workoutData.steps) : 'N/A'
-       },
-       {
-         label: 'TSS',
-         value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
-       }
-     ];
-   } else if (isBike) {
-     return [
-       ...baseMetrics,
-       {
-         label: 'Max Power',
-        value: Number.isFinite(norm.max_power as any) ? String(norm.max_power) : 'N/A',
-         unit: 'W'
-       },
-       {
-         label: 'TSS',
-         value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
-       },
-       {
-         label: 'Intensity Factor',
-         value: workoutData.intensity_factor ? `${workoutData.intensity_factor}%` : 'N/A'
-       }
-     ];
-  } else if (isSwim) {
-    // Hide elevation-like advanced rows for pool; keep HR/Max Pace/TSS/IF
-    const baseForSwim = baseMetrics.filter(m => m.label !== 'Elevation');
-    return [
-      ...baseForSwim,
-      {
-        label: 'Max Pace',
-        value: formatSwimPace(workoutData.metrics?.max_pace || workoutData.max_pace),
-        unit: '/100m'
-      },
-      {
-        label: 'TSS',
-        value: workoutData.tss ? String(Math.round(workoutData.tss * 10) / 10) : 'N/A'
-      },
-      {
-        label: 'Intensity Factor',
-        value: workoutData.intensity_factor ? `${workoutData.intensity_factor}%` : 'N/A'
-      }
-    ];
-  }
-
-   return baseMetrics;
- };
-
- const advancedMetrics = getAdvancedMetrics();
-
- // 🏠 TRAINING METRICS - Pull real data from FIT file, remove Weighted Avg Power
- const calculateTotalWork = () => {
-   if (import.meta.env?.DEV) console.log('🔍 calculateTotalWork - total_work:', workoutData.metrics?.total_work);
-   
-   // 🔧 GARMIN DATA EXTRACTION: Try all possible work sources
-   const totalWork = workoutData.metrics?.total_work || 
-                    workoutData.total_work || 
-                    workoutData.work;
-   
-   // Use total_work from FIT file if available (in Joules), convert to kJ
-   if (totalWork) {
-     const kj = Math.round(Number(totalWork) / 1000);
-     if (import.meta.env?.DEV) console.log('✅ calculateTotalWork using total_work:', kj, 'kJ');
-     return `${kj} kJ`;
-   }
-   // Fallback calculation if total_work not available
-  else if (workoutData.metrics?.avg_power && norm.duration_s) {
-     // Convert duration from minutes to seconds for proper kJ calculation
-    const durationSeconds = Number(norm.duration_s);
-     const kj = Math.round((workoutData.metrics.avg_power * durationSeconds) / 1000);
-     if (import.meta.env?.DEV) console.log('✅ calculateTotalWork using fallback calc:', kj, 'kJ');
-     return `${kj} kJ`;
-   }
-   if (import.meta.env?.DEV) console.log('✅ calculateTotalWork returning N/A');
-   return 'N/A';
- };
-
- // Derive average stride length for runs/walks (meters)
- 
-
- 
-
- 
+ // ⛔ `getAdvancedMetrics`, `calculateTotalWork` and `trainingMetrics` are deleted (2026-09-16, Stage 7 session 1):
+ // built on every render and never read.
 
   // D-186 (continuity audit fix #2): removed two DEAD client-recompute functions — `calculateRunningVAM`
   // and `calculateGradeAdjustedPace` (a client GAP with its own 1.2/0.8 Strava-approx coefficients).
@@ -1039,48 +884,10 @@ const formatMaxSpeed = (speedValue: any): string => {
   // a documented HONEST EXCEPTION — there is no workout-level server VAM yet (compute-facts has only a
   // per-segment vam_m_per_h), so it stays client-side by necessity. See AUDIT-continuity-2026-06-16.md.
 
-const formatMovingTime = () => {
-  // Prefer our unified swim-aware resolver
-  const s = Number(norm.duration_s);
-  if (Number.isFinite(s as any) && (s as number) > 0) return formatDuration(s as number);
-  // Fallback: legacy fields
-  const raw = (workoutData as any)?.metrics?.total_timer_time
-    ?? (workoutData as any)?.total_timer_time
-    ?? (workoutData as any)?.moving_time
-    ?? (workoutData as any)?.metrics?.moving_time
-    ?? (workoutData as any)?.elapsed_time
-    ?? (workoutData as any)?.metrics?.elapsed_time
-    ?? null;
-  return formatDuration(raw);
-};
+// ⛔ The legacy-column fallback rungs are deleted (2026-09-16, Stage 7 session 1): the server writes
+// `duration_s` on every Details reply.
+const formatMovingTime = () => formatDuration(norm.duration_s);
 
- const trainingMetrics = [
-   {
-     label: 'Normalized Power',
-     value: workoutData.metrics?.normalized_power ? `${workoutData.metrics.normalized_power} W` : 'N/A'
-   },
-   {
-     label: 'Workload',
-     value: workoutData.metrics?.training_stress_score ? String(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'
-   },
-   {
-     label: 'Total Work',
-     value: calculateTotalWork()
-   },
-   {
-     label: 'VAM',
-    value: (() => {
-      const vam = (norm.elevation_gain_m && norm.duration_s && norm.duration_s > 0)
-        ? (norm.elevation_gain_m / (norm.duration_s / 3600))
-        : null;
-      return Number.isFinite(vam as any) && (vam as number) > 0 ? Math.round(vam as number) : '—';
-    })()
-   },
-   {
-     label: 'Moving Time',
-     value: formatMovingTime()
-   }
- ];
 
  return (
   <>
@@ -1281,7 +1088,7 @@ const formatMovingTime = () => {
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
+              {dmDisplay.elevation_display ?? 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Elevation</div>
@@ -1400,11 +1207,6 @@ const formatMovingTime = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a2e] border-white/10">
                   {gear.map((item) => {
-                    const distanceMeters = item.total_distance || 0;
-                    const distanceMi = distanceMeters / 1609.34;
-                    const distanceText = useImperial 
-                      ? (distanceMi < 1 ? `${Math.round(distanceMeters)} m` : `${distanceMi.toFixed(1)} mi`)
-                      : `${(distanceMeters / 1000).toFixed(1)} km`;
                     return (
                       <SelectItem
                         key={item.id}
@@ -1413,9 +1215,9 @@ const formatMovingTime = () => {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-light">{item.name}</span>
-                          {distanceMeters > 0 && (
+                          {item.distance_display && (
                             <span className="text-xs text-white/50 font-light" style={{fontFeatureSettings: '"tnum"'}}>
-                              {distanceText}
+                              {item.distance_display}
                             </span>
                           )}
                         </div>
@@ -1453,7 +1255,7 @@ const formatMovingTime = () => {
           {/* Row 1 */}
           <div className="px-0.5 pb-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.distance_km ? `${(useImperial ? norm.distance_km * 0.621371 : norm.distance_km).toFixed(1)} ${useImperial ? 'mi' : 'km'}` : 'N/A'}
+              {dmDisplay.distance_tile_display ?? 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Distance</div>
@@ -1481,7 +1283,7 @@ const formatMovingTime = () => {
           {/* Row 2 */}
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.avg_speed_kmh ? `${(useImperial ? norm.avg_speed_kmh * 0.621371 : norm.avg_speed_kmh).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
+              {dmDisplay.avg_speed_display ?? 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Avg Speed</div>
@@ -1490,7 +1292,7 @@ const formatMovingTime = () => {
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.max_speed_mps ? `${(useImperial ? norm.max_speed_mps * 2.23694 : norm.max_speed_mps * 3.6).toFixed(1)} ${useImperial ? 'mph' : 'km/h'}` : 'N/A'}
+              {dmDisplay.max_speed_display ?? 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Max Speed</div>
@@ -1547,7 +1349,7 @@ const formatMovingTime = () => {
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.elevation_gain_m ? `${(useImperial ? norm.elevation_gain_m * 3.28084 : norm.elevation_gain_m).toFixed(0)} ${useImperial ? 'ft' : 'm'}` : 'N/A'}
+              {dmDisplay.elevation_display ?? 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Elevation</div>
@@ -1676,11 +1478,6 @@ const formatMovingTime = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a2e] border-white/10">
                   {gear.map((item) => {
-                    const distanceMeters = item.total_distance || 0;
-                    const distanceMi = distanceMeters / 1609.34;
-                    const distanceText = useImperial
-                      ? (distanceMi < 1 ? `${Math.round(distanceMeters)} m` : `${distanceMi.toFixed(1)} mi`)
-                      : `${(distanceMeters / 1000).toFixed(1)} km`;
                     return (
                       <SelectItem
                         key={item.id}
@@ -1689,9 +1486,9 @@ const formatMovingTime = () => {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-light">{item.name}</span>
-                          {distanceMeters > 0 && (
+                          {item.distance_display && (
                             <span className="text-xs text-white/50 font-light" style={{ fontFeatureSettings: '"tnum"' }}>
-                              {distanceText}
+                              {item.distance_display}
                             </span>
                           )}
                         </div>
@@ -1914,50 +1711,7 @@ const formatMovingTime = () => {
       )}
 
       {/* VAM section removed; now a chart tab inside EffortsViewerMapbox */}
-      {/* SEPARATE Power/Cadence Chart - at the bottom */}
-      {(workoutData.swim_data || workoutData.ride_data) && (() => {
-        // Try multiple data sources for sensor data
-        let samples = [];
-        if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
-          samples = (hydrated||workoutData).sensor_data.samples;
-        } else if (Array.isArray((hydrated||workoutData)?.sensor_data)) {
-          samples = (hydrated||workoutData).sensor_data;
-        } else if (Array.isArray((hydrated||workoutData)?.time_series_data)) {
-          samples = (hydrated||workoutData).time_series_data;
-        }
-        
-        if (samples.length > 0) {
-          // Extract power and cadence data
-          const powerData = samples
-            .map((s: any) => s.power || s.watts || null)
-            .filter((p: any) => p !== null && p !== undefined);
-          
-          // Normalize cadence data
-          const normalizeRunCadence = (v: any) => {
-            let n = Number(v);
-            if (!Number.isFinite(n)) return null;
-            if (n < 10) n *= 60;     // steps/sec -> steps/min
-            if (n < 130) n *= 2;     // strides/min -> steps/min
-            return Math.round(n);
-          };
-
-          const pickCadenceSample = (s: any) => {
-            // Prefer rpm if present
-            const rpm = s.bikeCadence ?? s.cadence ?? null;
-            if (Number.isFinite(rpm)) return Number(rpm); // rpm
-            // Else derive spm
-            const rc = s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence;
-            return normalizeRunCadence(rc);
-          };
-
-          const cadenceData = samples
-            .map(s => pickCadenceSample(s))
-            .filter(v => v != null);
-          
-          // Old Power/Cadence chart removed (now integrated into main viewer tabs)
-        }
-        return null;
-      })()}
+      {/* ⛔ The dead Power/Cadence block (built samples, returned nothing) is deleted (2026-09-16, Stage 7 session 1). */}
       {/* (Removed old mini zones histograms to avoid duplicate zones under splits) */}
       
       

@@ -93,7 +93,8 @@ Deno.test('⛔ EVERY RIDE-DAY PICKER READS THE ONE RANGE — no hardcoded 1/2/3 
   // ⚠️ THE TEST IS "NO LITERAL", NOT "THE VALUE IS 4". Pinning 4 here would be a seventh statement of
   // the range; what must hold is that every picker reads `RIDE_DAYS_CHOICES`, wherever that goes next.
   const rideDayWrites = [...SRC.matchAll(/\{\s*\.\.\.st?,?\s*rideDays: n\s*\}|rideDays: n \}/g)];
-  assert(rideDayWrites.length >= 2, `expected at least two ride-day pickers, found ${rideDayWrites.length}`);
+  // ⛔ One picker since the unreached `bike` step came out (2026-09-16, Stage 7 session 1).
+  assert(rideDayWrites.length >= 1, `expected a ride-day picker, found ${rideDayWrites.length}`);
   for (const m of rideDayWrites) {
     const before = SRC.slice(Math.max(0, m.index! - 700), m.index!);
     // ⚠️ BOTH HALVES. The schedule row's ride arm reads `RIDE_DAYS_CHOICES` inside a ternary, so

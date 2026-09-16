@@ -84,6 +84,20 @@ export type BaselineProposal = {
   accept_value: number;
 };
 
+/**
+ * The run threshold's proposal also carries both paces in the athlete's unit and which way it moved, for
+ * the post-workout popup ("Your runs now measure 7:12/mi at threshold · Faster than the 7:30/mi in use").
+ * ⛔ The popup converted and formatted these itself, always per mile (2026-09-16, Stage 7 session 1).
+ */
+export type RunThresholdProposal = BaselineProposal & {
+  /** The measured pace, e.g. `7:12/mi` or `4:28/km`. */
+  measured_display: string;
+  /** The pace in use now, same unit. */
+  applied_display: string;
+  /** True when the measured pace is faster than the one in use. */
+  faster: boolean;
+};
+
 export type ZoneTableRow = { name: string; range: string };
 
 export type ZoneTable = {
@@ -108,7 +122,7 @@ export type BaselinesReadout = {
   strength: { lifts: LiftReadoutRow[] };
   run: {
     threshold: BaselineReadoutRow;
-    threshold_proposal: BaselineProposal | null;
+    threshold_proposal: RunThresholdProposal | null;
     easy: BaselineReadoutRow;
     lthr: BaselineReadoutRow;
     max_hr: BaselineReadoutRow;
@@ -315,8 +329,16 @@ function buildReadout(args: {
 
   const thrProp = pendingRunThresholdProposal(baselinesLike);
   const thrPropText = thrProp ? pace(thrProp.measuredSecPerKm * SEC_PER_MI_TO_SEC_PER_KM) : null;
-  const threshold_proposal: BaselineProposal | null = thrProp && thrPropText
-    ? { text: `Your runs measure ${thrPropText}`, button: `use ${thrPropText}`, accept_value: thrProp.measuredSecPerKm }
+  const thrPropApplied = thrProp ? pace(thrProp.appliedSecPerKm * SEC_PER_MI_TO_SEC_PER_KM) : null;
+  const threshold_proposal: RunThresholdProposal | null = thrProp && thrPropText && thrPropApplied
+    ? {
+        text: `Your runs measure ${thrPropText}`,
+        button: `use ${thrPropText}`,
+        accept_value: thrProp.measuredSecPerKm,
+        measured_display: thrPropText,
+        applied_display: thrPropApplied,
+        faster: thrProp.measuredSecPerKm < thrProp.appliedSecPerKm,
+      }
     : null;
 
   const easy = resolveCurrentRunEasyPace(baselinesLike);

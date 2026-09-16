@@ -3,10 +3,9 @@ import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-stat
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceKm, normalizeDistanceMiles, formatMilesShort, typeAbbrev, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore, STATUS_COLORS } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { useAppContext } from '@/contexts/AppContext';
 import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
 import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
 // ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the server's, the same answer Today's cards use. See the glyph.
@@ -381,7 +380,6 @@ export default function WorkoutCalendar({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
-  const { useImperial } = useAppContext();
   const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
   const coachCtx = useCoachWeekContext();
   
@@ -1062,16 +1060,18 @@ export default function WorkoutCalendar({
   const weekTotals = useMemo(() => {
     const ws = (weeklyStats ?? {}) as Record<string, unknown>;
     const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-    const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
+    // ⛔ THE BAR'S DISTANCE ARRIVES IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 1) — `planned_distance_display`
+    // / `done_distance_display`, null under 0.05 of the unit; the metre-to-mile conversion here is deleted.
+    const s = (v: unknown) => (typeof v === 'string' && v ? v : null);
     return {
       plannedMin: n(ws.planned_minutes),
       doneMin: n(ws.done_minutes),
-      plannedMiles: toDist(n(ws.planned_meters)),
-      doneMiles: toDist(n(ws.done_meters)),
+      plannedDistance: s(ws.planned_distance_display),
+      doneDistance: s(ws.done_distance_display),
       liftsPlanned: n(ws.lifts_planned),
       liftsDone: n(ws.lifts_done),
     };
-  }, [weeklyStats, useImperial]);
+  }, [weeklyStats]);
 
   /** The week's own devices, off the rows already on screen. Absent when none of them are Garmin. */
   const garminDevices = useMemo(
@@ -1080,8 +1080,6 @@ export default function WorkoutCalendar({
     ),
     [weekDays, map],
   );
-
-  const distanceUnitLabel = useImperial ? 'mi' : 'km';
 
   /**
    * ⛔ HOW LONG, THE ONE WAY (§3f). `1h 06m` · `37m`. The minutes are zero-padded ONLY beside an
@@ -1105,7 +1103,7 @@ export default function WorkoutCalendar({
    * ⚠️ A LIFT PRINTS NEITHER DISTANCE NOR, WHEN DONE, ITS DURATION. Its mileage is nothing and the
    * time it took is the least interesting thing about it; the weight moved is the fact.
    */
-  const sessionLineMeta = (row: any, imperial: boolean): string => {
+  const sessionLineMeta = (row: any): string => {
     const done = String(row?.workout_status ?? '').toLowerCase() === 'completed';
     const isLift = String(row?.type ?? row?.workout_type ?? '').toLowerCase() === 'strength';
     // ⛔ THE SERVER'S TIME (2026-09-10, audit H-D10): `moving_seconds` once done, the planned length ahead.
@@ -1114,25 +1112,16 @@ export default function WorkoutCalendar({
 
     if (isLift && done) {
       /**
-       * ⛔ THE WEIGHT MOVED IS `strength_volume_lb`, PRICED BY THE SERVER (2026-09-10, audit H-T04). This
-       * summed reps × weight here and skipped every 0 lb set, so a chin-up, a band or an empty bar
-       * counted nothing on the Week row and something on the Performance tab.
+       * ⛔ THE WEIGHT MOVED IS THE SERVER'S `done_volume` (2026-09-16, Stage 7 session 1) — `strength_volume_lb`
+       * (audit H-T04) in the athlete's unit, "8,817 lb". The pound-to-kilogram conversion here is deleted.
        */
-      const volume = Number(row?.strength_volume_lb) || 0;
-      if (volume > 0) {
-        const shown = imperial ? volume : volume * 0.453592;
-        return `${Math.round(shown).toLocaleString()} ${imperial ? 'lb' : 'kg'}`;
-      }
+      if (typeof row?.done_volume === 'string' && row.done_volume) return row.done_volume;
       return mins > 0 ? fmtDur(mins) : '';
     }
 
     const parts: string[] = [];
-    if (done) {
-      const km = normalizeDistanceKm(row);
-      if (km != null && Number.isFinite(km) && km > 0) {
-        parts.push(imperial ? `${(km * 0.621371).toFixed(1)} ${distanceUnitLabel}` : `${km.toFixed(1)} ${distanceUnitLabel}`);
-      }
-    }
+    // ⛔ THE SERVER'S DISTANCE (2026-09-16, Stage 7 session 1) — `done_distance`, the one Today and the done card read.
+    if (done && typeof row?.done_distance === 'string' && row.done_distance) parts.push(row.done_distance);
     if (mins > 0) parts.push(fmtDur(mins));
     return parts.join(' · ');
   };
@@ -1330,7 +1319,7 @@ export default function WorkoutCalendar({
         >
           <span style={{ color: 'rgba(255,255,255,0.62)' }}>
             Done {fmtDur(weekTotals.doneMin)}
-            {weekTotals.doneMiles >= 0.05 ? ` · ${weekTotals.doneMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+            {weekTotals.doneDistance ? ` · ${weekTotals.doneDistance}` : ''}
           </span>
           <span
             aria-hidden="true"
@@ -1348,7 +1337,7 @@ export default function WorkoutCalendar({
           </span>
           <span>
             Planned {fmtDur(weekTotals.plannedMin)}
-            {weekTotals.plannedMiles >= 0.05 ? ` · ${weekTotals.plannedMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+            {weekTotals.plannedDistance ? ` · ${weekTotals.plannedDistance}` : ''}
             {weekTotals.liftsPlanned > 0 ? ` · ${weekTotals.liftsPlanned} ${weekTotals.liftsPlanned === 1 ? 'lift' : 'lifts'}` : ''}
           </span>
         </div>
@@ -1480,7 +1469,7 @@ export default function WorkoutCalendar({
                   const colour = getDisciplineColor(sport);
                   /* ⚠️ THE ROW'S OWN NAME, and the sport word only when it has none — never a code. */
                   const name = deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase());
-                  const meta = sessionLineMeta(row, useImperial);
+                  const meta = sessionLineMeta(row);
 
                   return (
                     <div

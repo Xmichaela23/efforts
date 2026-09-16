@@ -105,3 +105,10 @@ Deno.test('session counts: only when asked, with the limiter and 4 days as the e
   const d9 = computeSessionFrequencyDefaults({ weekly_hours_available: 9, days_per_week: 7, limiter_sport: 'run' });
   assertEquals(none.session_frequency_by_tier?.['9'], { swims: d9.swims_per_week, bikes: d9.bikes_per_week, runs: d9.runs_per_week });
 });
+
+Deno.test('run threshold on file prints in the athlete unit, rounded whole', () => {
+  const pn = { threshold_pace_sec_per_mi: 419.6, threshold_pace_source: 'manual' };
+  assertEquals(buildIntakeReadout({ arc: arc({ performance_numbers: pn, units: 'imperial' }), effort: null, asOf: AS_OF }).run_threshold_display, '7:00/mi');
+  assertEquals(buildIntakeReadout({ arc: arc({ performance_numbers: { threshold_pace_sec_per_mi: 432, threshold_pace_source: 'manual' }, units: 'metric' }), effort: null, asOf: AS_OF }).run_threshold_display, '4:28/km');
+  assertEquals(buildIntakeReadout({ arc: arc(), effort: null, asOf: AS_OF }).run_threshold_display, null);
+});

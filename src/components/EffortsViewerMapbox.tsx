@@ -10,7 +10,7 @@ import {
   weatherInvokeArgsFromWorkout,
   workoutHasStoredOpenMeteoBlob,
 } from "@/lib/sessionWeather";
-import { formatSpeed, formatPace } from "../utils/workoutFormatting";
+import { formatSpeed } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
 import { isIndoorSession } from "@shared/indoor-session";
 import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
@@ -59,6 +59,14 @@ type Sample = {
   power_raw_w?: number | null;    // series.power_watts (the power axis reaches the real peaks)
   gain_m: number | null;          // series.elevation_gain_cum_m
   loss_m: number | null;          // series.elevation_loss_cum_m
+  // ⛔ What the readouts print, in the athlete's unit (display_metrics.series_display, same index) —
+  // null when the reply carries none (2026-09-16, Stage 7 session 1).
+  dist_disp: number | null;       // series_display.distance (never steps back)
+  pace_disp: number | null;       // series_display.pace_s (whole seconds per mi / km)
+  elev_disp: number | null;       // series_display.elevation
+  vam_disp: number | null;        // series_display.vam
+  gain_disp: number | null;       // series_display.gain
+  loss_disp: number | null;       // series_display.loss
 };
 /** One row of the server's `computed.analysis.events.splits.{mi|km}` (audit H-D01). */
 type Split = {
@@ -80,19 +88,20 @@ const fmtTime = (sec: number) => {
   const s = Math.floor(sec % 60);
   return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}` : `${m}:${s.toString().padStart(2, "0")}`;
 };
-const toSecPerUnit = (secPerKm: number, useMiles: boolean) => (useMiles ? secPerKm * 1.60934 : secPerKm);
-const fmtPace = (secPerKm: number | null, useMi = true) => {
-  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
-  let spU = toSecPerUnit(secPerKm, useMi);
-  let m = Math.floor(spU / 60);
-  let s = Math.round(spU % 60);
-  if (s === 60) { m += 1; s = 0; }
-  return `${m}:${String(s).padStart(2, "0")}/${useMi ? "mi" : "km"}`;
-};
-// Y-axis formatter (no units suffix for cleaner labels)
+/**
+ * ⛔ THE READOUTS ARE THE SERVER'S (2026-09-16, Stage 7 session 1). Distance, pace, altitude, VAM and the
+ * climb at the cursor come in `display_metrics.series_display`, already in the athlete's unit; the pace
+ * pill's "(avg)" is `completed_totals.avg_pace_display`. The formatters that converted them here, the
+ * map card's formatters and the thumb-scrub formatters (whose card never rendered) are gone.
+ */
+type SeriesDisplayUnits = { distance: string; distance_dp: number; elevation: string; vam: string; pace: string };
+/** m:ss of the server's whole seconds per the athlete's unit. */
+const paceClock = (paceS: number | null | undefined, unit: string) =>
+  paceS == null ? "—" : `${Math.floor(paceS / 60)}:${String(paceS % 60).padStart(2, "0")}${unit}`;
+/* guard: layout — y-axis tick labels: evenly spaced chart ticks, not a printed athlete number */
 const fmtPaceYAxis = (secPerKm: number | null, useMi = true) => {
   if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
-  let spU = toSecPerUnit(secPerKm, useMi);
+  let spU = useMi ? secPerKm * 1.60934 : secPerKm;
   let m = Math.floor(spU / 60);
   let s = Math.round(spU % 60);
   if (s === 60) { m += 1; s = 0; }
@@ -101,17 +110,13 @@ const fmtPaceYAxis = (secPerKm: number | null, useMi = true) => {
 // ⛔ `fmtSpeed` DELETED (2026-09-16, Stage 4 session 3). It turned a split's seconds-per-kilometre into
 // miles per hour in the render, with the unit picked here. Each split row carries `rate_display` now —
 // speed on a ride, pace on everything else — written in the athlete's own unit by the server.
-// Y-axis formatters with units (for chart labels)
+/* guard: layout — y-axis tick labels: evenly spaced chart ticks, not a printed athlete number */
 const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', useMiles: boolean = true, useFeet: boolean = true): string => {
   if (!Number.isFinite(value)) return "—";
   
   switch (metric) {
     case 'pace':
-      if (workoutType === 'ride') {
-        const kmPerH = 3600 / value;
-        const speed = useMiles ? kmPerH * 0.621371 : kmPerH;
-        return `${Math.round(speed)} ${useMiles ? "mph" : "km/h"}`;
-      }
+      // Rides have no pace line and no pace tab.
       return fmtPaceYAxis(value, useMiles);
     case 'speed':
     case 'spd':
@@ -145,61 +150,10 @@ const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', us
       return `${Math.round(value)}`;
   }
 };
-const fmtDist = (m: number, useMi = true) => (useMi ? `${(m / 1609.34).toFixed(1)} mi` : `${(m / 1000).toFixed(2)} km`);
-const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
 /** The server sends grade in percent. */
 const fmtPct = (pct: number | null | undefined) => (pct == null || !Number.isFinite(pct) ? "—" : `${pct.toFixed(1)}%`);
-const fmtVAM = (mPerH: number | null, useFeet = true) => (mPerH == null || !Number.isFinite(mPerH) ? "—" : useFeet ? `${Math.round(mPerH * 3.28084)} ft/h` : `${Math.round(mPerH)} m/h`);
 
 /** ---------- Map Enhancement Helpers ---------- */
-// Format metric value for map overlay based on current tab
-function formatMetricValue(value: number | null, tab: MetricTab, useMi = true, useFeet = true): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  
-  switch (tab) {
-    case "pace":
-      return fmtPace(value, useMi);
-    case "spd":
-      const speedMph = value * 2.23694;
-      const speedKmh = value * 3.6;
-      return useMi ? `${speedMph.toFixed(1)} mph` : `${speedKmh.toFixed(1)} km/h`;
-    case "bpm":
-      return `${Math.round(value)} bpm`;
-    case "cad":
-      return `${Math.round(value)} spm`;
-    case "pwr":
-      return `${Math.round(value)} W`;
-    case "elev":
-      return fmtAlt(value, useFeet);
-    case "vam":
-      return fmtVAM(value, useFeet);
-    default:
-      return String(Math.round(value));
-  }
-}
-
-// Get human-readable label for current tab
-function getMetricLabel(tab: MetricTab, workoutType?: string): string {
-  switch (tab) {
-    case "pace":
-      return "PACE";
-    case "spd":
-      return workoutType === 'ride' ? "SPEED" : "PACE";
-    case "bpm":
-      return "HEART RATE";
-    case "cad":
-      return "CADENCE";
-    case "pwr":
-      return "POWER";
-    case "elev":
-      return "ELEVATION";
-    case "vam":
-      return "VAM";
-    default:
-      return "METRIC";
-  }
-}
-
 // Find nearest index in array that matches target value
 function findNearestIndex(arr: (number | null)[], target: number): number {
   if (!arr || arr.length === 0) return 0;
@@ -216,55 +170,6 @@ function findNearestIndex(arr: (number | null)[], target: number): number {
     }
   }
   return nearestIdx;
-}
-
-// Thumb scrubbing helper functions
-function getCurrentSample(normalizedSamples: any[], distance: number) {
-  const distances = normalizedSamples.map(sample => sample.d_m);
-  const sampleIdx = findNearestIndex(distances, distance);
-  return normalizedSamples[Math.min(sampleIdx, normalizedSamples.length - 1)];
-}
-
-/**
- * ⛔ A RUN READS THE RUN'S OWN LINE (2026-09-15, §8.0 #6). This took `speed_mps`, which the server writes for
- * RIDES only (`compute-workout-analysis/display-series.ts:251`), and turned it into a pace itself — so on a run
- * the overlay printed "--" while the server's `pace_display_s_per_km` sat unread in the same series. A ride
- * prints the speed line; everything else prints the pace line, in the one pace formatter (§8.0 #2).
- */
-function formatSpeedForScrub(speed_mps: number | null, pace_s_per_km: number | null, isRide: boolean, useMiles: boolean): string {
-  if (isRide) {
-    if (!Number.isFinite(speed_mps) || (speed_mps as number) <= 0) return '--';
-    return useMiles
-      ? `${((speed_mps as number) * 2.237).toFixed(1)} mph`
-      : `${((speed_mps as number) * 3.6).toFixed(1)} km/h`;
-  }
-  if (!Number.isFinite(pace_s_per_km) || (pace_s_per_km as number) <= 0) return '--';
-  return formatPace(pace_s_per_km as number, useMiles).replace('/', ' /');
-}
-
-function formatPowerForScrub(power_w: number | null): string {
-  if (!Number.isFinite(power_w)) return '--';
-  return `${Math.round(power_w)} W`;
-}
-
-function formatHRForScrub(hr_bpm: number | null): string {
-  if (!Number.isFinite(hr_bpm)) return '--';
-  return `${Math.round(hr_bpm)} bpm`;
-}
-
-function formatGradeForScrub(grade_pct: number | null): string {
-  if (!Number.isFinite(grade_pct)) return '--';
-  return `${grade_pct > 0 ? '+' : ''}${grade_pct.toFixed(1)}%`;
-}
-
-function formatDistanceForScrub(distance_m: number, useMiles: boolean): string {
-  if (useMiles) {
-    const miles = distance_m / 1609.34;
-    return `Mile ${miles.toFixed(1)}`;
-  } else {
-    const km = distance_m / 1000;
-    return `Km ${km.toFixed(1)}`;
-  }
 }
 
 /** ---------- Geometry helpers removed (handled in MapEffort) ---------- */
@@ -487,6 +392,14 @@ function EffortsViewerMapbox({
    * every line ready to plot (display-series.ts, each window marked there); a series it did not send
    * plots nothing. ⚠️ The thinning below picks points for drawing; it changes no value.
    */
+  // The readout arrays, only when they line up with the series being drawn.
+  const seriesDisplay = useMemo(() => {
+    const sd = (workoutData as { display_metrics?: { series_display?: any } })?.display_metrics?.series_display;
+    const n = Array.isArray(samples?.distance_m) ? samples.distance_m.length : -1;
+    return sd && Array.isArray(sd.distance) && sd.distance.length === n ? sd : null;
+  }, [workoutData, samples]);
+  const sdUnits: SeriesDisplayUnits | null = seriesDisplay?.units ?? null;
+
   const normalizedSamples: Sample[] = useMemo(() => {
     const s = samples || {};
     const arr = (k: string): (number | null)[] => (Array.isArray(s[k]) ? s[k] : []);
@@ -504,6 +417,10 @@ function EffortsViewerMapbox({
     const vam = arr('vam_m_per_h');
     const gain = arr('elevation_gain_cum_m');
     const loss = arr('elevation_loss_cum_m');
+    const sd = seriesDisplay || {};
+    const sdArr = (k: string): (number | null)[] => (Array.isArray(sd[k]) ? sd[k] : []);
+    const distD = sdArr('distance'), paceD = sdArr('pace_s'), elevD = sdArr('elevation');
+    const vamD = sdArr('vam'), gainD = sdArr('gain'), lossD = sdArr('loss');
 
     // Find peak indices BEFORE downsampling to ensure they're preserved
     const peakIndices = new Set<number>();
@@ -558,8 +475,14 @@ function EffortsViewerMapbox({
       power_raw_w: num(power_raw_w, i),
       gain_m: num(gain, i),
       loss_m: num(loss, i),
+      dist_disp: num(distD, i),
+      pace_disp: num(paceD, i),
+      elev_disp: num(elevD, i),
+      vam_disp: num(vamD, i),
+      gain_disp: num(gainD, i),
+      loss_disp: num(lossD, i),
     }));
-  }, [samples, useMiles]);
+  }, [samples, useMiles, seriesDisplay]);
 
   const isOutdoorGlobal = useMemo(() =>
     Array.isArray(trackLngLat) && trackLngLat.length > 1,
@@ -578,20 +501,10 @@ function EffortsViewerMapbox({
   const [showMapInfo, setShowMapInfo] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [scrubDistance, setScrubDistance] = useState<number | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   // Gesture detection state for distinguishing scrolling from scrubbing
   const touchStartRef = useRef<{ x: number; y: number; isScrubbing: boolean } | null>(null);
   
-  // Handle thumb scrubbing
-  const handleScrub = (distance_m: number) => {
-    setScrubDistance(distance_m);
-    // Update the main chart index to match scrubbed position
-    const distances = normalizedSamples.map(sample => sample.d_m);
-    const newIdx = findNearestIndex(distances, distance_m);
-    setIdx(newIdx);
-  };
-
   const [theme, setTheme] = useState<'standard' | 'outdoor' | 'hybrid' | 'topo'>(() => readStoredBasemap());
   
   // Segment click state
@@ -703,17 +616,6 @@ function EffortsViewerMapbox({
   const dTotal = distCalc.dN;
   const distNow = distCalc.distMono[idx] ?? distCalc.d0;
 
-  // Thumb scrubbing metrics (use scrubbed distance if available, otherwise current)
-  const currentDistance = scrubDistance !== null ? scrubDistance : distNow;
-  const currentSample = getCurrentSample(normalizedSamples, currentDistance);
-  const isRide = workoutData?.type === 'ride';
-  
-  // Format metrics for thumb scrubbing — the server's series at the cursor
-  const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps ?? null, currentSample?.pace_s_per_km ?? null, isRide, useMiles);
-  const currentPower = formatPowerForScrub(currentSample?.power_w ?? null);
-  const currentHR = formatHRForScrub(currentSample?.hr_bpm);
-  const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
-  const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 225;           // chart area height (in SVG units) - compact
@@ -1146,23 +1048,26 @@ function EffortsViewerMapbox({
     () => ((sessionDetail ?? extractSessionDetailV1FromWorkout(workoutData)) as any)?.completed_totals ?? null,
     [sessionDetail, workoutData],
   );
-  // sec/mi → sec/km only because the pace formatter takes sec/km; it prints /mi again.
-  const avgPaceSecPerMi = finiteOrNull(completedTotals?.avg_pace_s_per_mi);
-  const getAvgPace = avgPaceSecPerMi != null ? avgPaceSecPerMi / 1.60934 : null;
+  // ⛔ The average pace as the Performance tab prints it, in the athlete's unit (2026-09-16, Stage 7 session 1).
+  const avgPaceDisplay: string | null = completedTotals?.avg_pace_display ?? null;
   const getAvgSpeed = finiteOrNull(workoutData?.display_metrics?.avg_speed_mps);
   const getAvgHR = finiteOrNull(completedTotals?.avg_hr);
   const getAvgPower = finiteOrNull(workoutData?.display_metrics?.avg_power);
   const getAvgCadence = finiteOrNull(workoutData?.type === 'ride'
     ? workoutData?.display_metrics?.avg_cycling_cadence_rpm
     : workoutData?.display_metrics?.avg_running_cadence_spm);
-  const getAvgVam = finiteOrNull(workoutData?.computed?.overall?.avg_vam);
+  // ⛔ In the athlete's unit, whole (display_metrics.avg_vam_display) — 2026-09-16, Stage 7 session 1.
+  const getAvgVam = finiteOrNull(workoutData?.display_metrics?.avg_vam_display);
 
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
   const cx = xFromDist(s?.d_m ?? 0);
   const currentMetricRaw = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : 0;
   const cy = yFromValue(currentMetricRaw);
-  const altNow_m  = (s?.elev_m_sm ?? 0);
+  const last = normalizedSamples[normalizedSamples.length - 1];
+  // Readouts: the server's number and its unit; no reply, no number.
+  const distText = (v: number | null | undefined) => (v == null || !sdUnits ? "—" : `${v.toFixed(sdUnits.distance_dp)} ${sdUnits.distance}`);
+  const elevText = (v: number | null | undefined, unit: string | undefined) => (v == null || !unit ? "—" : `${v} ${unit}`);
   
   // Debug: Log cursor value vs Y-axis position for pace chart
   if (tab === 'pace' && workoutData?.type !== 'ride' && idx > 0) {
@@ -1350,11 +1255,10 @@ function EffortsViewerMapbox({
                           {Math.floor(seg.elapsed_time / 60)}:{String(seg.elapsed_time % 60).padStart(2, '0')}
                         </span>
                       )}
+                      {/* ⛔ The server's length, 2 dp in the athlete's unit (2026-09-16, Stage 7 session 1). */}
                       {seg.distance != null && (
                         <span>
-                          {useMiles
-                            ? `${(seg.distance / 1609.34).toFixed(2)} mi`
-                            : `${(seg.distance / 1000).toFixed(2)} km`}
+                          {(seg as { distance_display?: string | null }).distance_display ?? '—'}
                         </span>
                       )}
                     </span>
@@ -1485,18 +1389,6 @@ function EffortsViewerMapbox({
           theme={theme}
           height={280}
           
-          // Enhancement 4: Pass current metric data for overlay
-          currentMetric={{
-            value: formatMetricValue(
-              metricRaw[Math.min(idx, metricRaw.length - 1)] as number | null,
-              tab,
-              useMiles,
-              useFeet
-            ),
-            label: getMetricLabel(tab, workoutData?.type)
-          }}
-          currentTime={fmtTime(s?.t_s ?? 0)}
-          
           // Enhancement 6: Click-to-jump callback
           onRouteClick={(distance_m) => {
             // Find index in normalizedSamples that matches this distance
@@ -1510,15 +1402,6 @@ function EffortsViewerMapbox({
           
           // Pass imperial/metric preference
           useMiles={useMiles}
-          
-          // Thumb scrubbing props
-          discipline={isRide ? 'bike' : 'run'}
-          currentSpeed={currentSpeed}
-          currentPower={currentPower}
-          currentHR={currentHR}
-          currentGrade={currentGrade}
-          currentDistance={currentDistanceFormatted}
-          onScrub={handleScrub}
           
           // Strava segments (memoized to prevent re-renders from clearing)
           segments={memoizedSegments}
@@ -1576,10 +1459,7 @@ function EffortsViewerMapbox({
               )}
               {selectedSegment.distance && (
                 <span>
-                  {useMiles 
-                    ? `${(selectedSegment.distance / 1609.34).toFixed(2)} mi`
-                    : `${(selectedSegment.distance / 1000).toFixed(2)} km`
-                  }
+                  {(selectedSegment as { distance_display?: string | null }).distance_display ?? '—'}
                 </span>
               )}
               {/* ⛔ WHETHER THE OVERALL PLACING PRINTS IS THE SERVER'S CALL (2026-09-16) — the cut was a
@@ -1623,17 +1503,14 @@ function EffortsViewerMapbox({
                   const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
                   return formatSpeed(v, useMiles);
                 }
-                if (tab === 'pace') {
-                  const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                  return fmtPace(v, useMiles);
-                }
-                return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
+                if (tab === 'pace') return sdUnits ? paceClock(s?.pace_disp, sdUnits.pace) : '—';
+                return workoutData?.type === 'ride' ? formatSpeed(s?.speed_mps ?? null, useMiles) : (sdUnits ? paceClock(s?.pace_disp, sdUnits.pace) : '—');
               } else {
                 // Show averages
                 if (workoutData?.type === 'ride') {
                   return formatSpeed(getAvgSpeed, useMiles);
                 } else {
-                  return fmtPace(getAvgPace, useMiles);
+                  return avgPaceDisplay ?? '—';
                 }
               }
             })()}  
@@ -1732,15 +1609,8 @@ function EffortsViewerMapbox({
             <Pill 
               label="VAM" 
               value={(() => {
-                if (isScrubbing) {
-                  if (tab === 'vam') {
-                    const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
-                    return v != null ? fmtVAM(v, useFeet) : '—';
-                  }
-                  return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
-                } else {
-                  return getAvgVam != null ? fmtVAM(getAvgVam, useFeet) : '—';
-                }
+                if (isScrubbing) return elevText(s?.vam_disp, sdUnits?.vam);
+                return elevText(getAvgVam, sdUnits?.vam);
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="vam"} 
@@ -1762,7 +1632,7 @@ function EffortsViewerMapbox({
             transition: 'opacity 150ms ease',
             opacity: 1
           }}>
-            at {fmtDist(distNow, useMiles)} • {fmtTime(normalizedSamples[idx].t_s)}
+            at {distText(normalizedSamples[idx].dist_disp)} • {fmtTime(normalizedSamples[idx].t_s)}
           </div>
         )}
         
@@ -1771,7 +1641,7 @@ function EffortsViewerMapbox({
           {/* Altitude - show total when not scrubbing */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700 }}>
-              Alt {fmtAlt(isScrubbing ? altNow_m : (normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].elev_m_sm ?? 0 : 0), useFeet)}
+              Alt {elevText(isScrubbing ? s?.elev_disp : last?.elev_disp, sdUnits?.elevation)}
             </div>
             {!isScrubbing && (
               <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
@@ -1790,8 +1660,8 @@ function EffortsViewerMapbox({
               color: "rgba(255, 255, 255, 0.9)"
             }}>
               {isScrubbing 
-                ? `${fmtDist(s?.d_m ?? 0, useMiles)} · ${fmtTime(s?.t_s ?? 0)}`
-                : `${fmtDist(dTotal ?? 0, useMiles)} · ${fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
+                ? `${distText(s?.dist_disp)} · ${fmtTime(s?.t_s ?? 0)}`
+                : `${distText(last?.dist_disp)} · ${fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
               }
             </div>
             {!isScrubbing && (
@@ -1806,16 +1676,15 @@ function EffortsViewerMapbox({
             * jumps from a phone sum to the device total 25 m from the end. No series, no readout.
             */}
           {(() => {
-            const at = isScrubbing ? s : normalizedSamples[normalizedSamples.length - 1];
-            const gainNow = at?.gain_m;
-            const lossNow = at?.loss_m;
-            if (!Number.isFinite(gainNow as any) || !Number.isFinite(lossNow as any)) return <div />;
+            // ⛔ Whole feet or metres from the server (series_display.gain / loss) — 2026-09-16, Stage 7 session 1.
+            const at = isScrubbing ? s : last;
+            const gainNow = at?.gain_disp;
+            const lossNow = at?.loss_disp;
+            if (!sdUnits || !Number.isFinite(gainNow as any) || !Number.isFinite(lossNow as any)) return <div />;
             return (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700, whiteSpace: "nowrap" }}>
-              {useFeet
-                ? `+${Math.round((gainNow as number) * 3.28084)} / -${Math.round((lossNow as number) * 3.28084)} ft`
-                : `+${Math.round(gainNow as number)} / -${Math.round(lossNow as number)} m`}
+              {`+${gainNow} / -${lossNow} ${sdUnits.elevation}`}
             </div>
             {!isScrubbing && (
               <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
@@ -1902,8 +1771,8 @@ function EffortsViewerMapbox({
             const x = pl + i * ((W - pl - pr) / 4);
             const ratio = i / 4;
             // Calculate distance at this point
-            const distM = distCalc.d0 + ratio * (distCalc.dN - distCalc.d0);
-            const distDisplay = useMiles ? (distM / 1609.34).toFixed(1) : (distM / 1000).toFixed(1);
+            const distM = distCalc.d0 + ratio * (distCalc.dN - distCalc.d0); // guard: layout — x-axis tick position
+            const distDisplay = useMiles ? (distM / 1609.34).toFixed(1) : (distM / 1000).toFixed(1); // guard: layout — x-axis tick label at a quarter of the chart width
             const distUnit = useMiles ? 'mi' : 'km';
             // Calculate time at this point (interpolate from samples)
             const totalTime = normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0;

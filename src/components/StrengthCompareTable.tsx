@@ -59,10 +59,6 @@ interface StrengthCompareTableProps {
   previousByExercise?: PreviousStrengthByExercise | null;
   workoutId?: string | null;
   onAdjustmentSaved?: () => void;
-  /** @deprecated Ignored — the rows come from `slots`. Still passed by `WorkoutSummary`. */
-  planned?: unknown;
-  /** @deprecated Ignored — the rows come from `slots`. Still passed by `WorkoutSummary`. */
-  completed?: unknown;
 }
 
 // Format an ISO date-only string ("2026-05-18") as a short, self-evident label ("May 18").
@@ -302,6 +298,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                     return `${formatSeconds(s.duration_seconds)}${weightClause}${assistClause}${rirTxt}`;
                   }
                   // ⛔ THE ALL-OUT SET SAYS SO — "5+" (D-338).
+                  /* server-field: strength_slots[].reps_text */
                   const repsValue = s.reps_text ?? (s.reps || 0);
                   const repsTxt = (s as any).amrap ? `${repsValue}+ reps` : `${repsValue} reps`;
                   return `${repsTxt}${weightClause}${assistClause}${rirTxt}`;

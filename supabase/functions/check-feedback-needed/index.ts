@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { talkTestAppliesToTags } from '../_shared/effort-words.ts';
+import { displayFormat } from '../_shared/display-format.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
     // D-162: swims now get the popup too (feel/RPE + pool length + equipment confirmation).
     let q = supabase
       .from('workouts')
-      .select('id, type, name, gear_id, rpe, date, planned_id, feedback_dismissed_at')
+      .select('id, type, name, gear_id, rpe, date, planned_id, feedback_dismissed_at, distance')
       .eq('user_id', user.id);
     if (workoutId) q = q.eq('id', workoutId);
     const { data: workouts, error } = await q
@@ -104,6 +105,13 @@ Deno.serve(async (req) => {
           console.warn('[check-feedback-needed] talk-test lookup failed:', e);
         }
       }
+      let metric = false;
+      try {
+        const { data: ub } = await supabase.from('user_baselines').select('units').eq('user_id', user.id).maybeSingle();
+        metric = ub?.units === 'metric';
+      } catch (e) {
+        console.warn('[check-feedback-needed] units lookup failed:', e);
+      }
       return new Response(
         JSON.stringify({
           needs_feedback: true,
@@ -113,6 +121,8 @@ Deno.serve(async (req) => {
             name: workout.name || `${workout.type} workout`,
             existing_gear_id: workout.gear_id || null,
             existing_rpe: workout.rpe || null,
+            // ⛔ The distance under the popup's title, in the athlete's unit (Stage 7 session 1); `distance` is stored in km.
+            distance_display: displayFormat(metric).distanceOrMetres(Number(workout.distance) * 1000),
           },
           talk_test: talkTest,
         }),

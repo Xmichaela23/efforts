@@ -11,7 +11,6 @@ import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
 import { readoutPlateStyle } from '@/lib/readout-plate';
-import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
 import PlannedGroupRideRouteMap from './PlannedGroupRideRouteMap';

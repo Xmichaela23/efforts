@@ -535,6 +535,7 @@ const PlateMath: React.FC<{
       return { plates: [], possible: false };
     }
 
+    /* guard: device — plates for the weight in the athlete's box on the bar they picked */
     const weightToLoad = weight - barWeight;
     const weightPerSide = weightToLoad / 2;
 
@@ -546,6 +547,7 @@ const PlateMath: React.FC<{
     let remaining = weightPerSide;
 
     for (const plate of plates) {
+      /* guard: device — plates for the weight in the athlete's box on the bar they picked */
       const maxUsable = Math.floor(remaining / plate.weight);
       const actualUse = Math.min(maxUsable, plate.count);
       
@@ -555,6 +557,7 @@ const PlateMath: React.FC<{
           count: actualUse,
           color: plate.color
         });
+        /* guard: device — plates for the weight in the athlete's box on the bar they picked */
         remaining = Math.round((remaining - (actualUse * plate.weight)) * 100) / 100;
       }
     }
@@ -3322,18 +3325,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const a = (iso||'').split('-').map(x=>parseInt(x,10));
     return { y: a[0]||1970, m: a[1]||1, d: a[2]||1 };
   };
+  // ⛔ The weekday is the local calendar date's own (2026-09-16, Stage 7 session 1); this worked it out
+  // by hand (Sakamoto). Built from the parts, not parsed, so there is no UTC shift.
+  const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dayOfWeekYmd = (iso: string): number => { // 0=Sun..6=Sat
-    let { y, m, d } = ymdParts(iso);
-    // Tomohiko Sakamoto algorithm
-    const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
-    if (m < 3) y -= 1;
-    const v = (y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400) + t[m-1] + d) % 7;
-    return v;
+    const { y, m, d } = ymdParts(iso);
+    return new Date(y, m - 1, d).getDay();
   };
-  const weekdayShortFromYmd = (iso: string): string => {
-    const map = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    return map[dayOfWeekYmd(iso)];
-  };
+  const weekdayShortFromYmd = (iso: string): string => WEEKDAY_SHORT[dayOfWeekYmd(iso)];
   const addDaysYmd = (iso: string, days: number): string => {
     const { y, m, d } = ymdParts(iso);
     const dt = new Date(Date.UTC(y, m-1, d, 12, 0, 0));
@@ -5734,6 +5733,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const durationTimerKey = `${exercise.id}-set-${setIndex}`;
                         const durationTimer = timers[durationTimerKey];
                         const isDurationRunning = durationTimer?.running || false;
+                        /* guard: device — the hold timer counting down on the phone */
+                        // OURS — 60 s on the clock when the set carries no hold length; no source.
                         const currentDurationSeconds = durationTimer?.seconds ?? (set.duration_seconds || 60);
 
                         const isWarmup = set.setType === 'warmup';

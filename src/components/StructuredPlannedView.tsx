@@ -378,6 +378,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
    */
   const plannedSecs: number | null = plannedDurationSecondsOf(workout);
   const durationMin: number | null = plannedSecs == null ? null : Math.max(1, Math.round(plannedSecs / 60));
+  /* parked: race step, WORKORDER §3a */
   const computedMilesFromSteps: number | null = (() => {
     try {
       if (!hasComputedV3) return null;
