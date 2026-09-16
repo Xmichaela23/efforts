@@ -144,6 +144,14 @@ import {
  */
 const BAND_LB_HINT =
   "The band's resistance in pounds. Rated as a range? Enter the middle. Leave blank if you don't know it.";
+/** The same hint for a box in kilograms (a metric athlete's planned or hand-added exercise, Stage 7 session 3). */
+const BAND_KG_HINT =
+  "The band's resistance in kilograms. Rated as a range? Enter the middle. Leave blank if you don't know it.";
+/** A band or assist box's number, when it is one (D-415: the field can also hold a tension word). */
+const bandNumber = (v: unknown): number | null => {
+  const n = v != null && String(v).trim() !== '' ? Number(v) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
@@ -2549,7 +2557,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ...(!plannedRow && typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
               ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
               ...(!plannedRow && typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
-              ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
+              // A saved band number is pounds: into a kilogram box it does not go (a tension word still does).
+              ...(prior.resistance_level && (sameUnit || bandNumber(prior.resistance_level) == null) ? { resistance_level: prior.resistance_level } : {}),
               from_previous: true,
               prefilled: true, // D-204: prior-session prefill; cleared on first athlete edit/Done
             } as LoggedSet;
@@ -4047,7 +4056,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
      * (`KG_PER_LB`, 1 lb = 0.45359237 kg by definition): a metric athlete's typed 100 is saved as 220.46 lb,
      * not 100 lb. A number the athlete left as the server sent it is saved as the server's own pounds
      * (`weight_lb`). The exercise is stamped `unit: 'lb'` so every reader keeps reading pounds.
-     * ⚠️ The band and assist boxes are pounds on every account (their words say so), so they are not converted.
+     * The band and assist boxes are in the exercise's unit too (Stage 7 session 3), so a kilogram box's number
+     * converts the same way and is saved as pounds (D-351 reads `resistance_level` as pounds).
      * OURS — a converted weight is kept to 0.01 lb: any weight typed to a quarter kilogram reads back exactly
      * through `liftInAthletesUnit`, and the saved row is readable. Ledger row in docs/STATE-SOURCES.md.
      */
@@ -4061,9 +4071,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const typed = Number(st.weight) || 0;
           const weight = weight_lb != null && weight_lb > 0 ? weight_lb
             : (kg && typed > 0 ? Math.round((typed / KG_PER_LB) * 100) / 100 : st.weight);
+          const band = bandNumber(st.resistance_level);
           return {
             ...rest,
             weight,
+            ...(kg && band != null ? { resistance_level: String(Math.round((band / KG_PER_LB) * 100) / 100) } : {}),
             // A kilogram bar is saved as its own key; the pricer reads its pounds off the table.
             ...(kg && st.barType ? { barType: barKeysForUnit('kg').includes(st.barType) ? st.barType : barKeysForUnit('kg')[0] } : {}),
           };
@@ -5416,12 +5428,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
                   const exShowWeight = exIsAssistCapable || !(exIsBodyweight || exIsPlyo);
                   // ⛔ THE UNIT IS THE EXERCISE'S, AS THE SERVER SENT IT (2026-09-16, Stage 4 session 4); it read
-                  // "Lb" on every account. ⚠️ The band stays pounds on every account: its keypad title, hint and
-                  // label say pounds in words, and changing those is wording (see the session report).
+                  // "Lb" on every account. The band and assist boxes follow it (Stage 7 session 3, words approved).
                   const exUnit = unitOf(exercise);
                   const exUnitWord = exUnit === 'kg' ? 'Kg' : exUnit === 'lb' ? 'Lb' : '';
                   const exWeightLabel = exIsAssistCapable ? 'Assist / Added' /* 2026-09-03: band assist left, added weight right */
-                    : exEquip === 'band' ? 'Band lb'
+                    : exEquip === 'band' ? (exUnit === 'kg' ? 'Band kg' : 'Band lb')
                     : exEquip === 'dumbbell' ? (exUnitWord ? `${exUnitWord}/hand` : '')
                     : exUnitWord;
                   // The bar the chip and the plates read: the set's own if it is one of this unit's bars, else the unit's first.
@@ -5802,7 +5813,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           if (typeof prior.weight === 'number' && prior.weight > 0 && (prior.unit ?? 'lb') === (unitOf(exercise) ?? 'lb')) patch.weight = prior.weight;
                           if (typeof prior.reps === 'number' && prior.reps > 0) patch.reps = prior.reps;
                           if (typeof prior.duration_seconds === 'number' && prior.duration_seconds > 0) patch.duration_seconds = prior.duration_seconds;
-                          if (prior.resistance_level != null) patch.resistance_level = prior.resistance_level;
+                          if (prior.resistance_level != null && ((prior.unit ?? 'lb') === (unitOf(exercise) ?? 'lb') || bandNumber(prior.resistance_level) == null)) patch.resistance_level = prior.resistance_level;
                           if (Object.keys(patch).length > 0) updateSet(exercise.id, setIndex, patch);
                         };
 
@@ -5823,14 +5834,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <button
                                   type="button"
                                   onClick={() => openKeypadForSet({
-                                    exerciseId: exercise.id, setIndex, field: 'band', title: 'Assist (lb)',
+                                    exerciseId: exercise.id, setIndex, field: 'band', title: exUnit === 'kg' ? 'Assist (kg)' : 'Assist (lb)',
                                     initialValue: assistNum == null ? '' : String(assistNum),
                                     allowDecimal: true,
-                                    hint: 'Pounds of help from the band or machine. Leave blank if none.',
+                                    hint: exUnit === 'kg' ? 'Kilograms of help from the band or machine. Leave blank if none.' : 'Pounds of help from the band or machine. Leave blank if none.',
                                   })}
                                   className={`${numCls} flex-1 min-w-0`}
                                   style={{ ...numStyle, fontSize: '15px' }}
-                                  aria-label="Assist in pounds"
+                                  aria-label={exUnit === 'kg' ? 'Assist in kilograms' : 'Assist in pounds'}
                                 >
                                   {assistNum == null ? <span className="text-white/40">−</span> : `-${assistNum}`}
                                 </button>
@@ -5859,13 +5870,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <button
                                 type="button"
                                 onClick={() => openKeypadForSet({
-                                  exerciseId: exercise.id, setIndex, field: 'band', title: 'Band (lb)',
+                                  exerciseId: exercise.id, setIndex, field: 'band', title: exUnit === 'kg' ? 'Band (kg)' : 'Band (lb)',
                                   initialValue: bandNum == null ? '' : String(bandNum),
-                                  allowDecimal: true, hint: BAND_LB_HINT,
+                                  allowDecimal: true, hint: exUnit === 'kg' ? BAND_KG_HINT : BAND_LB_HINT,
                                 })}
                                 className={numCls}
                                 style={numStyle}
-                                aria-label="Band pounds"
+                                aria-label={exUnit === 'kg' ? 'Band kilograms' : 'Band pounds'}
                               >
                                 {bandNum == null ? <span className="text-white/40">—</span> : String(bandNum)}
                               </button>

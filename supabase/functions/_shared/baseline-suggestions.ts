@@ -13,6 +13,7 @@
  */
 import { resolveStrengthCapacity, canonicalizeLiftKey, type CanonicalLiftKey } from './state-trend/capacity-resolver.ts';
 import { suggestBaselineUpdate } from './state-trend/reconcile.ts';
+import { KG_PER_LB } from '../../../src/lib/bar-types.ts';
 
 /** The four lifts My Record lists. */
 export const RECORD_LIFT_KEYS: CanonicalLiftKey[] = ['deadlift', 'squat', 'bench', 'overheadPress1RM'];
@@ -20,7 +21,7 @@ export const RECORD_LIFT_KEYS: CanonicalLiftKey[] = ['deadlift', 'squat', 'bench
 export type RecordSuggestion = {
   /** The logged number the Update button saves: pounds for a lift, seconds per 100 yd for swim. */
   computed: number;
-  /** "225 lbs" · "1:32" */
+  /** "225 lbs" · "102 kg" · "1:32" — a lift in the athlete's unit. */
   display: string;
   /** "+13.3%" · "-6%" */
   pct_display: string;
@@ -30,6 +31,8 @@ export type RecordLiftRow = {
   key: CanonicalLiftKey;
   /** The number the app runs on (locked, then trusted logged, then typed), whole pounds; null = none. */
   value: number | null;
+  /** `value` in the athlete's unit with its label: "290 lbs" · "132 kg" (whole kilograms, as Adjust prints). */
+  value_display: string | null;
   locked: boolean;
   suggestion: RecordSuggestion | null;
 };
@@ -59,7 +62,10 @@ const fmtMmSs = (sec: number): string => {
   return `${mm}:${String(ss).padStart(2, '0')}`;
 };
 
-export function recordLiftRows(args: Baselines & { lockedBaselines: Record<string, unknown> | null | undefined }): RecordLiftRow[] {
+export function recordLiftRows(args: Baselines & { lockedBaselines: Record<string, unknown> | null | undefined; metric?: boolean }): RecordLiftRow[] {
+  // ⛔ THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3). A lift is stored in pounds; a metric account read
+  // "290 lbs" here while Adjust printed 132 kg. Converted by the definition constant, whole, as Adjust rounds.
+  const inUnit = (lb: number) => (args.metric ? `${Math.round(lb * KG_PER_LB)} kg` : `${Math.round(lb)} lbs`);
   const s1rms = (args.learnedFitness?.strength_1rms ?? null) as Record<string, any> | null;
   return RECORD_LIFT_KEYS.map((key) => {
     const r = resolveStrengthCapacity({
@@ -73,8 +79,9 @@ export function recordLiftRows(args: Baselines & { lockedBaselines: Record<strin
     return {
       key,
       value: r.value != null && r.source !== 'none' ? Math.round(r.value) : null,
+      value_display: r.value != null && r.source !== 'none' ? inUnit(r.value) : null,
       locked: r.source === 'locked',
-      suggestion: sug ? { computed: sug.computed, display: `${sug.computed} lbs`, pct_display: pctDisplay(sug.divergencePct) } : null,
+      suggestion: sug ? { computed: sug.computed, display: inUnit(sug.computed), pct_display: pctDisplay(sug.divergencePct) } : null,
     };
   });
 }

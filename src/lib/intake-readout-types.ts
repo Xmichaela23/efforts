@@ -5,7 +5,8 @@ import type { SetupBlock } from '../../supabase/functions/_shared/standing-plan/
  * The plan builder and the season wizard print these fields; the phone works none of them out.
  * Type only: the shape is owned by the server file.
  */
-export type LiftOnFile = { value: number; source: 'locked' | 'learned' | 'typed' };
+/** `value` pounds (reps for pull-ups); `display` the number printed, in the athlete's unit. */
+export type LiftOnFile = { value: number; display: string; source: 'locked' | 'learned' | 'typed' };
 
 export type IntakeLiftKey = 'squat' | 'bench' | 'deadlift' | 'overheadPress1RM' | 'pullupMaxReps';
 

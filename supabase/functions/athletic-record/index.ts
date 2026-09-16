@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
         .order('date', { ascending: true }),
       supabase
         .from('user_baselines')
-        .select('performance_numbers, learned_fitness, locked_baselines, updated_at')
+        .select('performance_numbers, learned_fitness, locked_baselines, updated_at, units')
         .eq('user_id', userId)
         .maybeSingle(),
     ]);

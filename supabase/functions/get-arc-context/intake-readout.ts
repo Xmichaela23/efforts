@@ -35,8 +35,10 @@ import { hasPaceBenchmark } from '../_shared/pace-benchmark.ts';
 import { inferLimiterSportFromArc } from '../_shared/limiter-sport.ts';
 import type { ArcContext } from '../_shared/arc-context.ts';
 import { clock, M_PER_MI } from '../_shared/display-format.ts';
+import { KG_PER_LB } from '../../../src/lib/bar-types.ts';
 
-export type LiftOnFile = { value: number; source: 'locked' | 'learned' | 'typed' };
+/** `value` stays pounds (reps for pull-ups); `display` is the number the screen prints, in the athlete's unit. */
+export type LiftOnFile = { value: number; display: string; source: 'locked' | 'learned' | 'typed' };
 
 /** The athlete's answers the hours cards depend on, as the wizard's goal payload carries them. */
 export type SessionFrequencyAsk = {
@@ -128,7 +130,13 @@ export function buildIntakeReadout(args: {
       asOf: args.asOf,
     });
     lifts[key] = r.value != null && r.source !== 'none'
-      ? { value: Math.round(r.value), source: r.source as LiftOnFile['source'] }
+      // ⛔ THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3): pounds printed bare on a metric account; whole
+      // kilograms by the definition constant, as Adjust prints. Pull-ups are reps.
+      ? {
+        value: Math.round(r.value),
+        display: String(metric && key !== 'pullupMaxReps' ? Math.round(r.value * KG_PER_LB) : Math.round(r.value)),
+        source: r.source as LiftOnFile['source'],
+      }
       : null;
   }
   const onFile = BARBELL_LIFTS.filter((k) => lifts[k] != null).length;

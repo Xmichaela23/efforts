@@ -54,6 +54,7 @@ export type RecordBaselinesRow = {
   learned_fitness?: Record<string, any> | null;
   locked_baselines?: Record<string, unknown> | null;
   updated_at?: string | null;
+  units?: string | null;
 } | null;
 
 const isRunSport = (sport: string | null | undefined) => {
@@ -108,7 +109,7 @@ export function buildAthleticRecord(input: {
   const lf = bl?.learned_fitness ?? null;
   const five = String(pn.fiveK_pace || pn.fiveK || '').trim();
   const swim_pace_100 = recordSwimPace({ performanceNumbers: pn, learnedFitness: lf, asOf: input.asOf });
-  const lifts = recordLiftRows({ performanceNumbers: pn, learnedFitness: lf, lockedBaselines: bl?.locked_baselines ?? null, asOf: input.asOf });
+  const lifts = recordLiftRows({ performanceNumbers: pn, learnedFitness: lf, lockedBaselines: bl?.locked_baselines ?? null, asOf: input.asOf, metric: String(bl?.units ?? '') === 'metric' });
 
   // The page's own empty-card test, moved unchanged.
   const has_content =

@@ -46,9 +46,9 @@ Deno.test('lifts: a trusted learned squat outranks the typed one; a thin one doe
     }),
     effort: null, asOf: AS_OF,
   });
-  assertEquals(trusted.lifts.squat, { value: 231, source: 'learned' });
-  assertEquals(trusted.lifts.bench, { value: 150, source: 'typed' });
-  assertEquals(trusted.lifts.pullupMaxReps, { value: 0, source: 'typed' });
+  assertEquals(trusted.lifts.squat, { value: 231, display: '231', source: 'learned' });
+  assertEquals(trusted.lifts.bench, { value: 150, display: '150', source: 'typed' });
+  assertEquals(trusted.lifts.pullupMaxReps, { value: 0, display: '0', source: 'typed' });
   assertEquals(trusted.barbell_lifts_on_file, 'all');
 
   const thin = buildIntakeReadout({
@@ -58,13 +58,21 @@ Deno.test('lifts: a trusted learned squat outranks the typed one; a thin one doe
     }),
     effort: null, asOf: AS_OF,
   });
-  assertEquals(thin.lifts.squat, { value: 200, source: 'typed' });
+  assertEquals(thin.lifts.squat, { value: 200, display: '200', source: 'typed' });
 
   const locked = buildIntakeReadout({
     arc: arc({ performance_numbers: { squat: 200 }, locked_baselines: { squat: 185 } }),
     effort: null, asOf: AS_OF,
   });
-  assertEquals(locked.lifts.squat, { value: 185, source: 'locked' });
+  assertEquals(locked.lifts.squat, { value: 185, display: '185', source: 'locked' });
+
+  // A metric account prints whole kilograms; pull-ups stay reps (2026-09-16, Stage 7 session 3).
+  const metric = buildIntakeReadout({
+    arc: arc({ units: 'metric', performance_numbers: { squat: 290, pullupMaxReps: 8 } }),
+    effort: null, asOf: AS_OF,
+  });
+  assertEquals(metric.lifts.squat, { value: 290, display: '132', source: 'typed' });
+  assertEquals(metric.lifts.pullupMaxReps, { value: 8, display: '8', source: 'typed' });
 });
 
 Deno.test('pace benchmark: a learned threshold object at medium confidence counts', () => {

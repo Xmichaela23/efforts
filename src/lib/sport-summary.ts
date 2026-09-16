@@ -85,14 +85,15 @@ export function latestPoint<T extends { date: string; value: number }>(points: R
  * prints the number alone — no "+0".
  */
 export function strengthGlanceRows(
-  lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; sinceBlockDelta?: number | null }>,
+  lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; latestE1rmDisplay?: string | null; sinceBlockDelta?: number | null }>,
 ): SportRow[] {
-  const primary = lifts.filter((l) => l.latestE1rm != null).slice(0, 6);
+  const primary = lifts.filter((l) => l.latestE1rm != null && l.latestE1rmDisplay != null).slice(0, 6);
   return primary.map((l) => {
-    const n = Math.round(l.latestE1rm as number);
+    // The server's number in the athlete's unit (2026-09-16, Stage 7 session 3); this rounded pounds.
+    const n = l.latestE1rmDisplay as string;
     const d = l.sinceBlockDelta;
     return d != null && d !== 0
-      ? { name: l.displayName, value: String(n), note: `${d > 0 ? '+' : '-'}${Math.abs(d)}` }
-      : { name: l.displayName, value: String(n) };
+      ? { name: l.displayName, value: n, note: `${d > 0 ? '+' : '-'}${Math.abs(d)}` }
+      : { name: l.displayName, value: n };
   });
 }

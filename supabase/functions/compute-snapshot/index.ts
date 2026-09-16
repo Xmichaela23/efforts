@@ -1899,7 +1899,7 @@ serve(async (req: Request) => {
         try {
           // `effort_paces` added 2026-08-19: it is the wizard/VDOT tier of the pace resolvers, and without
           // it the resolver answers with one of its three inputs missing. Same row, no extra query.
-          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness, effort_paces, locked_baselines").eq("user_id", userId).maybeSingle();
+          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness, effort_paces, locked_baselines, units").eq("user_id", userId).maybeSingle();
           ub = r.data;
           // A LOCKED value is the athlete's asserted number and outranks the typed seed here too (2026-09-02).
           strengthBaselines = buildStrengthBaselines(ub?.performance_numbers, ub?.learned_fitness?.strength_1rms, ub?.locked_baselines);
@@ -2024,7 +2024,8 @@ serve(async (req: Request) => {
         const result = assembleStateTrends({ asOf,
           // ⛔ THE ATHLETE'S UNIT (2026-09-15, Stage 4 session 2) — lifts convert from pounds and the run
           // row's paces are written per mile or per kilometre on the server, not in the render.
-          metric: String((ub?.performance_numbers as { units?: unknown } | null)?.units ?? 'imperial') === 'metric',
+          // The `units` column, the setting `save-baselines` writes and every other reader uses (2026-09-16, Stage 7 session 3).
+          metric: String(ub?.units ?? 'imperial') === 'metric',
           exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, planWeekAsOf, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).

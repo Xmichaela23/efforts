@@ -31,15 +31,21 @@ Deno.test('strengthGlanceRows: no lifts → []', () => {
 
 Deno.test('strengthGlanceRows: the server\'s creep beside the number; flat, opening or absent prints the number alone', () => {
   assertEquals(strengthGlanceRows([
-    { displayName: 'Back Squat', latestE1rm: 214.6, sinceBlockDelta: 5 },
-    { displayName: 'Bench Press', latestE1rm: 160, sinceBlockDelta: -5 },
-    { displayName: 'Deadlift', latestE1rm: 240, sinceBlockDelta: 0 },
-    { displayName: 'Overhead Press', latestE1rm: 100, sinceBlockDelta: null },
-    { displayName: 'Barbell Row', latestE1rm: null, sinceBlockDelta: 3 },
+    { displayName: 'Back Squat', latestE1rm: 214.6, latestE1rmDisplay: '215', sinceBlockDelta: 5 },
+    { displayName: 'Bench Press', latestE1rm: 160, latestE1rmDisplay: '160', sinceBlockDelta: -5 },
+    { displayName: 'Deadlift', latestE1rm: 240, latestE1rmDisplay: '240', sinceBlockDelta: 0 },
+    { displayName: 'Overhead Press', latestE1rm: 100, latestE1rmDisplay: '100', sinceBlockDelta: null },
+    { displayName: 'Barbell Row', latestE1rm: null, latestE1rmDisplay: null, sinceBlockDelta: 3 },
   ]), [
     { name: 'Back Squat', value: '215', note: '+5' },
     { name: 'Bench Press', value: '160', note: '-5' },
     { name: 'Deadlift', value: '240' },
     { name: 'Overhead Press', value: '100' },
+  ]);
+});
+
+Deno.test('strengthGlanceRows: a metric account prints the server\'s kilograms, never the pounds', () => {
+  assertEquals(strengthGlanceRows([{ displayName: 'Back Squat', latestE1rm: 280, latestE1rmDisplay: '127', sinceBlockDelta: 2 }]), [
+    { name: 'Back Squat', value: '127', note: '+2' },
   ]);
 });

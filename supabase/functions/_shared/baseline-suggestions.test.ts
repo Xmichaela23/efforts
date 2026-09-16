@@ -75,11 +75,15 @@ Deno.test('an unlocked lift with a trusted logged number prints that number and 
   const pn = { squat: 200, deadlift: 250, bench: 150 };
   const rows = recordLiftRows({ performanceNumbers: pn, learnedFitness: LEARNED, lockedBaselines: null, asOf: AS_OF });
   assertEquals(rows.map((r) => r.key), ['deadlift', 'squat', 'bench', 'overheadPress1RM']);
-  assertEquals(rows.find((r) => r.key === 'squat'), { key: 'squat', value: 230, locked: false, suggestion: null });
-  assertEquals(rows.find((r) => r.key === 'deadlift'), { key: 'deadlift', value: 300, locked: false, suggestion: null });
+  assertEquals(rows.find((r) => r.key === 'squat'), { key: 'squat', value: 230, value_display: '230 lbs', locked: false, suggestion: null });
+  assertEquals(rows.find((r) => r.key === 'deadlift'), { key: 'deadlift', value: 300, value_display: '300 lbs', locked: false, suggestion: null });
   // Two logged sessions are not trusted: the typed bench stands, as it did.
-  assertEquals(rows.find((r) => r.key === 'bench'), { key: 'bench', value: 150, locked: false, suggestion: null });
-  assertEquals(rows.find((r) => r.key === 'overheadPress1RM'), { key: 'overheadPress1RM', value: null, locked: false, suggestion: null });
+  assertEquals(rows.find((r) => r.key === 'bench'), { key: 'bench', value: 150, value_display: '150 lbs', locked: false, suggestion: null });
+  assertEquals(rows.find((r) => r.key === 'overheadPress1RM'), { key: 'overheadPress1RM', value: null, value_display: null, locked: false, suggestion: null });
+  // A metric account reads whole kilograms, as Adjust prints (2026-09-16, Stage 7 session 3); the saved number stays pounds.
+  const kg = recordLiftRows({ performanceNumbers: pn, learnedFitness: LEARNED, lockedBaselines: null, asOf: AS_OF, metric: true });
+  assertEquals(kg.find((r) => r.key === 'squat')?.value_display, '104 kg');
+  assertEquals(kg.find((r) => r.key === 'squat')?.value, 230);
 });
 
 Deno.test('Update: a locked lift saves the logged number as typed and locked; a moved number is refused', () => {

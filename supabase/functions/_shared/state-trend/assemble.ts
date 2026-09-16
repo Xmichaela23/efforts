@@ -1378,7 +1378,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         // as nothing — the same narrow point that would have killed the intent gate one file over.
         .map((p) => ({
           date: p.date,
-          value: Math.round(p.value),
+          // ⛔ IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3) — the chart's range label read "280–290 kg"
+          // off pound values on a metric account. Whole kilograms by the definition constant, as the tiles.
+          value: inAthletesUnit(p.value),
           recent: p.date > _verdictStart,
           ...(((p.meta as { week?: number } | undefined)?.week) != null
             ? { week: (p.meta as { week: number }).week }
@@ -1480,13 +1482,19 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     ),
     // ⚠️ The faint line, carried from the caller. Absent before the block's test is read — the card
     // then draws the readings alone, which is still the read.
-    expected: inp.expectedByCanonical?.[l.canonical],
+    // Same unit as `series` above — the faint line is drawn on the same axis.
+    expected: inp.expectedByCanonical?.[l.canonical]?.map((p) => ({ ...p, value: _metric ? p.value * KG_PER_LB : p.value })),
   }));
   // ⛔ ONE SLOT, ONE ROW (audit 2026-09-10, H-S18) — the trap bar folds into the deadlift HERE, before
   // the rows are cached, so every reader of `perLift` / `per_lift` sees the merged slot. Was folded on
   // the State screen only. Then the since-block creep (H-S19), measured on the folded chart.
   const strengthPerLift: StrengthPerLift[] = foldVariantSlots(unfoldedPerLift)
-    .map((l) => ({ ...l, sinceBlockDelta: sinceBlockDelta(l, inp.planWeekAsOf) }));
+    // The creep and the row's number in the athlete's unit, off the same (converted) chart (Stage 7 session 3).
+    .map((l) => ({
+      ...l,
+      sinceBlockDelta: sinceBlockDelta({ ...l, latestE1rm: l.latestE1rm != null && _metric ? l.latestE1rm * KG_PER_LB : l.latestE1rm }, inp.planWeekAsOf),
+      latestE1rmDisplay: l.latestE1rm != null && Number.isFinite(l.latestE1rm) ? String(inAthletesUnit(l.latestE1rm)) : null,
+    }));
   // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
   // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
   const strengthE1rmBand = computeE1rmBand(liftSeries, inp.strengthBaselines);

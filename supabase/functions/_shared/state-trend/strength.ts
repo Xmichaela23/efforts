@@ -181,7 +181,9 @@ export interface StrengthPerLift {
    *  ⚠️ BLOCK-SCOPED WHILE `series` IS NOT: the readings are the athlete's across blocks, but "where
    *  the programme says you should be" is a claim only the current programme can make. */
   expected?: Array<{ date: string; value: number }>;
-  /** ⛔ THE CREEP SINCE THE BLOCK OPENED, in lb — the "+5" on the collapsed strength row (audit
+  /** The collapsed row's number: `latestE1rm` in the athlete's unit, whole ("127" on a metric account). */
+  latestE1rmDisplay?: string | null;
+  /** ⛔ THE CREEP SINCE THE BLOCK OPENED, in the athlete's unit — the "+5" on the collapsed strength row (audit
    *  2026-09-10, H-S19). Null while the block is opening or when no reading carries a block week;
    *  0 = flat. Decided by `sinceBlockDelta` (`assemble.ts`). */
   sinceBlockDelta?: number | null;

@@ -79,7 +79,7 @@ type AthleticRecord = {
   ftp_best: { watts: number; date: string } | null;
   longest_ride: { seconds: number; display: string; date: string | null } | null;
   swim_pace_100: { value: string | null; suggestion: RecordSuggestion | null };
-  lifts: Array<{ key: string; value: number | null; locked: boolean; suggestion: RecordSuggestion | null }>;
+  lifts: Array<{ key: string; value: number | null; value_display: string | null; locked: boolean; suggestion: RecordSuggestion | null }>;
   baselines_updated_at: string | null;
   has_content: boolean;
 };
@@ -553,7 +553,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                         <div className="flex justify-between">
                           <span className="text-white/50">{label}</span>
                           <span className="tabular-nums">
-                            {row?.value != null ? `${row.value} lbs` : '—'}
+                            {row?.value_display ?? '—'}
                           </span>
                         </div>
                         {sug && <SuggestionLine sug={sug} onConfirm={() => confirmSuggestion('lift', sug.computed, key)} />}

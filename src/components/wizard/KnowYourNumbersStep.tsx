@@ -178,7 +178,7 @@ export function KnowYourNumbersStep({
           strengthAny
             ? (
               <>
-                {lifts.filter((l) => l.onFile).map((l) => `${copy.lift_labels[l.f.key]} ${l.onFile!.value}${l.f.reps ? copy.reps_suffix : ''}`).join(' · ')}
+                {lifts.filter((l) => l.onFile).map((l) => `${copy.lift_labels[l.f.key]} ${l.onFile!.display}${l.f.reps ? copy.reps_suffix : ''}`).join(' · ')}
                 {' '}<span className="text-white/40">· {lifts.some((l) => l.onFile?.source === 'learned') ? copy.source_learned_lifts : copy.source_typed}</span>
                 {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">{copy.strength_use_complete}</div>}
                 {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">{fillIn(copy.strength_use_partial, { lifts: untested.join(copy.lift_list_join), verb: untested.length === 1 ? copy.verb_one : copy.verb_many })}</div>}
