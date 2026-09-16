@@ -84,6 +84,18 @@ cuts are pre-existing and kept deliberately. Every reader of the table (zone row
 analyser's bins, the facts bins) moves together if it changes, and stored run analyses would need a
 recalculation to re-bin.
 
+## QUEUED — A RUN OR RIDE'S DISTANCE COMES FROM THE SAMPLES BEFORE THE DEVICE'S OWN TOTAL (filed 2026-09-16, WORKORDER Stage 7 session 1; Michael: its own item, after this session)
+
+`compute-workout-analysis/index.ts` (the non-swim `distance_m`, ~1907) takes the last sample's running distance
+first and the device's summary `distance` only when the samples carry none. Every distance reader
+(`_shared/pace-resolution.ts resolveOverallDistanceMi` and the screens behind it) reads that stored value, so it
+breaks WORKORDER §1 rule 7 (the device's number wins) on every run and ride that has samples. The guard does
+not flag it: the chain is series → sent, which reads as allowed. Flipping it moves stored distance and pace on
+every run and ride by metres and needs a re-analysis of every stored session. Session 1 removed only the third
+rung (the app's own previous value); the order of the first two is this item.
+**Seen in the same session's throwaway check, same kind:** Details' ride max speed reads the samples' best
+before the device's `max_speed` (`workout-detail/index.ts` `max_speed_mps`).
+
 ## QUEUED — THE RUN ANALYSER TAKES ONE MORE BEAT OFF A STORED ZONE 1 (filed 2026-09-16, WORKORDER §3b item 5; no change)
 
 `analyze-running-workout/index.ts` Priority 1 (the athlete's `configured_hr_zones.zones`) reads zone 1's
