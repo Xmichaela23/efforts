@@ -128,6 +128,7 @@ export const LIMITED_DATA_UNDER_SAMPLES = 5;
 export const LIMITED_DATA_STALE_OVER_DAYS = 21;
 
 export function isLimitedData(sampleCount: number | null | undefined, newestAgeDays: number | null | undefined): boolean {
+  // estimate-ok: no count on the payload is not read as "few" — the "limited data" words print only on a count that says so.
   return (sampleCount ?? 99) < LIMITED_DATA_UNDER_SAMPLES && (newestAgeDays ?? 0) > LIMITED_DATA_STALE_OVER_DAYS;
 }
 
@@ -145,6 +146,7 @@ export function isLimitedData(sampleCount: number | null | undefined, newestAgeD
  * ⚠️ `dp` IS DISPLAY ONLY; the raw change stays on the payload. A tenth of a percent on a regression
  * slope over three months is false precision.
  */
+// estimate-ok: `dp = 1` is the decimal places printed, a display default, not a stand-in for a measurement.
 export function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 1): string | null {
   if (pct == null) return null;
   const mag = (n: number) => Math.abs(n).toFixed(dp).replace(/\.0+$/, '');

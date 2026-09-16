@@ -56,10 +56,10 @@ function rirToIntensityContext(avgRir: number | null): string {
 }
 
 function effortFraction(avgRir: number | null): number {
-  // estimate-ok: RIR is optional; absent → a moderate-effort PRIOR (0.7) for the internal
-  // session_load recovery model. A model coefficient for a missing signal, not an impersonated
-  // measurement in a rendered verdict; keeps a logged set as real load rather than blanking it.
   // OURS — `effortFraction` (10 − RIR) ÷ 10, 0.7 with no RIR: no outside source
+  // RIR is optional; absent → a moderate-effort PRIOR (0.7) for the internal session_load recovery model. A model
+  // coefficient for a missing signal, not an impersonated measurement in a rendered verdict.
+  // estimate-ok: keeps a logged set as real load rather than blanking it.
   if (avgRir == null) return 0.7;
   return Math.max(0, Math.min(1, (10 - avgRir) / 10));
 }
@@ -75,10 +75,11 @@ function enduranceIntensityFromZones(timeInZone: Record<string, number> | null |
   z4z5Minutes: number;
   totalZoneMinutes: number;
 } {
-  // estimate-ok: no zone data → a moderate-intensity PRIOR (0.8) for the session_load recovery
+  // No zone data → a moderate-intensity PRIOR (0.8) for the session_load recovery
   // model (a coefficient for a missing signal, not an impersonated metric in a rendered verdict).
   if (!timeInZone || typeof timeInZone !== "object") {
     // OURS — `enduranceIntensityFromZones` 0.8 moderate prior; ≥ 20% in Z4–Z5 hard (1.2), ≥ 55% in Z1–Z2 recovery (0.5): no outside source
+    // estimate-ok: the moderate prior above, for the internal recovery model only.
     return { modifier: 0.8, context: "moderate", z4z5Minutes: 0, totalZoneMinutes: 0 };
   }
   let z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0;

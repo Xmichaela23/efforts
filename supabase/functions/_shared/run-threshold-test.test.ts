@@ -20,6 +20,9 @@ const REPO = new URL('../../../', import.meta.url);
 const card = await Deno.readTextFile(new URL('src/components/TrainingBaselines.tsx', REPO));
 const analysis = await Deno.readTextFile(new URL('supabase/functions/compute-workout-analysis/index.ts', REPO));
 const materialize = await Deno.readTextFile(new URL('supabase/functions/materialize-plan/index.ts', REPO));
+// ⛔ THE TIME-TRIAL MATHS MOVED INTO THE LEARNER (bc6d7b98, Stage 7 session 1): `learn-fitness-profile` is where the
+// result is computed and checked now, so the invariant is read there.
+const learner = await Deno.readTextFile(new URL('supabase/functions/learn-fitness-profile/index.ts', REPO));
 
 Deno.test('the run card OFFERS the test when the threshold is not measured', () => {
   assert(/Schedule a threshold test/.test(card), 'the run card no longer offers the test');
@@ -43,8 +46,8 @@ Deno.test('the TEST RESULT obeys the invariant — faster than easy, or refused'
   // ⛔ It is now the primary path to a measured threshold and writes at `confidence: 'high'`, which
   // every consumer trusts. A TT slower than the athlete's own easy pace is a mis-detected lap, a GPS
   // dropout, or an abandoned test — not a threshold.
-  const block = analysis.slice(analysis.indexOf("tags.includes('run_test')"));
-  assert(/slowerThanEasy/.test(block.slice(0, 3000)), 'the test result no longer checks the invariant');
+  const block = learner.slice(learner.indexOf('const slowerThanEasy'));
+  assert(learner.includes('const slowerThanEasy'), 'the test result no longer checks the invariant');
   assert(
     /paceSecPerKm > 180 && paceSecPerKm < 600 && !slowerThanEasy/.test(block.slice(0, 3000)),
     'the invariant is computed but not applied to the write',

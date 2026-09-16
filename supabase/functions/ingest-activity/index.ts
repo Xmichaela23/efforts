@@ -1321,7 +1321,7 @@ Deno.serve(async (req)=>{
     headers: cors
   });
   try {
-    const { userId, provider, activity } = await req.json();
+    const { userId, provider, activity, history } = await req.json();
     if (!userId || !provider || !activity) {
       return new Response(JSON.stringify({
         error: 'Missing required fields'
@@ -1338,6 +1338,9 @@ Deno.serve(async (req)=>{
     if (provider === 'strava') {
       row = mapStravaToWorkout(activity, userId);
       onConflict = 'user_id,strava_activity_id';
+      // A history import's row never asks for post-workout feedback; the popup honours this column as a dismissal.
+      // Sent only by `import-strava-history` — a live webhook or a re-ingest leaves the column as it is.
+      if (history === true) row.feedback_dismissed_at = new Date().toISOString();
     } else if (provider === 'garmin') {
       row = await mapGarminToWorkout(activity, userId);
       onConflict = 'user_id,garmin_activity_id';

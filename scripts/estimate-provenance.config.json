@@ -56,7 +56,7 @@
   "_truth_doc": "The one-truth guard (docs/DESIGN-one-truth-guard.md, Stage 6). severity: 'fail' stops `npm run build`; 'warn' prints and counts. A rule goes to fail only when its count outside `parked` is 0 (design §9). Parked hits are counted and never fail; removing a path reopens it for every rule at once.",
   "truth": {
     "severity": {
-      "0": "warn",
+      "0": "fail",
       "1": "fail",
       "2": "fail",
       "2-ledger": "fail",
