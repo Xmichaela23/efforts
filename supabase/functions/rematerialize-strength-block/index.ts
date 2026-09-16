@@ -59,6 +59,13 @@ import {
   undoLatestCalibration,
 } from '../shared/strength-system/loading/calibration.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
+// ⛔ THE STATUS AND ITS LINE ARE DECIDED HERE NOW (2026-09-15, Stage 4 session 2). The phone picked the
+// cycle to read, ran `liftStatus` itself and composed the sentence in `strength-calibration-copy`. Both
+// files stay where they are — the edge functions bundle `src/lib/` and `shared/` at deploy time — and
+// the phone simply stops calling them.
+import { liftStatus } from '../shared/strength-system/loading/calibration.ts';
+import { liftStatusLine } from '../../../src/lib/strength-calibration-copy.ts';
+import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
 
 /**
  * ⛔ ONE CLOCK, AND IT IS NOT IN THE PURE MODULES. `calibration.ts` takes an ISO string rather than
@@ -195,6 +202,16 @@ Deno.serve(async (req) => {
       return c?.index ?? 1;
     })();
 
+    // ⛔ THE ATHLETE'S UNIT, for the status line's number (2026-09-15). A working number is stored in
+    // pounds; a metric account reads kilograms. Absent → imperial, today's behaviour everywhere.
+    const { data: ubRow } = await supabase
+      .from('user_baselines')
+      .select('performance_numbers')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const liftMetric = String((ubRow?.performance_numbers as { units?: unknown } | null)?.units ?? 'imperial') === 'metric';
+    const liftUnit = liftMetric ? 'kg' : 'lb';
+
     // ── WHAT WAS LOGGED ──────────────────────────────────────────────────────
     const { data: plannedRows } = await supabase
       .from('planned_workouts')
@@ -244,7 +261,32 @@ Deno.serve(async (req) => {
       // ⚠️ `resetAtCycle` IS SLICE a's OWN OUTPUT and is what tells a `reset` apart from a `bump`. It
       // was exposed for exactly this and consumed by nothing until now.
       const resetAtCycle = walked[walked.length - 1]?.resetAtCycle ?? null;
-      perLift[lift.ref] = { name: lift.name, verdicts, byCycle, resetAtCycle };
+      /**
+       * ⛔ THE AMBIENT STATUS, AND THE LINE THAT PRINTS IT (2026-09-15, Stage 4 session 2). State and
+       * the logger both showed "climbing / holding / reset, training max 210 lb"; the phone chose
+       * which cycle to read it at, called `liftStatus`, and wrote the sentence.
+       * ⚠️ THE CYCLE PICK IS THE ONE THE PHONE MADE, MOVED, NOT CHANGED: the current cycle when this
+       * lift has a number for it, otherwise the last cycle it does — a lift whose block ended still
+       * reports the state it finished in rather than nothing.
+       */
+      const atCycle = byCycle.some((b) => b.cycle === currentCycle)
+        ? currentCycle
+        : (byCycle[byCycle.length - 1]?.cycle ?? 1);
+      const status = liftStatus(byCycle, resetAtCycle, atCycle);
+      const trainingMax = Number(byCycle.find((b) => b.cycle === atCycle)?.workingNumber) || 0;
+      perLift[lift.ref] = {
+        name: lift.name,
+        verdicts,
+        byCycle,
+        resetAtCycle,
+        status,
+        status_at_cycle: atCycle,
+        // ⛔ A WORKING NUMBER IS POUNDS, ALWAYS, and converts for a metric account by the definition
+        // constant — the same rule Adjust and Baselines follow (§8.0 #7).
+        training_max: liftMetric ? Math.round(trainingMax * KG_PER_LB) : Math.round(trainingMax),
+        training_max_unit: liftUnit,
+        status_line: liftStatusLine(lift.name, status, trainingMax, liftUnit),
+      };
     }
 
     // ── THE DIFF, ON WEEKS THAT HAVE NOT STARTED ─────────────────────────────

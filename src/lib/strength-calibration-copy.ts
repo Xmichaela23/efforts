@@ -150,8 +150,23 @@ export const CALIBRATION_STATUS_LABEL: Record<CalibrationStatus, string> = {
  * week's percentage, and an athlete comparing this against the weight on today's card would otherwise
  * find two numbers for one lift with nothing distinguishing them.
  */
-export function liftStatusLine(lift: string, status: CalibrationStatus, trainingMax: number): string {
-  const n = Math.round(Number(trainingMax) || 0);
+export function liftStatusLine(
+  lift: string,
+  status: CalibrationStatus,
+  /** The working number in POUNDS, as it is stored. */
+  trainingMax: number,
+  /**
+   * ⛔ THE ATHLETE'S UNIT (2026-09-15, Stage 4 session 2). The line printed "lb" on every account.
+   * A pound value converts by the definition constant — the same rule Adjust and Baselines follow.
+   * Absent → 'lb', today's behaviour everywhere.
+   */
+  unit: string = 'lb',
+): string {
+  const lb = Number(trainingMax) || 0;
+  // 1 lb = 0.45359237 kg exactly (the international pound definition; the same constant `KG_PER_LB`
+  // carries in `_shared/strength/session-volume.ts`). Written out here so this file keeps no import
+  // into the edge-function tree.
+  const n = Math.round(unit === 'kg' ? lb * 0.45359237 : lb);
   if (!(n > 0)) return `${lift} — ${CALIBRATION_STATUS_LABEL[status]}`;
-  return `${lift} — ${CALIBRATION_STATUS_LABEL[status]}, training max ${n} lb`;
+  return `${lift} — ${CALIBRATION_STATUS_LABEL[status]}, training max ${n} ${unit}`;
 }
