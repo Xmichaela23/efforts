@@ -57,7 +57,8 @@ Deno.serve(async (req: Request) => {
     const config = plan.config ?? {};
     const isStanding = String(config?.strength_protocol ?? '') === STANDING_PLAN_PROTOCOL_ID
       || String(config?.source ?? '').toLowerCase() === STANDING_PLAN_PROTOCOL_ID;
-    if (!isStanding) return json({ success: false, reason: 'not_a_standing_plan_block' }, 400);
+    // ⛔ THE OTHER PLAN TYPE IS AN ANSWER, NOT A FAILURE (2026-09-16) — same as both rematerializers; callers read `data.success`.
+    if (!isStanding) return json({ success: false, reason: 'not_a_standing_plan_block' }, 200);
     const sp = config?.standing_plan ?? {};
     const weeks = Number(plan.duration_weeks) || 12;
     const currentWeek = resolvePlanWeekIndex(config, today, weeks);
