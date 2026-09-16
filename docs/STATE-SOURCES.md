@@ -77,6 +77,9 @@ stated and it is a decision Michael can reverse.
 ## BODY
 Effort and soreness rows: **REMOVED from State 2026-09-04 evening** (Foster + our 7-vs-28 comparison; Hooper + our z-score — neither product's rule). Server computation untouched, coach still reads it.
 
+| Reschedule popup: daily workload cap 120 (140 in a peak week) and the warning line 80 (100 in a peak week); the "better dates" search uses the same 120 / 80 | `validate-reschedule/index.ts` | **OURS** — no app publishes a daily workload ceiling, and these arrived with the popup's own workload formula, which is deleted (2026-09-15, §8.0 #29: the popup now sums the stored `workload_planned`). Stage 5 sources them or strikes them |
+| Reschedule popup daily and weekly numbers = the sum of `planned_workouts.workload_planned` for that date, and for the plan week (`week_number`) holding it — the same field the week totals and the drawer's Workload chip read. A row with none makes the popup say "Workload not worked out yet for this session." | `validate-reschedule/index.ts`, written by `materialize-plan` / `rematerialize-standing-block`, read by `get-week` | FIELD — one stored workload per session (TrainingPeaks' planned TSS model); nothing re-derived at read time (2026-09-15, §8.0 #29, #30) |
+
 ## Not yet swept
 The week-execution bars (a count). Add rows when touched.
 

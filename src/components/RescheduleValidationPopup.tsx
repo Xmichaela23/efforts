@@ -27,12 +27,12 @@ interface ValidationResult {
   severity: 'green' | 'yellow' | 'red';
   reasons: ValidationReason[];
   before: {
-    dailyWorkload: number;
-    weekWorkload: number;
+    dailyWorkload: number | null;
+    weekWorkload: number | null;
   };
   after: {
-    dailyWorkload: number;
-    weekWorkload: number;
+    dailyWorkload: number | null;
+    weekWorkload: number | null;
   };
   suggestions?: string[];
   planContext?: {
@@ -389,21 +389,27 @@ export default function RescheduleValidationPopup({
           )
         )}
 
-        {/* Workload impact */}
+        {/* Workload impact — the server's stored numbers (§8.0 #29/#30); it says so when a row has none. */}
         <div className="mb-4 p-3 rounded-xl bg-white/[0.05] backdrop-blur-md border border-white/10">
           <p className="text-xs text-white/60 font-light mb-2">Workload impact</p>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/70 font-light">Daily</span>
-            <span className="text-white font-light">
-              {before.dailyWorkload} → <span className={after.dailyWorkload > before.dailyWorkload ? 'text-yellow-400' : 'text-white'}>{after.dailyWorkload}</span>
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-sm mt-1">
-            <span className="text-white/70 font-light">Weekly</span>
-            <span className="text-white font-light">
-              {before.weekWorkload} → <span className={after.weekWorkload > before.weekWorkload ? 'text-yellow-400' : 'text-white'}>{after.weekWorkload}</span>
-            </span>
-          </div>
+          {before.dailyWorkload == null || after.dailyWorkload == null || before.weekWorkload == null || after.weekWorkload == null ? (
+            <p className="text-sm text-white/70 font-light">Workload not worked out yet for this session.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/70 font-light">Daily</span>
+                <span className="text-white font-light">
+                  {before.dailyWorkload} → <span className={after.dailyWorkload > before.dailyWorkload ? 'text-yellow-400' : 'text-white'}>{after.dailyWorkload}</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span className="text-white/70 font-light">Weekly</span>
+                <span className="text-white font-light">
+                  {before.weekWorkload} → <span className={after.weekWorkload > before.weekWorkload ? 'text-yellow-400' : 'text-white'}>{after.weekWorkload}</span>
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Fallback: Simple suggestions if no coach options */}

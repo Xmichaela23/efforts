@@ -36,12 +36,12 @@ interface ValidationResult {
   severity: 'green' | 'yellow' | 'red';
   reasons: ValidationReason[];
   before: {
-    dailyWorkload: number;
-    weekWorkload: number;
+    dailyWorkload: number | null;
+    weekWorkload: number | null;
   };
   after: {
-    dailyWorkload: number;
-    weekWorkload: number;
+    dailyWorkload: number | null;
+    weekWorkload: number | null;
   };
   suggestions?: string[]; // ISO date strings (general suggestions based on workload/intensity)
   planContext?: {
@@ -188,36 +188,18 @@ function classifyWorkoutPurpose(workout: any): WorkoutPurpose {
   return 'other';
 }
 
-// Simple workload estimation (reuse existing logic if available)
-function estimateWorkload(workout: any): number {
-  // For planned workouts, use duration × intensity² × 100
-  const type = String(workout.type || '').toLowerCase();
-  const duration = workout.total_duration_seconds || workout.duration || 0;
-  const durationHours = duration / 3600;
-  
-  if (durationHours <= 0) return 0;
-  
-  // Get intensity factor
-  const intensity = classifyIntensity(workout);
-  const intensityFactor = intensity === 'hard' ? 1.0 : intensity === 'medium' ? 0.75 : 0.65;
-  
-  // Special handling for strength (volume-based, but simplified for validation)
-  if (type === 'strength') {
-    const exercises = Array.isArray(workout.strength_exercises) ? workout.strength_exercises : [];
-    if (exercises.length > 0) {
-      // Rough estimate: 50-100 for typical strength session
-      return intensity === 'hard' ? 80 : 50;
-    }
-    return 0;
-  }
-  
-  // Mobility/pilates_yoga: low workload
-  if (type === 'mobility' || type === 'pilates_yoga') {
-    return Math.round(durationHours * 0.75 * 0.75 * 100);
-  }
-  
-  // Cardio: duration × intensity² × 100
-  return Math.round(durationHours * Math.pow(intensityFactor, 2) * 100);
+/**
+ * ⛔ THERE IS NO SECOND WORKLOAD FORMULA HERE (2026-09-15, §8.0 #29). `estimateWorkload` lived at this spot —
+ * duration × intensity² × 100, with a flat 80/50 for a lifting session — beside the drawer's own "Workload"
+ * chip for the same session, so the popup and the chip disagreed on every row. The popup now sums
+ * `planned_workouts.workload_planned`, the field `materialize-plan` and `rematerialize-standing-block` write
+ * and the week totals and the chip read (`get-week:1593`). A row without it makes the popup say so.
+ */
+
+/** A planned row's stored workload, or null when the server has not priced it yet. */
+function posLoad(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -452,7 +434,7 @@ Deno.serve(async (req) => {
     const intensity = classifyIntensity(workout);
     const isLong = isLongSession(workout);
     const strengthFocus = classifyStrengthFocus(workout);
-    const workoutWorkload = estimateWorkload(workout);
+    const workoutWorkload = posLoad((workout as any).workload_planned);
     const workoutPurpose = classifyWorkoutPurpose(workout);
     
     // Understand plan week structure (which day_number typically has which workout type)
@@ -566,6 +548,32 @@ Deno.serve(async (req) => {
       .neq('id', workout_id) // Exclude the workout being moved
       .in('workout_status', ['planned', 'in_progress']);
 
+    /**
+     * ⛔ THE WEEK IS THE PLAN'S WEEK (2026-09-15, §8.0 #30). The weekly number was summed over a seven-day
+     * window centred on each date, so the "before" total counted the days around the NEW date — it under-counted
+     * against the "after" number by construction. Both sides now sum the plan week (`week_number`) that holds
+     * the date, from the rows of this plan.
+     */
+    const { data: planWeekRows } = trainingPlanId
+      ? await supabase
+        .from('planned_workouts')
+        .select('id, date, week_number, workload_planned, workout_status')
+        .eq('user_id', user.id)
+        .eq('training_plan_id', trainingPlanId)
+        .in('workout_status', ['planned', 'in_progress'])
+      : { data: null } as { data: null };
+    const weekOfDate = new Map<string, number>();
+    const rowsByWeek = new Map<number, Array<{ id: string; workload_planned: unknown }>>();
+    for (const r of (planWeekRows ?? []) as Array<Record<string, unknown>>) {
+      const wk = Number(r.week_number);
+      const d = String(r.date ?? '').slice(0, 10);
+      if (!Number.isFinite(wk) || !d) continue;
+      weekOfDate.set(d, wk);
+      const arr = rowsByWeek.get(wk) ?? [];
+      arr.push({ id: String(r.id), workload_planned: r.workload_planned });
+      rowsByWeek.set(wk, arr);
+    }
+
     if (contextError) {
       console.error('[validate-reschedule] Context fetch error:', contextError);
     }
@@ -584,24 +592,36 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Calculate workloads
+    // The day's stored load: `workload_planned` on the rows of that date. Null when a row on it has none.
+    let loadUnknown = workoutWorkload == null;
     const calculateDayWorkload = (date: string): number => {
       const workouts = contextByDate.get(date) || [];
-      return workouts.reduce((sum, w) => sum + estimateWorkload(w), 0);
-    };
-
-    const calculateWeekWorkload = (centerDate: string): number => {
       let sum = 0;
-      for (let i = -3; i <= 3; i++) {
-        sum += calculateDayWorkload(addDays(centerDate, i));
+      for (const w of workouts) {
+        const load = posLoad((w as any).workload_planned);
+        if (load == null) loadUnknown = true; else sum += load;
       }
       return sum;
     };
 
-    const beforeDaily = calculateDayWorkload(oldDate);
-    const beforeWeekly = calculateWeekWorkload(oldDate);
-    const afterDaily = calculateDayWorkload(new_date) + workoutWorkload;
-    const afterWeekly = calculateWeekWorkload(new_date) + workoutWorkload;
+    /** The plan week holding this date, summed from its own rows (the moved row excluded — it is added by the caller). */
+    const calculateWeekWorkload = (date: string): number => {
+      const wk = weekOfDate.get(String(date).slice(0, 10));
+      if (wk == null) { loadUnknown = true; return 0; }
+      let sum = 0;
+      for (const r of rowsByWeek.get(wk) ?? []) {
+        if (r.id === workout_id) continue;
+        const load = posLoad(r.workload_planned);
+        if (load == null) loadUnknown = true; else sum += load;
+      }
+      return sum;
+    };
+
+    const movedLoad = workoutWorkload ?? 0;
+    const beforeDaily = calculateDayWorkload(oldDate) + movedLoad;
+    const beforeWeekly = calculateWeekWorkload(oldDate) + movedLoad;
+    const afterDaily = calculateDayWorkload(new_date) + movedLoad;
+    const afterWeekly = calculateWeekWorkload(new_date) + movedLoad;
 
     // Check for conflicts: same type workouts on target date
     const sameDayWorkouts = contextByDate.get(new_date) || [];
@@ -900,10 +920,16 @@ Deno.serve(async (req) => {
     // Normal: ~120 daily (allows 1 hard + 1 medium or 2 medium sessions)
     // Peak: ~140 daily (allows higher volume during peak training blocks)
     // These are guidelines - individual recovery varies
+    // OURS — the daily caps (120, 140 in a peak week) and the warning lines (80, 100). No outside source: no app
+    // publishes a daily workload ceiling, and these came in with the popup's own formula. Ledger row
+    // "Reschedule popup caps"; Stage 5 sources them or strikes them (2026-09-15, §8.0 #29).
     const workloadCap = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 140 : 120;
     const workloadWarning = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) ? 100 : 80;
-    
-    if (afterDaily > workloadCap) {
+
+    if (loadUnknown) {
+      // The popup says so rather than inventing a number (§8.0 #29).
+      reasons.push({ code: 'workload_unknown', message: 'Workload not worked out yet for this session.' });
+    } else if (afterDaily > workloadCap) {
       if (severity === 'green') severity = 'yellow';
       const phaseNote = isRecoveryWeek ? " You're in a recovery week, so" : isTaperWeek ? " You're in taper, so" : weekIntent === 'peak' ? " You're in peak week, so" : planPhase ? ` You're in ${planPhase} phase, so` : '';
       const capNote = (weekIntent === 'peak' || planPhase?.toLowerCase().includes('peak')) 
@@ -961,7 +987,7 @@ Deno.serve(async (req) => {
           }
         }
         
-        const candidateWorkload = calculateDayWorkload(candidateDate) + workoutWorkload;
+        const candidateWorkload = calculateDayWorkload(candidateDate) + movedLoad;
         const candidateWorkouts = contextByDate.get(candidateDate) || [];
         const candidateHasHard = candidateWorkouts.some((w: any) => classifyIntensity(w) === 'hard');
         const candidateHasLong = candidateWorkouts.some((w: any) => isLongSession(w));
@@ -1030,6 +1056,7 @@ Deno.serve(async (req) => {
         }
         
         // Workload check
+        // OURS — same two numbers as above; see the ledger row.
         if (candidateWorkload > 120) {
           isValidCandidate = false;
         } else if (candidateWorkload > 80) {
@@ -1136,12 +1163,12 @@ Deno.serve(async (req) => {
       severity,
       reasons,
       before: {
-        dailyWorkload: beforeDaily,
-        weekWorkload: beforeWeekly
+        dailyWorkload: loadUnknown ? null : beforeDaily,
+        weekWorkload: loadUnknown ? null : beforeWeekly
       },
       after: {
-        dailyWorkload: afterDaily,
-        weekWorkload: afterWeekly
+        dailyWorkload: loadUnknown ? null : afterDaily,
+        weekWorkload: loadUnknown ? null : afterWeekly
       },
       suggestions: suggestions.length > 0 ? suggestions : undefined,
       planContext: trainingPlanId ? {
