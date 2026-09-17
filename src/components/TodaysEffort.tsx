@@ -371,8 +371,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [daySlideRaw, setDaySlideRaw] = useState(false);
   /** Set when a swipe commits, read when the new date lands, so the entry comes from the right side. */
   const pendingDayDir = useRef<'prev' | 'next' | null>(null);
-  const DAY_SWIPE_COMMIT_PX = 60;
-  const DAY_SWIPE_FLICK_V = 0.5;   // px per ms — CardDeck's FLICK_VELOCITY
+  /**
+   * ⛔ THE DAY SWIPE COMMITS EASIER THAN THE DECK (2026-09-17, Michael: "it needs a more forceful forward than back").
+   * The rule was already the same both ways (60 px or a 0.5 px/ms flick, CardDeck's numbers); forward is the thumb's
+   * short, slow direction for a right hand, and it cleared the bar less often. OURS — 40 px and 0.3 px/ms, for the day
+   * swipe only: the lift deck keeps its own, so a sideways nudge on a card does not flip it. The 8 px axis lock is
+   * unchanged, so a vertical scroll is still the scroll's.
+   */
+  const DAY_SWIPE_COMMIT_PX = 40;
+  const DAY_SWIPE_FLICK_V = 0.3;   // px per ms
   const DAY_SWIPE_AXIS_PX = 8;     // CardDeck's AXIS_LOCK_PX
   const DAY_SLIDE_MS = 190;
 
