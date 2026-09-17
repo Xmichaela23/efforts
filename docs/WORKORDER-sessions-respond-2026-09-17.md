@@ -146,7 +146,7 @@ something once.
 
 | Stage | State | Date | Notes |
 |---|---|---|---|
-| A Red checks mean something | not started | | |
+| A Red checks mean something | done | 2026-09-17 | 47 → 8 red (556 files). 39 stale checks updated (953389af). 8 left red: 3 real on the punch list (5aa8b95c) — KB swing, seated DB press, eleven untyped movements; `docs/INVENTORY.md` out of date (needs `npm run inventory:write`); 3 checks whose rule is gone, proposed for deletion — the two wizard week-solve checks (9be46477) and the FTP easy-rides warning (abcd7988). Tests only; nothing deployed. |
 | B The run nobody judged | not started | | ladder words await Michael |
 | C Words picked on the phone | not started | | |
 | D Sessions answer back (design) | not started | | |
