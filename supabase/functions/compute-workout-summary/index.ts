@@ -172,6 +172,11 @@ function normalizeComputedPaces(c: any): any {
 }
 
 // ---------- planned field readers (v3 + token parsing) ----------
+/**
+ * The raw metres on a planned step, derived or prescribed. Every caller that PRINTS or MATCHES on it reads
+ * `distanceDerived` first (`formatPlannedLabel`, `stepLapWithinTolerance`) — this accessor deliberately does not,
+ * so a caller that needs the accounting figure can still have it. server-field: the mark is read by the callers.
+ */
 function deriveMetersFromPlannedStep(st: any): number | null {
   const dm = Number(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters);
   if (Number.isFinite(dm) && dm > 0) return dm;
@@ -577,7 +582,8 @@ function calculateExecutionPercentage(plannedStep: any, executedStep: any, overa
       return percentage;
     }
 
-    // Distance adherence
+    // Distance adherence. server-field: a ratio of two measured-against-prescribed distances, never a printed
+    // distance — a derived step falls to the duration branch above, which returns before this line.
     const plannedDistance = Number((plannedStep as any)?.distance_m);
     const executedDistance = Number((executedStep as any)?.distance_m);
     if (Number.isFinite(plannedDistance) && plannedDistance > 0 && Number.isFinite(executedDistance) && executedDistance > 0) {
@@ -1566,8 +1572,13 @@ Deno.serve(async (req) => {
      *     order, takes the next lap that fits it on the same tolerance. A paired lap takes the step's id, name and
      *     range and is judged; every other lap reads "Lap N"; a work step no lap fits is a "not matched" row. Mode
      *     `laps-paired`; the analyzer scores the paired reps' pace plus time.
-     *   · With no rep paired the rows read "Lap 1…N" with no plan, no range, no colour, and no "not done" rows; the
-     *     analyzer scores Execution on duration only.
+     *   · ⛔ AND WHEN NO LAP FITS THE TOLERANCE AT ALL, THE LAPS ARE STILL THE STEPS IF THEY COUNT OUT (2026-09-17,
+     *     Michael's same run seen again: the watch ran 656 m distance laps of 198–211 s against 240 s steps, so the
+     *     3-second work tolerance rejected every rep and nothing was judged). Laps shorter than the shortest planned
+     *     step are dropped — no step is that short, so such a lap cannot be one; if the rest number exactly the steps,
+     *     lap i IS step i. Mode `laps-in-order`; judged like `laps-paired`.
+     *   · With no rep paired and no order match the rows read "Lap 1…N" with no plan, no range, no colour, and no
+     *     "not done" rows; the analyzer scores Execution on duration only.
      * ⚠️ OURS — "structured": the plan has two or more work steps. A steady planned run keeps the existing path,
      * so a watch's automatic mile laps do not turn an easy run into unlabelled rows.
      * The watch's own step type per lap (in its activity file) is not read yet — a later build.
@@ -1646,7 +1657,42 @@ Deno.serve(async (req) => {
             }
             snapMode = 'laps-paired';
           } else {
-            snapMode = 'laps-unmatched';
+            /**
+             * ⛔ WHEN NOTHING FITS THE TOLERANCE BUT THE LAPS ARE THE STEPS, PAIR THEM IN ORDER (2026-09-17,
+             * WORKORDER Stage B1). Michael's 2026-09-16 run: the watch was sent 0.41 mi distance steps by the
+             * pre-493fecc7 export, so its six work laps ran 198–211 s against 240 s steps. `ALIGN.tol.run.time_work_s`
+             * is 3 s, so every rep missed by 29–42 s, NOT ONE REP PAIRED, and the session read Execution 95 from
+             * time alone with no rep judged. The order was right on every row; only the tolerance said no.
+             *
+             * So: drop any lap shorter than the SHORTEST planned step — no step is that short, so such a lap cannot
+             * be one (his watch left an 8-second, 13-metre stray at the end). If the laps that remain then number
+             * exactly the planned steps, lap i is step i. The work steps' laps are judged against their range; every
+             * other lap prints as before. Mode `laps-in-order`; the analyzer scores it like `laps-paired`.
+             *
+             * ⚠️ NO NEW NUMBER. The floor is "shorter than the shortest planned step", not a constant, and the
+             * count test is equality — a lap more or less and this rung does not fire.
+             */
+            const shortestStepSec = plannedSteps
+              .map((st: any) => deriveSecondsFromPlannedStep(st))
+              .filter((s: number) => Number.isFinite(s) && s > 0)
+              .reduce((a: number, b: number) => Math.min(a, b), Infinity);
+            const keep = Number.isFinite(shortestStepSec)
+              ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= shortestStepSec)
+              : [];
+            if (keep.length === plannedSteps.length && keep.length >= 2) {
+              snapped = lapWins.map(([a, b], i) => {
+                const n = placed[i].L.number;
+                const at = keep.indexOf(i);
+                if (at < 0) {
+                  const row = execFromIdx(rows, a, b, 'lap', 'lap');
+                  return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
+                }
+                return { ...execIntervalFromWindow(plannedSteps[at], a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
+              });
+              snapMode = 'laps-in-order';
+            } else {
+              snapMode = 'laps-unmatched';
+            }
           }
         }
       }

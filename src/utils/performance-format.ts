@@ -50,22 +50,6 @@ export const fmtDistanceMi = (km?: number) => {
   return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
 };
 
-export const joinPlannedLabel = (step: any): string => {
-  if (typeof step.distanceMeters === 'number' && step.distanceMeters > 0) {
-    const mi = step.distanceMeters / 1609.34;
-    const paceStr = step.paceTarget || step.target_pace || step.pace || '';
-    const paceClean = String(paceStr).includes('/') ? String(paceStr) : '';
-    return `${mi.toFixed(mi < 1 ? 2 : 1)} mi${paceClean ? ` @ ${paceClean}` : ''}`;
-  }
-  if (typeof step.duration === 'number' && step.duration > 0) {
-    const paceStr = step.paceTarget || step.target_pace || step.pace || '';
-    const paceClean = String(paceStr).includes('/') ? String(paceStr) : '';
-    return `${fmtTime(step.duration)}${paceClean ? ` @ ${paceClean}` : ''}`;
-  }
-  const label = step.effortLabel || step.name || step.type || '';
-  return String(label || '').toString();
-};
-
 export const getAvgHR = (completed: any): number | null => {
   const v = completed?.avg_heart_rate ?? completed?.metrics?.avg_heart_rate;
   return typeof v === 'number' && v > 0 ? Math.round(v) : null;
@@ -221,40 +205,3 @@ export function computeOverallSwimPer100Sec(completed: any): number | null {
     return durationSec / (dMeters / 100);
   } catch { return null; }
 }
-
-export const completedValueForStep = (completed: any, plannedStep: any): CompletedDisplay => {
-  if (!completed) return { text: '—', hr: null } as CompletedDisplay;
-  const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
-  const isRide = /ride|bike|cycling/i.test(completed.type || '') || /cycling|bike/i.test(completed.activity_type || '');
-  const isSwim = /swim/i.test(completed.type || '') || /swim/i.test(completed.activity_type || '');
-
-  try {
-  } catch {}
-
-  if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
-    const mi = plannedStep.distanceMeters / 1609.34;
-    if (isRunOrWalk) {
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
-    }
-    if (isRide) {
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
-    }
-    if (isSwim) {
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
-    }
-  }
-
-  if (typeof plannedStep.duration === 'number' && plannedStep.duration > 0) {
-    if (isRunOrWalk) {
-      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
-    }
-    if (isRide) {
-      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
-    }
-    if (isSwim) {
-      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
-    }
-  }
-
-  return { text: '—', hr: getAvgHR(completed) };
-};

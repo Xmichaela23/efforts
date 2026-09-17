@@ -26,12 +26,16 @@ Deno.test('an easy run is prescribed by heart rate: every step carries the zone 
   }
 });
 
-Deno.test('threshold work carries effort 5–6 on the work steps; its recoveries carry their pace, never the easy heart-rate range', () => {
+/**
+ * ⛔ THE BANDS ARE FOSTER'S CR-10 NOW, NOT THE OURS 5–6 / 8–10 (2026-09-17, WORKORDER Stage B2). Threshold work
+ * reads 6–7 on that scale, not 5–6. This check pinned the hand-set band and went red when the rule changed.
+ */
+Deno.test('threshold work carries effort 6–7 on the work steps; its recoveries carry their pace, never the easy heart-rate range', () => {
   const steps = expand('cruise_4x1mi_threshold');
   const w = work(steps);
   assertEquals(w.length, 4);
   for (const s of w) {
-    assertEquals(s.target_rpe, { lo: 5, hi: 6 });
+    assertEquals(s.target_rpe, { lo: 6, hi: 7 });
     assertEquals(s.pace_sec_per_mi, 450);
     assertEquals(s.hr_range, undefined);
   }
@@ -61,12 +65,13 @@ Deno.test('an easy run\'s strides keep heart rate on their recoveries', () => {
   for (const s of expand('strides_6x20s').filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
 });
 
-Deno.test('intervals carry effort 8–10 on the work steps', () => {
+/** 5K pace is above threshold by definition (p229 ">vVO2"), so it reads 8–9 — the top of the old band, 10, is all-out only. */
+Deno.test('work above threshold carries effort 8–9 on the work steps', () => {
   const steps = expand('interval_6x800m_5kpace_R90s');
   const w = work(steps);
   assertEquals(w.length, 6);
   for (const s of w) {
-    assertEquals(s.target_rpe, { lo: 8, hi: 10 });
+    assertEquals(s.target_rpe, { lo: 8, hi: 9 });
     assertEquals(s.pace_sec_per_mi, 425);
     assertEquals(s.prescription, undefined);
   }
@@ -110,7 +115,7 @@ Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.s
   const hard = expand('cruise_4x1mi_threshold').map((st) => toV3Step(st, row));
   const w = hard.filter((s) => s.kind === 'work');
   assertEquals(w.length, 4);
-  for (const s of w) assertEquals(s.target_rpe, { lo: 5, hi: 6 });
+  for (const s of w) assertEquals(s.target_rpe, { lo: 6, hi: 7 });
   for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, undefined); // a hard run's rest carries its pace (2026-09-16)
 });
 
@@ -127,3 +132,16 @@ Deno.test('D-478: an easy step priced at the easy pace shows the Friel range, no
   for (const s of work(expand('cruise_4x1mi_threshold', b))) assertEquals(s.pace_range, undefined);
 });
 
+
+/**
+ * ⛔ THE BAND FOLLOWS THE STEP'S OWN PERCENT OF THRESHOLD (2026-09-17, WORKORDER Stage B2). The old rule read the
+ * token: anything starting `interval_` got 8–10, so Michael's 2026-09-16 session — six reps at 90% of threshold,
+ * BELOW it — printed "RPE 8–10" on sub-threshold work.
+ */
+Deno.test('CR-10: a 90%-of-threshold rep reads 6–7, a 120% rung reads 8–9', () => {
+  const step = (pace: number) => ({ kind: 'work', pace_sec_per_mi: pace });
+  const nearThreshold = stampRunPrescription('interval_6x240s_90pct_r60s', [step(Math.round(450 / 0.9))], baselines);
+  assertEquals(nearThreshold[0].target_rpe, { lo: 6, hi: 7 });
+  const aboveThreshold = stampRunPrescription('round_5x_ladder_120pct', [step(Math.round(450 / 1.2))], baselines);
+  assertEquals(aboveThreshold[0].target_rpe, { lo: 8, hi: 9 });
+});

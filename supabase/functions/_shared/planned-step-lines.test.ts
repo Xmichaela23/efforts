@@ -46,3 +46,34 @@ Deno.test('a step that repeats nothing prints on its own line', () => {
     '3:00 @ 6:08–6:23/mi · RPE 8–10', '2:00 @ 11:45–13:15/mi', '2:00 @ 6:08–6:23/mi · RPE 8–10',
   ]);
 });
+
+/**
+ * ⛔ THE DESCENDING LADDER, CHUNKED (Michael's words, approved 2026-09-17, WORKORDER Stage B4). It printed twenty
+ * lines — one per step — because nothing in a ladder repeats. The set line carries the pace only; the effort band
+ * prints on the sessions that group.
+ */
+Deno.test('the approved ladder lines, word for word (2026-09-17)', () => {
+  const W = { lower: 469, upper: 489 }, J = { lower: 901, upper: 1015 }, E = { lower: 656, upper: 742 };
+  const work = (seconds: number) => ({ kind: 'work', seconds, distanceDerived: true, pace_range: W, target_rpe: { lo: 8, hi: 9 } });
+  const jog = (seconds: number) => ({ kind: 'recovery', seconds, distanceDerived: true, pace_range: J });
+  const wrap = (kind: string, seconds: number) =>
+    ({ kind, seconds, distanceDerived: true, prescription: 'heart_rate', hr_range: { lower: 138, upper: 144 }, pace_range: E });
+  const steps = [
+    wrap('warmup', 600),
+    work(180), jog(120), work(120), jog(80), work(60), jog(40), work(45), jog(30), work(30), jog(20),
+    { kind: 'recovery', seconds: 120, distanceDerived: true, pace_range: E, label: 'Between rounds' },
+    work(120), jog(80), work(60), jog(40), work(45), jog(30), work(30),
+    wrap('cooldown', 480),
+  ];
+  assertEquals(plannedStepLines(steps as never, { units: 'imperial', sport: 'run' }), [
+    '10:00 warm-up · HR 138–144 · ref 10:56–12:22/mi',
+    'Set 1',
+    '3:00, 2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
+    'jog after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi',
+    '2:00 @ 10:56–12:22/mi between sets',
+    'Set 2',
+    '2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
+    'jog after each: 1:20, 40 s, 30 s @ 15:01–16:55/mi',
+    '8:00 cool-down · HR 138–144 · ref 10:56–12:22/mi',
+  ]);
+});

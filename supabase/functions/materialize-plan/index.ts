@@ -688,13 +688,62 @@ type Baselines = {
  * ⛔ THE PRESCRIPTION ON A RUN STEP (Michael, 2026-09-02, rulings 1 and 2).
  *   · EASY steps carry a HEART-RATE range (`hr_range`, bpm) and `prescription: 'heart_rate'`. The pace
  *     on them is a reference band, not the target.
- *   · HARD steps carry an EFFORT target (`target_rpe`, session RPE): threshold work 5–6, intervals
- *     8–10 — his numbers. The pace on them is the target; the effort is the gauge he trusts more.
+ *   · HARD steps carry an EFFORT target (`target_rpe`). The pace on them is the target; the effort is
+ *     the gauge he trusts more.
+ *
+ * ⛔ THE EFFORT NUMBERS ARE FOSTER'S CR-10, NOT OURS (2026-09-17, WORKORDER Stage B2). They were 5–6 for
+ * threshold and 8–10 for anything the token called an interval — set by hand 2026-09-02 with no page behind
+ * them (superseded ledger row 201). That put "RPE 8–10" on Michael's 2026-09-16 session, whose work is at
+ * 90% of threshold — BELOW threshold, where the scale says 6–7. See `RUN_EFFORT_CR10` below.
+ *
  * ⚠️ OURS: which token shapes count as easy / threshold / interval. Labelled below. Strides carry
  * neither — they are neuromuscular, not an effort band.
  * ⚠️ On a long-run token only the steps priced at the easy band (or unpriced) get the heart-rate
  * range; a race-pace finish keeps its pace.
  */
+/**
+ * ⛔ THE EFFORT A RUN STEP ASKS FOR, ON FOSTER'S CR-10 SCALE (2026-09-17).
+ *
+ * FIELD — Foster et al. (2001), "A New Approach to Monitoring Exercise Training", J Strength Cond Res 15(1):109-115:
+ * the category-ratio 0–10 session scale, on which threshold sits at about 6–7 and only an all-out effort reads 10.
+ * The book prints no effort number for any running session (p229–235 give a percentage of threshold and nothing
+ * else; p229's Sprint/Power page says "paces based on performance and RPE" with no figure; the only "RPE 9/10" in
+ * the book is the ME lift, p205), so the SCALE is Foster's and the BANDS are read off it.
+ *
+ * ⚠️ OURS — the cut-offs that decide which band a step falls in. They are the book's own family boundaries read as
+ * percentages of threshold (p229: "100% = threshold/VT2"): at or under VT1 is easy (p235); near-threshold work runs
+ * 85–105% (p233–234); MLSS runs 100–130% (p231–232); sprint work is ">vVO2", 130–140% and all-out (p229–231).
+ * Ledger row in docs/STATE-SOURCES.md.
+ */
+const RUN_EFFORT_CR10 = [
+  { min_pct_of_threshold: 130, lo: 10, hi: 10 },  // sprints — all-out
+  { min_pct_of_threshold: 105.01, lo: 8, hi: 9 }, // intervals above threshold
+  { min_pct_of_threshold: 85, lo: 6, hi: 7 },     // threshold and near-threshold
+  { min_pct_of_threshold: 0, lo: 4, hi: 5 },      // tempo
+] as const;
+/**
+ * A token that names its own intensity rather than a percentage. 5K pace and vVO2 work are above threshold by
+ * definition (p229's ">vVO2"), and they sit within a point or two of the 105% line, too close to read off a pace.
+ */
+const RUN_TOKEN_ABOVE_THRESHOLD = /(5kpace|vo2|vvo2)/;
+const RUN_TOKEN_ALL_OUT = /(sprint|allout|all_out|maxpace)/;
+/** Easy and long work is prescribed by heart rate, so its 2–3 never reaches a step; kept for the record. */
+const RUN_EFFORT_CR10_EASY = { lo: 2, hi: 3 } as const;
+
+/** The step's pace as a percent of threshold pace — p229's convention, so a faster pace is a higher percent. */
+function runStepPctOfThreshold(s: any, thresholdSecPerMi: number | null | undefined): number | null {
+  const thr = Number(thresholdSecPerMi);
+  if (!Number.isFinite(thr) || thr <= 0) return null;
+  let pace = Number(s?.pace_sec_per_mi);
+  if (!Number.isFinite(pace) || pace <= 0) {
+    const r = s?.pace_range;
+    const lo = Array.isArray(r) ? Number(r[0]) : Number(r?.lower);
+    const hi = Array.isArray(r) ? Number(r[1]) : Number(r?.upper);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) pace = (lo + hi) / 2;
+  }
+  return Number.isFinite(pace) && pace > 0 ? (thr / pace) * 100 : null;
+}
+
 export function stampRunPrescription(tok: string, steps: any[], baselines: Baselines): any[] {
   const t = String(tok ?? '').toLowerCase();
   const hr = (baselines as any)?._easyHrRange as { lower: number; upper: number } | undefined;
@@ -729,9 +778,22 @@ export function stampRunPrescription(tok: string, steps: any[], baselines: Basel
       if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
       continue;
     }
-    // OURS — `stampRunPrescription` effort targets 5–6 (threshold) and 8–10 (intervals): set by hand 2026-09-02, no page.
-    if (kind === 'work' && isThresholdToken) s.target_rpe = { lo: 5, hi: 6 };
-    else if (kind === 'work' && isIntervalToken) s.target_rpe = { lo: 8, hi: 10 };
+    /**
+     * The effort band off `RUN_EFFORT_CR10` (Foster 2001), by the step's own percent of threshold — so the 90%
+     * reps of a near-threshold session read 6–7 and the 120% rungs of a ladder read 8–9, in the same session shape
+     * the old token test gave a flat 8–10. A hard step whose pace cannot be read against a threshold keeps the
+     * band its token implies, which is the old behaviour and never worse than it.
+     */
+    if (kind === 'work' && (isThresholdToken || isIntervalToken)) {
+      const pct = runStepPctOfThreshold(s, (baselines as any)?._resolvedThresholdSecPerMi);
+      if (RUN_TOKEN_ALL_OUT.test(t)) s.target_rpe = { lo: 10, hi: 10 };
+      else if (RUN_TOKEN_ABOVE_THRESHOLD.test(t)) s.target_rpe = { lo: 8, hi: 9 };
+      else if (pct != null) {
+        const band = RUN_EFFORT_CR10.find((b) => pct >= b.min_pct_of_threshold) ?? RUN_EFFORT_CR10[RUN_EFFORT_CR10.length - 1];
+        s.target_rpe = { lo: band.lo, hi: band.hi };
+      } else if (isThresholdToken) s.target_rpe = { lo: 6, hi: 7 };
+      else s.target_rpe = { lo: 8, hi: 9 };
+    }
   }
   return steps;
 }
@@ -2833,6 +2895,14 @@ export function expandTokensForRow(
             ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
               ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
             /**
+             * ⛔ "By feel" IS STAMPED HERE, NOT PICKED ON THE PHONE (2026-09-17, WORKORDER Stage C). Two surfaces
+             * held the literal as a fallback (`SessionDeck`, `strengthFormatter`), so a row with no priced weight
+             * got its word from whichever file drew it. An auto-regulated row (`load_prescribed: false`, p226) is
+             * the design — the absence of a number is deliberate, and this names it without inventing one.
+             */
+            ...(finalWeightDisplay || typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim() || finalWeight
+              ? {} : { weight_display: 'By feel' }),
+            /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
              * here and every surface downstream saw a bare "By feel" with no way to tell an
@@ -3252,6 +3322,14 @@ export function expandTokensForRow(
             // and no dose. Belongs to the slot, like the swap list, so it survives a swap to another carry.
             ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
               ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
+            /**
+             * ⛔ "By feel" IS STAMPED HERE, NOT PICKED ON THE PHONE (2026-09-17, WORKORDER Stage C). Two surfaces
+             * held the literal as a fallback (`SessionDeck`, `strengthFormatter`), so a row with no priced weight
+             * got its word from whichever file drew it. An auto-regulated row (`load_prescribed: false`, p226) is
+             * the design — the absence of a number is deliberate, and this names it without inventing one.
+             */
+            ...(finalWeightDisplay || typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim() || finalWeight
+              ? {} : { weight_display: 'By feel' }),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died

@@ -119,8 +119,8 @@ const rpeText = (s: PlannedStep) =>
  * " @ 5:39–5:53/mi · RPE 8–10", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy".
  * ⛔ THE EFFORT IS "RPE", THE BOOK'S TERM (Michael, 2026-09-16), after the pace or watts it gauges.
  */
-function targetText(s: PlannedStep, opts: StepLineOptions): string {
-  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s), rpe = rpeText(s);
+function targetText(s: PlannedStep, opts: StepLineOptions, effort = true): string {
+  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s), rpe = effort ? rpeText(s) : undefined;
   const withRpe = (t: string) => (rpe ? `${t} · ${rpe}` : t);
   if (hr) return ` @ ${hr}${pace ? ` · ref ${pace}` : ''}`;
   if (pace) return withRpe(` @ ${pace}`);
@@ -202,6 +202,51 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
   return { covered: best.covered, line: best.line };
 }
 
+/**
+ * ⛔ A SET WHERE NOTHING REPEATS IS CHUNKED, NOT LISTED STEP BY STEP (2026-09-17, WORKORDER Stage B4).
+ *
+ * The descending ladder (p231–232) is ten different steps, then eight more — so `groupAt` finds no repeat and
+ * printed TWENTY lines, one per step. Michael's words, approved 2026-09-17:
+ *
+ *   Set 1
+ *   3:00, 2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi
+ *   jog after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi
+ *   2:00 @ 10:56–12:22/mi between sets
+ *   Set 2
+ *   …
+ *
+ * FIELD — the chunking is Nielsen Norman Group's scanning guidance: readers scan rather than read, and a line runs
+ * 50–75 characters. The one-line form was about 140 and wrapped.
+ *
+ * ⚠️ The effort band is left OFF these lines — Michael's approved strings carry the pace only. Everywhere else a
+ * hard work step still prints its `RPE n–n`.
+ */
+function setBlockAt(seg: PlannedStep[], from: number, opts: StepLineOptions): { covered: number; work: PlannedStep[]; rec: PlannedStep[] } | null {
+  if (isRecovery(seg[from])) return null;
+  const work: PlannedStep[] = [];
+  const rec: PlannedStep[] = [];
+  const wSig = targetText(seg[from], opts, false);
+  let rSig: string | null = null;
+  let i = from;
+  while (i < seg.length) {
+    const w = seg[i];
+    if (isRecovery(w) || targetText(w, opts, false) !== wSig) break;
+    work.push(w);
+    i++;
+    const r = seg[i];
+    if (!r || !isRecovery(r)) break;
+    const sig = targetText(r, opts, false);
+    if (rSig == null) rSig = sig;
+    else if (sig !== rSig) break;
+    rec.push(r);
+    i++;
+  }
+  // Two work steps and two recoveries at the least, and only where the steps differ — an even block is `groupAt`'s.
+  if (work.length < 2 || rec.length < 2) return null;
+  if (new Set(work.map((s) => lengthText(s, opts))).size < 2) return null;
+  return { covered: i - from, work, rec };
+}
+
 export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: StepLineOptions = {}): string[] {
   const all = Array.isArray(steps) ? steps.filter((s) => s && typeof s === 'object') : [];
   const out: string[] = [];
@@ -214,8 +259,26 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
     const seg = all.slice(i, j);
     const sig = seg.map((s) => sigOf(s, opts));
     let k = 0;
+    let setNo = 0;
     while (k < seg.length) {
       const g = groupAt(seg, sig, k, opts);
+      // A repeat is still a repeat — the chunked form is only for a stretch where nothing repeats.
+      if (g.covered === 1) {
+        const block = setBlockAt(seg, k, opts);
+        if (block) {
+          setNo++;
+          out.push(`Set ${setNo}`);
+          out.push(`${block.work.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.work[0], opts, false)}`);
+          out.push(`jog after each: ${block.rec.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.rec[0], opts, false)}`);
+          k += block.covered;
+          // The lone recovery that separates one set from the next.
+          if (k < seg.length && isRecovery(seg[k]) && setBlockAt(seg, k + 1, opts)) {
+            out.push(`${stepText(seg[k], opts)} between sets`);
+            k++;
+          }
+          continue;
+        }
+      }
       out.push(g.line);
       k += g.covered;
     }
