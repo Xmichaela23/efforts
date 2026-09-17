@@ -96,15 +96,36 @@ const TodayWeather: React.FC<{
       className={`flex flex-col gap-1 ${className}`}
       style={{ color: 'rgba(255,255,255,0.62)', ...style }}
     >
-      {/* The reading itself, with the condition as a picture beside it. */}
-      <div className="flex items-center gap-2">
-        {Icon ? <Icon aria-hidden="true" className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.78)' }} /> : null}
-        <span className="text-[0.95rem] font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.92)' }}>
-          {temp}°F
-        </span>
-        {/* ⚠️ SAME WORDING THE SESSION HEADER ALREADY USES — "Feels like N°" (`WeatherDisplay`). */}
-        {feels != null ? (
-          <span className="text-[0.72rem] font-light tabular-nums">Feels like {feels}°</span>
+      {/* ⛔ THREE LINES SINCE 2026-09-17 (Michael, screenshot): the reading with sunrise and sunset at the far end
+          of its line; the conditions; the city with the credit. It was four — sunrise had its own row and so
+          did the credit. No word changed. The sun times wrap under the reading on a very narrow phone. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+        <div className="flex items-center gap-2">
+          {Icon ? <Icon aria-hidden="true" className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.78)' }} /> : null}
+          <span className="text-[0.95rem] font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.92)' }}>
+            {temp}°F
+          </span>
+          {/* ⚠️ SAME WORDING THE SESSION HEADER ALREADY USES — "Feels like N°" (`WeatherDisplay`). */}
+          {feels != null ? (
+            <span className="text-[0.72rem] font-light tabular-nums whitespace-nowrap">Feels like {feels}°</span>
+          ) : null}
+        </div>
+        {/* Sunrise and sunset are the icons, so the pair carries two times and no labels. */}
+        {(up || down) ? (
+          <div className="flex items-center gap-x-3 text-[0.7rem] font-light tabular-nums">
+            {up ? (
+              <span className={chip}>
+                <Sunrise aria-hidden="true" className="h-3 w-3" />
+                {up}
+              </span>
+            ) : null}
+            {down ? (
+              <span className={chip}>
+                <Sunset aria-hidden="true" className="h-3 w-3" />
+                {down}
+              </span>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -127,34 +148,25 @@ const TodayWeather: React.FC<{
         </div>
       ) : null}
 
-      {/* ⛔ SUNRISE AND SUNSET ARE THE ICONS, so the row carries two times and no labels — and the
-          city sits at the far end of it. ⚠️ THE ROW DRAWS FOR THE CITY ALONE TOO: an athlete whose
-          weather row carries no sunrise (a device-temperature fallback) must still be told where
-          this reading is from, not silently lose it.
-          ⚠️ Open-Meteo's licence requires an on-screen credit (attribution work order §7); it is
-          the line under this row. */}
-      <div className="flex items-center justify-between gap-x-3 text-[0.7rem] font-light">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums">
-          {up ? (
-            <span className={chip}>
-              <Sunrise aria-hidden="true" className="h-3 w-3" />
-              {up}
-            </span>
-          ) : null}
-          {down ? (
-            <span className={chip}>
-              <Sunset aria-hidden="true" className="h-3 w-3" />
-              {down}
-            </span>
-          ) : null}
-        </div>
-        {city ? <span className="truncate text-right min-w-0">{city}</span> : null}
-      </div>
-
-      {/* ⛔ THE CREDIT IS THE BLOCK'S LAST SMALL LINE (Michael, 2026-09-10). On the sunrise row it
-          squeezed the city to "Phoen…". */}
-      <div className="text-[11px] font-light" style={{ color: 'rgba(255,255,255,0.45)' }}>
-        Weather by Open-Meteo
+      {/* ⛔ THE CITY AND THE CREDIT SHARE THE LAST LINE. ⚠️ THE LINE DRAWS FOR THE CREDIT ALONE TOO — and the city
+          draws whenever there is one, so an athlete on a device-temperature fallback is still told where the
+          reading is from. The city gives way first (`truncate`); the credit never shrinks — on the sunrise row
+          it squeezed the city to "Phoen…" (2026-09-10).
+          ⛔ THE CREDIT IS A LINK, BESIDE THE DATA. Open-Meteo's licence (open-meteo.com/en/licence, read
+          2026-09-17): "You must include a link next to any location Open-Meteo data are displayed." It was
+          plain text, and it cannot move to the foot of the screen. The tap does not open the card behind it. */}
+      <div className="flex items-baseline justify-between gap-x-3 text-[0.7rem] font-light">
+        <span className="truncate min-w-0">{city ?? ''}</span>
+        <a
+          href="https://open-meteo.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex-shrink-0 whitespace-nowrap text-[11px]"
+          style={{ color: 'rgba(255,255,255,0.45)' }}
+        >
+          Weather by Open-Meteo
+        </a>
       </div>
     </div>
   );
