@@ -57,6 +57,12 @@ loads one week (`handlePlanClick`), and each week is added only when the athlete
 a twelve-week plan exported after viewing week 1 prints week 1. Found while tracing the export's lift names; not fixed
 in that change. A file that is meant to match the phone row for row needs every week read from `planned_workouts`.
 
+## QUEUED (2026-09-17, throwaway round for D-479) — THE WEEK LIST PRINTS "Lateral Raise", THE WORKOUT SCREEN "Dumbbell Lateral Raise"
+
+Day 1 of every week, home and commercial gym alike: the week list prints the stored name where the workout screen
+and the export print the shown name (`execution_name || name`). Older than the D-479 work. Same fix as the export
+got: the week list uses the shown name. Not traced to a file yet.
+
 ## QUEUED (Michael, 2026-09-16 night, Today screenshot) — A DONE PLYOMETRICS SESSION READS "3 lifts"
 
 The done card's line is the server's `done_headline` (`get-week/week-totals.ts:112-117`): every `strength` row
