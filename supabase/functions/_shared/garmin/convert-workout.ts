@@ -3,14 +3,9 @@
 // automatic calendar sync build the same workout. Pure: no network, no database.
 import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // ⛔ ONE BAND AROUND A SINGLE PERCENTAGE, DEFINED ONCE (2026-09-15) — see the note on the constant.
-import { SINGLE_PERCENT_BAND } from '../plan-tokens/quality-work.ts'
+// The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
+import { SINGLE_PERCENT_BAND, FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts'
 
-/**
- * ⛔ THE CEILING A FLOOR-ONLY STEP GOES TO THE WATCH WITH — p237: *"start at 110% and progress to
- * 125-130% by the end"*. A Garmin step's custom power target is a low/high pair with no open form,
- * so the page's own top is what fills the high. ⚠️ PERCENT OF FTP, not a multiple of the floor.
- */
-const FLOOR_ONLY_WATCH_CEILING_PCT_OF_FTP = 1.30
 
 export type PlannedWorkout = {
   id: string
@@ -232,7 +227,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
          * all rather than one worked out from the floor.
          */
         if (typeof low === 'number' && high == null && userFTP) {
-          high = Math.max(low, Math.round(userFTP * FLOOR_ONLY_WATCH_CEILING_PCT_OF_FTP))
+          high = Math.max(low, Math.round(userFTP * FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP))
         }
         if (typeof low === 'number' && typeof high === 'number') {
           step.targetType = 'POWER'

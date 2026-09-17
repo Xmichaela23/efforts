@@ -168,6 +168,15 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
 export const SINGLE_PERCENT_BAND = 0.05;
 
 /**
+ * ⛔ THE CEILING A FLOOR-ONLY STEP LEAVES THE APP WITH — p237: *"start at 110% and progress to
+ * 125-130% by the end"*. The plan keeps the ceiling off (see `floorOnlyAtOrAbovePct` below); a Garmin step's
+ * power target is a low/high pair and Intervals.icu's workout text takes `lo-hi%`, so the page's own top fills
+ * the high in both senders. ⚠️ PERCENT OF FTP, not a multiple of the floor. Defined once (2026-09-16): it lived in
+ * the Garmin sender only, and the Intervals writer refused the whole ride (`unreadable power range {"lower":185}`).
+ */
+export const FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP = 1.30;
+
+/**
  * Percent of FTP as watts. Undefined without an FTP — the step then carries no target, as it always did.
  *
  * ⛔ A SINGLE PERCENTAGE GETS `SINGLE_PERCENT_BAND` EITHER SIDE. Both ends equal is the caller saying

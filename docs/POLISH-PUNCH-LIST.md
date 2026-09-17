@@ -38,6 +38,20 @@ call returns 401 (`:152-180`, `:437`). Disconnect inside Efforts and delete-acco
 the stored tokens (reuse what `disconnect-connection` does, minus the call to Strava). Then resubmit the form with
 a note: webhooks in use, no polling, deauthorization handled. Read from the code, not exercised on a live account.
 
+## QUEUED (2026-09-16 night) — INTERVALS.ICU SYNC REJECTS A RIDE STEP WITH A FLOOR AND NO CEILING
+
+`calendar-sync` run 2026-09-16 returned, for two planned rides (e6745501, 775af67b): `intervals_icu · step 1:
+unreadable power range {"lower":185}`. That is the anaerobic ride's p237 work (a floor, no ceiling, c96a20d0); the
+Intervals writer wants both ends. The Garmin copy went through. Not traced further.
+
+## AWAITING MICHAEL (2026-09-16 night) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
+
+`_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
+run step went to Garmin as a distance (16 Sep run: 6 × 0.41 mi for a 6 × 4:00 plan). Fixed 493fecc7; deployed
+`send-workout-to-garmin` + `calendar-sync`; sync run once, 4 workouts re-sent. Look for: the next run with reps shows
+a time countdown on the watch for warm-up, reps and cool-down. Also deployed the same night (1da1fd91): lap pairing
+when a watch joins or splits laps — not seen on a real run yet; the word "not matched" needs his yes before a merge.
+
 ## QUEUED (2026-09-16) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
 
 `calendar-sync` records a fingerprint of every copy it sends (Garmin: delete + resend on change; Intervals: update

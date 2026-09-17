@@ -16,6 +16,8 @@
 // (forum.intervals.icu/t/uploading-planned-workouts-to-intervals-icu/63624):
 //   category WORKOUT · start_date_local `YYYY-MM-DDT00:00:00` · type · name · description · external_id
 
+import { FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts';
+
 export class IntervalsSerializeError extends Error {
   constructor(message: string) {
     super(message);
@@ -67,7 +69,10 @@ function stepLine(step: any, index: number, ftp: number): string {
   const cue = label || CUE_BY_KIND[kind] || '';
 
   const lo = Number(step?.powerRange?.lower);
-  const hi = Number(step?.powerRange?.upper);
+  // ⛔ A FLOOR WITH NO CEILING GOES OUT WITH THE PAGE'S OWN TOP (2026-09-16, p237 "start at 110%, progress to
+  // 125-130%") — the same number the Garmin sender fills in. Without it the whole ride was refused.
+  const floorOnly = step?.powerRange != null && step.powerRange.upper == null && Number.isFinite(lo) && lo > 0;
+  const hi = floorOnly ? Math.max(lo, ftp * FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP) : Number(step?.powerRange?.upper);
   let target: string;
   if (step?.powerRange == null) {
     // The plan gives this step no power (e.g. a sprint by feel): ERG off.
