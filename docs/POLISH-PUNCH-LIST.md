@@ -44,6 +44,14 @@ a note: webhooks in use, no polling, deauthorization handled. Read from the code
 unreadable power range {"lower":185}`. That is the anaerobic ride's p237 work (a floor, no ceiling, c96a20d0); the
 Intervals writer wants both ends. The Garmin copy went through. Not traced further.
 
+## QUEUED (Michael, 2026-09-16 night, Today screenshot) — A DONE PLYOMETRICS SESSION READS "3 lifts"
+
+The done card's line is the server's `done_headline` (`get-week/week-totals.ts:112-117`): every `strength` row
+counts its logged exercises and prints "N lift(s)", with the pounds in front when there are any. A plyometrics
+session is stored as `strength`, has no pounds, so the card reads "3 lifts" alone. Fix in that one place: the word
+follows the session (jumps are not lifts). The replacement word is copy — print it and wait for Michael's yes.
+Also check the Week bar, which counts the same session.
+
 ## AWAITING MICHAEL (2026-09-16 night) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
 
 `_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
@@ -141,8 +149,23 @@ import (parked) is built, show Intervals as the source where it provided the fil
 
 Scrolling back to today, the header card grows again because the weather block (`c/TodayWeather.tsx`) renders
 only for today; other days have no weather so the card is shorter, and the return snaps it back. Not a reload.
-Two fixes, look decision for Michael: hold the card at one height on every day, or animate the weather in.
-After the one-truth workorder.
+~~Two fixes, look decision for Michael: hold the card at one height on every day, or animate the weather in.~~
+
+**RULED 2026-09-16 night (Michael: "same height every day"; "I like the detail and the sunrise/sunset, why
+shrink"):** the FULL weather block shows on every day, so the card never changes height.
+- Today: as now. Future day: that day's forecast with sunrise/sunset. Past day: that day's recorded weather with
+  sunrise/sunset. A day out of the provider's range: the block keeps its height and prints sunrise/sunset only.
+- ⚠️ UNVERIFIED, from memory — confirm before building: Open-Meteo forecast reaches ~16 days ahead, the same
+  forecast service serves ~3 months back (`past_days`), older dates need its archive service; apparent temperature,
+  humidity, dew point and wind exist for past hours.
+- OURS (mark it + ledger row): the hour a past day's temperature is read at — the hour of that day's session when
+  there is one, midday when there is none.
+- Traced 2026-09-16 (`c/TodaysEffort.tsx`): weather is fetched for today only (`:457`, rendered `:1933`); the
+  run/ride/lb totals follow the week of the day shown (`useWeekUnified(fromISO,toISO)`, `:411`); the form number is
+  ALWAYS today's (`useCoachWeekContext()` called with no date, `:202`) — so last week's card prints today's form.
+  Open question for Michael, not ruled: hide form on days that are not today, or leave it.
+- Server work, not the phone's: the weather for a date comes from the server (one fetch path, cached per
+  place + date); the phone prints it.
 
 ## QUEUED — SMART PLATE MATH IN THE LOGGER (Michael, 2026-09-15, "nice to have, don't get stuck on it")
 
