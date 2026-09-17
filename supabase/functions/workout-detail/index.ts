@@ -55,7 +55,7 @@ import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
-import { clock, displayFormat } from '../_shared/display-format.ts';
+import { clock, displayFormat, durationClock } from '../_shared/display-format.ts';
 import {
   buildArcPerformanceBridge,
   ARC_PERFORMANCE_BRIDGE_VERSION,
@@ -2152,7 +2152,7 @@ Deno.serve(async (req) => {
       return {
         // `duration_display` — the chart's "Duration" is the device's elapsed time (rule 7), the same seconds as the
         // Elapsed tile; the bins sum one sample interval short of it (Stage 7 session 3).
-        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0), duration_display: elapsedS != null && elapsedS > 0 ? clock(elapsedS) : null } } : {}),
+        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0), duration_display: elapsedS != null && elapsedS > 0 ? durationClock(elapsedS) : null } } : {}),
         ...(power ? { power: { ...(z?.power ?? {}), bins: power, total_s: power.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
       };
     })();

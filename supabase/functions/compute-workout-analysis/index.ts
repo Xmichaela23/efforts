@@ -1793,9 +1793,12 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             const kph = Number((w as any)?.avg_speed);
             const secPerKm = Number((w as any)?.avg_pace);
             const runSec = runMovingSeconds({
-              // ⛔ `dur` here is only Garmin's last-sample moving seconds, set above (2026-09-16, Stage 7 session 1).
+              // ⛔ THE PROVIDER'S SUMMARY MOVING SECONDS FIRST (2026-09-16, Stage 7 session 3) — the same seconds the Moving
+              // Time tile prints (`completedMovingSeconds` rung 2, then 4); `dur` is Garmin's LAST SAMPLE, a second reading
+              // that sat ahead of the summary and moved the pace 2–4 s/mi off the tile's seconds on Garmin runs.
               /* sent-held: moving_time — dur */
-              movingSeconds: dur || Number(parseJson((w as any)?.metrics)?.moving_time_seconds) || null,
+              movingSeconds: Number(parseJson((w as any)?.metrics)?.moving_time_seconds)
+                || Number(parseJson((w as any)?.metrics)?.movingDurationInSeconds) || dur || null,
               avgSpeedMps: kph > 0 ? kph / 3.6 : (secPerKm > 0 ? 1000 / secPerKm : null),
               distanceM: dist,
             }, runView);
