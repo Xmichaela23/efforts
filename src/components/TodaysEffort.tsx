@@ -448,13 +448,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     })();
   }, [unifiedItems, activeDate]);
 
-  // Only fetch weather for today (we don't have historical weather data)
+  /**
+   * ⛔ WEATHER ON EVERY DAY (2026-09-17, Michael: the card must not change height between days). Today asks for what
+   * it is like outside now; any other day asks for that day at MIDDAY LOCAL, sent as a real instant. It used to send
+   * `<date>T12:00:00` with no zone, which the server reads as noon UTC — 5am in Los Angeles.
+   * OURS — midday. Past days come off Open-Meteo's recent forecast or its archive (back to 1940); future days off
+   * the forecast, 16 days out. Past that there is no reading and the block keeps its space empty.
+   */
   const isTodayDate = activeDate === today;
   const { weather, heatNote } = useWeather({
     lat: dayLoc?.lat,
     lng: dayLoc?.lng,
-    timestamp: `${activeDate}T12:00:00`,
-    enabled: !!dayLoc && isTodayDate, // Only enable for today
+    timestamp: isTodayDate ? `${activeDate}T12:00:00` : new Date(`${activeDate}T12:00:00`).toISOString(),
+    current: isTodayDate,
+    enabled: !!dayLoc,
   });
 
   const { toast } = useToast();
@@ -1944,9 +1951,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               * See the block below the weather.
               * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
-            {weather && isTodayDate ? (
-              <div style={{ marginTop: 8 }}>
-                <TodayWeather weather={weather} city={cityName} />
+            {/* ⛔ THE BLOCK'S SPACE IS HELD ON EVERY DAY (2026-09-17) — while a day loads, and on a day with no reading
+                (more than 16 days out). 67 px is the block's own three lines at 12 px, measured at 375 and 393 wide.
+                No location, no block, on any day. */}
+            {dayLoc ? (
+              <div style={{ marginTop: 8, minHeight: 67 }}>
+                {weather ? <TodayWeather weather={weather} city={cityName} /> : null}
               </div>
             ) : null}
         {/**

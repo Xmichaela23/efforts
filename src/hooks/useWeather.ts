@@ -15,6 +15,8 @@ interface UseWeatherProps {
   /** Moving duration in seconds — passed to get-weather so Open-Meteo returns start/end/peak across the effort */
   durationSeconds?: number;
   enabled?: boolean;
+  /** Today card only: true asks for what it is like outside now; false for a day's reading at `timestamp`. */
+  current?: boolean;
 }
 
 export function useWeather({
@@ -24,6 +26,7 @@ export function useWeather({
   workoutId,
   durationSeconds,
   enabled = true,
+  current,
 }: UseWeatherProps) {
   const [weather, setWeather] = useState<SessionWeatherForDisplay | null>(null);
   // ⛔ The hot-day line, decided by `get-weather` (2026-09-10, audit H-T07). Null means say nothing.
@@ -40,6 +43,10 @@ export function useWeather({
     }
 
     let cancelled = false;
+    // ⛔ A NEW DAY CLEARS THE OLD READING FIRST (2026-09-17) — otherwise yesterday's weather sits under today's date
+    // until the fetch lands, now that the Today card asks for every day.
+    setWeather(null);
+    setHeatNote(null);
 
     const fetchWeather = async () => {
       if (cancelled) return;
@@ -53,6 +60,7 @@ export function useWeather({
           timestamp,
           workout_id: workoutId,
         };
+        if (typeof current === 'boolean') body.current = current;
         if (durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds >= 60) {
           body.duration_seconds = Math.min(6 * 3600, Math.round(durationSeconds));
         }
@@ -98,7 +106,7 @@ export function useWeather({
       }
       if (timeoutId != null) clearTimeout(timeoutId);
     };
-  }, [lat, lng, timestamp, workoutId, enabled, durationSeconds]);
+  }, [lat, lng, timestamp, workoutId, enabled, durationSeconds, current]);
 
   return { weather, heatNote, loading, error };
 }

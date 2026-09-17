@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const { lat, lng, timestamp, workout_id, force_refresh } = body;
+    // The Today card says whether it wants what it is like outside NOW (today) or a day's reading (any other day).
+    const currentFlag = typeof body.current === 'boolean' ? body.current : null;
     const durationSecondsRaw = body.duration_seconds;
     const durationSeconds =
       durationSecondsRaw != null && Number.isFinite(Number(durationSecondsRaw))
@@ -241,8 +243,29 @@ Deno.serve(async (req) => {
     // returning nothing, exactly as before — nothing in the app asks for future weather (the Today
     // screen's `useWeather` is gated on `isTodayDate`, and a workout is always in the past), and
     // widening this to the forecast window would be building a caller that does not exist.
-    const useForecastEndpoint = requestedDayIsTodayish || requestedDayWithinArchiveLag;
-    const wantsCurrentConditions = !workout_id && requestedDayIsTodayish;
+    /**
+     * ⛔ FUTURE DAYS COME OFF THE FORECAST (2026-09-17, Michael: weather on every day of the Today card, so the card
+     * never changes height). The comment above was true until today — nothing asked for a future date.
+     * FIELD — Open-Meteo forecast API docs (open-meteo.com/en/docs, read 2026-09-17): `forecast_days` 0–16.
+     * A date past that has no forecast anywhere, so it returns no weather without calling Open-Meteo, and the
+     * card keeps the block's space empty.
+     */
+    const FORECAST_DAYS_MAX = 16;
+    const daysAhead = -daysAgo;
+    const requestedDayInForecast = daysAhead >= 1 && daysAhead <= FORECAST_DAYS_MAX;
+    if (!workout_id && daysAhead > FORECAST_DAYS_MAX) {
+      return new Response(JSON.stringify({ weather: null, heat_note: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+    const useForecastEndpoint = requestedDayIsTodayish || requestedDayWithinArchiveLag || requestedDayInForecast;
+    /**
+     * ⛔ "NOW" ONLY WHEN THE CARD SAYS IT IS SHOWING TODAY. Day-adjacency (±1 UTC day) is the right test for which
+     * ENDPOINT, but it would hand yesterday's and tomorrow's card the current hour. The Today card sends
+     * `current`; a caller that does not (an older phone build) keeps the adjacency rule it had.
+     */
+    const wantsCurrentConditions = !workout_id && (currentFlag ?? requestedDayIsTodayish);
 
     /**
      * ⚠️ `:cur` KEEPS THE TWO ANSWERS APART IN THE SHARED CACHE. A current-conditions row and a
@@ -311,7 +334,7 @@ Deno.serve(async (req) => {
       tsStr,
       deviceTempC,
       durationSeconds,
-      { useForecastEndpoint, wantsCurrentConditions },
+      { useForecastEndpoint, wantsCurrentConditions, forecastDays: Math.min(FORECAST_DAYS_MAX, Math.max(2, daysAhead + 2)) },
     );
     
     if (!weatherData) {
@@ -375,7 +398,14 @@ Deno.serve(async (req) => {
     try {
       const key = (globalThis as any).__wx_cache_key as string | undefined;
       if (key) {
-        const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        /**
+         * ⛔ A PAST DAY OUTSIDE THE ARCHIVE LAG IS KEPT FOR A YEAR (2026-09-17). Its reading does not change once the
+         * archive holds it, so fetching it again every 15 minutes spent Open-Meteo calls for the same answer.
+         * OURS — the year. ⚠️ Open-Meteo replaces preliminary reanalysis with the final one about two months later
+         * (small revisions); a year-old copy may differ from a fresh fetch by that much. Everything else keeps 15 min.
+         */
+        const keepMs = daysAgo > ARCHIVE_LAG_DAYS ? 365 * 86400 * 1000 : 15 * 60 * 1000;
+        const expires = new Date(Date.now() + keepMs).toISOString();
         await supabase.from('weather_cache').upsert({ key, lat: latNum, lng: lngNum, day, weather: weatherData, expires_at: expires });
       }
     } catch {}
@@ -479,7 +509,7 @@ async function fetchWeatherData(
   deviceTempC: number | null,
   durationSeconds: number | null,
   /** See the endpoint / hour decision in the handler — the two flags are not the same question. */
-  opts: { useForecastEndpoint: boolean; wantsCurrentConditions: boolean } = {
+  opts: { useForecastEndpoint: boolean; wantsCurrentConditions: boolean; forecastDays?: number } = {
     useForecastEndpoint: false,
     wantsCurrentConditions: false,
   },
@@ -511,7 +541,8 @@ async function fetchWeatherData(
         `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min` +
         // ⚠️ `past_days=7`, NOT 2 — it has to cover the archive's own lag (`ARCHIVE_LAG_DAYS`) plus
         // the day of UTC adjacency, or a four-day-old session routed here finds no hour to read.
-        `&past_days=7&forecast_days=2&${UNITS}`;
+        // `forecast_days` reaches the requested future day (+1 for UTC adjacency), 2 at least, 16 at most.
+        `&past_days=7&forecast_days=${opts.forecastDays ?? 2}&${UNITS}`;
       console.log(
         `🌡️ [WEATHER] Fetching Open-Meteo FORECAST at ${lat},${lng} (${opts.wantsCurrentConditions ? 'current hour' : `hourly slot ${workoutDate.toISOString()}`} dur_s=${durationSeconds ?? 'n/a'})`,
       );
