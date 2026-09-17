@@ -76,10 +76,11 @@ Deno.test('cardio HR vs THRESHOLD HR (LTHR) → hr_intensity, measured (never re
   );
 });
 
-Deno.test('strength → volume_based, measured', () => {
+Deno.test('strength → rpe_estimate, estimated', () => {
+  // 598bebe0: strength load is Friel's minutes × session rating estimate, labelled 'rpe_estimate' and estimated.
   assertEquals(
     classifyWorkloadMethod({ ...base, type: 'strength' }),
-    { method: 'volume_based', estimated: false },
+    { method: 'rpe_estimate', estimated: true },
   );
 });
 

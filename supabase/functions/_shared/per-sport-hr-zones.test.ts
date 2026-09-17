@@ -26,6 +26,7 @@ const REPO = new URL('../../../', import.meta.url);
 const analysisSrc = await Deno.readTextFile(new URL('supabase/functions/compute-workout-analysis/index.ts', REPO));
 const baselinesSrc = await Deno.readTextFile(new URL('src/components/TrainingBaselines.tsx', REPO));
 const writerSrc = await Deno.readTextFile(new URL('supabase/functions/save-baselines/derive.ts', REPO));
+const readoutSrc = await Deno.readTextFile(new URL('supabase/functions/save-baselines/zones.ts', REPO));
 
 Deno.test('the WRITER emits a per-sport zone array for each discipline', () => {
   assert(/zones_run\b/.test(writerSrc), 'no run zone array is written');
@@ -99,9 +100,14 @@ Deno.test('the SCREEN shows the stored threshold heart rate or nothing — no es
   // that estimate (and an age tier below it); both were numbers the engine refuses to use, shown as if
   // they were the athlete's threshold. The row now prints the resolver's value or nothing.
   const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  assert(/const effLthr = lthr\.bpm \?\? null;/.test(codeOnly), 'the threshold row falls back to an estimate again');
+  // d3f7f3a4 (Stage 4 session 1): the row is built on the server (`save-baselines/zones.ts`); the screen prints it.
+  assert(/value=\{side\?\.lthr\.value \?\? null\}/.test(codeOnly), 'the threshold row no longer prints the server row');
+  const readoutCode = readoutSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert(/value: lthr\.bpm != null \? `\$\{Math\.round\(lthr\.bpm\)\} bpm[^`]*` : null,/.test(readoutCode), 'the threshold row falls back to an estimate again');
   assert(!/\*\s*0\.88\b/.test(codeOnly), 'an 88%-of-max threshold estimate is back on the screen');
   assert(!/thresholdHR/.test(codeOnly), 'an age-based threshold estimate is back on the screen');
+  assert(!/\*\s*0\.88\b/.test(readoutCode), 'an 88%-of-max threshold estimate is back in the server row');
+  assert(!/thresholdHR/.test(readoutCode), 'an age-based threshold estimate is back in the server row');
 });
 
 Deno.test('the HR inputs show the SAME number the zones are built from', () => {
@@ -109,8 +115,13 @@ Deno.test('the HR inputs show the SAME number the zones are built from', () => {
   // age estimate — while `effectiveLTHR` moved to estimating from the measured max. The box read 148
   // (Tanaka(57) x 0.88) beneath a label that said "est. from max", which would have been 154. One
   // number, two chains, one component. The zones and the label used one; the input used the other.
-  assert(/value=\{effectiveLTHR \?\? ''\}/.test(baselinesSrc), 'the LTHR input carries its own chain again');
-  assert(/value=\{effectiveMaxHR \?\? ''\}/.test(baselinesSrc), 'the max HR input carries its own chain again');
+  // 6c3d3c1a then d3f7f3a4: the inputs print the server readout row, built with the same resolver calls as the zone writer.
+  assert(/value=\{side\?\.lthr\.value \?\? null\}/.test(baselinesSrc), 'the LTHR input carries its own chain again');
+  assert(/value=\{side\?\.max_hr\.value \?\? null\}/.test(baselinesSrc), 'the max HR input carries its own chain again');
+  assert(/resolveCurrentLthr\(baselinesLike, \{ sport \}\)/.test(readoutSrc), 'the readout threshold row left the resolver');
+  assert(/resolveCurrentLthr\(baselinesForHr, \{ sport: 'run' \}\)/.test(writerSrc), 'the zone writer left the resolver');
+  assert(/\{ sport, allowAgeEstimate: false \}/.test(readoutSrc), 'the readout max row takes an age estimate the zone writer refuses');
+  assert(/allowAgeEstimate: false/.test(writerSrc), 'the zone writer takes an age estimate');
   const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert(
     !/value=\{sport\.manual(LTHR|MaxHR)\s*\|\|/.test(codeOnly),

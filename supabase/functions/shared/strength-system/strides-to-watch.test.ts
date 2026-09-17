@@ -37,7 +37,8 @@ const BASELINES = {
  * `hard-run-terrain.test.ts` works around. Handing the expander the wrong shape only costs it the
  * easy pace on recoveries, which is why the strides themselves are unaffected either way.
  */
-const EXPANDER_BASELINES = { easyPace: '9:00/mi', fiveK_pace: '7:00/mi' };
+// 4f5f9bbe (D-462): the expander reads the paces resolved at the baselines-load block, not the raw `easyPace` / `fiveK_pace`.
+const EXPANDER_BASELINES = { _fiveKSecPerMi: 420, _resolvedEasySecPerMi: 540 }; // 5K 7:00/mi, easy 9:00/mi
 
 function easyRunTokens(): string[] {
   const wk = composeWeek({

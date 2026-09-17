@@ -20,22 +20,27 @@ const REPO = new URL('../../../', import.meta.url);
 const card = await Deno.readTextFile(new URL('src/components/TrainingBaselines.tsx', REPO));
 const analysis = await Deno.readTextFile(new URL('supabase/functions/compute-workout-analysis/index.ts', REPO));
 const materialize = await Deno.readTextFile(new URL('supabase/functions/materialize-plan/index.ts', REPO));
+// 6c3d3c1a / bb277dcb: the offer is Adjust's Retest row, and the session row is built by the shared test-row helper.
+const adjust = await Deno.readTextFile(new URL('src/components/context/StateAdjustLens.tsx', REPO));
+const testRows = await Deno.readTextFile(new URL('supabase/functions/_shared/baseline-test-rows.ts', REPO));
 // ⛔ THE TIME-TRIAL MATHS MOVED INTO THE LEARNER (bc6d7b98, Stage 7 session 1): `learn-fitness-profile` is where the
 // result is computed and checked now, so the invariant is read there.
 const learner = await Deno.readTextFile(new URL('supabase/functions/learn-fitness-profile/index.ts', REPO));
 
 Deno.test('the run card OFFERS the test when the threshold is not measured', () => {
-  assert(/Schedule a threshold test/.test(card), 'the run card no longer offers the test');
-  assert(
-    /thrBasis\.state !== 'measured' && thrBasis\.state !== 'stated'/.test(card),
-    'the offer is no longer gated on the threshold being unmeasured — it would nag an athlete who has one',
-  );
+  // 6c3d3c1a (Profile rebuilt like Adjust; tests live on Adjust, Michael 2026-09-05): Adjust's Retest row offers it.
+  assert(/onClick=\{\(\) => scheduleTest\('run'\)\}[^>]*>Threshold</.test(adjust), 'Adjust no longer offers the run test');
+  assert(/kind === 'run' \? runThresholdTestRow\(date\)/.test(adjust), 'the offer no longer builds the threshold test row');
+  // 6c3d3c1a replaced the "only when unmeasured" gate: Adjust's Retest row offers the test whether or not a threshold is on
+  // file; the one condition is whether a test is already scheduled (then it offers to remove it, so it cannot be doubled).
+  assert(/\{scheduled\.run \? \(\s*<button[^>]*onClick=\{\(\) => removeTest\('run'\)\}/.test(adjust), 'a scheduled run test is no longer shown as one to remove');
 });
 
 Deno.test('⛔ THE TAG CONTRACT — `run_test` is what makes it a test', () => {
   // The name is cosmetic. `run_test` is what the expander and the analyser both key on; dropping it
   // turns the session into an ordinary hard run that measures nothing, with no error anywhere.
-  const sched = card.slice(card.indexOf('const scheduleRunTest'), card.indexOf('const deleteRunTest'));
+  // bb277dcb: the session row moved to the shared helper (`_shared/baseline-test-rows.ts`), which Adjust and week one call.
+  const sched = testRows.slice(testRows.indexOf('export function runThresholdTestRow'), testRows.indexOf('export function ftpTestRow'));
   assert(/'run_test'/.test(sched), 'the scheduled session lost the run_test tag');
   assert(/type: 'run'/.test(sched), 'the scheduled session is no longer a run');
   assert(/tags\.includes\('run_test'\)/.test(materialize), 'the expander no longer keys on run_test');
@@ -59,7 +64,10 @@ Deno.test('the TEST RESULT carries the date field readers actually use', () => {
   // so the app's most authoritative threshold reading reported as UNDATED.
   // ⚠️ The window is generous because the reason lives in a comment beside the code — a tight slice
   // made this fail on a passing implementation, which is the false alarm that gets a test deleted.
-  const block = analysis.slice(analysis.indexOf("source: 'Run 12-min time trial'"), analysis.indexOf("source: 'Run 12-min time trial'") + 1400);
+  // b1064203 renamed the source (p210, 88% of trial speed); bc6d7b98 moved the write into the learner.
+  const at = learner.indexOf("source: 'Run time trial — 88% of vVO2 speed (Viada p210)'");
+  assert(at >= 0, 'the learner no longer writes the time-trial threshold');
+  const block = learner.slice(at, at + 1400);
   assert(/as_of:/.test(block), 'the test result is undated to every reader again');
   assert(/is_estimate: false/.test(block), 'the test result no longer declares itself measured');
 });

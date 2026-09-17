@@ -22,27 +22,27 @@ Deno.test('nothing is proposed away from a boundary — the formula runs at cycl
 });
 
 Deno.test('⛔ uses the APP\'s 85% working number, never the book\'s 90%', () => {
-  // 150 × 12 → 150 × 12 × 0.0333 + 150 = 209.94
-  //   at the app's 0.85 → 178.4 → rounds DOWN to 175
-  //   at the book's 0.90 → 188.9 → would round to 185
+  // 1a11016f (p215): the estimate is Epley and Brzycki averaged. 150 × 12 → (209.94 + 216) / 2 = 212.97
+  //   at the app's 0.85 → 181.0 → rounds DOWN to 180
+  //   at the book's 0.90 → 191.7 → would round to 190
   // The second number is the silent policy change this test exists to prevent: adopting it would
   // ratchet every athlete from an 85% training max to a 90% one under the label "adopt your AMRAP".
   const [p] = amrapTrainingMaxCatchUp([{ lift: 'bench', weight: 150, reps: 12, week: 7 }], TM, true);
-  assertEquals(p.estimated1RM, 210);
-  assertEquals(p.proposedTm, 175);
+  assertEquals(p.estimated1RM, 213);
+  assertEquals(p.proposedTm, 180);
   assertEquals(WORKING_NUMBER_PCT_OF_1RM, 0.85, 'the constant moved — this whole module follows it');
 });
 
 Deno.test('the best set is chosen BY ESTIMATE, not by weight and not by reps', () => {
-  // 185×5 → 215.8 (the heavier bar) beats 150×12 → 209.9 (the longer set). Neither column alone
-  // answers it, which is the entire reason Wendler prints the formula (p.32).
+  // 190×5 → 217.7 (the heavier bar) beats 150×12 → 213.0 (the longer set). Neither column alone
+  // answers it. 1a11016f (p215 average) moved 185×5 to 212.0, below 150×12, so the heavier set is 190 now.
   const [p] = amrapTrainingMaxCatchUp([
     { lift: 'squat', weight: 150, reps: 12, week: 3 },
-    { lift: 'squat', weight: 185, reps: 5, week: 7 },
+    { lift: 'squat', weight: 190, reps: 5, week: 7 },
   ], TM, true);
-  assertEquals(p.from.weight, 185);
+  assertEquals(p.from.weight, 190);
   assertEquals(p.from.reps, 5);
-  assertEquals(p.estimated1RM, 216);
+  assertEquals(p.estimated1RM, 218);
 });
 
 Deno.test('⛔ RAISES ONLY — a modest AMRAP never proposes lowering the working number', () => {
@@ -89,7 +89,8 @@ Deno.test('the copy names the evidence, not a verdict', () => {
   const [p] = amrapTrainingMaxCatchUp([{ lift: 'bench', weight: 150, reps: 12, week: 7 }], TM, true);
   const line = catchUpReason(p);
   assertEquals(line.includes('150 × 12'), true, 'must show the set the athlete actually did');
-  assertEquals(line.includes('130 → 175'), true, 'must show both working numbers');
+  // 1a11016f (p215 average): 150 × 12 proposes 180.
+  assertEquals(line.includes('130 → 180'), true, 'must show both working numbers');
   for (const banned of ['you should', 'need to', 'must ', 'great', 'crushed']) {
     assertEquals(line.toLowerCase().includes(banned), false, `banned: ${banned}`);
   }
@@ -97,7 +98,7 @@ Deno.test('the copy names the evidence, not a verdict', () => {
 
 Deno.test('proposals are ordered by how far the working number has drifted', () => {
   const out = amrapTrainingMaxCatchUp([
-    { lift: 'bench', weight: 150, reps: 12, week: 7 },   // 130 → 175, gap 45
+    { lift: 'bench', weight: 150, reps: 12, week: 7 },   // 130 → 180, gap 50 (1a11016f, p215 average)
     { lift: 'overheadPress', weight: 95, reps: 6, week: 7 }, // 80 → 90, gap 10
   ], TM, true);
   assertEquals(out.map((p) => p.lift), ['bench', 'overheadPress']);
@@ -172,9 +173,9 @@ Deno.test('END TO END — stored workouts at a boundary become proposals', () =>
   const out = amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(8, 12));
   // ⚠️ BENCH FIRST, and the first draft of this line had it backwards. Squat moves further in
   // absolute pounds (170 → 200) but bench has drifted further from what the athlete can actually do
-  // (130 → 175, a 45 lb gap vs 30). The sort is by GAP, which is the number that says how stale the
-  // working weight is — not by the size of the lift.
-  assertEquals(out.map((p) => [p.lift, p.currentTm, p.proposedTm]), [['bench', 130, 175], ['squat', 170, 200]]);
+  // (130 → 180, a 50 lb gap vs 30). The sort is by GAP, which is the number that says how stale the
+  // working weight is — not by the size of the lift. 1a11016f (p215 average) moved bench 175 → 180.
+  assertEquals(out.map((p) => [p.lift, p.currentTm, p.proposedTm]), [['bench', 130, 180], ['squat', 170, 200]]);
   // …and the same block one week earlier offers nothing.
   assertEquals(amrapTrainingMaxCatchUp(sets, tm, isCatchUpBoundary(7, 12)).length, 0);
 });
@@ -198,9 +199,10 @@ Deno.test('WIRED — the apply path recomputes and cannot be driven by a posted 
 
   // At the boundary the offer resolves and the config write would be this one key only.
   const p = recompute(8, tm)!;
-  assertEquals(p.proposedTm, 175);
+  // 1a11016f (p215 average): 150 × 12 proposes 180.
+  assertEquals(p.proposedTm, 180);
   const nextTm = { ...tm, [liftKey]: p.proposedTm };
-  assertEquals(nextTm, { bench: 175, squat: 170, deadlift: 190, overheadPress: 80 });
+  assertEquals(nextTm, { bench: 180, squat: 170, deadlift: 190, overheadPress: 80 });
 
   // ⚠️ THE WEEK ROLLED OVER WHILE THE CARD SAT ON SCREEN → the apply re-checks and finds nothing.
   assertEquals(recompute(9, tm), undefined);

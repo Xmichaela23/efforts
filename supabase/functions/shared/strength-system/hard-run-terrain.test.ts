@@ -41,7 +41,8 @@ import { expandRunToken } from '../../materialize-plan/index.ts';
 // no longer the representative working week these assertions want. Week 2 is cycle 1's first
 // leader week and is the shape week 1 used to be.
 const PACE = 10; // min/mi, so minutes ÷ 10 = miles
-const BASE: any = { easyPace: '9:00/mi', fiveK_pace: '7:00/mi' };
+// 4f5f9bbe (D-462): the expander reads the paces resolved at the baselines-load block, not the raw `easyPace` / `fiveK_pace`.
+const BASE: any = { _fiveKSecPerMi: 420, _resolvedEasySecPerMi: 540 }; // 5K 7:00/mi, easy 9:00/mi
 
 /** Every terrain the menu can produce, plus `undefined` — the pre-2026-08-06 goal. */
 const ALL = [undefined, 'hill_3min', 'hill_short', 'treadmill', 'flat'] as const;

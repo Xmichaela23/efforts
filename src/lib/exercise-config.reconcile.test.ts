@@ -313,7 +313,8 @@ Deno.test('⛔ THE PER-HAND AUDIT, AS A STANDING CHECK', () => {
   // Every two-handed DUMBBELL movement shows a per-hand number. ⚠️ THE EXEMPTIONS ARE NOT LAZINESS:
   // a swing is ONE bell held with TWO hands, so a per-hand label would be wrong in the other
   // direction — the same mistake Q-180 made about a Farmers Carry, pointing the opposite way.
-  const singleImplementTwoHands = /swing|goblet/;
+  // 817af3de / 544881e6 added two more ONE-dumbbell, two-hand movements (p220 DB pullover, pp.222-223 behind-the-neck DB triceps extension).
+  const singleImplementTwoHands = /swing|goblet|pullover|behind the neck db triceps extension/;
   const unilateralByName = /single arm|one arm|single-arm|suitcase/;
   const offenders: string[] = [];
   for (const [key, cfg] of Object.entries(EXERCISE_CONFIG)) {

@@ -244,10 +244,12 @@ Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the id
    * ⚠️ Equipment omitted here, so this is the frame's full membership before the kit is considered —
    * `BRACED_NEEDS_MACHINES` covers what a barbell-only athlete loses.
    */
+  // 35041913 + 07b8e9a6 (2026-08-31) added the three core keys; 3aec68f2 (2026-09-11) split p274's focused upper cells into six.
   assertEquals(picksForFrame('all_rounder'), [
-    'braced_push', 'iso_push', 'iso_pull_a',
+    'braced_push', 'ar_arms_push_1', 'ar_arms_pull_1', 'ar_push_iso_1',
     'braced_hinge', 'braced_leg', 'ham_iso',
-    'braced_pull', 'iso_pull_b', 'quad_iso',
+    'braced_pull', 'ar_arms_push_4', 'ar_arms_pull_4', 'ar_pull_iso_4', 'quad_iso',
+    'core', 'core_2', 'core_3',
   ]);
   // ⛔ AND ITS DAY TAGS ARE ITS OWN: p274 carries the focused push cell on day 1 AND day 4, where the
   // defaulted call printed "day 1" alone.
@@ -255,7 +257,7 @@ Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the id
   assertEquals(dayLabelForPick('iso_push'), 'day 1');
 });
 
-Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPOSED WEEK', () => {
+Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPOSED WEEK', async () => {
   /**
    * ⛔⛔ THIS IS THE DEFECT CLASS THAT STARTED THE WHOLE PASS, and it is now a standing check rather
    * than a one-off sweep. A control the athlete answers and the plan discards is worse than no
@@ -274,8 +276,13 @@ Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPO
     enduranceExperience: { run: 'experienced' as const, ride: 'experienced' as const },
   };
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const drawn = picksForFrame('all_rounder', ['Commercial gym']);
-  assertEquals(drawn.length, 9, 'Standard Focus no longer draws a control for all nine of its cells');
+  // 82b4ffec (2026-09-08) took core picks off the built week and off the screen (the server's Build focus rows drop
+  // every `core*` key); 3aec68f2 (2026-09-11) gave each of p274's twelve HYP cells its own control.
+  const screen = await read('../../supabase/functions/_shared/standing-plan/setup-readout.ts');
+  assert(/picksForFrame\(frame, equipment\)\.filter\(\(k\) => !String\(k\)\.startsWith\('core'\)\)/.test(screen),
+    'the Build focus rows no longer drop the core picks the built week does not honour');
+  const drawn = picksForFrame('all_rounder', ['Commercial gym']).filter((k) => !String(k).startsWith('core'));
+  assertEquals(drawn.length, 12, 'Standard Focus no longer draws a control for all twelve of its HYP cells');
 
   let checked = 0;
   for (const key of drawn) {

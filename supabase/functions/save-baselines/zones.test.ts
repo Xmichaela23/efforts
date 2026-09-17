@@ -30,8 +30,18 @@ Deno.test('stored JSON strings are read the same', () => {
 });
 
 Deno.test('nothing on file: nothing to print', () => {
-  assertEquals(zonesForBaselinesRow({}), { power: null, swim_pace: null, run_easy_hr: null });
-  assertEquals(zonesForBaselinesRow(null), { power: null, swim_pace: null, run_easy_hr: null });
+  // d3f7f3a4 (Stage 4 session 1) added the `readout` block; with nothing on file it carries rows with no number.
+  const values = (o: unknown): unknown[] =>
+    o && typeof o === 'object'
+      ? Object.entries(o as Record<string, unknown>).flatMap(([k, v]) => (k === 'value' ? [v] : values(v)))
+      : [];
+  for (const row of [{}, null]) {
+    const { readout, ...zones } = zonesForBaselinesRow(row);
+    assertEquals(zones, { power: null, swim_pace: null, run_easy_hr: null });
+    assertEquals(values(readout).filter((v) => v != null), []);
+    assertEquals([readout.run.zones.rows, readout.bike.zones.rows], [[], []]);
+    assertEquals([readout.run.threshold_proposal, readout.bike.ftp_proposal], [null, null]);
+  }
 });
 
 Deno.test('run threshold proposal: both paces in the athlete unit, and which way it moved', () => {

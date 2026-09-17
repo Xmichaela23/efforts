@@ -112,7 +112,8 @@ Deno.test('⛔⛔ THE LADDER\'S OWN OUTPUT PRODUCES A CARD — producer to consu
   const composed = composeBlock({
     frame: 'strength_5k', competitionLifts: defaultCompetitionLifts(),
     seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
-    workingNumbers: { bench: { value: 135, movement: 'Bench Press' } },
+    // 71935074 (D-469): a by-feel ME row (weight null) earns no rung, so the block needs a bench working number to log against.
+    workingNumbers: { bench: { lift: 'bench', predicted1RM: 155, workingNumber: 148.8, measured: { weight: 130, reps: 7 }, cite: 'test' } },
     baselines, equipment: ['Commercial gym'], roundTo: 5, weeks: 12,
     sportMix: { runs: 3, rides: 2, swimDays: 0, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'run' } },
     enduranceDaysBySport: { run: 3, ride: 2 }, targetRunHours: 3, targetRideHours: 4,
@@ -126,8 +127,8 @@ Deno.test('⛔⛔ THE LADDER\'S OWN OUTPUT PRODUCES A CARD — producer to consu
     Thursday: '2026-09-10', Friday: '2026-09-11', Saturday: '2026-09-12', Sunday: '2026-09-13',
   };
   const wk2 = composed.find((w) => w.week === 2);
-  assert(wk2 && wk2.meRows.length > 0, 'the composed block carried no ME rows to log against');
-  const row = wk2!.meRows[0];
+  const row = wk2?.meRows.find((r) => r.weight != null);
+  assert(row, 'the composed block carried no prescribed ME row to log against');
   const logged = [{
     week_number: 2,
     date: DAY_ISO[row.day],
@@ -135,7 +136,7 @@ Deno.test('⛔⛔ THE LADDER\'S OWN OUTPUT PRODUCES A CARD — producer to consu
       name: row.movement,
       // Mid-band: completed every prescribed set, stopped short of the top. → 'On track'.
       sets: Array.from({ length: row.sets }, () => ({
-        completed: true, reps: 3, weight: row.weight ?? 135, rir: 2,
+        completed: true, reps: 3, weight: row.weight, rir: 2,
       })),
     }],
   }];
@@ -159,5 +160,5 @@ Deno.test('⛔⛔ THE LADDER\'S OWN OUTPUT PRODUCES A CARD — producer to consu
   // ⛔ The word is one of the three, never a raw outcome name leaking to the screen.
   assert(['Stalled', 'On track', 'Moving up'].includes(card.word), `unmapped word: ${card.word}`);
   // ⛔ AND THE PAIRING HOLDS: the weight is the one those reps were performed at.
-  assertEquals(card.atWeight, row.weight ?? 135);
+  assertEquals(card.atWeight, row.weight);
 });

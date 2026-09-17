@@ -24,9 +24,10 @@ Deno.test('E3a: long run is ZONE-LED when learned data present (HR band + pace)'
   assert(/\/mi/.test(d), `expected a pace target: ${d}`);
 });
 
-Deno.test('E3a: Friel HR band uses the learned LTHR (158 → Z2 ~142)', () => {
+Deno.test('E3a: Friel HR band uses the learned LTHR (158 → Z2 ~141)', () => {
+  // 70c84ad1: one Friel table (`src/lib/friel-zones.ts`), Z2 top = 89% of LTHR → round(158 × 0.89) = 141.
   const d = longRunDesc(plan({ lthr: 158, vdot: 50 }));
-  assert(/HR 134–142/.test(d), `expected Friel Z2 134–142 off LTHR 158: ${d}`);
+  assert(/HR 134–141/.test(d), `expected Friel Z2 134–141 off LTHR 158: ${d}`);
 });
 
 Deno.test('E3a: RPE FALLBACK when no learned data (no zones, keeps effort wording)', () => {

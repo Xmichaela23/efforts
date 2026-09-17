@@ -1108,8 +1108,13 @@ Deno.test('⛔ A DOUBLE DAY IS LEGAL AND NEVER SILENT — the spacing is the par
           for (const x of wk.sessions.filter((y) => y.type === sport)) {
             perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
           }
-          const doubled = [...perDay.values()].some((c) => c > 1);
-          const said = wk.notes.find((nt) => /land on one day/.test(nt.text));
+          // c7c21af2: a double day of two hard/long sessions is named by the conflict rule's own sentence, with the day
+          // in it; the generic line steps aside there. So every double is named, by exactly one of the two.
+          const doubledDays = [...perDay].filter(([, c]) => c > 1).map(([d]) => d);
+          const namedByConflict = (d: string) => wk.notes.some((nt) => nt.text.startsWith(`${d} has `) && /on it\./.test(nt.text));
+          const doubled = doubledDays.some((d) => !namedByConflict(d));
+          // The line is per sport (compose.ts writes one for runs and one for rides), so it is read for this sport only.
+          const said = wk.notes.find((nt) => nt.text.startsWith(`Two ${sport === 'run' ? 'runs' : 'rides'} land on one day`));
 
           // ⛔ THE SENTENCE AND THE WEEK AGREE, BOTH WAYS. A silent double is the defect; a sentence
           //    about a double that was not built is the copy-lying shape all over again.
@@ -1118,15 +1123,13 @@ Deno.test('⛔ A DOUBLE DAY IS LEGAL AND NEVER SILENT — the spacing is the par
 
           if (said) {
             sawADouble = true;
-            // ⛔ IT NAMES THE HOURS. That is the only actionable half.
-            assert(/six to eight hours/.test(said.text), `no spacing named: ${said.text}`);
-            assert(/four to six/.test(said.text), `the sub-hour case is missing: ${said.text}`);
+            // 507fec99 (Michael, 2026-09-16, option A): p143's hours are the gap before a strength session and print no
+            // gap between two runs or two rides, so the line states the fact and stops, cited to p143.
+            assertEquals(said.text, `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day.`);
             // ⚠️ DAY-AGNOSTIC — this screen runs before the scheduler decides weekdays.
             assert(!DAY_NAMES.some((d) => said.text.includes(d)), `a weekday leaked in: ${said.text}`);
             assertEquals(voiceViolation(said.text), null, said.text);
-            // ⚠️ AND IT CARRIES BOTH CITES: B3's bullet has only its chapter, rule 6 has a read page.
-            assert(/69-125/.test(said.cite ?? '') && /139-145/.test(said.cite ?? ''),
-              `the cite overstates or understates: ${said.cite}`);
+            assertEquals(said.cite, 'Viada p143');
           }
         }
       }

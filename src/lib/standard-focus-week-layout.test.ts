@@ -282,11 +282,13 @@ Deno.test('⛔⛔ NO OFFERED LENGTH SITS IN A GAP THE LADDER CANNOT BUILD', () =
    * screen would have promised a session the plan does not contain — the ask-15-get-20 defect in a
    * new place. Every value comes off the ladder's own rungs, which is what makes that impossible.
    */
+  // e6796bfb (2026-09-11): the easy ride stops at two hours (p108), so its picker ends at 100 and the long ride's starts at 130.
   const o = slotLengthOptions('easy', AR_LONG_RIDE as never, { baselines: BASELINES as never, frame: 'all_rounder' })!;
+  const long = slotLengthOptions('long', AR_LONG_RIDE as never, { baselines: BASELINES as never, frame: 'all_rounder' })!;
   assert(o.options.includes(60), 'the ride ladder\'s own floor is not offered');
-  assert(o.options.includes(100) && o.options.includes(130), 'the rung ends are not offered');
+  assert(o.options.includes(100) && long.options.includes(130), 'the rung ends are not offered');
   for (const gap of [105, 110, 115, 120, 125]) {
-    assert(!o.options.includes(gap), `${gap} min is offered and p239 has no such ride`);
+    assert(!o.options.includes(gap) && !long.options.includes(gap), `${gap} min is offered and p239 has no such ride`);
   }
 });
 
@@ -326,7 +328,8 @@ Deno.test('⛔⛔⛔ EVERY OFFERED LENGTH BUILDS EXACTLY THAT LENGTH — swept t
       }
     }
   }
-  assert(checked >= 40, `only ${checked} lengths swept — the sweep stopped covering the ladder`);
+  // e6796bfb (2026-09-11) capped the easy ride at 120 and the long ride at 210: 4 + 7 + 4 + 4 lengths offered.
+  assert(checked >= 19, `only ${checked} lengths swept — the sweep stopped covering the ladder`);
 });
 
 Deno.test('⛔ A QUALITY SLOT IGNORES A MINUTES KEY — the frame owns the page\'s doses', () => {

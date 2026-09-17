@@ -189,8 +189,9 @@ Deno.test('the working number comes off the completed max-rep set, and it is 96%
   );
   const wn = read.working.bench!;
   assertEquals(wn.measured, { weight: 185, reps: 5 });
-  // Epley 185×(1+5/30)=215.833…, Brzycki 185×36/32=208.125 → mean 211.979…, ×0.96
-  const expected = ((185 * (1 + 5 / 30)) + (185 * 36 / 32)) / 2 * WORKING_MAX_FRACTION;
+  // Epley at the book's printed 0.0333 (1fe13dab, one e1RM recipe): 185×5×0.0333+185=215.8025, Brzycki 185×36/32=208.125
+  // → mean 211.96375, ×0.96
+  const expected = ((185 * 5 * 0.0333 + 185) + (185 * 36 / 32)) / 2 * WORKING_MAX_FRACTION;
   assert(Math.abs(wn.workingNumber - expected) < 1e-9, `working number was ${wn.workingNumber}, not ${expected}`);
   // ⛔ AND IT IS NOT 85% OF ANYTHING. The collision is the whole reason this quantity is separate.
   assert(Math.abs(wn.workingNumber - wn.predicted1RM * 0.85) > 1, 'the working number landed on the previous program\'s fraction');
@@ -445,9 +446,13 @@ Deno.test('a second pass never blanks a weight the first pass already set', () =
   const secondPass = composeBlock({ ...ROW_ARGS.compose, workingNumbers: partial, weeks: 4, taperWeeks: [] });
   const restated = restateFromTest({ composed: secondPass, planned, afterWeek: 1 });
 
+  // 38466e9c (D-469 addendum): a step rep change now rewrites the row, so a returned session also carries rows that
+  // were "By feel" on the calendar already. Blanking is a row whose calendar weight was a NUMBER coming back "By feel".
   for (const row of restated.rows) {
+    const onCalendar = (planned.find((p) => p.id === row.id)?.strength_exercises ?? []) as { name: string; weight: unknown }[];
     for (const ex of row.strength_exercises) {
-      assert(ex.weight !== 'By feel',
+      const was = onCalendar.find((e) => e.name === ex.name)?.weight;
+      assert(!(typeof was === 'number' && ex.weight === 'By feel'),
         `week ${row.week} ${row.day} ${ex.name} had a real weight blanked back to "By feel"`);
     }
   }

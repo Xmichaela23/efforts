@@ -29,7 +29,8 @@ Deno.test('⛔ THE DERIVED DISTANCE IS MARKED AT ITS SOURCE', () => {
 });
 
 Deno.test('⛔⛔ THE WATCH GETS TIME FOR A TIME-PRESCRIBED STEP — both export paths', () => {
-  const gar = read('../../send-workout-to-garmin/index.ts');
+  // 87202a89 moved the Garmin conversion out of send-workout-to-garmin into the shared converter it now imports.
+  const gar = read('../garmin/convert-workout.ts');
   /**
    * ⛔ BOTH PATHS, AND THE SEGMENT ONE IS THE ONE THAT MATTERS MOST: most quality work is segmented
    * intervals, so fixing only the simple path would have left the defect where it actually lives.

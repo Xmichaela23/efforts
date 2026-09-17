@@ -102,8 +102,8 @@ Deno.test('⛔ `recalibrate` HOLDS IN `applyVerdict` — the new number is an ab
 // ── The number a recalibration produces ─────────────────────────────────────
 
 Deno.test('⛔ THE RECOMPUTED TRAINING MAX IS 85% OF THE ESTIMATE OFF THAT SET (Forever p.21)', () => {
-  // Wendler's own estimator: 200 × 2 × 0.0333 + 200 = 213.3 → 85% = 181.3 → 180 on the plate grid.
-  assertEquals(trainingMaxFromSet(200, 2), 180);
+  // 1a11016f (p215): the estimate is Epley and Brzycki averaged: (213.3 + 205.7) / 2 = 209.5 → 85% = 178.1 → 175 on the plate grid.
+  assertEquals(trainingMaxFromSet(200, 2), 175);
   // ⛔ IT ROUNDS DOWN, like every other weight this engine writes. An overshoot authors a set the
   // athlete cannot complete; an undershoot is absorbed. The error is not symmetric.
   // ⚠️ A SINGLE IS NOT ESTIMATED — `estimate1RM` returns the weight itself for one rep ("a true

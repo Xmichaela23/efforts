@@ -135,7 +135,8 @@ const LEDGER: Record<string, Reason> = {
 
   // ── run threshold pace ───────────────────────────────────────────────────
   'run threshold pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
-  'run threshold pace::src/components/TrainingBaselines.tsx': 'receipt',
+  // Moved from TrainingBaselines.tsx with the readout (d3f7f3a4): reads `sample_count` for the "N best efforts" note.
+  'run threshold pace::supabase/functions/save-baselines/zones.ts': 'receipt',
   // Updates the learned threshold after a race (reads the prior to diff, writes the next).
   'run threshold pace::supabase/functions/_shared/race-feedback.ts': 'writer',
   // The pace gate (2026-09-10, audit H-B13): one presence test on the server, used by create-goal and
@@ -162,7 +163,8 @@ const LEDGER: Record<string, Reason> = {
 
   // ── swim css (no owner by design — tracked, not chased) ──────────────────
   'swim css::supabase/functions/learn-fitness-profile/index.ts': 'writer',
-  'swim css::src/components/AthleticRecordPage.tsx': 'unreviewed',
+  // Moved from AthleticRecordPage.tsx to the server (8e17c1e6): the swim suggestion line on My Record.
+  'swim css::supabase/functions/_shared/baseline-suggestions.ts': 'unreviewed',
   'swim css::src/components/CompletedTab.tsx': 'unreviewed',
   'swim css::src/hooks/useWorkoutData.ts': 'unreviewed',
   'swim css::supabase/functions/_shared/planning-context.ts': 'unreviewed',

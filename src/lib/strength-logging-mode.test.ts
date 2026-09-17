@@ -254,6 +254,8 @@ Deno.test('⛔ EVERY DIFFERENCE FROM THE OLD REGEX IS NAMED HERE — no silent t
   // weighted movement. It is asserted directly in the fixture above.
   assertEquals(lost.sort(), [
     'cable woodchopper',
+    // 817af3de added p221's dip machine, a weight-stack machine the table files as loaded; the old `dip` stem ate it.
+    'dip machine',
     'weighted single leg calf raise',
     'weighted single-leg calf raises',
   ].sort(), 'a loaded movement changed sides — a stem is matching something it should not');

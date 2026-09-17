@@ -148,17 +148,15 @@ const VARIABLE_PACE_PACKET = (driftBpm: number) => {
 // 2026-09-03 (Michael: "drift is going to be important" — never withheld). A raw-basis percentage on a
 // variable-pace session is SHOWN, with the number against the 5% line and "hills mixed in" said plainly,
 // instead of the old "pace varied too much" apology. Still no bpm line beside it.
-Deno.test('a raw-basis drift on a variable-pace session is shown against the 5% line, with the caveat', () => {
+Deno.test('a raw-basis drift on a variable-pace session prints no heart-rate line (p107)', () => {
   const rows = buildAnalysisDetailRows(
     VARIABLE_PACE_PACKET(5), [], false, null, false, [], 'run', null, null, RAW,
   );
+  // 67c488a0 (p107, reverses the 2026-09-03 "never withheld" ruling): a session that is not steady gets no heart-rate
+  // line at all — no percentage, no bpm line, and no "not read" line in its place.
   const hr = rows.find((r) => r.label === 'Heart rate');
-  assertEquals(!!hr, true, 'the row must render');
-  assertStringIncludes(hr!.value, '6.0%');
-  assertStringIncludes(hr!.value, '1.0 over the 5% line');
-  assertStringIncludes(hr!.value, 'hills mixed in');
-  assertEquals(/\d+ bpm/.test(hr!.value), false);
-  assertEquals(rows.filter((r) => r.label === 'Heart rate').length, 1);
+  assertEquals(hr, undefined, 'a non-steady session printed a heart-rate line');
+  assertEquals(rows.filter((r) => r.label === 'Heart rate').length, 0);
 });
 
 Deno.test('interval session: NO heart-rate line — drift is a steady-session read (p107, 2026-09-12)', () => {

@@ -361,7 +361,16 @@ Deno.test('a skipped block has no test week, and week one carries real weights',
     .flatMap((s) => s.strength_exercises ?? [])
     .filter((e) => typeof e.weight === 'number');
   assert(wk1Weights.length > 0, 'a skipped block opened week one with no weights at all');
-  assert(!skipped[0].sessions.some((s) => s.tags.includes('test_week')), 'a test session survived the skip');
+  // acc96593 (D-467, Michael 2026-09-04): under the skip a lift with no number is its own week-one test session, never a
+  // full test week. The evidence here covers bench, squat and deadlift, so only the overhead press may be tested.
+  const testNames = skipped[0].sessions.filter((s) => s.tags.includes('test_week'))
+    .flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name));
+  const untested = new Set((Object.keys(NAMES) as TestedLift[]).filter((l) => !wn[l]).map((l) => NAMES[l]));
+  assertEquals(testNames.filter((n) => !untested.has(n)), [], 'a test session survived the skip for a lift that has a number');
+  const allNumbers = composeBlock({
+    ...COMPOSE, workingNumbers: { ...wn, overheadPress: { ...wn.bench!, lift: 'overheadPress' } }, skipTestWeek: true, weeks: 3, taperWeeks: [],
+  });
+  assert(!allNumbers[0].sessions.some((s) => s.tags.includes('test_week')), 'a test session survived the skip');
 
   // And the default is still the test.
   const normal = composeBlock({ ...COMPOSE, weeks: 3, taperWeeks: [] });

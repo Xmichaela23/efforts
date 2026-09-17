@@ -68,18 +68,11 @@ Deno.test('ALIGNED: agreement is silent', () => {
 // THE STARVATION — the flag must fire when the threshold LEARNER abstains
 // ═══════════════════════════════════════════════════════════════════════════
 
-Deno.test('THE STARVATION FIX: no measured threshold, but measured EASY runs — it still speaks', () => {
-  // ⛔ THIS IS THE CASE THAT PROMPTED THE JOB and the case the old flag could not see. The threshold
-  // learner has published nothing (contaminated candidates dropped); the athlete has ten clean easy
-  // runs and a 5K typed long ago. Shape asserted, not a tuned value.
+Deno.test('no measured threshold, only measured EASY runs — no threshold, so no flag (D-462)', () => {
+  // 4f5f9bbe (D-462): threshold is learned or entered; the derived-from-easy tier is gone, so easy runs alone found no flag.
+  // The athlete has ten clean easy runs and a 5K typed long ago; with no threshold there is nothing to judge the 5K by.
   const n = buildFiveKNudge({ fiveK: clock('25:21') }, easyLearned(755) as never);
-  assert(n != null, 'the flag was still starved — this is the whole bug');
-  assertEquals(n!.evidence, 'derived-from-easy');
-  assertEquals(n!.direction, 'stale-fast');
-  assertEquals(n!.should_prompt, true);
-  // Law 3 — the message must not present a derived number as a measured one.
-  assert(/easy runs/i.test(n!.message), `derived evidence not disclosed: ${n!.message}`);
-  assert(!/measured/i.test(n!.message), `a derived number was called measured: ${n!.message}`);
+  assertEquals(n, null, 'easy runs alone produced a flag — a derived threshold is back');
 });
 
 Deno.test('a typed threshold pace is evidence too, and says so', () => {

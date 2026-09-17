@@ -25,9 +25,11 @@ Deno.test('no learned → manual/typed value is used (assertion)', () => {
 });
 
 Deno.test('typed LTHR can live in configured_hr_zones too', () => {
-  const r = resolveCurrentLthr({ configured_hr_zones: { threshold_heart_rate: 149, source: 'manual' } });
+  // f459f82a (§8.0 #23): the run reads its own typed key; the sport-agnostic `threshold_heart_rate` is no longer a tier.
+  const r = resolveCurrentLthr({ configured_hr_zones: { manual_run_lthr: 149, source: 'manual' } });
   assertEquals(r.bpm, 149);
   assertEquals(r.source, 'manual');
+  assertEquals(resolveCurrentLthr({ configured_hr_zones: { threshold_heart_rate: 149, source: 'manual' } }).bpm, null);
 });
 
 Deno.test('learned LOW confidence (but sampled) falls to learned-low, below manual', () => {

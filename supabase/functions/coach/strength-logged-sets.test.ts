@@ -37,5 +37,6 @@ Deno.test('others: not main, a weight logged, most-logged first, at most eight',
   assertEquals(out.main, []);
   assertEquals(out.others.length, 8);
   assertEquals(out.others.map((o) => o.sessions), [12, 11, 10, 9, 8, 7, 6, 4]);
-  assertEquals(out.others[0], { canonical: 'accessory_10', display_name: out.others[0].display_name, weight: 30, reps: 5, sessions: 12 });
+  // 9ba9144a: each other lift also carries its heaviest set as the athlete reads it (`set_line`, imperial by default).
+  assertEquals(out.others[0], { canonical: 'accessory_10', display_name: out.others[0].display_name, weight: 30, reps: 5, sessions: 12, set_line: '30 lb × 5' });
 });

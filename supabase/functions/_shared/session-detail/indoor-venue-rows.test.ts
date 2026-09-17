@@ -25,15 +25,14 @@ const rows = (indoors: boolean) =>
   buildAnalysisDetailRows(hot, [], false, null, false, [], 'ride', null, 88, drift, null, null, null, indoors);
 const row = (indoors: boolean, label: string) => rows(indoors).find((r) => r.label === label)?.value ?? null;
 
-Deno.test('⛔ OUTDOORS SAYS BOTH — the baseline this suppression is measured against', () => {
-  assert(String(row(false, 'Heart rate')).includes('hills mixed in'), String(row(false, 'Heart rate')));
+// 67c488a0 (p107): this fixture is an interval ride, and an interval session prints no heart-rate line, outdoors or in.
+Deno.test('⛔ OUTDOORS SAYS THE HEAT; AN INTERVAL RIDE HAS NO HEART-RATE LINE', () => {
+  assertEquals(row(false, 'Heart rate'), null);
   assert(String(row(false, 'Conditions')).includes('88°F'), String(row(false, 'Conditions')));
 });
 
-Deno.test('⛔ INDOORS SAYS NEITHER, AND KEEPS THE NUMBER', () => {
-  const hr = String(row(true, 'Heart rate'));
-  assert(hr.includes('7.4%'), hr);            // the measurement stands
-  assert(!hr.includes('hills'), hr);
+Deno.test('⛔ INDOORS SAYS NEITHER', () => {
+  assertEquals(row(true, 'Heart rate'), null);
   assertEquals(row(true, 'Conditions'), null); // the heat line and the hills line are the row
 });
 

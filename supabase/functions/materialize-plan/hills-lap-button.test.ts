@@ -15,6 +15,7 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { expandRunToken } from './index.ts';
+import { parseQualityWork, qualityRideSteps } from '../_shared/plan-tokens/quality-work.ts';
 
 const BASE: any = { easyPace: '9:00/mi', fiveK_pace: '7:00/mi' };
 const steps = (tok: string) => expandRunToken(tok, BASE) as any[];
@@ -85,7 +86,21 @@ Deno.test('⛔⛔ NO REST AFTER THE LAST BIKE BLOCK — the rests between them a
   const src = await Deno.readTextFile(
     new URL('./index.ts', import.meta.url).pathname,
   );
-  for (const fam of ['bike_ss', 'bike_thr', 'bike_vo2']) {
+  // a4bdab0e: `bike_ss_` / `bike_thr_` moved to `parseQualityWork` + `qualityRideSteps` (_shared/plan-tokens/quality-work.ts); `bike_vo2_` stays here.
+  const qw = await Deno.readTextFile(new URL('../_shared/plan-tokens/quality-work.ts', import.meta.url).pathname);
+  {
+    const at = qw.indexOf(`if (work.kind === 'band') {`);
+    assert(at > 0, 'bike_ss / bike_thr: the band branch could not be found — it moved or was rewritten');
+    const body = qw.slice(at, at + 700);
+    assert(/i < work\.reps - 1/.test(body),
+      `⛔ bike_ss / bike_thr rest after the final block again. That rest is ours and the source never wrote it`);
+    assert(/kind: 'recovery', duration_s: work\.restS/.test(body),
+      `bike_ss / bike_thr: the between-block rest was dropped — those five minutes are his`);
+    const ss = qualityRideSteps(parseQualityWork('bike_ss_3x18min_R5min')!, 250);
+    assertEquals(ss.map((x) => x.kind), ['work', 'recovery', 'work', 'recovery', 'work']);
+    assertEquals(ss.filter((x) => x.kind === 'recovery').map((x) => x.duration_s), [300, 300]);
+  }
+  for (const fam of ['bike_vo2']) {
     const at = src.indexOf(`lower.match(/${fam}_(\\d+)x(\\d+)min_r(\\d+)min/)`);
     assert(at > 0, `${fam}: the interval branch could not be found — it moved or was rewritten`);
     const body = src.slice(at, at + 700);

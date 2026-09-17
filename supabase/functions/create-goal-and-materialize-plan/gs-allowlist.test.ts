@@ -88,6 +88,8 @@ const CONSUMED: Record<string, string> = {
   plan_start_date: 'a top-level payload key, becomes gsBody.start_date',
   priority: 'the goal row',
   notes: 'the goal row',
+  // bb277dcb added the key; since 1781fbb8 create-goal reads it off the goal row to insert the week-one tests.
+  baseline_numbers: 'read by create-goal (week-one-tests.ts) to insert the week-one test sessions',
 };
 
 Deno.test('⛔ NO KEY THE STRENGTH WIZARD SENDS IS SILENTLY DROPPED', () => {
