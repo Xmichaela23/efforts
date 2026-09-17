@@ -344,6 +344,8 @@ export type CoachWeekContextV1 = {
    * so an athlete on "your number" read two different watt numbers on two screens.
    */
   applied_ftp?: number | null;
+  /** Where that FTP came from, in Adjust's words (`ftpSourceWord`, v212). */
+  applied_ftp_word?: string | null;
   baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
   plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
   marathon_readiness?: {

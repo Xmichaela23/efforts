@@ -35,7 +35,7 @@
  * `RETEST_OFFSET_DAYS`, the third and fifth day of the block, so neither test sits on the first lifting
  * day and the two are two days apart. Different act, different rule, both stated.
  */
-import { resolveCurrentFtp, pendingFtpProposal } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentFtp, pendingFtpProposal, ftpSourceWord } from '../../../src/lib/resolve-current-ftp.ts';
 import {
   resolveCurrentRunEasyPace,
   resolveCurrentRunThresholdPace,
@@ -357,12 +357,8 @@ function buildReadout(args: {
   // ── FTP ──────────────────────────────────────────────────────────────────────────────────────
   const ftpMine = pn.ftp_source === 'manual';
   const ftpValue = positive(ftpResolved.value);
-  const ftpAccepted = positive((learned as { ride_ftp_accepted?: { value?: unknown } } | null)?.ride_ftp_accepted?.value) != null;
-  const ftpNote = ftpMine
-    ? 'your number'
-    : ftpResolved.source === 'learned'
-      ? (ftpAccepted ? 'accepted from your rides' : 'from your rides')
-      : ftpValue != null ? 'typed, until your rides measure' : null;
+  // The word is `ftpSourceWord`'s (2026-09-17) — the same call the coach payload makes for State's bike row.
+  const ftpNote = ftpSourceWord({ learned_fitness: learned, performance_numbers: pn } as never);
   const ftpRow: BaselineReadoutRow = {
     value: pill(ftpValue != null ? `${Math.round(ftpValue)} W` : null, ftpResolved.source, !!ftpMine),
     raw: ftpValue != null ? Math.round(ftpValue) : null,

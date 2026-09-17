@@ -394,7 +394,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               What was true in the complaint is that it must not read as the verdict's own number —
               hence "Easy power is set from…", which states the basis and claims nothing about the trend. */}
           {/* ⛔ THE FTP LINE IS GONE FROM THE OPEN CARD (2026-09-03, WORKORDER-bike-state-audit §5.1).
-              The collapsed bike row prints `FTP 168 W · estimated` and stays on screen when the card
+              The collapsed bike row prints `FTP 168 W · <where it came from>` and stays on screen when the card
               opens, so this line put the same fact twice, two lines apart. The row is the ruled place
               for it (FTP leads the rider's numbers, checked against the field 2026-09-03); the row and
               the verdict share one resolve (`ftpNow` / `bikeAnchorValue`), so nothing here is lost.
@@ -1006,7 +1006,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, appliedFtpWord = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; appliedFtpWord?: string | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -1184,12 +1184,12 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // Roadman's FTP benchmarks). The first cut of this row put efficiency factor on top to MIRROR
       // THE RUN ROW, which is our internal consistency, not the rider's priority. ⚠️ Watts per kilo is
       // not offered: no athlete body weight is stored anywhere in the app.
-      // ⚠️ "estimated" is not decoration — it is the line that says the number is worth testing, and
-      // the book gives two tests we can send (20 min × 0.95, or the ramp; pp.212–213).
+      // ⛔ THE WORD BESIDE IT IS THE SERVER'S (2026-09-17): `trends.applied_ftp_word`, from `ftpSourceWord` — the
+      // rule Adjust's readout uses. This row picked "tested" / "estimated" here from the efficiency read's basis,
+      // a different fact, so 168 W read "estimated" on State and "accepted from your rides" on Adjust.
+      // The word belongs to `applied_ftp`; a row that fell back to the anchor prints the number alone.
       const ftp = appliedFtp ?? (bikeAnchorValue != null ? Math.round(bikeAnchorValue) : null);
-      const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
-        : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
-      if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
+      if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: (appliedFtp != null && appliedFtpWord) ? appliedFtpWord : undefined });
       const efFit = rideTrends?.efficiencyTrend.fit ?? null;
       if (efFit && efFit.tooFew === false) {
         // The row reads the TREND LINE (WKO5's fitted line), start → end, never one ride (2026-09-04, Michael).

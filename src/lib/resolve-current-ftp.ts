@@ -158,6 +158,24 @@ export function resolveCurrentFtp(baselines: BaselinesLike): ResolvedFtp {
   return NULL_RESULT;
 }
 
+/**
+ * ⛔ THE WORD BESIDE THE FTP — WHERE THE NUMBER CAME FROM, ONE RULE (2026-09-17). Adjust's readout held this rule
+ * inline (`save-baselines/zones.ts`) while State's bike row picked "tested" / "estimated" on the phone from the
+ * efficiency read's basis — a different fact — so one number read "accepted from your rides" on Adjust and
+ * "estimated" on State. Moved here unchanged; Adjust and the coach payload both call it, State prints it.
+ * The four wordings are Adjust's, approved there. Null when there is no FTP.
+ */
+export function ftpSourceWord(baselines: BaselinesLike): string | null {
+  const resolved = resolveCurrentFtp(baselines);
+  if (String(baselines?.performance_numbers?.ftp_source ?? '') === 'manual') return 'your number';
+  if (resolved.source === 'learned') {
+    return asPositiveFinite(baselines?.learned_fitness?.ride_ftp_accepted?.value) != null
+      ? 'accepted from your rides'
+      : 'from your rides';
+  }
+  return asPositiveFinite(resolved.value) != null ? 'typed, until your rides measure' : null;
+}
+
 export type FtpProposal = {
   /** The live estimate the athlete has not accepted yet. */
   measured: number;

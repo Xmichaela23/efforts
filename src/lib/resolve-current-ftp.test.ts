@@ -7,7 +7,7 @@
  * precedence semantics.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { resolveCurrentFtp } from './resolve-current-ftp.ts';
+import { resolveCurrentFtp, ftpSourceWord } from './resolve-current-ftp.ts';
 
 Deno.test('resolveCurrentFtp — learned >= medium wins over manual', () => {
   const result = resolveCurrentFtp({
@@ -263,4 +263,15 @@ Deno.test('accept write — refuses a low-confidence or missing estimate (learne
   assertEquals(acceptEstimatedFtp({ ride_ftp_estimated: { value: 0, confidence: 'high' } }, 'checkpoint'), null);
   assertEquals(acceptEstimatedFtp({}, 'checkpoint'), null);
   assertEquals(acceptEstimatedFtp(null, 'checkpoint'), null);
+});
+
+// ── ftpSourceWord (2026-09-17): the word beside the FTP on Adjust AND on State's bike row ─────────────────
+Deno.test('ftpSourceWord — the four words, and null with no FTP', () => {
+  const est = { value: 168, confidence: 'high' };
+  assertEquals(ftpSourceWord({ learned_fitness: { ride_ftp_estimated: est, ride_ftp_accepted: { value: 168 } }, performance_numbers: {} } as never), 'accepted from your rides');
+  assertEquals(ftpSourceWord({ learned_fitness: { ride_ftp_estimated: est }, performance_numbers: {} } as never), 'from your rides');
+  assertEquals(ftpSourceWord({ learned_fitness: { ride_ftp_estimated: est }, performance_numbers: { ftp: 200, ftp_source: 'manual' } } as never), 'your number');
+  assertEquals(ftpSourceWord({ learned_fitness: null, performance_numbers: { ftp: 200 } } as never), 'typed, until your rides measure');
+  assertEquals(ftpSourceWord({ learned_fitness: null, performance_numbers: {} } as never), null);
+  assertEquals(ftpSourceWord(null), null);
 });
