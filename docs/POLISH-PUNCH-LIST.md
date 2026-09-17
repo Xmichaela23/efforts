@@ -24,6 +24,20 @@ by order (the D-laps work: `_shared/session-detail/interval-compare.ts`, the lap
 6f3d7c19/44a1ab79), judge the matched ones, and print what was not matched. Execution must not read 95% on a run
 whose every work rep was outside its range. Report before building.
 
+## QUEUED (2026-09-16, Strava Developer Program reply) — THE WEBHOOK IGNORES "ATHLETE REMOVED THE APP"
+
+Strava declined the capacity request until (a) webhooks replace polling and (b) deauthorized athletes are handled.
+(a) holds — traced 2026-09-16: no timer asks Strava for activities (the two cron jobs are `run-jobs` and
+`calendar-sync`; neither calls Strava); activities arrive through `strava-webhook`; the other callers are on a tap
+(`import-strava-history`, `reingest-activity`, `fetch-strava-route`, `share-strength-to-strava`) or on opening
+Baselines (`StravaPreview` → `StravaDataService.fetchRecentActivities`, from the phone). (b) has a gap:
+`strava-webhook/index.ts:70` skips every event whose `object_type` is not `activity`, so Strava's
+`object_type: athlete` / `updates.authorized: "false"` event is dropped; the connection reads live until a later
+call returns 401 (`:152-180`, `:437`). Disconnect inside Efforts and delete-account do call `oauth/deauthorize`
+(`_shared/provider-deregister.ts:96`). Fix, in place: on that event mark the connection disconnected and delete
+the stored tokens (reuse what `disconnect-connection` does, minus the call to Strava). Then resubmit the form with
+a note: webhooks in use, no polling, deauthorization handled. Read from the code, not exercised on a live account.
+
 ## QUEUED (2026-09-16) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
 
 `calendar-sync` records a fingerprint of every copy it sends (Garmin: delete + resend on change; Intervals: update
