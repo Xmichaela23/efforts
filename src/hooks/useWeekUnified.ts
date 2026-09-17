@@ -47,6 +47,8 @@ export function useWeekUnified(fromISO: string, toISO: string) {
         items: UnifiedItem[];
         weekly_stats: Record<string, unknown>;
         training_plan_context: unknown | null;
+        /** The line for a day with nothing on it, per date — `_shared/empty-day-line.ts` (2026-09-17). */
+        empty_day_lines: Record<string, string> | null;
       }>;
     },
     placeholderData: keepPreviousData,
@@ -71,12 +73,13 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   const items: UnifiedItem[] = (query.data as any)?.items || [];
   const weeklyStats = (query.data as any)?.weekly_stats || { planned: 0, completed: 0 };
   const trainingPlanContext = (query.data as any)?.training_plan_context || null;
+  const emptyDayLines: Record<string, string> = (query.data as any)?.empty_day_lines || {};
   // Show loading while fetching when there is no real data yet, or when showing previous week's placeholder (wrong dates for the requested range).
   const loading =
     enabled &&
     query.isFetching &&
     (query.isPlaceholderData || query.data === undefined);
-  return { items, weeklyStats, trainingPlanContext, loading, error: (query.error as any)?.message || null };
+  return { items, weeklyStats, trainingPlanContext, emptyDayLines, loading, error: (query.error as any)?.message || null };
 }
 
 

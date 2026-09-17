@@ -21,6 +21,9 @@ export type ArcFiveKLearnedDivergence = {
   manual_5k_label: string;
   implied_5k_total_sec: number;
   implied_5k_label: string;
+  /** The two words the Baselines 5K row prints, composed on the server (2026-09-17, WORKORDER Stage C). */
+  baselines_value_when_auto: string;
+  baselines_note_when_mine: string;
   /** manual − implied; positive = the saved 5K is SLOWER than the training data suggests. */
   gap_sec: number;
   /**

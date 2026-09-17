@@ -83,3 +83,24 @@ export type PreviewCompromise = { kind?: string; text: string; rule?: string; da
 export function conflictsOf(compromises: ReadonlyArray<PreviewCompromise>): PreviewCompromise[] {
   return compromises.filter((c) => !!c.rule && CONFLICT_RULES.has(c.rule));
 }
+
+/**
+ * ⛔ THE HARD CARD'S WHOLE LABEL, IN ONE PLACE (2026-09-17, WORKORDER Stage C). `NonRaceBuilder` assembled
+ * "Hard run — top-end intensity" inline in its JSX from three conditions, so the words lived in a render path.
+ *
+ * ⚠️ AND IT IS NOT A SERVER FIELD, DELIBERATELY. The wizard's week is solved ON THE DEVICE — `week-model` runs
+ * through the `@shared` alias so the preview and the built plan come from one solver (CLAUDE.md, Scheduling).
+ * There is no server call behind this card to hang a word on, so the owner is this shared module: one composer,
+ * both surfaces, no second vocabulary.
+ */
+export function hardCardLabel(
+  discipline: string,
+  ownership: string | null | undefined,
+  family: string | null | undefined,
+  fallbackIntensity: 'top-end' | 'threshold',
+): string {
+  const sport = discipline === 'bike' ? 'Hard ride' : 'Hard run';
+  if (String(ownership ?? '') === 'club') return `${sport} — club session`;
+  const intensity = hardIntensityOf(String(family ?? '')) ?? fallbackIntensity;
+  return `${sport}${intensity === 'threshold' ? ' — sustained threshold' : ' — top-end intensity'}`;
+}

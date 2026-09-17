@@ -52,8 +52,8 @@ const barLoaded = (movement: string): boolean =>
 /**
  * The row's weight, top right (§3d). ⚠️ DATA, NEVER A PRESCRIPTION THIS FILE WRITES: `weight_display`
  * is what the server priced, in the athlete's unit, and a string `weight` is the composer's own
- * literal (`By feel` on an auto-regulated row). Nothing is invented when both are absent — the corner
- * stays empty.
+ * literal, which since 2026-09-17 (WORKORDER Stage C) INCLUDES `By feel` on an auto-regulated row — the server
+ * stamps that word. Nothing is invented when both are absent — the corner stays empty.
  * ⛔ A BARE NUMBER IS NOT LABELLED HERE ANY MORE (2026-09-10, audit H-T06). This rounded it and added
  * "lb" or "kg" from the phone's units with no conversion; materialize-plan stamps the label on the row.
  */
@@ -375,7 +375,8 @@ export const LiftSessionCard: React.FC<{
                 ) : null}
               </div>
               <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
-                {c.meta ?? 'By feel'}
+                {/* server-word: materialize-plan stamps `weight_display: 'By feel'` (2026-09-17, Stage C). */}
+                {c.meta ?? ''}
               </span>
             </div>
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}

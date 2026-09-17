@@ -72,8 +72,8 @@ export function getStrengthExercisesFromWorkout(workout: any): any[] {
  * "— last time 4"; the load-basis sentences; `(was 85 lb)`. A list the athlete reads at the bar has
  * one job — what to load and how many — and every repeated phrase pushed that off the line.
  *
- * ⚠️ A ROW WITH NO PRICED WEIGHT READS `By feel` — the composer's own literal for an auto-regulated
- * row, the same one Today's card shows.
+ * ⚠️ A ROW WITH NO PRICED WEIGHT READS `By feel` — and that literal is the SERVER'S now (2026-09-17,
+ * WORKORDER Stage C): materialize-plan stamps it on the row, this prints `weight_display` and nothing else.
  * ⛔ A BARE NUMBER IS NOT LABELLED HERE (2026-09-10, audit H-T06): the server's `weight_display` carries
  * the athlete's unit; the phone's "lb"/"kg" guess is gone.
  */
@@ -93,7 +93,8 @@ export function plainLiftList(items: any[], _units: 'imperial' | 'metric' = 'imp
     const d = typeof x?.weight_display === 'string' ? x.weight_display.trim() : '';
     if (d) return d;
     if (typeof x?.weight === 'string' && x.weight.trim()) return x.weight.trim();
-    return 'By feel';
+    // server-word: materialize-plan stamps `weight_display: 'By feel'` on an auto-regulated row (2026-09-17).
+    return null;
   };
 
   const out: PlainLiftLine[] = [];

@@ -1930,7 +1930,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
        */
       isPretest: Array.isArray(scheduledWorkout?.tags)
         && scheduledWorkout.tags.some((t: unknown) => String(t) === 'test_week'),
-      isDeload: /deload/i.test(String(scheduledWorkout?.name || '')),
+      // server-word: get-week's `is_deload` (2026-09-17, WORKORDER Stage C), not a parse of the display name.
+      isDeload: (scheduledWorkout as any)?.is_deload === true,
       // isValiditySet: intentionally omitted — see the note above.
     });
   };
@@ -4638,7 +4639,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 explains itself. Detection mirrors the app's convention (name-string
                 parse — same as WorkoutCalendar/UnifiedWorkoutView/AllPlansInterface);
                 no structured week_type flag is plumbed to the logger. */}
-            {/deload/i.test(String(scheduledWorkout?.name || '')) && (
+            {/* ⛔ THE DELOAD FLAG IS THE SERVER'S (2026-09-17, WORKORDER Stage C) — get-week's `is_deload`.
+                This parsed the session name; a rename killed the pill with no error.
+                server-word: the server decides, this prints. */}
+            {(scheduledWorkout as any)?.is_deload === true && (
               <span
                 className="shrink-0 mt-1 text-[11px] font-semibold uppercase tracking-wide text-strength/90"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."

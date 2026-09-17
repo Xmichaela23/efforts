@@ -62,7 +62,8 @@
       "2-ledger": "fail",
       "3": "fail",
       "4": "fail",
-      "5": "fail"
+      "5": "fail",
+      "6": "fail"
     },
     "scopes": {
       "rule1": [
@@ -85,6 +86,21 @@
       ],
       "rule5": [
         "supabase/functions/_shared/standing-plan/**/*.ts"
+      ],
+      "derivedDistance": [
+        "src/components/**/*.tsx",
+        "src/components/**/*.ts",
+        "src/utils/**/*.ts",
+        "src/lib/**/*.ts",
+        "supabase/functions/compute-workout-summary/index.ts",
+        "supabase/functions/_shared/planned-step-lines.ts"
+      ],
+      "rule6": [
+        "src/components/TodaysEffort.tsx",
+        "src/components/StrengthLogger.tsx",
+        "src/components/NonRaceBuilder.tsx",
+        "src/components/SessionDeck.tsx",
+        "src/components/TrainingBaselines.tsx"
       ]
     },
     "parked": [
@@ -331,6 +347,49 @@
         "calories"
       ]
     },
-    "_markers_doc": "Stage 7 escapes, each carrying its reason: rule 1 `/* guard: layout — <why> */` (pixels, axis ticks) and `/* guard: device — <why> */` (a calculator or timer on what the athlete is typing or doing), on the line, the line above, or a leading comment on an enclosing statement; rule 4 `/* sent-held: <field> — <local> */` (a sent value read into a local first) and a `parked:` block comment; rule 3 `/* writes-keys: a, b */` on or up to three lines above each write site — a JSON column passes when every live site names its keys and no key has two steps."
+    "_markers_doc": "Stage 7 escapes, each carrying its reason: rule 1 `/* guard: layout — <why> */` (pixels, axis ticks) and `/* guard: device — <why> */` (a calculator or timer on what the athlete is typing or doing), on the line, the line above, or a leading comment on an enclosing statement; rule 4 `/* sent-held: <field> — <local> */` (a sent value read into a local first) and a `parked:` block comment; rule 3 `/* writes-keys: a, b */` on or up to three lines above each write site — a JSON column passes when every live site names its keys and no key has two steps.",
+    "movedWords": [
+      {
+        "field": "get-week day.empty_day_line",
+        "words": [
+          "'Rest'",
+          "No effort logged",
+          "No effort scheduled",
+          "Your plan starts "
+        ]
+      },
+      {
+        "field": "get-week planned row.is_deload",
+        "words": [
+          "/deload/i.test("
+        ]
+      },
+      {
+        "field": "preview session.intensity_word",
+        "words": [
+          " — sustained threshold",
+          " — top-end intensity"
+        ]
+      },
+      {
+        "field": "strength_exercises[].weight_display",
+        "words": [
+          "'By feel'"
+        ]
+      },
+      {
+        "field": "get-week row.unlinked",
+        "words": [
+          "unlinked\n"
+        ]
+      },
+      {
+        "field": "save-baselines readout.run.five_k",
+        "words": [
+          "· auto`",
+          "Your runs suggest about "
+        ]
+      }
+    ]
   }
 }

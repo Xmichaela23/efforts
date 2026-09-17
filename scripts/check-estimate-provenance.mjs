@@ -22,6 +22,7 @@
  *   rule 3 (c) one derived field written by two server steps (whole supabase/functions tree)
  *   rule 4 (d) a provider-field chain longer than sent → computed
  *   rule 5 (e) a composer string printing a number with no source
+ *   rule 6 (f) a status word or label chosen on the phone (src/components, JSX)
  * Each rule is warn or fail in config.truth.severity. Hits inside config.truth.parked (the race
  * path, WORKORDER §3a) are counted and never fail.
  *
@@ -304,8 +305,9 @@ const RULE_LABEL = {
   3: 'rule 3 (c) · derived field written by two steps',
   4: 'rule 4 (d) · chain longer than sent → computed',
   5: 'rule 5 (e) · composer prints a number with no source',
+  6: 'rule 6 (f) · status word chosen on the phone',
 };
-const RULE_ORDER = ['0', '1', '2', '2-ledger', '3', '4', '5'];
+const RULE_ORDER = ['0', '1', '2', '2-ledger', '3', '4', '5', '6'];
 
 function flagValue(name) { const i = rawArgs.indexOf(name); return i >= 0 ? rawArgs[i + 1] : null; }
 const ONLY_RULE = flagValue('--rule');
@@ -831,12 +833,109 @@ function rule5() {
   }
 }
 
+
+// ---- rule 1 (a), the derived-distance pattern: a time-prescribed step printed as a distance ----
+/**
+ * ⛔ WORKORDER Stage B3 (2026-09-17). `materialize-plan` stores `distanceMeters` on a TIME-prescribed step —
+ * seconds x target pace, kept for accounting — and marks it `distanceDerived`. A surface that prints the metres
+ * without reading that mark turns a 4:00 rep into "0.41 mi" (ce39c5b3 fixed the Planned tab; the row label was
+ * still doing it on 2026-09-16, 1da1fd91). The mark is the whole defence, so a read without it is a hit.
+ *
+ * A measured distance is not in scope: only a PLANNED STEP is, so the object has to name one (`step`, `st`,
+ * `plannedStep`, anything on a `planned`/`steps` path). `executed`, `completed`, `overall`, `actual`, a lap or an
+ * interval row carry what the athlete really ran.
+ */
+function rulePlannedDerivedDistance() {
+  const FIELD = /^(distanceMeters|distance_m)$/;
+  const MEASURED = /\b(executed|completed|overall|actual|lap|interval|row|sensor|summary)\b/i;
+  const PLANNED_STEP = /(^|[.\[\]])(st|step|steps|plannedStep|plannedSteps)\b|\bplanned/i;
+  // swims are prescribed by distance, so the mark never applies to them
+  const NOT_A_RUN_OR_RIDE = /swim/i;
+  const MARK = /distanceDerived/;
+  for (const rel of filesIn(TRUTH.scopes?.derivedDistance)) {
+    const s = source(rel);
+    if (!MARK.test(s.text) && !/distanceMeters|distance_m/.test(s.text)) continue;
+    const sf = astOf(rel);
+    const parked = isParkedPath(rel);
+    const seenLine = new Set();
+    const visit = (n) => {
+      if (ts.isPropertyAccessExpression(n) && FIELD.test(n.name.text)) {
+        const obj = n.expression.getText(sf);
+        if (!MEASURED.test(obj) && PLANNED_STEP.test(obj) && !NOT_A_RUN_OR_RIDE.test(rel)) {
+          // the nearest enclosing function — the mark has to be read somewhere in it
+          let fn = n;
+          while (fn && !ts.isFunctionLike(fn) && !ts.isSourceFile(fn)) fn = fn.parent;
+          const scopeText = fn ? fn.getText(sf) : s.text;
+          const li = lineOf(sf, n);
+          const excused = markNear(s.lines, li, MARK) || markNear(s.lines, li, /server-field\s*:/) ||
+            inMarkedBlock(sf, n, /server-field\s*:/);
+          if (!MARK.test(scopeText) && !excused && !seenLine.has(li)) {
+            seenLine.add(li);
+            push(1, rel, li + 1, `planned \`${n.name.text}\` printed without reading \`distanceDerived\``, parked || inParkedBlock(sf, n));
+          }
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(sf);
+  }
+}
+
+// ---- rule 6 (f): a word the server now owns, reappearing on the phone (design §1, added 2026-09-17) ----
+/**
+ * ⛔ WORKORDER Stage C. The guard checked numbers, not words: State's bike row printed "168 W · estimated" while
+ * Adjust printed "accepted from your rides" for the SAME number, because the phone picked the word from a different
+ * field (df71a674). A word is a verdict; the server owns it and the phone prints it.
+ *
+ * ⚠️ THIS IS A REGRESSION GUARD, NOT A DETECTOR, AND THE DIFFERENCE MATTERS. A general "is this string a status
+ * word" test was tried first and could not tell "No effort logged" from "Send to Garmin" or a Tailwind class — 147
+ * hits, almost all of them button text and styling. So it pins the EXACT words that have been moved to the server:
+ * if one reappears as a literal on the phone, the move has been undone and the build fails. Every future move adds
+ * its words here; `config.truth.movedWords` is the list, `/* server-word: <reason> *​/` the escape for the one
+ * place that legitimately still holds the string (a type, a test fixture).
+ */
+function rule6() {
+  const SERVER_WORD = /server-word\s*:/;
+  const COMMENT_LINE = /^\s*(\*|\/\/|\/\*)/;
+  const moved = TRUTH.movedWords || [];
+  for (const rel of filesIn(TRUTH.scopes?.rule6)) {
+    const s = source(rel);
+    const sf = astOf(rel);
+    // a JSX escape can sit a few lines above the literal it covers, so the node's own block is checked too
+    const escaped = new Set();
+    const collectEscapes = (n) => {
+      if (n.getStart && inMarkedBlock(sf, n, SERVER_WORD)) {
+        for (let li = sf.getLineAndCharacterOfPosition(n.getStart(sf)).line,
+                 end = sf.getLineAndCharacterOfPosition(n.getEnd()).line; li <= end; li++) escaped.add(li);
+      }
+      ts.forEachChild(n, collectEscapes);
+    };
+    collectEscapes(sf);
+    for (const entry of moved) {
+      for (const word of entry.words || []) {
+        let from = 0;
+        for (;;) {
+          const at = s.text.indexOf(word, from);
+          if (at < 0) break;
+          from = at + word.length;
+          const li = s.text.slice(0, at).split('\n').length - 1;
+          // a word named in a comment is documentation, not a choice
+          if (COMMENT_LINE.test(s.lines[li] || '')) continue;
+          if (markNear(s.lines, li, SERVER_WORD) || escaped.has(li)) continue;
+          push(6, rel, li + 1, `"${word}" — ${entry.field}`, isParkedPath(rel));
+        }
+      }
+    }
+  }
+}
+
 // ---- run ----
-if (ruleOn(1)) rule1();
+if (ruleOn(1)) { rule1(); rulePlannedDerivedDistance(); }
 if (ruleOn(2)) rule2();
 if (ruleOn(3)) rule3();
 if (ruleOn(4)) rule4();
 if (ruleOn(5)) rule5();
+if (ruleOn(6)) rule6();
 
 // Rule 0 (D-237): fresh undeclared fallbacks join the same report; ticketed exceptions are counted.
 let knownCount = 0;

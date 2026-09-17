@@ -983,7 +983,6 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const rd = readout?.run ?? null;
     const thrProposal = rd?.threshold_proposal ?? null;
     const fiveKMine = pnAny.fiveK_source !== 'learned';
-    const implied = arcFiveKNudge?.implied_5k_label ?? null;
     const hr = hrRows('run');
     return [
       { id: 'run-numbers', label: 'Paces', Icon: Activity, info: 'Threshold pace is the fastest pace you could hold for about an hour; hard sessions are set from it. Easy pace is your zone 2 pace, worked out from threshold pace. Typing a number makes it your number; auto uses what your runs measure.', body: (
@@ -1001,9 +1000,10 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
             </div>
           )}
           <NumberRow id="easy" name="Easy pace" editable={false} sport="run" value={rd?.easy.value ?? null} note={rd?.easy.note ?? null} />
-          {/* The 5K row's own number is the server's; the implied clock and its nudge come from
-              `get-arc-context`, which already works both out (`arc-context.ts` five_k_nudge). */}
-          <NumberRow id="fiveK" name="5K time" hint={rd?.five_k.hint ?? 'mm:ss'} inputMode="numeric" sport="run" value={rd?.five_k.value ?? (!fiveKMine && implied ? `${implied} · auto` : null)} note={rd?.five_k.note != null && arcFiveKNudge?.should_prompt && implied && fiveKMine ? `your number. Your runs suggest about ${implied}.` : (rd?.five_k.note ?? null)} mine={rd?.five_k.mine === true} seed={pnAny.fiveK || ''}
+          {/* server-word: every word on this row is the server's (2026-09-17, WORKORDER Stage C) — the readout's
+              own `value`/`note`, or `five_k_nudge.baselines_value_when_auto` / `.baselines_note_when_mine` from
+              `get-arc-context`. The two strings were assembled here beside a server-authored row. */}
+          <NumberRow id="fiveK" name="5K time" hint={rd?.five_k.hint ?? 'mm:ss'} inputMode="numeric" sport="run" value={rd?.five_k.value ?? (!fiveKMine ? (arcFiveKNudge?.baselines_value_when_auto ?? null) : null)} note={rd?.five_k.note != null && arcFiveKNudge?.should_prompt && fiveKMine ? (arcFiveKNudge?.baselines_note_when_mine ?? null) : (rd?.five_k.note ?? null)} mine={rd?.five_k.mine === true} seed={pnAny.fiveK || ''}
             onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK: t.trim(), fiveK_source: 'manual' } as any })); }}
             onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK_source: 'learned' } as any }))} />
           {hr.rows[0]}

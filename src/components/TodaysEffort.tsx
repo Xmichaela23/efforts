@@ -11,7 +11,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
-import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
+
 // ⛔ THE SWAP IS THE SERVER'S (2026-09-10, audit H-T15). `swap-session` sends which swaps a session
 // offers, with the words each shows, and writes the tap; this file renders the sheet and posts it.
 import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@/hooks/useSwapSheet';
@@ -146,20 +146,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const navigate = useNavigate();
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans, currentPlans } = useAppContext();
   /**
-   * The active plan that has not opened yet (Michael, 2026-09-11): a build lands here, and until its
-   * first week arrives this screen has no session to show, so it says when the plan starts. The
-   * server answers both fields (`plan-overview`); this reads them.
+   * ⛔ THE "YOUR PLAN STARTS …" LINE MOVED TO THE SERVER (2026-09-17, WORKORDER Stage C). It is one of the four
+   * `empty_day_lines` get-week composes; the phone reads `currentPlans` for nothing here any more.
    */
-  const upcomingPlan = useMemo(() => {
-    const list = Array.isArray(currentPlans) ? currentPlans : [];
-    return list.find((p: any) => p?.status === 'active' && p?.has_started === false && typeof p?.starts_on === 'string') ?? null;
-  }, [currentPlans]);
-  const upcomingPlanLine = useMemo(() => {
-    if (!upcomingPlan?.starts_on) return null;
-    const [y, m, d] = String(upcomingPlan.starts_on).split('-').map((x) => parseInt(x, 10));
-    const when = new Date(y, (m || 1) - 1, d || 1).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    return `Your plan starts ${when}.`;
-  }, [upcomingPlan]);
 
   /**
    * Connection health (docs/WORKORDER-plumbing-2026-09-07.md §4): the providers whose stored token
@@ -415,7 +404,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   // Unified lookup - use week range for training plan context, but filter items to active date
-  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
+  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext, emptyDayLines } = useWeekUnified(fromISO, toISO);
   // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
   // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
   // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
@@ -2162,19 +2151,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/* `overflow-x: clip`, not hidden: hidden made this list a second scroller inside the panel's. */}
         <div ref={listRef} className="px-3" style={{ overflowX: 'clip', paddingBottom: hasExpandedWorkout ? 120 : dayOverflows ? 56 : 0 }}>
         {displayWorkouts.length === 0 ? (
-          // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
+          // ⛔ THE LINE IS THE SERVER'S (2026-09-17, WORKORDER Stage C) — get-week's `empty_day_lines`, one per
+          // date, composed by `_shared/empty-day-line.ts`. The rest/logged/scheduled/plan-starts choice ran here
+          // and a second copy of its first half ran in the calendar. server-word: printed, never chosen.
           <div className="px-4 py-10">
             <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
-              {trainingPlanContext
-                ? 'Rest'
-                : isPastDate
-                  ? 'No effort logged'
-                  // The plan is built and has not opened yet: the day it starts, in the slot the session
-                  // would take (Michael, 2026-09-11: "put the your plan starts note where today's efforts says").
-                  : (upcomingPlan?.starts_on && activeDate < String(upcomingPlan.starts_on) && upcomingPlanLine)
-                    ? upcomingPlanLine
-                    : 'No effort scheduled'
-              }
+              {emptyDayLines?.[activeDate] ?? ''}
             </p>
           </div>
         ) : (
@@ -2464,12 +2446,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             className="inline-block w-1.5 h-1.5 rounded-full ml-2 align-middle bg-amber-300/85"
                           />
                         )}
-                        {isCompleted && isUnmatchedAgainstPlan(
-                          workout as never,
-                          (Array.isArray(unifiedItems) ? unifiedItems : [])
-                            .map((it: { planned?: unknown }) => it?.planned ?? null)
-                            .filter(Boolean) as never,
-                        ) && (
+                        {/* server-word: get-week's `unlinked` (2026-09-17, WORKORDER Stage C). The rule ran here
+                            over the items this screen happened to hold, and a second time in the week view over a
+                            different set — one rule, two inputs, two possible answers for one session. */}
+                        {(workout as any)?.unlinked === true && (
                           <span
                             className="ml-2 align-middle text-[10px] font-normal text-amber-300/85"
                             title="Didn't match a planned session — tap to link it"

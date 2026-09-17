@@ -44,6 +44,8 @@ import { isExecutedWorkout } from '../_shared/is-executed.ts';
 import { doneLines, weekBarTotals } from './week-totals.ts';
 import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
+import { emptyDayLine } from '../_shared/empty-day-line.ts';
+import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -1676,6 +1678,12 @@ Deno.serve(async (req)=>{
         strength_exercises: p.strength_exercises ?? null,
         mobility_exercises: p.mobility_exercises ?? null,
         tags: Array.isArray(p.tags) ? p.tags : [],
+        /**
+         * ⛔ THE DELOAD FLAG IS A FIELD NOW, NOT A NAME PARSE (2026-09-17, WORKORDER Stage C). The logger ran
+         * `/deload/i` over the session name in two places to decide whether to show its pill; so did the calendar,
+         * the workout view and the plan list. The name is display text and a rename silently kills the pill.
+         */
+        is_deload: /deload/i.test(String(p.name ?? item.name ?? '')),
         // The day's listing order (H-T16); the same number sits on the item and on completed_workout.
         day_order: item.day_order ?? null,
         export_hints: p.export_hints ?? null,
@@ -1727,11 +1735,27 @@ Deno.serve(async (req)=>{
         day_order: item.day_order ?? null,
       };
     };
+    /**
+     * ⛔ "unlinked" IS A FIELD NOW (2026-09-17, WORKORDER Stage C). Today ran `isUnmatchedAgainstPlan` over the
+     * items it happened to hold and the week ran it over day rows filtered by status — one rule, two inputs, and
+     * the two surfaces could disagree about the same session. The rule itself is unchanged
+     * (`src/lib/associate-candidates.ts`): a completed row with no plan behind it, on a day that still owes one.
+     */
+    const plannedByDate = new Map<string, any[]>();
+    for (const it of itemsWithAI as any[]) {
+      const p = (it as any)?.planned ?? null;
+      if (!p) continue;
+      const d = String((it as any)?.date ?? '').slice(0, 10);
+      if (!plannedByDate.has(d)) plannedByDate.set(d, []);
+      plannedByDate.get(d)!.push(p);
+    }
     const itemsWithPlannedWorkout = itemsWithAI.map((it) => {
       const pw = toPlannedWorkout(it);
       const cw = toCompletedWorkout(it);
+      const sameDay = plannedByDate.get(String((it as any)?.date ?? '').slice(0, 10)) ?? [];
       return {
         ...it,
+        unlinked: cw ? isUnmatchedAgainstPlan(cw as never, sameDay as never) : false,
         ...(pw ? { planned_workout: pw } : {}),
         ...(cw ? { completed_workout: cw } : {}),
       };
@@ -1759,6 +1783,34 @@ Deno.serve(async (req)=>{
         }
       }
     };
+    /**
+     * ⛔ THE EMPTY-DAY LINE IS THE SERVER'S (2026-09-17, WORKORDER Stage C) — `_shared/empty-day-line.ts`.
+     * One line per date in the window, whether the day has items or not; the phone prints the one for the day it
+     * is showing and chooses nothing. `upcomingPlanStartsOn` is the start of an active plan whose first week has
+     * not arrived, which is the only case that names a date.
+     */
+    try {
+      const todayISO = new Date().toISOString().slice(0, 10);
+      const { data: allPlans } = await supabase.from('plans')
+        .select('config,status').eq('user_id', userId).eq('status', 'active');
+      const starts = (Array.isArray(allPlans) ? allPlans : [])
+        .map((p: any) => String(p?.config?.user_selected_start_date || p?.config?.start_date || '').slice(0, 10))
+        .filter((d: string) => isISO(d) && d > todayISO)
+        .sort();
+      const upcomingPlanStartsOn = starts[0] ?? null;
+      const datesWithPlan = new Set(
+        itemsWithPlannedWorkout
+          .filter((it: any) => it?.planned_workout?.training_plan_id || it?.training_plan_id)
+          .map((it: any) => String(it?.date ?? '').slice(0, 10)),
+      );
+      const lines: Record<string, string> = {};
+      for (let d = fromISO; d <= toISO; d = addDays(d, 1)) {
+        lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: datesWithPlan.has(d) || !!trainingPlanContext, upcomingPlanStartsOn });
+      }
+      (responseData as any).empty_day_lines = lines;
+    } catch (e) {
+      debugNotes.push({ where: 'empty_day_lines', error: String(e) });
+    }
     if (trainingPlanContext) responseData.training_plan_context = trainingPlanContext;
     if (warningsOut.length) responseData.warnings = warningsOut;
     return new Response(JSON.stringify(responseData), {

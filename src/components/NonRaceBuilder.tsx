@@ -120,7 +120,7 @@ import {
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
 import {
-  conflictsOf, familyOf, hardIntensityOf, placedHardDays, placedHardSessions, type PreviewCompromise,
+  conflictsOf, familyOf, hardCardLabel, hardIntensityOf, placedHardDays, placedHardSessions, type PreviewCompromise,
 } from '@/lib/preview-week-read';
 import type { IntakeReadout } from '@/lib/intake-readout-types';
 
@@ -6444,12 +6444,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * server never read it. Once the preview is back the family tag decides; before that
                * the phone's guess stands in.
                */
-              const builtIntensity = hardIntensityOf(placedFamilies[i] ?? '');
-              const intensity = builtIntensity ?? (hardRoleOf(i) === 'threshold' ? 'threshold' : 'top-end');
-              const label = `${h.discipline === 'bike' ? 'Hard ride' : 'Hard run'}${
-                h.ownership === 'club' ? ' — club session'
-                  : intensity === 'threshold' ? ' — sustained threshold'
-                    : ' — top-end intensity'}`;
+              // server-word: `hardCardLabel` owns every word on this card (2026-09-17, WORKORDER Stage C).
+              const label = hardCardLabel(h.discipline, h.ownership, placedFamilies[i], hardRoleOf(i) === 'threshold' ? 'threshold' : 'top-end');
               return (
                 <div key={`hard-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
                   <div className="flex items-baseline justify-between gap-2">

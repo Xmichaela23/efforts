@@ -654,7 +654,7 @@ export default function WorkoutCalendar({
   const toISO = toDateOnlyString(weekEnd);
   const queryClient = useQueryClient();
   const weekStaleMs = (import.meta.env?.DEV ? 5 : 60) * 60 * 1000;
-  const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, weeklyStats, trainingPlanContext, emptyDayLines, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
 
   // Warm previous/next week in React Query so swipe/navigation hits cache (matches useWeekUnified staleTime)
   useEffect(() => {
@@ -1457,10 +1457,12 @@ export default function WorkoutCalendar({
 
               <div className="flex flex-col gap-1 min-w-0">
                 {items.length === 0 ? (
-                  /* ⛔ `Rest` ONLY WHERE A PLAN SAYS SO. A day with no plan behind it has nothing to
-                     say about itself, and calling it rest would be the app inventing a prescription. */
-                  trainingPlanContext ? (
-                    <span className="text-[14px] italic" style={{ color: 'rgba(242,240,236,0.36)' }}>Rest</span>
+                  /* ⛔ `Rest` ONLY WHERE A PLAN SAYS SO, AND THE SERVER SAYS IT (2026-09-17, WORKORDER Stage C).
+                     This ran its own copy of Today's rule; both read `empty_day_lines` now. The calendar prints
+                     only the rest word — the other three lines belong to the day's own screen.
+                     server-word: get-week composes it, this prints it. */
+                  emptyDayLines?.[key] === 'Rest' ? (
+                    <span className="text-[14px] italic" style={{ color: 'rgba(242,240,236,0.36)' }}>{emptyDayLines[key]}</span>
                   ) : null
                 ) : items.map((evt: any, i: number) => {
                   const row = evt?._src;

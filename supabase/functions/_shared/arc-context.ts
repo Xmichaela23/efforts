@@ -173,6 +173,13 @@ export interface ArcFiveKLearnedDivergence {
   /** From the resolved threshold pace via the app's own VDOT tables, run backwards. */
   implied_5k_total_sec: number;
   implied_5k_label: string;
+  /**
+   * ⛔ THE TWO WORDS THE BASELINES ROW PRINTS, WRITTEN HERE (2026-09-17, WORKORDER Stage C). The screen
+   * built "6:42 · auto" and "your number. Your runs suggest about 6:42." inline beside the server's own
+   * readout, so one row had two authors. Both are unchanged; they simply have one owner now.
+   */
+  baselines_value_when_auto: string;
+  baselines_note_when_mine: string;
   /** manual − implied; positive = the saved 5K is SLOWER than the training data suggests. */
   gap_sec: number;
   /**
@@ -797,6 +804,8 @@ export function buildFiveKNudge(
     manual_5k_label: manual.label,
     implied_5k_total_sec: implied,
     implied_5k_label: impliedLabel,
+    baselines_value_when_auto: `${impliedLabel} · auto`,
+    baselines_note_when_mine: `your number. Your runs suggest about ${impliedLabel}.`,
     gap_sec: gap,
     direction,
     evidence,
