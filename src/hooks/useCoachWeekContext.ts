@@ -567,6 +567,8 @@ export type CoachWeekContextV1 = {
       cross_training_signal?: { label: string; tone: 'positive' | 'warning' | 'info'; detail?: string | null; info?: string | null } | null;
       /** Audit 2026-09-10 (H-B08): State's glance headline — null unless form is in the high-risk zone. */
       form_headline?: string | null;
+      /** BODY's one line on Today, written by the coach (v213). */
+      body_today_line?: string | null;
       /** H-T21: the load key's form-zone table, the athlete's current zone flagged. */
       form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
       /** H-T21: the rolling seven days' workload points, the sport that carried most, and each sport's printed share. */

@@ -518,7 +518,6 @@ export default function StateTab({
   const readiness = trends.readiness_state;
   const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" — now NON-RPE factors only
   const readinessSuggestion = trends.readiness_suggestion ?? null; // D-232: loaded-legs one-line suggestion
-  const readinessRpeDriver = trends.readiness_rpe_driver ?? null; // BODY-row driver (RPE clause only, Whoop pattern)
   const readinessColor =
     readiness === 'fresh' ? 'text-emerald-400/90' :
     readiness === 'adapting' ? 'text-sky-400/85' :
@@ -690,17 +689,7 @@ export default function StateTab({
             above BODY. */}
         <StateWeekExecution wsv={wsv} week={week} />
 
-        {/* BODY — restored 2026-09-04 (Michael: "you got rid of body, I didn't ask for that"). Effort is Foster's
-            session RPE, soreness is Hooper's scale; the comparisons under them are OURS and say so in the ledger.
-            ⛔ LAST ON THE PLATE (2026-09-10, Michael). The order is what the training did, then what the
-            athlete did, then how it felt: LOAD · THIS WEEK · BODY. BODY is the only reported block, so it
-            reads after the two measured ones rather than between them. */}
-        <StateBodyBlock
-          visibleSignals={visibleSignals}
-          windowLabel={rm?.body_window_label ?? null}
-          readinessRpeDriver={readinessRpeDriver}
-        />
-
+        {/* ⛔ BODY MOVED BELOW THE TRENDS (2026-09-17, Michael) — see the block under <StatePerformanceSection>. */}
         {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
             Raw + distinct sliders; shown ONLY when a recent check-in exists (no-data
             on absent, per Q3). Neutral tone — Phase 1 is visible-only, no good/bad
@@ -741,6 +730,18 @@ export default function StateTab({
       <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} appliedFtp={(wsv.trends as any)?.applied_ftp ?? null} appliedFtpWord={(wsv.trends as any)?.applied_ftp_word ?? null} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} hasActivePlan={wsv.plan.has_active_plan === true} asOf={data.as_of_date ?? null} />
 
       <div className="mt-2 galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+
+        {/* ⛔ BODY SITS BELOW THE TRENDS (2026-09-17, Michael). It is the only block made from what the athlete
+            typed, and it changes nothing in the plan — TrainingPeaks keeps logged soreness on the day's metrics
+            card, off its first screen. It stood third on this screen, above every measured trend, as the tallest
+            block in the top card. Numbers only: effort with its 28-day usual, soreness with its entry count, the
+            logged count. The verdict words and the two sentences under them came off (coach v213); BODY's one
+            line on Today is `load.body_today_line`. History: restored to State 2026-09-04, placed last in the
+            top card 2026-09-10. */}
+        <StateBodyBlock
+          visibleSignals={visibleSignals}
+          windowLabel={rm?.body_window_label ?? null}
+        />
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}

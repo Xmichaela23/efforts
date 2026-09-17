@@ -11,21 +11,19 @@ import { Dot } from '../LoadBar';
  * numbers, same words, same server fields: effort, soreness and the logged count now read across one
  * wrapping line, with `Dot` from LoadBar so the separator is literally the same component.
  *
- * ⚠️ NOTHING IS COMPUTED HERE. `value_display`, `detail`, `soreness_flag` and `as_of_date` are printed
+ * ⚠️ NOTHING IS COMPUTED HERE. `value_display`, `detail` and `as_of_date` are printed
  * exactly as the coach payload sends them (Law 4) — the client never re-words or re-rounds a BODY row.
  */
 export default function StateBodyBlock({
   visibleSignals,
   windowLabel = null,
-  readinessRpeDriver,
 }: {
   visibleSignals: VisibleSignal[];
   /** The coach's window for every number in the section ("last 7 days"). Printed once, here. */
   windowLabel?: string | null;
-  readinessRpeDriver: string | null;
 }) {
-  // ⛔ NO TAP-TO-REVEAL (Michael 2026-09-03: one click). Provenance prints under its row.
-  const sorenessFlag = visibleSignals.find((s) => s.soreness_flag)?.soreness_flag ?? null;
+  // ⛔ NUMBERS ONLY (2026-09-17). The effort driver sentence and the soreness persistence line are no longer
+  // sent (coach v213) or drawn: no athlete app words a self-reported number against a personal normal.
   return (
   <div className="px-3 py-3">
     {/* Heading line — the section name, what it is made of, and the window it rests on.
@@ -69,22 +67,6 @@ export default function StateBodyBlock({
       ))}
     </div>
 
-    {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session moved the week —
-        sits WITH the "how hard it feels" verdict, dim + always-visible. RPE-clause only (server
-        guarantees no non-RPE factor reaches this row). Full width, under the readings. */}
-    {readinessRpeDriver && visibleSignals.some((s) => s.label === 'effort') && (
-      <p className="mt-1.5 text-[12px] text-white/65 leading-snug">{readinessRpeDriver}</p>
-    )}
-
-    {/* ⛔ THE PERSISTENCE LINE STATES A FACT AND DOES NOT ACT ON IT (D-354).
-        Soreness above this athlete's OWN normal for 4 of the last 6 sessions. Nothing changes unless
-        the athlete goes to the Adjust tab and changes it. ⚠️ Adjust is still a scaffold for endurance —
-        strength steers work (in the logger), ease/push does not exist yet. It is not honest to pretend
-        the line acts.
-        ⛔ FULL WIDTH (2026-09-10) — it used to sit in a 116 px-indented column and wrapped to four lines. */}
-    {sorenessFlag && (
-      <p className="mt-1.5 text-[12px] text-white/60 leading-snug">{sorenessFlag}</p>
-    )}
     {/* ⛔ NO PROVENANCE SENTENCE (Michael 2026-09-03: "AI slop talk in there"). The row is the value
         and its note; the window and source do not print.
         ⛔ BODY IS REPORTED-ONLY (Michael 2026-09-03): "it's solely a reported number, we shouldn't

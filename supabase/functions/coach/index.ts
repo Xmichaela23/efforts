@@ -76,7 +76,7 @@ import {
 } from '../_shared/strength/all-out-set.ts';
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
 import { protocolExpectsE1rmToDip } from '../_shared/insights/strength-protocol-read.ts';
-import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt, bodyRpeDriver } from '../_shared/response-model/readiness-receipts.ts';
+import { buildReadinessWhy, buildCrossTrainingReceipt, crossTrainingStressReceipt } from '../_shared/response-model/readiness-receipts.ts';
 import { buildLoadedLegsDiagnosis, classifyFatigueLabel, readinessForLoadVerdict, type LoadedLegsDiagnosis } from '../_shared/response-model/loaded-legs.ts';
 import { detectNovelMovements, novelMovementsNames, type SessionMovement } from '../_shared/novel-movements.ts';
 import { classifyStrengthFocus, resolveCurrentSoreness } from '../_shared/cross-domain-carryover.ts';
@@ -150,7 +150,7 @@ const corsHeaders: Record<string, string> = {
  *  issue, and which the State row could not even build a sentence around because accessories carry
  *  no anchor. ⛔ COMPUTATION CHANGE, NOT DISPLAY: every cached per-lift row still holds the old
  *  command and must re-source, so this bump is load-bearing. Main lifts are untouched. */
-// ⛔ COACH_PAYLOAD_VERSION (now 212) LIVES IN `_shared/coach-payload-version.ts` — bump it there; the app's floor reads the same number. History: // 212 (2026-09-17): `trends.applied_ftp_word` — where the FTP came from, by Adjust's rule (`ftpSourceWord`); State's bike row prints it and the phone's tested/estimated pick is deleted. A cached row has no word and the row prints the number alone. // 210 (2026-09-15): `trends.applied_ftp` — the FTP the app RUNS ON (`resolveCurrentFtp`), so State's bike row prints the typed number when there is one instead of the learned estimate the anchor carries (§8.0 #22). A cached 209 row has no field and the row falls back to the anchor, which is the bug. // 209 (2026-09-10): BODY carries its window — `response_model.body_window_label` ("last 7 days"), "usual" says its 28 d, soreness drops its count when it equals the logged count. A cached row has no header window. // 208 (2026-09-10): `load.form_headline` reads "Form −32 · high risk" in every week — a recovery or taper week with form under −30 no longer gets "Recovery • …", and no "(TrainingPeaks)" is printed. A cached row still carries the old words. // 207 (2026-09-10): audit H-B10 — top-level `post_race_unofficial` (the race-day finish State used to find on the phone). A cached row has none and State prints no unofficial finish without it. // 206 (2026-09-10): audit item 17 — `load` gains form_headline, form_zones, total_7d, dominant, composition_7d; `weekly_state_v1.strength_logged_sets`. A cached row has none of them and the screens print nothing without them. // 205 (2026-09-08): empty-State subtitle names the plans.
+// ⛔ COACH_PAYLOAD_VERSION (now 213) LIVES IN `_shared/coach-payload-version.ts` — bump it there; the app's floor reads the same number. History: // 213 (2026-09-17): BODY is numbers only — no verdict word or colour on effort / soreness, `soreness_flag` and `readiness_rpe_driver` no longer sent; `load.body_today_line` is BODY's one line on Today. A cached row still carries the words and has no Today line. // 212 (2026-09-17): `trends.applied_ftp_word` — where the FTP came from, by Adjust's rule (`ftpSourceWord`); State's bike row prints it and the phone's tested/estimated pick is deleted. A cached row has no word and the row prints the number alone. // 210 (2026-09-15): `trends.applied_ftp` — the FTP the app RUNS ON (`resolveCurrentFtp`), so State's bike row prints the typed number when there is one instead of the learned estimate the anchor carries (§8.0 #22). A cached 209 row has no field and the row falls back to the anchor, which is the bug. // 209 (2026-09-10): BODY carries its window — `response_model.body_window_label` ("last 7 days"), "usual" says its 28 d, soreness drops its count when it equals the logged count. A cached row has no header window. // 208 (2026-09-10): `load.form_headline` reads "Form −32 · high risk" in every week — a recovery or taper week with form under −30 no longer gets "Recovery • …", and no "(TrainingPeaks)" is printed. A cached row still carries the old words. // 207 (2026-09-10): audit H-B10 — top-level `post_race_unofficial` (the race-day finish State used to find on the phone). A cached row has none and State prints no unofficial finish without it. // 206 (2026-09-10): audit item 17 — `load` gains form_headline, form_zones, total_7d, dominant, composition_7d; `weekly_state_v1.strength_logged_sets`. A cached row has none of them and the screens print nothing without them. // 205 (2026-09-08): empty-State subtitle names the plans.
 // 204 // 204 (2026-09-08): empty-State copy says focus, not goal.
 // 211 (2026-09-15, Stage 4 session 2): the LOAD line's three readings arrive as finished text (`load.fitness_fatigue.display` — the number, the week's change, the window); State's NEXT row reads `week.next_sessions` (after today, at most three) instead of filtering `key_sessions_remaining` on the phone; `load.total_7d` is a whole number. A 210 row has none of the three, so the LOAD readings and the NEXT row print nothing until it re-sources. // 203 // 203 (2026-09-07): athlete_snapshot.coaching removed — no model writes anything in this payload (no-AI work order). // 202 (2026-09-05): fitness_fatigue carries fitness_prior / fatigue_prior so the (i) can print the subtraction that made form. // 201 (2026-09-05): load.fitness_fatigue.week_ago — the 7-day change beside fitness / fatigue / form on the LOAD line. // 200 (2026-09-04): the bike row draws FTP over time — `state_trends_v1.display.bikeFitness.ftpHistory` (every fitness_baselines bike/ftp reading in the 12-week window) replaces the 12-week min/max dot (`range`, deleted). A 199 row has no ftpHistory and still carries `range`. docs/SPEC-ftp-trend-line-2026-09-04.md // 199 (2026-09-04): run grader reads classified_type; easy/hard rows fall back to raw pace when a run has no elevation (flagged). Cached rows lack both. // 198 (2026-09-04): snapshot rebuilt after the last regrade (Aug 9 → hard); cached pools were built from the earlier snapshot. // 197 (2026-09-04): run facts regraded (untagged runs graded from the recording); cached easy/hard pools carry hard runs as easy. // 196 (2026-09-04): spine drift points — whole-session again includes the analyser's measured mixed-effort test; cached rows carry interval runs on the drift chart. // 195 (2026-09-04, one reference per metric): load.fitness_fatigue is computed over the WHOLE history (was 84 days) and is the State LOAD read; a 194 row carries an under-seeded fitness. // 194 (2026-09-04): bike efficiency trend counts every ride with 10 min in the aerobic band (type + 90%-FTP gates removed); cached spine points carry the old countsTowardTrend. // 193 (2026-09-04, SPEC-state-nothing-invented): every trend verdict is Garmin's 28/28 rule — `withheld` and `recentlyFlat` are gone, `recent` on chart points means the last 28 days, pctChange is recent-half vs prior-half. A cached 192 row carries the old verdicts. // 192 (2026-09-04, D-372): the 7-day run/ride `efficiency_label` verdicts ("HR drifted — build aerobic base", the 3/5/8% ride bands) are gone — null on every row; the numbers stay. Bump so cached rows drop the copy. // 191 (2026-09-04): spine points — `driftWholeSession` now means an interval session only, not the analyser's mixed-effort hedge; the State drift trend reads every steady run/ride. Bump so cached rows re-source. // 190 (2026-09-03): the bike/run spine points changed shape and source — `countsTowardTrend` on every ride, `driftBasis` gains 'power', the facts index is keyed by workout id (a run and a ride on one day no longer swap numbers), and the climb reads `workouts.elevation_gain ?? metrics.elevation_gain` instead of a run-only facts copy. A cached 189 row carries the crossed-over numbers and NO climb on a ride, and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate. 189 (2026-09-03): BODY is three signals (effort · soreness · logged), not one paragraph; a cached 188 row still serves the paragraph row. 188: // 188 (2026-09-03): runs feed ONE aerobic efficiency series (group 'aerobic'). 187: // 187 (2026-09-03): warm-up easy points back in, median headline on the card. 186: // 186 (2026-09-03): warm-ups back OUT of the easy efficiency series. 185: // 185 (2026-09-03): easy spine points from warm-ups (fromWarmup), one drift read (driftBasis/driftWholeSession), Workload naming. 184: // 184: display.loadByDiscipline gains `weeks` (five weekly bars) and spine points carry tempF/elevationGainM (2026-09-02). Cached 183 rows lack both. // 183: // 183: RUN LOAD THE STRAVA WAY (2026-09-02). `state_trends_v1.display.loadByDiscipline` carries this week's points per sport vs the athlete's typical week; a rated run's points now come from the rating (calculate-workload). ⛔ NEW FIELD + COMPUTATION CHANGE: a cached row has no loadByDiscipline and carries HR-scored run points; without this bump the State run card shows nothing and the old number. // 182: LOCKED ANCHORS + RUN VERDICT UNREAD (2026-09-02, D-459/D-460). per_lift.anchor_1rm now honours `user_baselines.locked_baselines`. The run efficiency verdict is still computed (`runFitness.efficiency`, now `withheld` with a named reason when heat moves with the calendar) but NO screen reads it any more — the run plate and the workout page show Efficiency Factor, decoupling and the chart, TrainingPeaks-style, no verdict. ⛔ COMPUTATION CHANGE: cached rows carry the pre-lock anchor and pass the cachedVer gate. // 181: AUTO/LOCKED strength authority (2026-09-02). per_lift.anchor_1rm now reads the RESOLVED capacity (locked > trusted-learned > typed seed) instead of typed only — reverses D-231 typed-wins in capacity-resolver.ts. ⛔ COMPUTATION CHANGE: a cached row carries the old typed anchor (e.g. deadlift 150 vs the learned 185) and passes the cachedVer gate; without this bump the coach keeps de-alarming against the stale number. // 180: REAL RUN PACE, PER GROUP (2026-09-01, Michael: "LLM slop got us those numbers"). `runFitness.efficiency.groups[]` now carries `recentPaceSecPerKm` + `recentHrAvg` — the MEDIAN of each group's last five runs' REAL recorded pace, so the card shows easy and hard on their own pools. The old top-level fallback back-derived pace from the efficiency index (`100000/(index×hr)`) and put 13:21/mi on screen whenever route pace was thin; that path is deleted — no real pace → null → the card shows the run count. ⛔ COMPUTATION CHANGE: a cached row serves the old groups with no per-group pace and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate; without this bump the real paces do not reach the card. // 179: THE LIFTING CARD READS THE PLAN'S WEEK (2026-09-01, approved by Michael — "is this a rolling week?"). `state_trends_v1.display.viadaWeek` is cut on `weekStartOf` + the plan's start-day — the SAME boundary as the planned-vs-actual bar — instead of a rolling as-of-minus-six; `since` is now the plan week's first day. `weekChange` gains `basis` / `from` / `to` and compares only CLOSED plan weeks (last week vs the week before while the week is open; this week vs last on its final day). ⛔ COMPUTATION CHANGE: a cached row carries rolling-window numbers under a "this week" label and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate — the trap v175–v178 each hit on this object. Without this bump the window does not move.
 // 178: OFF-PLAN WORK REACHES THE CARD (2026-09-01, approved by Michael). `state_trends_v1.display.viadaWeek` gains `offPlan` — the added-only lifting dose per muscle, classified per SESSION off the logger's `planned_name` marker (a session with no marked row is UNKNOWN and contributes nothing; `known: false` when no session in the window can be read). Resolved on the spine. ⛔ COMPUTATION CHANGE: a cached row serves a `display.viadaWeek` with no `offPlan` and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate — the trap v175/v176/v177 each hit on this same object. Without this bump the field lands nowhere.
@@ -2596,6 +2596,15 @@ Deno.serve(async (req) => {
     // ⚠️ SORENESS IS AGAINST THE ATHLETE'S OWN BASELINE, never a population norm — a 3 means different
     // things to different people. Silent until 5 prior entries exist: "normal" off two data points is
     // a claim, not a reading.
+    /**
+     * ⛔ BODY'S LINE ON TODAY (2026-09-17, Michael) — "effort 6.0 of 10 · soreness 2.6 of 7 · last 7 days", written
+     * here and printed by the phone under the form line. TrainingPeaks keeps logged soreness on the day and
+     * TrainerRoad shows its fatigue read on the day; the full reading stays on State, below the trends.
+     * Numbers only: the verdict words ("a bit harder than usual", "above your normal") and the two sentences came
+     * off both screens the same day — no athlete app words a self-reported number against a personal normal.
+     * Soreness joins the line on 3 or more entries, the same bar the State row used for its comparison.
+     */
+    let bodyTodayLine: string | null = null;
     {
       const rpeRow = weeklyResponseModel.visible_signals.find((s: any) => s.label === 'How hard it feels');
       if (rpeRow) {
@@ -2624,14 +2633,14 @@ Deno.serve(async (req) => {
         const base = rpe?.baseline_avg ?? null;
         // The verdict phrase is the row's NOTE, lower-cased; the numbers are the value. Same words as
         // before (rpeFeelVerdict), just no longer leading a sentence.
-        const verdictWord = String(rpeRow.detail ?? '').split(' — ')[0].trim();
-        const note = verdictWord && verdictWord !== 'steady' ? ` · ${verdictWord.charAt(0).toLowerCase()}${verdictWord.slice(1)}` : '';
         // `value_display` is the VALUE slot, `detail` the note under it — the client's BODY rows use the
         // same name · value · note grid as the sport rows (DESIGN_GUIDELINES Layout Rules §1).
         rpeRow.label = 'effort';
         if (cur != null && base != null) {
           (rpeRow as any).value_display = `${cur.toFixed(1)} of 10`;
-          rpeRow.detail = `usual ${base.toFixed(1)} · ${normDays} d${note}`;
+          // ⛔ NO VERDICT WORD, NO VERDICT COLOUR (2026-09-17) — the value and its 28-day usual, nothing judged.
+          rpeRow.detail = `usual ${base.toFixed(1)} · ${normDays} d`;
+          (rpeRow as any).trend_tone = 'neutral';
         }
         const extra: any[] = [];
         if (sore.level && sore.recent != null) {
@@ -2645,12 +2654,13 @@ Deno.serve(async (req) => {
           // already says which days both rest on); when they match it would say the same thing twice.
           const loggedCount = (rpeRow as any).samples ?? null;
           const countNote = loggedCount != null && nEnt === loggedCount ? '' : entries;
-          const soreVerdict = thin ? '' : (sore.level === 'elevated' ? 'above your normal' : 'normal for you');
+          // ⛔ NO "above your normal" / "normal for you" (2026-09-17): the value and its entry count. `sore.level`
+          // is still computed — the readiness read uses it — it is no longer printed.
           extra.push({
             label: 'soreness', category: 'endurance', trend: 'stable', trend_icon: '—',
-            trend_tone: !thin && sore.level === 'elevated' ? 'warning' : 'neutral',
+            trend_tone: 'neutral',
             value_display: `${sore.recent.toFixed(1)} of 7`,
-            detail: [countNote, soreVerdict].filter(Boolean).join(' · '),
+            detail: countNote,
             samples: nEnt, samples_label: entries,
           });
         } else if (sore.logged > 0 && !sore.baselineOk) {
@@ -2692,9 +2702,14 @@ Deno.serve(async (req) => {
         // signal: a rough week you reported honestly must never cost you fitness on screen, or the
         // honest reporting stops — which is the documented failure mode of subjective monitoring.
         // Sits on the SORENESS row now — it is about soreness, not effort.
-        if (sore.elevatedCount >= 4 && sore.countWindow >= 4) {
-          (soreRow as any).soreness_flag =
-            `Soreness above your normal on ${sore.elevatedCount} of your last ${sore.countWindow} sessions.`;
+        // ⛔ NOT SENT SINCE 2026-09-17 — "Soreness above your normal on N of your last M sessions." came off State
+        // with the other verdict words. `sore.elevatedCount` / `sore.countWindow` are still computed above.
+        void soreRow;
+        if (cur != null) {
+          const parts = [`effort ${cur.toFixed(1)} of 10`];
+          if (sore.level && sore.recent != null && sore.recentCount >= 3) parts.push(`soreness ${sore.recent.toFixed(1)} of 7`);
+          parts.push(`last ${recentDays} days`);
+          bodyTodayLine = parts.join(' · ');
         }
       }
     }
@@ -4591,6 +4606,7 @@ Deno.serve(async (req) => {
         acwr: acwr ?? null,
         acwr_provisional: (athleteSnapshot?.body_response?.load_status as any)?.acwr_provisional ?? false, // thin-base ratio → render "· provisional"
         overload: overloadVerdict, // Slice 1: THE verdict + its receipt, so a surface can show WHY without re-deciding
+        body_today_line: bodyTodayLine, // BODY's one line on Today, under the form line (2026-09-17, v213)
         label: formZone(fitnessFatigue.form), // Friel's Form zone word — the same word the State LOAD line prints (2026-09-04); the ACWR bands are gone
         // Audit 2026-09-10 (H-B08): State's glance headline and (H-T21) the zone table, off the same form number.
         form_headline: formHeadline(fitnessFatigue.form),
@@ -4727,15 +4743,9 @@ Deno.serve(async (req) => {
         // BODY-row driver (Whoop pattern: verdict + its driver, paired): the RPE CLAUSE ONLY of the
         // Why — the session that moved the week — rendered under BODY's "how hard it feels". RPE-only
         // (bodyRpeDriver drops non-RPE factors); null when effort isn't up.
-        readiness_rpe_driver: (() => {
-          const e = weeklyResponseModel.endurance;
-          return bodyRpeDriver({
-            rpeDeclining: e.rpe.sufficient && e.rpe.trend === 'declining',
-            sessions: rpeSessions,
-            currentAvg: e.rpe.current_avg,
-            baseline: e.rpe.baseline_avg,
-          });
-        })(),
+        // ⛔ NOT SENT SINCE 2026-09-17 (v213) — the sentence under BODY ("effort 6.0 vs your typical 5.1, across 7
+        // sessions") came off State with the verdict words. `bodyRpeDriver` stays in `_shared` with its tests.
+        readiness_rpe_driver: null,
         // D-232: the loaded-legs suggestion line (rendered under the Why). Null for systemic/EFFORT-UP.
         readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion ?? null,
         signals: trendSignals,

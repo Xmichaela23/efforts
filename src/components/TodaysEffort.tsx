@@ -1459,6 +1459,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * planned-versus-done; this line is "what did the week come to", and for lifting that is the
    * weight that moved.
    */
+  /**
+   * ⛔ BODY'S LINE, WRITTEN BY THE COACH (2026-09-17) — `load.body_today_line`, printed as sent under the form
+   * line. Form and this line are both readings AS OF TODAY, so they print on today only; on any other day they
+   * keep their space (`visibility: hidden`) and the card does not change height between days.
+   */
+  const bodyTodayLine = useMemo(() => {
+    const l = (coachWeek.data?.weekly_state_v1?.load as { body_today_line?: string | null } | undefined)?.body_today_line;
+    return typeof l === 'string' && l.trim() ? l.trim() : null;
+  }, [coachWeek.data]);
+  const asOfTodayStyle: React.CSSProperties | undefined = isTodayDate ? undefined : { visibility: 'hidden' };
+
   const weekTotalsLine = useMemo(() => {
     const d = (weeklyStats as { distances?: { run_meters?: number; cycling_meters?: number } } | null)?.distances;
     const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
@@ -1995,8 +2006,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                */
             }}
           >
-            {formLine ? <span className="block font-light">{formLine}</span> : null}
-            {showFormKey && formKey ? (
+            {formLine ? <span className="block font-light" style={asOfTodayStyle} aria-hidden={!isTodayDate || undefined}>{formLine}</span> : null}
+            {bodyTodayLine ? (
+              <span
+                className="block font-light tabular-nums text-[13px]"
+                style={{ color: 'rgba(255,255,255,0.45)', marginTop: formLine ? 2 : 0, ...(asOfTodayStyle ?? {}) }}
+                aria-hidden={!isTodayDate || undefined}
+              >
+                {bodyTodayLine}
+              </span>
+            ) : null}
+            {showFormKey && isTodayDate && formKey ? (
               /* ⚠️ The card grows to fit it (Michael 2026-09-10) — the key is not scrolled or clipped. */
               <div onClick={(e) => e.stopPropagation()} className="mt-1.5 max-w-[min(100%,360px)]">
                 <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
@@ -2013,7 +2033,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
                 not a reading. The lines above it grew; it did not, so it is still the smallest. */}
             {garminDerived && formLine ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2 }} />
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, ...(asOfTodayStyle ?? {}) }} />
             ) : null}
           </div>
         ) : null}
