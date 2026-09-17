@@ -745,7 +745,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Reverse geocoding to get city name from coordinates
   useEffect(() => {
-    if (!dayLoc || activeDate !== today) {
+    // The city names where the weather is read, which is the same place on every day (2026-09-17: it was today-only).
+    if (!dayLoc) {
       setCityName(null);
       return;
     }
@@ -1415,13 +1416,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return { ff, zones: load?.form_zones };
   }, [coachWeek.data]);
 
+  /**
+   * ⛔ THE DAY ON SCREEN PRINTS ITS OWN FORM (2026-09-17). Today reads `load.fitness_fatigue.form` + `load.label`;
+   * a past day reads `load.form_by_day[date]`, which the coach works out as of that date (84 days back). A day with
+   * no entry (older, or in the future) has no form of its own: the line is drawn with today's value INVISIBLE, so
+   * its space is held and the card does not change height.
+   */
+  const dayForm = useMemo(() => {
+    const load = coachWeek.data?.weekly_state_v1?.load as {
+      fitness_fatigue?: { form?: number | null }; label?: string | null;
+      form_by_day?: Record<string, { form: number; label: string | null }>;
+    } | undefined;
+    const todayRaw = load?.fitness_fatigue?.form;
+    const todays = todayRaw != null && Number.isFinite(Number(todayRaw)) ? { form: Number(todayRaw), label: load?.label ?? null } : null;
+    const own = isTodayDate ? todays : (load?.form_by_day?.[activeDate] ?? null);
+    return { own, placeholder: todays };
+  }, [coachWeek.data, isTodayDate, activeDate]);
+
   const formLine = useMemo(() => {
-    const load = coachWeek.data?.weekly_state_v1?.load as { fitness_fatigue?: { form?: number | null }; label?: string | null } | undefined;
-    const raw = load?.fitness_fatigue?.form;
-    if (raw == null || !Number.isFinite(Number(raw))) return null;
-    const n = Math.round(Number(raw));
-    // ⛔ THE ZONE WORD IS THE COACH'S `load.label` (audit 2026-09-10, H-B08) — the same word State's bar prints.
-    const zone = load?.label ?? null;
+    const shownDay = dayForm.own ?? dayForm.placeholder;
+    if (!shownDay) return null;
+    const n = Math.round(Number(shownDay.form));
+    // ⛔ THE ZONE WORD IS THE COACH'S (`load.label` today, the day's own label otherwise) — State's bar prints the same.
+    const zone = shownDay.label ?? null;
     // ⛔ A TYPOGRAPHIC MINUS, as the work order prints it (`form −21 · optimal`).
     const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (
@@ -1438,7 +1455,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             it opens the same component. It sits after the WORD, where State's sits after "LOAD", not
             at the end of the reading. It never opens State: the tap is swallowed, or reading the key
             would navigate away from it. */}
-        {formKey ? (
+        {formKey && isTodayDate ? (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowFormKey((o) => !o); }}
@@ -1458,7 +1475,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ) : null}
       </span>
     );
-  }, [coachWeek.data, formKey, showFormKey]);
+  }, [dayForm, formKey, showFormKey, isTodayDate]);
 
   /**
    * The week's own totals, off the rows already loaded. ⚠️ THE SAME SOURCE THE WEEK TAB'S BAR IS
@@ -1474,11 +1491,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * line. Form and this line are both readings AS OF TODAY, so they print on today only; on any other day they
    * keep their space (`visibility: hidden`) and the card does not change height between days.
    */
-  const bodyTodayLine = useMemo(() => {
-    const l = (coachWeek.data?.weekly_state_v1?.load as { body_today_line?: string | null } | undefined)?.body_today_line;
-    return typeof l === 'string' && l.trim() ? l.trim() : null;
-  }, [coachWeek.data]);
-  const asOfTodayStyle: React.CSSProperties | undefined = isTodayDate ? undefined : { visibility: 'hidden' };
+  const dayBody = useMemo(() => {
+    const load = coachWeek.data?.weekly_state_v1?.load as { body_today_line?: string | null; body_line_by_day?: Record<string, string> } | undefined;
+    const clean = (l: unknown) => (typeof l === 'string' && l.trim() ? l.trim() : null);
+    const todays = clean(load?.body_today_line);
+    // A past day prints its own line (`body_line_by_day`, 84 days back); a day with none holds today's space, invisible.
+    return { own: isTodayDate ? todays : clean(load?.body_line_by_day?.[activeDate]), placeholder: todays };
+  }, [coachWeek.data, isTodayDate, activeDate]);
+  const bodyTodayLine = dayBody.own ?? dayBody.placeholder;
+  const hiddenStyle: React.CSSProperties = { visibility: 'hidden' };
+  const formStyle: React.CSSProperties | undefined = dayForm.own ? undefined : hiddenStyle;
+  const bodyStyle: React.CSSProperties | undefined = dayBody.own ? undefined : hiddenStyle;
 
   const weekTotalsLine = useMemo(() => {
     const d = (weeklyStats as { distances?: { run_meters?: number; cycling_meters?: number } } | null)?.distances;
@@ -2019,12 +2042,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                */
             }}
           >
-            {formLine ? <span className="block font-light" style={asOfTodayStyle} aria-hidden={!isTodayDate || undefined}>{formLine}</span> : null}
+            {formLine ? <span className="block font-light" style={formStyle} aria-hidden={!dayForm.own || undefined}>{formLine}</span> : null}
             {bodyTodayLine ? (
               <span
                 className="block font-light tabular-nums text-[13px]"
-                style={{ color: 'rgba(255,255,255,0.60)', marginTop: formLine ? 2 : 0, ...(asOfTodayStyle ?? {}) }}
-                aria-hidden={!isTodayDate || undefined}
+                style={{ color: 'rgba(255,255,255,0.60)', marginTop: formLine ? 2 : 0, ...(bodyStyle ?? {}) }}
+                aria-hidden={!dayBody.own || undefined}
               >
                 {bodyTodayLine}
               </span>
@@ -2056,7 +2079,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE CREDIT SHOWS WHENEVER A NUMBER IT CREDITS SHOWS — form on today, the totals on any day. Hidden
                 (space kept) only on a day with no totals, where form is the only thing it would credit. */}
             {garminDerived && (formLine || weekTotalsLine) ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(weekTotalsLine ? {} : (asOfTodayStyle ?? {})) }} />
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(weekTotalsLine || dayForm.own ? {} : hiddenStyle) }} />
             ) : null}
           </div>
         ) : null}

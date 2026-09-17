@@ -569,6 +569,10 @@ export type CoachWeekContextV1 = {
       form_headline?: string | null;
       /** BODY's one line on Today, written by the coach (v213). */
       body_today_line?: string | null;
+      /** Each of the last 84 days' own form and zone word (v214). */
+      form_by_day?: Record<string, { form: number; label: string | null }>;
+      /** Each of the last 84 days' own BODY line (v214). */
+      body_line_by_day?: Record<string, string>;
       /** H-T21: the load key's form-zone table, the athlete's current zone flagged. */
       form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
       /** H-T21: the rolling seven days' workload points, the sport that carried most, and each sport's printed share. */
