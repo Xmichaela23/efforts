@@ -12,7 +12,7 @@
 // athlete's tap; `decision: 'keep'` records the answer and moves nothing. Same law as
 // `rematerialize-standing-block`: it proposes; it does not silently write.
 //
-// ⚠️ IT ONLY EVER RE-PRICES ROWS THAT HAVE NOT STARTED. History is not editable.
+// ⚠️ IT ONLY EVER RE-PRICES ROWS NOT COMPLETED OR SKIPPED, whatever their date. History is not editable.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
       // A continuation carries the rows the previous request did not reach, and the job it belongs to.
       const cont = p?.reprice_continue && Array.isArray(p.reprice_continue.ids) ? p.reprice_continue : null;
       const contIds = cont ? new Set((cont.ids as unknown[]).map(String)) : null;
-      const pending = (rows ?? []).filter((r: any) => isRepriceable(r, today) && (!contIds || contIds.has(String(r.id))));
+      const pending = (rows ?? []).filter((r: any) => isRepriceable(r) && (!contIds || contIds.has(String(r.id))));
       const job = cont?.job
         ? { started_at: String(cont.job.started_at), total: Number(cont.job.total) || pending.length, done: Number(cont.job.done) || 0, finished_at: null as string | null, misses: Array.isArray(cont.job.misses) ? cont.job.misses : [] }
         : { started_at: new Date().toISOString(), total: pending.length, done: 0, finished_at: null as string | null, misses: [] as Array<Record<string, unknown>> };
@@ -225,7 +225,7 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userId)
       .order('date');
     const all = rows ?? [];
-    const pending = all.filter((r: any) => isRepriceable(r, today));
+    const pending = all.filter((r: any) => isRepriceable(r));
     // The stamp every unstarted row carries (identical across a materialization); the newest wins.
     const stamped = pending.map((r: any) => r?.computed?.anchors as Anchors | null).filter(Boolean);
     const onPlan: Anchors | null = stamped.length ? stamped[stamped.length - 1] : null;

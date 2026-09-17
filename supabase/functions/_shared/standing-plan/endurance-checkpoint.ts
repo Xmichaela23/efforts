@@ -157,12 +157,15 @@ export function evidenceFor(sport: 'run' | 'ride', sessions: HardSession[]): Evi
   };
 }
 
-/** Which planned rows a checkpoint may re-price: endurance, not started, on or after today. */
-export function isRepriceable(row: { type?: unknown; date?: unknown; workout_status?: unknown; completed_workout_id?: unknown }, today: string): boolean {
+/**
+ * Which planned rows a checkpoint may re-price: endurance, not completed, not skipped.
+ * ⛔ NO DATE (Michael, 2026-09-16: "the workout never dies, I could do it tomorrow"). A planned row from
+ * yesterday is still a workout the athlete may do, so it takes the current numbers like any other.
+ */
+export function isRepriceable(row: { type?: unknown; date?: unknown; workout_status?: unknown; completed_workout_id?: unknown }): boolean {
   const t = String(row?.type ?? '').toLowerCase();
   if (!(t === 'run' || t === 'ride' || t === 'bike' || t === 'cycling')) return false;
   if (row?.completed_workout_id) return false;
   const status = String(row?.workout_status ?? '').toLowerCase();
-  if (status === 'completed' || status === 'skipped') return false;
-  return String(row?.date ?? '') >= today;
+  return !(status === 'completed' || status === 'skipped');
 }

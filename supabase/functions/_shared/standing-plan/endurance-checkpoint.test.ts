@@ -96,12 +96,13 @@ Deno.test('missing fields are skipped in the mean, never read as zero', () => {
 });
 
 // ═══ WHICH ROWS MAY BE RE-PRICED ═════════════════════════════════════════════
-Deno.test('only unstarted endurance rows on or after today; strength, completed, skipped and past rows never', () => {
-  const today = '2026-09-02';
-  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05' }, today), true);
-  assertEquals(isRepriceable({ type: 'ride', date: '2026-09-02', workout_status: 'planned' }, today), true);
-  assertEquals(isRepriceable({ type: 'strength', date: '2026-09-05' }, today), false);
-  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05', completed_workout_id: 'abc' }, today), false);
-  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05', workout_status: 'skipped' }, today), false);
-  assertEquals(isRepriceable({ type: 'run', date: '2026-09-01' }, today), false);
+Deno.test('every endurance row not completed or skipped, whatever its date; strength, completed and skipped never', () => {
+  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05' }), true);
+  assertEquals(isRepriceable({ type: 'ride', date: '2026-09-02', workout_status: 'planned' }), true);
+  assertEquals(isRepriceable({ type: 'strength', date: '2026-09-05' }), false);
+  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05', completed_workout_id: 'abc' }), false);
+  assertEquals(isRepriceable({ type: 'run', date: '2026-09-05', workout_status: 'skipped' }), false);
+  assertEquals(isRepriceable({ type: 'run', date: '2026-09-01', workout_status: 'completed' }), false);
+  // ⛔ A planned row dated before today is still a workout (2026-09-16).
+  assertEquals(isRepriceable({ type: 'run', date: '2026-09-01' }), true);
 });
