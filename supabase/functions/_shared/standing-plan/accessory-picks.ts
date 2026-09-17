@@ -66,6 +66,8 @@ export type ViadaPickKey =
   | 'single_leg_b'
   | 'hinge_lower'
   | 'quad_iso'
+  /** ⛔ p278 DAY 4 — `1 x SKILL: Carry` (D-479, 2026-09-16). See the spec. */
+  | 'carry'
   /**
    * ⛔⛔⛔ p274's OWN CELLS — the second frame's pick vocabulary (Michael, 2026-08-30: *"Standard
    * Focus gets its own accessory pickers over the cells p274 actually has"*).
@@ -169,7 +171,8 @@ export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
    * push, accessory lower), so it takes p246's keys — and the filter in `picksForFrame` keeps only the
    * ones that reach a p278 cell. ⚠️ NO CORE: p278 prints no core row and nothing is added to it.
    */
-  cycling_base: VIADA_PICK_KEYS.filter((k) => k !== 'core'),
+  // ⛔ AND THE CARRY ROW (D-479, 2026-09-16) — p278 day 4 is the only frame cell that prints a carry.
+  cycling_base: [...VIADA_PICK_KEYS.filter((k) => k !== 'core'), 'carry'],
 };
 
 /**
@@ -304,7 +307,7 @@ export type ViadaPickSpec = {
      * p246/p278 Day 2 speed row `DE: Accessory: secondary hinge lower` (Michael, 2026-09-13: the "Hinge
      * variation" pick is honoured there, from p220's list). A pick only ever matches cells of its own intent.
      */
-    intent?: 'HYP' | 'DE';
+    intent?: 'HYP' | 'DE' | 'SKILL';
   } | null;
   /**
    * ⛔ THE OTHER HALF OF A SUPERSET THE PAGE PRINTS AS ONE ROW. p274 pairs `braced hinge` with
@@ -784,6 +787,25 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     servesChips: [],
   },
   /**
+   * ⛔⛔ p278 DAY 4 — `1 x SKILL: Carry` (D-479, 2026-09-16, Michael: add a "Sled" chip; sled push and sled pull
+   * are picks on the Carry row only, and the row's default does not change).
+   * ⚠️ INFERENCE, not a finding: that the page's "Carry" row covers the whole p226 CARRY/DRAG/PICK page, so the
+   * push/pull variants belong on it. p278 prints "Carry" and nothing more.
+   * The list is p226's printing, in the catalogue's spellings, for the movements the catalogue holds: farmer's
+   * carry (`farmers carry`), sled push, sled pull. Farmer's carry leads, so the default is the movement the row
+   * already built. The row stays prescribed in words (`CARRY_ROW_WORDS`), no sets or reps.
+   * ⚠️ `label` IS ATHLETE-FACING — "Carry" is the page's own word for the row.
+   */
+  carry: {
+    key: 'carry',
+    label: 'Carry',
+    slot: { category: 'carry', pattern: 'hinge_lower', frameDay: 4, intent: 'SKILL' },
+    hisList: ['farmers carry', 'sled push', 'sled pull'],
+    leadWith: ['farmers carry', 'sled push', 'sled pull'],
+    leadCite: 'Viada p226 — carry/drag/pick options',
+    servesChips: [],
+  },
+  /**
    * ⛔ p274 DAY 1 — `1 × HYP: braced push`. p221 BRACED PUSH UPPER: *Smith machine press · machine
    * chest press · dip machine/pressdown*.
    * ⚠️ MACHINES OR NOTHING, AND THAT IS A REAL LIMIT ON THIS PICK — see `BRACED_NEEDS_MACHINES`.
@@ -806,6 +828,24 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
     leadWith: ['smith machine press', 'machine chest press', 'dip machine'],
     leadCite: 'Viada p221 — braced push upper',
+    /**
+     * ⛔ DUMBBELL BENCH PRESS OPENS THE ROW WHERE NO MACHINE IS REACHABLE (Michael, 2026-09-16) — a stated
+     * choice, not catalogue order. p221 defines braced as "more externally braced movements" and lists only
+     * machines. Of the reachable stand-ins a bench holds the torso; dip bars hold nothing. Dips stay in the
+     * list as a pick.
+     * RECEIPTS:
+     *  - Viada p221: braced = "more externally braced movements"; every entry is a machine.
+     *  - Haugen et al. 2023, BMC Sports Sci Med Rehabil 15:103 (13 studies, 1,016 participants): no difference
+     *    between free-weight and machine training for hypertrophy in direct comparison. PMID 37582807.
+     *  - Saeterbakken et al. 2011, J Sports Sci 29(5):533-8: pectoralis major and anterior deltoid activity did
+     *    not differ across Smith machine, barbell and dumbbell chest press; dumbbell load 14% below the Smith
+     *    machine and 17% below the barbell; triceps activity lower with dumbbells. PMID 21225489.
+     *  - McKenzie et al. 2022, IJERPH 19(20):13211: bench, bar and ring dips tested "bodyweight only", four reps;
+     *    bar dip triceps peak 1.04 mV; no press was compared. PMID 36293792.
+     *  - INFERENCE, not a finding: dumbbells let any athlete load into 3x6-12; a dip starts at full body weight.
+     * OURS — `braced_push.subLeadWith` Dumbbell Bench Press first; the definition is Viada p221, the pick is ours.
+     */
+    subLeadWith: ['dumbbell bench press'],
     // ⛔ p274 PAIRS NOTHING HERE. The braced push stands alone on day 1; only the arms and the lower
     // braced rows are printed as supersets.
     servesChips: ['chest'],
@@ -1103,7 +1143,7 @@ export function pickKeyForSlot(
   /** Whether the cell is the page's "(arms) superset" one — see `slot.arms`. */
   arms?: boolean,
   /** The cell's intent. A pick answers only cells of its own (`slot.intent`, absent = HYP). */
-  intent: 'HYP' | 'DE' = 'HYP',
+  intent: 'HYP' | 'DE' | 'SKILL' = 'HYP',
 ): ViadaPickKey | null {
   let fallback: ViadaPickKey | null = null;
   for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {

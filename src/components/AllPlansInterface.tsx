@@ -1352,7 +1352,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           if (Array.isArray(strengthExercises) && strengthExercises.length > 0) {
             lines.push(`  - **Exercises:**`);
             for (const ex of strengthExercises) {
-              const name = ex?.name || 'Exercise';
+              // The name the phone shows: the kit's own name for the row first ("Dumbbell Leg Curl" where
+              // there is no machine), then the stored name (2026-09-16, same pick as `plainLiftList`).
+              const name = String(ex?.execution_name || ex?.name || '').trim() || 'Exercise';
               // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): `name · words`, no dose.
               if (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim()) {
                 lines.push(`    - ${name} · ${ex.prescription_words.trim()}`);

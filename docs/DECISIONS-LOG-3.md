@@ -1225,6 +1225,13 @@ climb (`run_vt1: 90, run_lsd: 150, ride_endurance: 300`).
 
 ## D-455 — Gate only on gear that is required AND declarable; everything else is dropped from prescribing, never silently offered (2026-08-26, Michael)
 
+> ⛔ **SHARPENED 2026-09-16 BY [D-479] (DECISIONS-LOG-4) — ONE TEST PER CHIP.** A chip is added only when the gear
+> is nameable AND it unlocks a movement the book prints that is unreachable otherwise. This entry's "required AND
+> commonly declarable" is the first half and stands. First chip under the rule: "Back extension bench" (p222's GHD
+> back extension only, `src/lib/strength-gear.ts`). Dip bars fail the second half (dips route
+> on a rack or a bench). `PRESCRIPTION_EXCLUDED` is unchanged; sled push and sled pull are printed on p226 and are
+> an open question (whether p278's "SKILL: Carry" row includes drags). Everything below is history.
+
 **What forced it: a screen.** Michael, on his own plan:
 
 > *"we need to add to equipment list for home gym, should never be just prescribed."*

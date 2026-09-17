@@ -138,7 +138,15 @@ export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
     // `athleteEquipmentToKeys` ("trx"/"suspension", "stability ball"); renaming either silently
     // removes the capability from every athlete who ticked it.
     "TRX / suspension trainer",
-    "Stability ball"
+    "Stability ball",
+    // ⛔ ADDED 2026-09-16 (D-479) — the first chip under the one-test rule; see the ruling above. ⚠️ Matched
+    // by SUBSTRING ("back extension") in `athleteEquipmentToKeys`, which also keeps the word "bench" in it
+    // from granting a flat bench.
+    "Back extension bench",
+    // ⛔ ADDED 2026-09-16 (D-479) on Michael's ruling from p226 — the stated exception to the ownership bar (no
+    // survey number). Matched by SUBSTRING ("sled") in `athleteEquipmentToKeys` and EXACTLY in
+    // `substituteExerciseForEquipment`.
+    "Sled"
   ];
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
@@ -1220,6 +1228,13 @@ const disciplineOptions = [
    * per-exercise substitution, not an itemized checklist. We were more precise than the leaders and
    * worse for it.
    *
+   * ⛔⛔ SHARPENED 2026-09-16 (D-479) — THE LIST GROWS BY ONE TEST PER CHIP. A chip is added only when
+   * (1) a person can name the gear and (2) it unlocks a movement the book prints that the athlete
+   * cannot reach any other way. The rule below stands as the first half; the second half is new. Dip
+   * bars fail it (dips already route on a rack or a bench); a back extension bench passes it (p222's
+   * GHD back extension was reachable only in a commercial gym; the bench is its 90-degree type). Everything
+   * below is history.
+   *
    * ⛔ THE RULE THAT REPLACES THE ITEMIZATION: **gate only on gear that is BOTH required AND commonly
    * declarable.** Everything else is the substitution backstop's job
    * (`substituteExerciseForEquipment`). Do not re-add a chip here to make a gate more precise — that
@@ -1233,7 +1248,7 @@ const disciplineOptions = [
    * in their garage knows whether they own a TRX or a stability ball. What Slice 7 cut was gear
    * people could not NAME — a glute-ham developer, dip bars, a leg curl machine. These are not that.
    *
-   * ⚠️ AND THE KIT THAT COULD NOT CLEAR THE SAME BAR DID NOT GET A CHIP. A GHD, a sled, a captain's
+   * ⚠️ AND THE KIT THAT COULD NOT CLEAR THE SAME BAR DID NOT GET A CHIP. A GHD, a sled (back 2026-09-16 with its own chip, D-479), a captain's
    * chair, a landmine, a sandbag, a ruck, gymnastic rings — those movements were DROPPED FROM THE
    * PRESCRIBABLE POOL instead (`PRESCRIPTION_EXCLUDED`, `strength-grid/taxonomy.ts`). They stay in
    * the library and an athlete may still log them by choice. Not commonly declarable means not

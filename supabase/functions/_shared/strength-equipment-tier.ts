@@ -153,7 +153,8 @@ export function hasPullUpBar(strengthEquipment: string[]): boolean {
  */
 export function hasBench(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
-  return n.some((s) => s.includes('bench'));
+  // ⚠️ "Back extension bench" (D-479) is not a bench to press on.
+  return n.some((s) => s.includes('bench') && !s.includes('back extension'));
 }
 
 /**

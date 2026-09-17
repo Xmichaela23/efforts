@@ -188,6 +188,7 @@ Deno.test('⛔ THE PICKER LIST AND THE KEY MAP AGREE — a renamed chip is a sil
   const PICKER = [
     'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
     'Incline bench', 'Pull-up bar', 'Kettlebells', 'Cable machine', 'Resistance bands', 'Ab wheel',
+    'TRX / suspension trainer', 'Stability ball', 'Back extension bench', 'Sled',
   ];
   const dead = PICKER.filter((chip) => athleteEquipmentToKeys([chip]).size === 0);
   assertEquals(dead, [], 'these chips produce no gear key — ticking them does nothing');

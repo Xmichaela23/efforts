@@ -34,7 +34,13 @@ Deno.test('⛔ Build focus: Ride + Strength at a home kit reads as the screen di
   assertEquals(b.groups.map((g) => [g.heading, g.rows.map((r) => r.label)]), [
     ['Day 1', ['Push isolation', 'Pull isolation']],
     ['Day 2', ['Hinge variation', 'Leg variation']],
+    // ⛔ p278 day 4's Carry row (D-479, 2026-09-16): one option without a sled, three with one.
+    ['Day 4', ['Carry']],
   ]);
+  assertEquals(b.groups[2].rows[0].options.map((o) => o.label), ['Farmers Carry']);
+  const sled = setupBlock([...HOME, 'Sled']).build_focus.cycling_base.groups[2].rows[0];
+  assertEquals(sled.options.map((o) => o.label), ['Farmers Carry', 'Sled Push', 'Sled Pull']);
+  assertEquals(sled.default, 'farmers carry');
   const pull = b.groups[0].rows[1];
   assertEquals(pull.options.map((o) => o.label), ['Bent-Over Dumbbell Rear Delt Fly', 'Concentration Curl', 'Drag Curl', 'Flat-Bench Dumbbell Pullover']);
 });

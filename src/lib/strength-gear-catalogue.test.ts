@@ -38,6 +38,8 @@ Deno.test('every movement the engine can prescribe carries a gear tag', () => {
     'a prescribable movement has no gear tag — tag it in strength-gear.ts, or bring the kit gap to Michael');
 });
 
+// ⚠️ EIGHT SINCE 2026-09-16 (D-479): sled push and sled pull left the list with the "Sled" chip, on Michael's
+// ruling from p226. The test keeps its name so its history reads straight.
 Deno.test('⛔ THE DROPPED TEN ARE OUT OF THE POOL, BY NAME', () => {
   /**
    * ⛔ PINNED SO NOBODY QUIETLY RE-OFFERS ONE. Each needs kit `GearKey` cannot express — a GHD, a
@@ -50,8 +52,8 @@ Deno.test('⛔ THE DROPPED TEN ARE OUT OF THE POOL, BY NAME', () => {
    */
   assertEquals([...PRESCRIPTION_EXCLUDED].sort(), [
     'backpack carry', 'captain s chair knee raise', "captain's chair knee raise", 'ghd sit up',
-    'landmine twist', 'ring dips', 'roman chair sit up', 'sandbag lunge', 'sled pull', 'sled push',
-  ].sort(), 'the drop list changed — Michael ruled on exactly these ten, 2026-08-26');
+    'landmine twist', 'ring dips', 'roman chair sit up', 'sandbag lunge',
+  ].sort(), 'the drop list changed — Michael ruled on these ten 2026-08-26, and took the two sled rows off 2026-09-16');
 
   const pool = new Set(allGridMovements().map((m) => foldExerciseName(m.name)));
   for (const name of PRESCRIPTION_EXCLUDED) {
@@ -175,6 +177,7 @@ Deno.test('every route is spelled with a real key', () => {
   const vocabulary = new Set(Object.keys(ASSISTANCE_GEAR).length ? [
     'barbell', 'rack', 'bench', 'incline_bench', 'dumbbells', 'kettlebell', 'cable', 'pull_up_bar',
     'ab_wheel', 'bands', 'box', 'rings', 'machine', 'suspension_trainer', 'stability_ball',
+    'back_extension_bench', 'sled',
   ] : []);
   for (const [name, routes] of Object.entries(ASSISTANCE_GEAR)) {
     assertEquals(foldExerciseName(name), name, `"${name}" is not stored in folded form`);
@@ -184,4 +187,30 @@ Deno.test('every route is spelled with a real key', () => {
       }
     }
   }
+});
+
+Deno.test('⛔ THE BACK EXTENSION BENCH CHIP (D-479) — unlocks p222\'s GHD back extension, and is not a flat bench', () => {
+  // The first chip under the one-test rule: nameable gear that unlocks a printed movement a home athlete
+  // could not reach before. Its label contains the word "bench", which must not grant `bench`.
+  const home = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
+  assert(!canPerform('ghd back extension', home), 'the GHD back extension reached a home gym with no back extension bench');
+  assert(canPerform('ghd back extension', [...home, 'Back extension bench']), 'the GHD back extension was withheld from a back extension bench');
+  assert(canPerform('ghd back extension', ['Commercial gym']), 'the GHD back extension was withheld from a commercial gym');
+  // The machine back extension stays on the station: one bench, one row.
+  assert(!canPerform('machine back extension', [...home, 'Back extension bench']), 'the machine back extension reached a back extension bench');
+  assert(canPerform('machine back extension', ['Commercial gym']), 'the machine back extension was withheld from a commercial gym');
+  const alone = athleteEquipmentToKeys(['Back extension bench']);
+  assert(alone.has('back_extension_bench'), 'the chip produces no key');
+  assert(!alone.has('bench'), 'the back extension bench chip granted a flat bench');
+  assert(!canPerform('dumbbell bench press', ['Dumbbells', 'Back extension bench']), 'a back extension bench let an athlete bench press');
+});
+
+Deno.test('⛔ THE SLED CHIP (D-479) — unlocks p226\'s sled push and sled pull, and nothing else', () => {
+  const home = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
+  for (const name of ['sled push', 'sled pull']) {
+    assert(!canPerform(name, home), `"${name}" reached a home gym with no sled`);
+    assert(canPerform(name, [...home, 'Sled']), `"${name}" was withheld from a sled owner`);
+    assert(canPerform(name, ['Commercial gym']), `"${name}" was withheld from a commercial gym`);
+  }
+  assertEquals([...athleteEquipmentToKeys(['Sled'])], ['sled'], 'the sled chip granted more than a sled');
 });

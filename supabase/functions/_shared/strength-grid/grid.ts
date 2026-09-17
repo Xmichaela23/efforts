@@ -506,6 +506,13 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   // option read as a run-on: *"Back Extension - feet under a loaded bar - for your gear"*.
   'back extension': 'Back Extension',
   /**
+   * ⛔ THE GHD BACK EXTENSION ON A BACK EXTENSION BENCH (D-479, 2026-09-16) — "Back Extension", the name lifters
+   * use. Shown only when the bench route resolved; a gym member who owns the station reads "GHD Back Extension".
+   * Name approved by Michael 2026-09-16 night. It shares the floor version's name above; the clash check (every
+   * frame, pick and six kits) found no list that holds both.
+   */
+  'ghd back extension': 'Back Extension',
+  /**
    * ⛔ THE BENCH EXECUTION, NAMED AS ONE (2026-08-30). `reverse hyper` and `reverse hyperextension`
    * read as the same movement and were the same route; p221's is the MACHINE, and this is the home
    * version — torso on the bench, hips at the edge, legs swinging, a dumbbell between the feet.
@@ -608,6 +615,9 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<string>> = {
   'reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
   'calf raise': 'Stand with the balls of both feet on a step or a plate, heels hanging off. Rise onto your toes as high as you can, pause, then lower your heels below the step. Bodyweight, both legs at once.',
   'calf raises': 'Stand with the balls of both feet on a step or a plate, heels hanging off. Rise onto your toes as high as you can, pause, then lower your heels below the step. Bodyweight, both legs at once.',
+  // ⛔ THE GHD BACK EXTENSION ON A BACK EXTENSION BENCH (D-479) — approved by Michael 2026-09-16 night, one
+  // sourced sentence each; the sources are the ledger row in `docs/STATE-SOURCES.md`.
+  'ghd back extension': 'Set the hip pad just below your hip bones. Hook your ankles under the ankle pads. Cross your arms over your chest. Bend at the hips and lower your chest toward the floor. Raise your torso until your body is in a straight line. Do not arch past a straight line at the top.',
   'weighted reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Squeeze a light dumbbell between your feet. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
 };
 

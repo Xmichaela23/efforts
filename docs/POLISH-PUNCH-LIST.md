@@ -44,6 +44,19 @@ a note: webhooks in use, no polling, deauthorization handled. Read from the code
 unreadable power range {"lower":185}`. That is the anaerobic ride's p237 work (a floor, no ceiling, c96a20d0); the
 Intervals writer wants both ends. The Garmin copy went through. Not traced further.
 
+## PARKED (2026-09-16 night) — SMITH MACHINE CHIP: ADD WHEN A SURVEY GIVES A NUMBER
+
+Passes the first two parts of D-479 (nameable; unlocks p221 Smith machine press and p223 Smith machine hip thrust,
+unreachable at home). Fails the third for want of evidence: the Garage Gym Experiment 2022 ownership chart does not
+list it. The bar is Cable (functional trainer), 19%.
+
+## QUEUED (2026-09-16 night) — THE PLAN EXPORT ONLY CONTAINS THE WEEKS THAT WERE OPENED
+
+The export (`AllPlansInterface.tsx exportPlanToMarkdown`) walks `plan.weeks` as the plan screen holds it. Opening a plan
+loads one week (`handlePlanClick`), and each week is added only when the athlete taps to it (the week-load effect), so
+a twelve-week plan exported after viewing week 1 prints week 1. Found while tracing the export's lift names; not fixed
+in that change. A file that is meant to match the phone row for row needs every week read from `planned_workouts`.
+
 ## QUEUED (Michael, 2026-09-16 night, Today screenshot) — A DONE PLYOMETRICS SESSION READS "3 lifts"
 
 The done card's line is the server's `done_headline` (`get-week/week-totals.ts:112-117`): every `strength` row

@@ -1285,13 +1285,15 @@ function exerciseForSlot(
    * cell — the picker built its dropdown from that same call — so honouring it can never widen the
    * equipment gate or put a movement in a slot the frame did not ask for.
    */
-  const slotKey = (slot.intent === 'HYP' || slot.intent === 'DE') && slot.role === 'accessory'
+  // ⛔ AND THE SKILL CARRY ROW (p278 day 4, D-479 2026-09-16): its pick is the only SKILL pick.
+  const slotKey = (slot.intent === 'HYP' || slot.intent === 'DE' || (slot.intent === 'SKILL' && slot.category === 'carry'))
+    && slot.role === 'accessory'
     // ⛔⛔ THE FRAME'S OWN PICK TABLE (D-457, 2026-08-30). p274's accessory cells are BRACED and
     // FOCUSED; p246's are SECONDARY. Matched against the wrong table a cell finds no pick and the
     // athlete's answer is discarded in silence — which is what happened to five controls.
     // ⚠️ A DE CELL IS ASKED TOO (2026-09-13), and only a pick declared for a DE cell answers it — today the
     // p246/p278 Day 2 hinge row. Every other DE cell finds no key and is unchanged.
-    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame, /\(arms\)/i.test(String(slot.sourceText ?? '')), slot.intent as 'HYP' | 'DE')
+    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame, /\(arms\)/i.test(String(slot.sourceText ?? '')), slot.intent as 'HYP' | 'DE' | 'SKILL')
     : null;
   /**
    * ⛔⛔ "ALREADY USED TODAY" HAS TO ASK THE NAME THE ATHLETE WILL READ (2026-08-30). `bandRouteName`
@@ -1414,11 +1416,29 @@ function exerciseForSlot(
       // way: the superset half ranks arm work first, the solo half ranks it last (`inSuperset`).
       const armsCell = frameHasArmsSuperset(slotKey, args.frame) || VIADA_PICKS[slotKey].slot?.arms != null;
       const inSuperset = /\(arms\)/i.test(String(slot.sourceText || ''));
+      // ⚠️ ONLY THE PICKER'S OPENING STAND-IN, AND ONLY WHEN THIS CELL HOLDS IT. The leg-press row names
+      // `front squat` first, which lives in the primary pool, not here; ranking its later entries would
+      // move that row off its printed Zercher squat onto a goblet squat.
+      const subLeadFirst = canonicalize((VIADA_PICKS[slotKey].subLeadWith ?? [])[0] ?? '');
+      const subLeadHeld = subLeadFirst !== '' && resolved.options.some((o) => canonicalize(o.name) === subLeadFirst);
+      const subLeadRank = (name: string): number => (subLeadHeld && canonicalize(name) === subLeadFirst ? 0 : 1);
+      // ⛔ THE CARRY ROW OPENS ON ITS FIRST PRINTED MOVEMENT (D-479, 2026-09-16): a sled owner's week built with
+      // no pick saved keeps Farmer's Carry, the picker's default, instead of the sled winning on equipment fit.
+      const carryLead = slotKey === 'carry' ? VIADA_PICKS.carry.leadWith.map((n) => canonicalize(n)) : [];
+      const carryLeadRank = (name: string): number => {
+        if (carryLead.length === 0) return 0;
+        const i = carryLead.indexOf(canonicalize(name));
+        return i === -1 ? carryLead.length : i;
+      };
       const rank = (name: string): number[] => [
         isTaken(name) ? 1 : 0,
         armsCell ? focusedArmFit(pattern, inSuperset, name) : 0,
         his.has(canonicalize(name)) ? 0 : 1,
+        carryLeadRank(name),
         demoteBodyweight && isBodyweightLoad(name) ? 1 : 0,
+        // ⛔ THE PICK'S NAMED OPENING STAND-IN (`subLeadWith[0]`, 2026-09-16) — the movement the picker opens
+        // on, so a week built with no pick saved agrees with the row's default instead of catalogue order.
+        subLeadRank(name),
         dayReservesAsymmetry && isAsymmetrical(name) ? 1 : 0,
       ];
       resolved.options = resolved.options

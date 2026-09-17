@@ -190,3 +190,57 @@ easy is a range with ±20 s/mi daily allowance. A point competed with the heart-
 **> Supersedes** D-462's × 1.19 (back-annotated) and STATE-SOURCES row "Easy pace on Adjust…" (rewritten).
 Race path and season wizard readers (parked, §3a) take the midpoint through the same resolver, unedited.
 
+---
+
+## D-479 — The equipment list grows by one test per chip (2026-09-16, Michael)
+
+**The rule.** A chip is added to the home-gym equipment list only when (1) a person can name the gear and
+(2) it unlocks a movement the book prints that the athlete cannot reach any other way. D-455's "required AND
+commonly declarable" is the first half; the second half is new — a nameable chip that unlocks nothing printed
+is not added.
+
+**Applied.**
+- **Dip bars: no chip.** Dips route on a rack or a bench (`src/lib/strength-gear.ts` `'dips'`), so the chip
+  would unlock nothing. Traced 2026-09-16: dips are not blocked at a home kit; they sit in the Machine press
+  row's list and build when picked. The row opens on Dumbbell Bench Press because every stand-in ties on
+  equipment fit and the catalogue's key order breaks the tie.
+- **Back extension bench: chip added.** p222's braced hinge row prints GHD back extension, routed on `machine`
+  only, so a home athlete could not reach it. New key `back_extension_bench`, chip "Back extension bench". Back extension benches are 45- or 90-degree (Wikipedia, "Hyperextension (exercise)");
+  the GHD back extension is the 90-degree type, so ONLY `ghd back extension` routes `[['back_extension_bench'],
+  ['machine']]` and is shown as "Back Extension" at home with a six-sentence how-to (label, name and how-to approved by Michael
+  2026-09-16 night; sources in `STATE-SOURCES.md`). `machine back extension` stays
+  machine-only — routing it too put two identical rows in the picker. The commercial-gym chip grants the key. The chip's label contains "bench" and is kept from
+  granting a flat bench (`athleteEquipmentToKeys`, `hasBench`). `ghd sit up` and `roman chair sit up` stay in
+  `PRESCRIPTION_EXCLUDED` — neither is printed.
+
+**Third part (Michael, 2026-09-16 night): the gear is common in home gyms.** Evidence: Garage Gym Experiment
+ownership survey, September 2022 (garagegymexperiment.com/2022/09/06/what-do-you-own-initial-interest-in-homegymcon/),
+read off its ownership chart: barbell 97%, dumbbells 93%, squat rack / power rack 92%, adjustable bench 78%, flat bench
+58%; the large items are under 20% — functional trainer 19%, belt squat 17%, GHD 16%, reverse hyper 16%, leg press
+machine 8%. The chart does not list a Smith machine, a back extension bench or a sled. The page gives no sample size.
+
+**The bar for "common" is the chip that already exists** (Michael, 2026-09-16 night): Cable = the survey's functional
+trainer, 19% owned. Applied:
+- **Leg press / hack squat — OUT** (leg press machine 8%).
+- **Smith machine — OUT** (no number in the survey); punch-list line: add when a survey gives a number.
+- **Back extension bench — STAYS.** Not on the chart; the nearest measured items, GHD and reverse hyper, are 16% each.
+  INFERENCE, not a finding: a back extension bench is a cheaper, smaller version of those.
+- **Sled — ADDED, the stated exception** (Michael, 2026-09-16 night). Not on the ownership bar (the survey has no
+  sled number); on his ruling from the page. p226 CARRY/DRAG/PICK prints "Push/pull variants: sled push · sled
+  pull"; p278 day 4 prints "1 x SKILL: Carry". ⚠️ INFERENCE, not a finding: that "Carry" covers the whole p226 page.
+  Chip "Sled" (label approved), key `sled` (the commercial-gym chip grants it, as `substituteExerciseForEquipment`
+  already treated a gym as having one). Sled push and sled pull left `PRESCRIPTION_EXCLUDED` and route on the key.
+  They are picks on the p278 Carry row only — a new `carry` pick (Ride + Strength) listing p226's movements the
+  catalogue holds: farmer's carry, sled push, sled pull. Farmer's carry leads, so the row's default is unchanged
+  for every kit that reached it; the row stays prescribed in words. `substituteExerciseForEquipment` keeps the sled
+  rows for a chip owner. ⚠️ Side effect, measured: a barbell-only kit's carry row was building "Drag Curl" (the
+  classifier files it as a carry on the word "drag"); with the printed list it builds "Farmers Carry".
+
+**Machine press row (p274 day 1):** Dumbbell Bench Press opens the row where no p221 machine is reachable — a stated
+OURS choice off p221's definition ("more externally braced movements"; a bench holds the torso, dip bars hold nothing),
+ledger row in `STATE-SOURCES.md`. Dips stay a pick; no dip chip.
+
+**Pinned** in `src/lib/strength-gear-catalogue.test.ts` (the chip unlocks both movements, grants no bench).
+
+**Back-annotated:** D-455; the Slice 7 notes in `strength-gear.ts`, `TrainingBaselines.tsx`, `strength-grid/taxonomy.ts`.
+

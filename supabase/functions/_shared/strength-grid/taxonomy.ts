@@ -354,10 +354,14 @@ function dedupeKey(name: string): string {
  * ⛔ IN THE LIBRARY, NEVER PRESCRIBED (Michael, 2026-08-26).
  *
  * Each of these needs kit `GearKey` cannot express — a GHD, a roman chair, a captain's chair, a
- * sled, a landmine, a sandbag, a ruck, gymnastic rings. Slice 7's rule is *"gate only on gear that
+ * sled (until 2026-09-16, D-479), a landmine, a sandbag, a ruck, gymnastic rings. Slice 7's rule is *"gate only on gear that
  * is BOTH required AND commonly declarable"*, and none of them clears the second half: an itemized
  * picker asking about a glute-ham developer is the exact trade that ruling reversed, after drawing
  * Michael's *"I wouldn't know what that is."*
+ *
+ * ⚠️ D-479 (2026-09-16): the rule is now one test per chip — nameable gear that unlocks a PRINTED
+ * movement unreachable otherwise. A back extension bench passed and routes p222's printed GHD back
+ * extension; the two sit-ups below stay here because neither is printed.
  *
  * ⛔ SO THE RULE IS CARRIED THROUGH RATHER THAN BENT: not commonly declarable means not gateable
  * means never prescribed. Leaving them in the pool untagged was the 2026-08-26 defect — measured on
@@ -380,8 +384,8 @@ export const PRESCRIPTION_EXCLUDED: readonly string[] = [
   'ring dips',
   'roman chair sit up',
   'sandbag lunge',
-  'sled pull',
-  'sled push',
+  // ⛔ `sled pull` AND `sled push` LEFT THIS LIST 2026-09-16 (D-479) with the "Sled" chip, on Michael's ruling
+  // from p226. They are gated on that chip (`ASSISTANCE_GEAR`) and offered on the carry row only.
 ];
 
 /**

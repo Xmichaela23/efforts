@@ -1413,7 +1413,9 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   // Hyrox stations: sled/sandbag need commercial-gym (turf/sled/prowler) access → same-PATTERN barbell/DB
   // fallbacks for a home gym.
   // OURS — `substituteExerciseForEquipment` rep doses '10/leg' (lunge) and '8-12' (row): no page; kept as found.
-  if (name.includes('sled push') && !hasGymAccess) {
+  // ⛔ THE "Sled" CHIP (D-479, 2026-09-16) keeps the sled rows for a home athlete who owns one.
+  const hasSled = hasGymAccess || equipment.includes('Sled');
+  if (name.includes('sled push') && !hasSled) {
     resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
     notes = 'No sled — loaded walking lunge (forward horizontal drive under load)';
     repsOverride = '10/leg'; // Q-180: a loaded walking lunge is dosed in reps, not metres
@@ -1424,7 +1426,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     repsOverride = '10/leg'; // Q-180: same
   }
   // OURS — '8-12', see the `substituteExerciseForEquipment` rep-dose note above.
-  if (name.includes('sled pull') && !hasGymAccess) {
+  if (name.includes('sled pull') && !hasSled) {
     resultName = hasDumbbells ? 'Dumbbell Row' : hasBarbell ? 'Bent-Over Row' : hasResistanceBands ? 'Band Row' : 'Inverted Row';
     notes = 'No sled — heavy horizontal pull';
     repsOverride = '8-12'; // Q-180: a row is dosed in reps, not metres

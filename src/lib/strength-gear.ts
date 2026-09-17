@@ -66,6 +66,12 @@ export type GearKey =
   // substitute collides with nothing, leg extension's collided with a default pick on its own
   // path. "Commonly declarable" is satisfied — the commercial-gym chip is the declaration.
   | 'machine'
+  // ⛔ THE RULE IS NOW ONE TEST PER CHIP (D-479, 2026-09-16), and it sharpens what follows rather than
+  // reversing it: a chip is added only when (1) a person can name the gear and (2) it unlocks a movement
+  // the book PRINTS that the athlete cannot reach any other way. "Commonly declarable" was half of it;
+  // the other half is that the chip must unlock something printed. Dip bars fail the second half (dips
+  // already route on rack or bench); a back extension bench passes both. Everything below is the history.
+  //
   // ⛔ THE SLICE 7 EXCEPTION, RULED 2026-08-26 — and it does not reverse Slice 7's rule, it applies
   // it. That ruling cut gear people could not NAME: a glute-ham developer, dip bars, a leg curl
   // machine, drawing Michael's *"I wouldn't know what that is."* The test it left behind is "BOTH
@@ -74,11 +80,20 @@ export type GearKey =
   //
   // ⚠️ THE ALTERNATIVE WAS WORSE, which is why they earned keys rather than joining the drop list.
   // `trx fallout`, `stability ball rollout` and `stir the pot` were being PRESCRIBED to athletes who
-  // own neither — the 2026-08-26 defect. The kit that could not clear the same bar (a GHD, a sled, a
+  // own neither — the 2026-08-26 defect. The kit that could not clear the same bar (a GHD, a sled — back 2026-09-16 with its own chip, D-479 — a
   // captain's chair, a landmine, a sandbag) was dropped from the prescribable pool instead; see
   // `PRESCRIPTION_EXCLUDED` in `strength-grid/taxonomy.ts`.
   | 'suspension_trainer'
-  | 'stability_ball';
+  | 'stability_ball'
+  // ⛔ THE ONE-TEST-PER-CHIP RULE (2026-09-16, D-479): a chip is added only when a person can name the
+  // gear AND it unlocks a movement the book prints that the athlete cannot reach any other way. This
+  // key passes both: a back extension bench (45-degree or flat hyperextension bench, sold as home gear)
+  // is gear a lifter names, and p222's braced hinge row prints GHD back extension, which routed on
+  // `machine` alone — a home athlete could not reach it. It routes that one movement only.
+  | 'back_extension_bench'
+  // ⛔ THE SLED (D-479, 2026-09-16) — ON MICHAEL'S RULING FROM THE PAGE, the stated exception to the ownership
+  // bar (no survey number). p226 CARRY/DRAG/PICK prints "sled push" and "sled pull" under push/pull variants.
+  | 'sled';
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -97,6 +112,8 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   machine: 'Machine',
   suspension_trainer: 'Suspension Trainer',
   stability_ball: 'Stability Ball',
+  back_extension_bench: 'Back Extension Bench',
+  sled: 'Sled',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -185,7 +202,9 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
   for (const s of n) {
     if (s.includes('barbell') || s.includes('plate')) out.add('barbell');
     if (s.includes('rack') || s.includes('cage')) out.add('rack');
-    if (s.includes('bench')) out.add('bench');
+    // ⚠️ "Back extension bench" CONTAINS THE WORD (D-479, 2026-09-16) and is not a bench to press or row
+    // on — ticking it alone must not hand the athlete every flat-bench movement.
+    if (s.includes('bench') && !s.includes('back extension')) out.add('bench');
     if (s.includes('dumbbell') || /\bdb\b/.test(s)) out.add('dumbbells');
     if (s.includes('kettlebell') || /\bkb\b/.test(s)) out.add('kettlebell');
     if (s.includes('band')) out.add('bands');
@@ -200,7 +219,8 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
     if (s.includes('incline bench')) out.add('incline_bench');
     if (s.includes('ab wheel') || s.includes('ab roller')) out.add('ab_wheel');
     // ⚠️ THE `dip_bars` / `ghd` / `leg_curl_machine` / `decline_bench` CLAUSES ARE GONE WITH THEIR
-    // CHIPS (Slice 7). Nothing routes on them any more, so a clause here would map a chip nobody can
+    // CHIPS (Slice 7). ⛔ D-479 (2026-09-16): a new clause comes back only with a chip that passes the
+    // one-test rule — the back extension bench clause below is the first. Nothing routes on them any more, so a clause here would map a chip nobody can
     // tick onto a key nothing reads.
     // Commercial gym implies most fixed equipment is on hand.
     if (s.includes('commercial gym')) {
@@ -229,6 +249,12 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       // ball on the floor as surely as it has dumbbells.
       out.add('suspension_trainer');
       out.add('stability_ball');
+      // A commercial gym has a back extension bench on the floor (D-479). The machine route already
+      // reaches the two p221 movements; this keeps the grant complete, and it can only add.
+      out.add('back_extension_bench');
+      // The app already treats a commercial gym as having a sled (`substituteExerciseForEquipment` keeps
+      // sled push and sled pull there); the key says the same thing here.
+      out.add('sled');
     }
     // ⛔ THE TWO CHIPS ADDED 2026-08-26 — see the GearKey note. Matched by SUBSTRING, like every
     // clause above, so "TRX / suspension trainer" and "Stability ball" both land.
@@ -236,6 +262,10 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
     if (s.includes('stability ball') || s.includes('swiss ball') || s.includes('exercise ball')) {
       out.add('stability_ball');
     }
+    // ⛔ THE BACK EXTENSION BENCH CHIP (D-479, 2026-09-16) — see the key's note in `GearKey`.
+    if (s.includes('back extension')) out.add('back_extension_bench');
+    // ⛔ THE SLED CHIP (D-479, 2026-09-16) — see the key's note in `GearKey`.
+    if (s.includes('sled')) out.add('sled');
   }
   return out;
 }
@@ -265,6 +295,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ⛔ DIPS ARE THE MOVEMENT SLICE 7 EXISTS FOR. The route was `[['dip_bars'], ['rings']]` — precise,
   // sourced (the previous program), and it gated a normal home gym OUT of a
   // movement it can obviously do. Dips "worked" until Slice 3/4 invented that gate.
+  //
+  // ⛔ AND NO DIP BAR CHIP UNDER D-479 (2026-09-16): a chip must unlock a printed movement the athlete
+  // cannot reach otherwise, and these two routes already reach dips for anyone with a rack or a bench.
   //
   // ⚠️ ANYTHING TO DIP ON COUNTS: rack safety-arms, a dip attachment on the rack, two benches. Both
   // routes are gear the athlete can actually declare, which is the whole rule now — gate on what is
@@ -415,6 +448,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // recognisable enough to keep asking about, so neither can be declared, so neither can gate.
   // ⛔ Do not re-add them without re-adding the chips; a route nobody can satisfy is a movement
   // nobody is offered.
+  // ⚠️ D-479 (2026-09-16): the chip that came back is a back extension bench, and it routes p222's
+  // printed GHD back extension (`ghd back extension`) only, not this family. Plain
+  // `back extension` stays on the barbell anchor — the floor version with the feet under a loaded bar.
   'nordic curl': [['barbell']],
   'nordic curls': [['barbell']],
   'nordic hamstring curl': [['barbell']],
@@ -469,12 +505,15 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // to need nothing; an absent row is a movement nobody has looked at. The two used to be
   // indistinguishable, which is the whole reason `gearRoutesFor` warns.
   //
+  // ⚠️ D-479 (2026-09-16): sled push and sled pull are tagged now, on the sled chip — see their rows.
   // ⚠️ THIRTEEN MOVEMENTS ARE DELIBERATELY LEFT UNTAGGED: trx fallout, stability ball rollout, stir
   // the pot, ghd sit up, roman chair sit up, captain's chair knee raise (both spellings), sled push,
   // sled pull, landmine twist, sandbag lunge, backpack carry, ring dips. Each needs kit this
   // vocabulary cannot express, and the Slice 7 ruling in `TrainingBaselines.tsx` forbids re-adding
   // the chips that would express it — "gate only on gear that is BOTH required AND commonly
-  // declarable", after an itemized picker drew *"I wouldn't know what that is."* Tagging them would
+  // declarable", after an itemized picker drew *"I wouldn't know what that is."* ⚠️ Sharpened by D-479
+  // (2026-09-16): a chip may be added when the gear is nameable AND it unlocks a movement the book prints
+  // that is unreachable otherwise. None of the movements named here is printed, so none earns one. Tagging them would
   // mean inventing keys no athlete can produce, which the vocabulary note at the top of this file
   // rules out. Open with Michael, 2026-08-26; not an oversight.
 
@@ -732,6 +771,14 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // which one the kit resolved to.
   'pullover machine': [['dumbbells', 'bench'], ['machine']],
   'hip adduction machine': [['machine']],
+  /**
+   * ⛔ THE SLED (D-479, 2026-09-16, Michael's ruling from the page). p226 prints both under CARRY/DRAG/PICK,
+   * "Push/pull variants". They left `PRESCRIPTION_EXCLUDED` with this chip and are offered on the carry row
+   * only (p278 day 4, "1 x SKILL: Carry"). ⚠️ INFERENCE, not a finding: that the page's "Carry" row covers
+   * the whole p226 page, drags and pushes included — p278 does not say.
+   */
+  'sled push': [['sled']],
+  'sled pull': [['sled']],
 
   // ── the nine added on the second pass (2026-08-29) ─────────────────────────────────────────────
   // ⚠️ THE CALF PAIR IS THE POINT: his FREESTANDING BARBELL calf raise (p220, secondary) needs a
@@ -753,7 +800,17 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // Smith-rack movement was treated as needing nothing (found 2026-08-30). It follows
   // `machine hip thrust`: the station is what makes it this movement.
   'smith machine hip thrust': [['machine']],
-  'ghd back extension': [['machine']],
+  /**
+   * ⛔ THE BACK EXTENSION BENCH ROUTE (D-479, 2026-09-16) — ON THE GHD BACK EXTENSION ONLY. Back extension
+   * benches come in two types, 45-degree and 90-degree (Wikipedia, "Hyperextension (exercise)"); the GHD
+   * back extension is the 90-degree, horizontal one. p222 prints it under braced hinge lower, and until this
+   * route a home athlete reached it only through a commercial gym. ⚠️ The bench route leads, the station
+   * route stays: `equipmentFitRank` scores the first satisfied route, and a commercial gym satisfies both.
+   * ⛔ `machine back extension` STAYS MACHINE-ONLY. Routing it on the same bench put two rows for one
+   * execution in the picker ("Back Extension / Back Extension", clash check 2026-09-16).
+   * `ghd sit up` and `roman chair sit up` stay in `PRESCRIPTION_EXCLUDED` — neither is printed.
+   */
+  'ghd back extension': [['back_extension_bench'], ['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],
   // THE IMPLEMENT SWAP APPLIES HERE (2026-08-29, reversing an earlier read). His rear delt machine
