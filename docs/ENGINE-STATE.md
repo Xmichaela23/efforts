@@ -1,46 +1,47 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-16 night, PM chat — the one-truth workorder is DONE; branch `stage/one-truth-drift` PUSHED, 41+ functions DEPLOYED, Michael's last 16 weeks RECALCULATED, NOT merged to main, partly phone-checked)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-17, PM chat — `stage/one-truth-drift` MERGED to main, everything below PUSHED; main = `f1a39cda`)
 
-> **Your job:** the first item on `docs/POLISH-PUNCH-LIST.md`: a structured run whose watch laps do not match the
-> plan's step count gets NO pace verdict (laps shown, execution scored on time only). Michael's 2026-09-16
-> near-threshold run: 12 laps vs 13 steps, six work laps at 8:06–8:38 against a 10:26–10:52 target, execution read
-> 95%. Trace `_shared/session-detail/interval-compare.ts` and the laps-as-rows fallback (6f3d7c19, 44a1ab79) first;
-> then match work laps to work steps by order, judge them, print what was not matched. Same session: the planned
-> line's "RPE 8–10" on sub-threshold work (OURS, `materialize-plan:698-699`) and the Planned tab's "0.41 mi" for a
-> 4:00 step (`c/StructuredPlannedView.tsx:193`, phone maths the guard missed — add the pattern). Report, wait for go.
+> **Your job:** `docs/WORKORDER-sessions-respond-2026-09-17.md` (sessions that answer back, stages A–D), one stage per
+> terminal, run from a project-manager chat. ⚠️ Its opening story says the 16 Sep run's laps "matched nothing" because
+> of 12 laps vs 13 steps — the real cause was the Garmin send putting timed steps on the watch as distances (6 × 0.41 mi,
+> fixed 493fecc7), so the reps were 3:18–3:31, not 4:00. The fact that nothing told him the reps were far over target
+> still stands. Smaller open items are listed below and on `docs/POLISH-PUNCH-LIST.md`, each with its file:line.
 >
-> **What shipped 2026-09-15/16 — do not redo.** `docs/WORKORDER-app-one-truth-2026-09-15.md` §8 has every row.
-> Stages 0–7 done: 514 numbers mapped (`TRUTH-MAP.md` §7), 42 verified breaks (§8.0), five book/field rulings
-> accepted (§9), 32 of 42 fixed in Stage 3, Adjust/Baselines/State/Performance/Details/logger read one server
-> payload each in the athlete's unit (Stage 4), 194 constants cited + 863 OURS + 449 ledger rows (Stage 5,
-> `docs/STAGE5-REPORT-2026-09-16.md`), the guard built and EVERY rule on FAIL (`npm run lint:truth`, runs inside
-> `npm run build`; `docs/DESIGN-one-truth-guard.md`), final pass 681 numbers / 0 breaks
-> (`docs/STAGE7-FINAL-PASS-2026-09-16.md`). Rules added to §1/§5 of the workorder: rule 7 (the device's number
-> wins), fix-in-place (no new function/file/column/screen), recalculate 16 weeks not history, throwaway checks one
-> round by default (Supabase Disk IO warning 2026-09-16). Scope ruling §3a: race path + season wizard PARKED.
+> **What shipped 2026-09-16/17 — do not redo.**
+> - **One-truth workorder** (Stages 0–7) is on main: `docs/WORKORDER-app-one-truth-2026-09-15.md` §8 has every row;
+>   guard `npm run lint:truth` runs inside `npm run build`.
+> - **Garmin send:** a timed run step reaches the watch as TIME (493fecc7, `_shared/garmin/convert-workout.ts` kept
+>   `distanceDerived`). This was the real cause of the 16 Sep "no pace verdict": the watch ran 6 × 0.41 mi, not 6 × 4:00.
+>   Lap pairing when a watch joins/splits laps also shipped (1da1fd91; timed steps match on time).
+> - **Intervals.icu send:** a floor-only ride step goes out as floor → 130% FTP, p237's top, one constant shared with
+>   Garmin (cea4d5fb).
+> - **Equipment (D-479, `DECISIONS-LOG-4`):** chip test = nameable + unlocks a printed movement unreachable otherwise +
+>   common in home gyms (bar: Cable/functional trainer 19%). "Back extension bench" (GHD back extension only, shown
+>   "Back Extension", sourced how-to) and "Sled" (Ride + Strength Carry row) chips; machine-press default Dumbbell Bench
+>   Press stated OURS with receipts; export prints the shown name (ed228810). Throwaway-checked 6/6.
+> - **State:** bike row's FTP word is Adjust's (`ftpSourceWord`, coach v212). BODY is numbers only, below the trends;
+>   the verdict words and both sentences are gone (v213).
+> - **Today card:** weather on every day (past = midday local, future = forecast to 16 days, `get-weather`), each past
+>   day's own form + BODY line 84 days back (coach v214, `load.form_by_day` / `body_line_by_day`), totals in the load
+>   section, weather block three lines, small text 60% white, phone keeps weather in memory, day swipe 40 px / 0.3 px/ms
+>   and never opens a card, tab bar above the iPhone swipe zone (a start-up override in `src/main.tsx` had zeroed it).
 >
-> **Michael's state (2026-09-16 night):** threshold pace 9:35 ACCEPTED at 17:48 (was 8:51); the trace says his reps
-> tonight (8:06–8:38 at HR 153–164 < LTHR 162) mean 9:35 is too slow — he was told a retest settles it. Plan
-> rebuilt on the final code, 50/50 rows, lines on every run/ride, lifts unchanged.
+> **Open, in order (all on the punch list):** (1) "RPE 8–10" on sub-threshold run steps — words to Michael ·
+> (2) soreness reads 8 days under "last 7 days" · (3) Strava webhook drops "athlete removed the app" (blocks the
+> Developer Program resubmission) · (4) week list prints the stored name ("Lateral Raise") · (5) plyometrics reads
+> "3 lifts" — word to Michael · (6) weather cache: 1 hour for future days and the last 5 days — proposed, no go yet ·
+> (7) three stale red tests · (8) manual Send to Garmin not recorded by the sync · (9) plan export only holds opened weeks.
+> Before launch: Open-Meteo's free API is non-commercial — the paid plan is needed for a paid app.
 >
-> **Still open, in order (all on the punch list):** (1) the lap-count verdict gap above · (2) RPE label + "0.41 mi"
-> · (3) a notice + tap when upcoming rows predate a rule change (words to Michael) · (4) manual "Send to Garmin"
-> not recorded by the sync · (5) inbound source per sport for Intervals/Wahoo/Zwift with cross-source dedupe —
-> DESIGN BRIEF first (`FOUNDATION`: no inbound Strava off switch exists; "Garmin only" = Garmin first) · (6) metric
-> plan builder rounds in pounds · (7) unattached-ride drift, title prefix, header re-pop, smart plates, zone-5 edge,
-> one-beat trim. Merge to main is Michael's decision (Netlify web client is behind the server until then).
+> **UNVERIFIED (what would settle it):** the watch countdown on a timed run (next run with reps); the two rides in
+> Intervals.icu at 110–130% (open them there); the tab bar position and the swipe feel (on the phone); the Strava
+> webhook path and checkpoint screen (a real reconnect). Seen by Michael 2026-09-17: State bike word (web), Today card
+> with weather on other days, totals in the header.
 >
-> **UNVERIFIED (what would settle it):** Strava connect no longer wiping typed HR setup, the Strava webhook path and
-> the checkpoint screen were never exercised on a throwaway (Stage 7 s1/s2 "not exercised") — a real reconnect or a
-> week-7 account. The "swam as planned" migration ran (24 rows) but no swim has been logged since. Phone-checked by
-> Michael: Adjust (9:35 accepted, "today" retest lines), the Planned tab, the near-threshold run's Performance.
-> Everything else is throwaway-checked only.
->
-> **Rules that bind you (Michael, this week):** never build beside what exists; every number has a page/vendor or
-> says OURS with a ledger row; the phone prints, the server computes, the device's number wins; commit exact files,
-> never -a; commit/push/deploy wait for his word; throwaway accounts one round; recalculate 16 weeks; no
-> notify-admin-signup emails for `@example.com` / `burner-` accounts (deployed 2026-09-16).
+> **Rules that bind you:** every number has a page/vendor or says OURS with a ledger row; the phone prints, the server
+> computes; commit exact files, never -a; commit/push/deploy wait for his word; every report ends by saying plainly
+> whether he can see it yet ("needs a push" / "pushed, run from Xcode"); throwaway checks one round.
 
 ## (older banner) (written 2026-09-15, PM chat — the whole app on one truth; ride power, run pace, threshold, laps, effort PUSHED AND DEPLOYED, mostly not phone-checked)
 

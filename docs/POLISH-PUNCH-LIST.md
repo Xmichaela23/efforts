@@ -14,7 +14,20 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## OPEN (2026-09-16 evening, Michael's near-threshold run) — LAP COUNT ≠ STEP COUNT → NO PACE VERDICT AT ALL
+## AWAITING MICHAEL (2026-09-17, PUSHED f1a39cda, iOS synced) — TAB BAR ABOVE THE SWIPE ZONE; DAY SWIPE
+
+Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall, 14 px labels; the + no longer covers
+the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
+start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
+
+## QUEUED (2026-09-17, proposed, no go) — WEATHER CACHE TIMES
+
+Today 15 min (Open-Meteo current data is 15-minutely) · future days and the last 5 days 1 hour (fastest models update
+hourly) · older days kept (a year on the server, until the app closes on the phone). Today all but the oldest are 15 min.
+
+## [x] RESOLVED 2026-09-17 — LAP COUNT ≠ STEP COUNT → NO PACE VERDICT AT ALL
+
+> The cause was the Garmin send, not the lap match: timed steps went to the watch as distances (6 × 0.41 mi), so no lap could fit a 4:00 step. Fixed 493fecc7. Lap pairing for joined/split laps also shipped (1da1fd91). The 16 Sep run itself stays unmatched — the watch ran a different workout. Everything below is history.
 
 A 6 × 4:00 near-threshold run came in as 12 Garmin laps against 13 plan steps (WU, 6 work, 5 recovery, CD; the
 watch folded the last recovery + CD). The match failed, the table fell back to watch laps with no colour, and
@@ -71,7 +84,7 @@ session is stored as `strength`, has no pounds, so the card reads "3 lifts" alon
 follows the session (jumps are not lifts). The replacement word is copy — print it and wait for Michael's yes.
 Also check the Week bar, which counts the same session.
 
-## AWAITING MICHAEL (2026-09-17) — EQUIPMENT CHIPS, THE CARRY SETUP ROW AND THE EXPORT NEED THE MERGE + PHONE BUILD
+## AWAITING MICHAEL (2026-09-17, MERGED + PUSHED to main, iOS synced) — EQUIPMENT CHIPS, THE CARRY SETUP ROW AND THE EXPORT
 
 D-479, ed228810 on `stage/one-truth-drift`: committed, not merged, not pushed; the 36 server functions are deployed;
 no phone build carries it. The server half was checked 2026-09-17 on five throwaway accounts (deleted): back
@@ -84,7 +97,7 @@ with all 12 weeks loaded, printed the session screen's name on all 600 exercise 
 Before he can see any of it: the merge + phone build. Look for: the "Back extension bench" and "Sled" chips on the
 equipment list; the Day 4 Carry row on Ride + Strength setup; exported lift names matching the phone.
 
-## AWAITING MICHAEL (2026-09-17) — BODY: ONE LINE ON TODAY, NUMBERS ONLY ON STATE BELOW THE TRENDS
+## [x] SEEN 2026-09-17 (pushed; past days' own lines 5cd4c715) — BODY: ONE LINE ON TODAY, NUMBERS ONLY ON STATE BELOW THE TRENDS
 
 091b034d, NOT pushed. `coach` deployed (v213). Needs the phone/web build. Look for: Today, under the form line,
 "effort 6.0 of 10 · soreness 2.6 of 7 · last 7 days"; on any other day form, that line and the Garmin line are
@@ -100,14 +113,16 @@ called with `recentDays` at `coach/index.ts` BODY block). Older than the 2026-09
 number on State and on Today's new line. Third stale test, same day: `coach/strength-logged-sets.test.ts`
 "others: not main…" fails on unchanged code.
 
-## QUEUED (2026-09-17) — TWO STALE TESTS ARE RED ON UNCHANGED CODE
+## QUEUED (2026-09-17) — THREE STALE TESTS ARE RED ON UNCHANGED CODE
+
+(3) `coach/strength-logged-sets.test.ts` "others: not main, a weight logged, most-logged first, at most eight".
 
 Both fail before and after the 2026-09-16/17 sessions; neither was touched. (1) `save-baselines/zones.test.ts`
 "nothing on file: nothing to print" — expects `{ power, swim_pace, run_easy_hr }` and the function now also
 returns `readout`. (2) `src/lib/strength-gear-catalogue.test.ts` "A PLURAL AND ITS SINGULAR AGREE". Read each
 before changing it: decide whether the test or the code is stale.
 
-## AWAITING MICHAEL (2026-09-17) — STATE'S BIKE ROW PRINTS ADJUST'S WORD
+## [x] SEEN ON THE WEB 2026-09-17 (pushed) — STATE'S BIKE ROW PRINTS ADJUST'S WORD
 
 df71a674, NOT pushed. `coach`, `save-baselines`, `export-data` deployed (payload v212). State's bike row needs the
 phone build. Look for: "FTP 168 W · accepted from your rides" on State, the same words Adjust prints; no "tested" or
@@ -115,7 +130,7 @@ phone build. Look for: "FTP 168 W · accepted from your rides" on State, the sam
 (two rounds: the first round's script read Adjust's reply at the wrong place). BODY stays on State; the stale
 "REMOVED from State" sentence is gone from STATE-SOURCES.
 
-## AWAITING MICHAEL (2026-09-16 night) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
+## AWAITING MICHAEL (2026-09-16 night, deployed + pushed; needs a run with reps) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
 
 `_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
 run step went to Garmin as a distance (16 Sep run: 6 × 0.41 mi for a 6 × 4:00 plan). Fixed 493fecc7; deployed
@@ -132,7 +147,11 @@ send a second copy and the button's copy is never removed when the row changes o
 not reproduced. Fix: the button records its send the same way the sync does (one record of what was sent). One
 function. After the one-truth workorder.
 
-## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: THE PACE IS THE PAGE'S; "RPE 8–10" AND THE PHONE'S "0.41 mi" ARE NOT
+## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: "RPE 8–10" ON SUB-THRESHOLD STEPS
+
+> 2026-09-17: the "0.41 mi" half is DROPPED (Michael) — it was a row built before the 17:48 rebuild; the Planned tab
+> prints 4:00 for timed steps. Open: the RPE line only. Proposed "4:00 @ 10:26–10:52/mi" with no RPE (no effort number
+> for p233/p234 in the book's notes) — waits on Michael's yes. The re-price question is settled: he accepted 9:35.
 
 Traced 2026-09-16 (read-only): both rows are `below_threshold` level 2, p234 "6 rounds of 4 min @ 90% / 1 min @
 VT1" — the reps at 90% are the page's number (`_shared/endurance-library/source-rules.ts:906,916`; priced at
@@ -208,7 +227,7 @@ The title is the file's own name: Intervals pushed the workout to Zwift with tha
 workorder: strip a "Zwift - Intervals icu:" style prefix in `lib/derive-workout-title.ts`; and when the Intervals.icu
 import (parked) is built, show Intervals as the source where it provided the file.
 
-## AWAITING MICHAEL (built 2026-09-17, 953e4168, get-weather deployed, not pushed) — TODAY HEADER CARD RE-POPS ON RETURN TO TODAY (Michael, 2026-09-15, screenshot)
+## [x] SEEN 2026-09-17 (pushed, 953e4168 + 5cd4c715 + a18e45c1) — TODAY HEADER CARD RE-POPS ON RETURN TO TODAY (Michael, 2026-09-15, screenshot)
 
 Built, smallest version: weather on every day (past = that day at midday local, future = forecast to 16 days, past 16 = empty block at full height); form and the BODY line keep their space on other days (a6a16b00). Look for: scrolling between days, the card does not change height. Not built: session start hour, session location, our own sunrise calculation. The open form-on-other-days question was ruled: today only.
 

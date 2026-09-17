@@ -3290,6 +3290,8 @@ drift — is what cost the session.
 
 ## D-354 — BODY IS WHAT YOU LOGGED: the heart-rate and cross-training rows are DELETED (2026-08-01, Michael — **PUSHED + DEPLOYED, not device-verified**)
 
+> **2026-09-17 — the persistence line is no longer shown.** "Soreness above your normal on N of your last M sessions.", the effort driver sentence and the verdict words ("a bit harder than usual", "above your normal") came off State (coach v213, 091b034d): no athlete app words a self-reported number against a personal normal. BODY is numbers only, below the trends; its one line is on Today (`load.body_today_line`). The comparisons are still computed in `coach` for the readiness read. Everything below is history.
+
 **Michael:** *"body is simply how you've been reporting."* The section is now **one row** carrying the
 two things the athlete reports — effort and soreness — and nothing measured.
 
