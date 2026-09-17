@@ -373,6 +373,13 @@ const ALIGN = {
   idle_speed_mps: 0.3,
   min_work_slice_s: 60,
   expand_work_floor_s: 90,
+  /**
+   * OURS — `order_lap_floor_frac` 0.5: a watch lap under HALF the shortest planned step cannot be any step, so it
+   * is not counted when the laps are paired to the steps by order (2026-09-17). A recorded lap runs a second or
+   * two short of the step it is (a 60-second jog lands at 59); nothing lands at half. Ledger row in
+   * docs/STATE-SOURCES.md.
+   */
+  order_lap_floor_frac: 0.5,
   tol: {
     run:  { dist_short_m: 10, dist_long_pc: 0.02, time_work_s: 3, time_rec_s: 8 },
     ride: { dist_long_pc: 0.05, time_work_s: 2, time_rec_s: 6 },
@@ -1664,8 +1671,11 @@ Deno.serve(async (req) => {
              * is 3 s, so every rep missed by 29–42 s, NOT ONE REP PAIRED, and the session read Execution 95 from
              * time alone with no rep judged. The order was right on every row; only the tolerance said no.
              *
-             * So: drop any lap shorter than the SHORTEST planned step — no step is that short, so such a lap cannot
-             * be one (his watch left an 8-second, 13-metre stray at the end). If the laps that remain then number
+             * So: drop any lap too short to be a step at all — his watch left an 8-second, 13-metre stray at the
+             * end. ⚠️ THE FLOOR IS HALF THE SHORTEST STEP, NOT THE STEP (`ALIGN.order_lap_floor_frac`, OURS,
+             * ledgered). A first cut used the step itself and this rung never fired on the very run it was written
+             * for: his 60-second jogs recorded as 59 seconds, so every one of them was thrown away with the stray.
+             * A recorded lap runs a second or two short of its step; nothing runs at half of it. If the laps that remain then number
              * exactly the planned steps, lap i is step i. The work steps' laps are judged against their range; every
              * other lap prints as before. Mode `laps-in-order`; the analyzer scores it like `laps-paired`.
              *
@@ -1676,8 +1686,9 @@ Deno.serve(async (req) => {
               .map((st: any) => deriveSecondsFromPlannedStep(st))
               .filter((s: number) => Number.isFinite(s) && s > 0)
               .reduce((a: number, b: number) => Math.min(a, b), Infinity);
+            const floor = shortestStepSec * ALIGN.order_lap_floor_frac;
             const keep = Number.isFinite(shortestStepSec)
-              ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= shortestStepSec)
+              ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= floor)
               : [];
             if (keep.length === plannedSteps.length && keep.length >= 2) {
               snapped = lapWins.map(([a, b], i) => {
