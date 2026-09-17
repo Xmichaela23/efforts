@@ -208,7 +208,9 @@ The title is the file's own name: Intervals pushed the workout to Zwift with tha
 workorder: strip a "Zwift - Intervals icu:" style prefix in `lib/derive-workout-title.ts`; and when the Intervals.icu
 import (parked) is built, show Intervals as the source where it provided the file.
 
-## QUEUED — TODAY HEADER CARD RE-POPS ON RETURN TO TODAY (Michael, 2026-09-15, screenshot)
+## AWAITING MICHAEL (built 2026-09-17, 953e4168, get-weather deployed, not pushed) — TODAY HEADER CARD RE-POPS ON RETURN TO TODAY (Michael, 2026-09-15, screenshot)
+
+Built, smallest version: weather on every day (past = that day at midday local, future = forecast to 16 days, past 16 = empty block at full height); form and the BODY line keep their space on other days (a6a16b00). Look for: scrolling between days, the card does not change height. Not built: session start hour, session location, our own sunrise calculation. The open form-on-other-days question was ruled: today only.
 
 Scrolling back to today, the header card grows again because the weather block (`c/TodayWeather.tsx`) renders
 only for today; other days have no weather so the card is shorter, and the return snaps it back. Not a reload.
