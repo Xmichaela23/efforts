@@ -165,6 +165,9 @@ each number equals the one server value, same on every screen. Report a table: n
 - **Every athlete-facing line** goes to Michael word for word first.
 - **Test on throwaway accounts**, created and deleted by script, with more than one data source. Never write
   to Michael's data by hand; read-only reads of his account only with his go-ahead.
+- **Throwaway checks run ONE round by default** (Supabase Disk IO budget warning, 2026-09-16, after two days of
+  three-round checks on three accounts each). Three back-to-back rounds only when the thing under test is not
+  deterministic (a generator with randomness, a fit with sampling). Read-only table builds never repeat.
 - **Recalculate the last 16 weeks, not the whole history** (Michael, 2026-09-16: "we just need the last 12 weeks
   tops"; 16 because the run-threshold fit reads 16 weeks of best efforts and every other State window is shorter).
   A recalculation names its window and its count in the report.
