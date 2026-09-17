@@ -41,7 +41,7 @@ function json(obj: unknown, status = 200): Response {
  * re-price finished "30 of 33" with nothing on record about the three. The status, the row, its date and type and
  * the reply are logged now, so the misses can be named.
  */
-async function repriceOneRow(supabase: any, r: any, tag: string): Promise<boolean> {
+async function repriceOneRow(supabase: any, r: any, tag: string, misses?: Array<Record<string, unknown>>): Promise<boolean> {
   try {
     const { data, error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
     if (!error) return true;
@@ -49,11 +49,52 @@ async function repriceOneRow(supabase: any, r: any, tag: string): Promise<boolea
     let body = '';
     try { body = ctx && typeof ctx.text === 'function' ? (await ctx.text()).slice(0, 300) : ''; } catch { /* no body */ }
     console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: status=${ctx?.status ?? 'none'} ${error.name ?? ''} ${error.message ?? ''} body=${body} data=${JSON.stringify(data ?? null).slice(0, 200)}`);
+    misses?.push({ id: r.id, date: r.date, type: r.type, status: ctx?.status ?? null, error: `${error.name ?? ''} ${error.message ?? ''}`.trim(), body });
     return false;
   } catch (e) {
     console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: threw ${(e as Error)?.message ?? String(e)}`);
+    misses?.push({ id: r.id, date: r.date, type: r.type, status: null, error: `threw ${(e as Error)?.message ?? String(e)}` });
     return false;
   }
+}
+
+/**
+ * ⛔ THIRTY CALLS A REQUEST (2026-09-16, Stage 7 session 3). One request to this function can send about 30 calls to
+ * other edge functions; every call after that fails before it leaves ("FunctionsFetchError: Failed to send a request to
+ * the Edge Function"). Measured on throwaway blocks of 32 re-priceable rows: rows 1–30 re-priced and rows 31–32 failed
+ * — in date order, in reverse order, one at a time or four at a time, and again on a second try inside the same request;
+ * each failed row re-priced when sent on its own. That was the "30 of 33". Not on Supabase's published limits page
+ * (read 2026-09-16), so the number is what was measured, not a documented one.
+ * So a request re-prices at most `budget` rows and hands the rest to a fresh request of this function
+ * (`reprice_continue`), which is itself one call. Four rows at a time keeps each request short.
+ * OURS — `REPRICE_CALLS_PER_REQUEST` 29 (the measured 30 less the hand-off call) and the batch of 4.
+ */
+const REPRICE_CALLS_PER_REQUEST = 29;
+const REPRICE_BATCH = 4;
+async function repriceRows(
+  supabase: any, rows: any[], tag: string, misses: Array<Record<string, unknown>>, budget: number,
+  onBatch?: (done: number) => Promise<void>,
+): Promise<{ repriced: number; rest: any[] }> {
+  const now = rows.slice(0, Math.max(0, budget));
+  let repriced = 0;
+  for (let i = 0; i < now.length; i += REPRICE_BATCH) {
+    const oks = await Promise.all(now.slice(i, i + REPRICE_BATCH).map((r) => repriceOneRow(supabase, r, tag, misses)));
+    repriced += oks.filter(Boolean).length;
+    if (onBatch) await onBatch(repriced);
+  }
+  return { repriced, rest: rows.slice(now.length) };
+}
+
+/** One call: the rows not yet reached go to a fresh request of this function, as the same athlete. */
+async function handOffReprice(supabase: any, req: Request, planId: string, rest: any[], job: Record<string, unknown>): Promise<boolean> {
+  try {
+    const { error } = await supabase.functions.invoke('endurance-checkpoint', {
+      body: { reprice: true, plan_id: planId, reprice_continue: { ids: rest.map((r) => String(r.id)), job } },
+      headers: { Authorization: req.headers.get('Authorization') ?? '' },
+    });
+    if (error) console.warn(`[reprice] hand-off failed: ${error.name ?? ''} ${error.message ?? ''}`);
+    return !error;
+  } catch (e) { console.warn('[reprice] hand-off threw:', (e as Error)?.message ?? String(e)); return false; }
 }
 
 const HARD_FAMILIES = new Set(['run_mlss', 'run_near_threshold', 'ride_sweet_spot', 'ride_anaerobic']);
@@ -108,22 +149,33 @@ Deno.serve(async (req: Request) => {
         .eq('training_plan_id', plan.id)
         .eq('user_id', userId)
         .order('date');
-      const pending = (rows ?? []).filter((r: any) => isRepriceable(r, today));
-      const job = { started_at: new Date().toISOString(), total: pending.length, done: 0, finished_at: null as string | null };
+      // A continuation carries the rows the previous request did not reach, and the job it belongs to.
+      const cont = p?.reprice_continue && Array.isArray(p.reprice_continue.ids) ? p.reprice_continue : null;
+      const contIds = cont ? new Set((cont.ids as unknown[]).map(String)) : null;
+      const pending = (rows ?? []).filter((r: any) => isRepriceable(r, today) && (!contIds || contIds.has(String(r.id))));
+      const job = cont?.job
+        ? { started_at: String(cont.job.started_at), total: Number(cont.job.total) || pending.length, done: Number(cont.job.done) || 0, finished_at: null as string | null, misses: Array.isArray(cont.job.misses) ? cont.job.misses : [] }
+        : { started_at: new Date().toISOString(), total: pending.length, done: 0, finished_at: null as string | null, misses: [] as Array<Record<string, unknown>> };
       const writeJob = async (j: typeof job) => {
         const { data: cur } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
         await supabase.from('plans').update({ config: { ...((cur?.config as Record<string, unknown>) ?? config), reprice_job: j } }).eq('id', plan.id).eq('user_id', userId);
       };
       await writeJob(job);
       const run = async () => {
-        let repriced = 0;
-        for (const r of pending) {
-          if (await repriceOneRow(supabase, r, 'reprice')) repriced += 1;
-          if (repriced % 5 === 0) await writeJob({ ...job, done: repriced });
+        const misses: Array<Record<string, unknown>> = [...job.misses];
+        const { repriced, rest } = await repriceRows(supabase, pending, 'reprice', misses, REPRICE_CALLS_PER_REQUEST, (done) => writeJob({ ...job, done: job.done + done }));
+        const done = job.done + repriced;
+        if (rest.length > 0) {
+          const next = { ...job, done, misses };
+          const handed = await handOffReprice(supabase, req, plan.id, rest, next);
+          if (handed) { await writeJob(next); console.log(`[reprice] plan=${plan.id} ${done}/${job.total}, ${rest.length} handed on`); return done; }
+          for (const r of rest) misses.push({ id: r.id, date: r.date, type: r.type, status: null, error: 'hand-off failed' });
         }
-        await writeJob({ ...job, done: repriced, finished_at: new Date().toISOString() });
-        console.log(`[reprice] plan=${plan.id} repriced=${repriced}/${pending.length}`);
-        return repriced;
+        // The rows that did not re-price, with the reply, on the job record (nothing else keeps them).
+        const { misses: _m, ...base } = job;
+        await writeJob({ ...base, done, finished_at: new Date().toISOString(), ...(misses.length ? { misses } : {}) } as typeof job);
+        console.log(`[reprice] plan=${plan.id} repriced=${done}/${job.total}`);
+        return done;
       };
       const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
       if (typeof waitUntil === 'function' && pending.length > 0) {
@@ -290,8 +342,14 @@ Deno.serve(async (req: Request) => {
         const thrProposal = pendingRunThresholdProposal({ learned_fitness: lf2, performance_numbers: pn2 } as any);
         if (thrProposal) await acceptVia('run_threshold', thrProposal.measuredSecPerKm);
       } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }
-      for (const r of pending) {
-        if (await repriceOneRow(supabase, r, 'checkpoint')) repriced += 1;
+      // Up to three calls are spent above (the learner on the dry run, two accepts), so fewer rows fit in this request;
+      // the rest go to a background re-price job (`reprice_continue`) and are counted as re-priced when handed on.
+      const misses: Array<Record<string, unknown>> = [];
+      const { repriced: inRequest, rest } = await repriceRows(supabase, pending, 'checkpoint', misses, REPRICE_CALLS_PER_REQUEST - 3);
+      repriced = inRequest;
+      if (rest.length > 0) {
+        const job = { started_at: new Date().toISOString(), total: pending.length, done: inRequest, finished_at: null, misses };
+        if (await handOffReprice(supabase, req, plan.id, rest, job)) repriced += rest.length;
       }
     }
     const record = {
