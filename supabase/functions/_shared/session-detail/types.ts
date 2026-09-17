@@ -928,6 +928,8 @@ export type IntervalRow = {
   } | null;
   /** 2026-09-03: the recording ended before this planned step (a session cut short). Executed fields are null. */
   not_done?: boolean;
+  /** 2026-09-16: a planned work step no watch lap fitted (`laps-paired`); also `not_done`, printed "not matched". */
+  not_matched?: boolean;
 }
 
 // -----------------------------------------------------------------------------

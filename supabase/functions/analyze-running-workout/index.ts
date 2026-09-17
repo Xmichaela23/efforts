@@ -649,9 +649,15 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // ⛔ UNMATCHED WATCH LAPS ARE THE ROWS (2026-09-14). The plan's steps cannot be paired with them, and a plan step
     // reads as "measured" above because its PLANNED duration sits in `duration_s` — so without this the analyzer
     // chose 46 unexecuted plan steps and printed no rows at all.
-    const lapsUnmatched = ['laps-unmatched', 'no-laps-whole-run'].includes(String((workout as any)?.computed?.alignment_mode || '')) && computedOnlyIntervals.length > 0;
+    // ⛔ AND WHEN SOME LAPS WERE PAIRED WITH WORK STEPS (`laps-paired`, 2026-09-16) the laps are still the rows; a paired
+    // rep carries its step's pace range, read off the plan by its step id, so it is judged like any planned rep.
+    const lapsUnmatched = rowsComeFromTheWatch((workout as any)?.computed?.alignment_mode) && computedOnlyIntervals.length > 0;
+    const planStepsById = new Map<string, any>((Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : []).map((s: any) => [String(s?.id), s]));
     const computedIntervals = lapsUnmatched
-      ? computedOnlyIntervals
+      ? computedOnlyIntervals.map((iv: any) => {
+          const pr = iv?.planned_step_id != null ? planStepsById.get(String(iv.planned_step_id))?.pace_range : null;
+          return pr && !iv.pace_range ? { ...iv, pace_range: { lower: pr.lower, upper: pr.upper }, target_pace: { lower: pr.lower, upper: pr.upper } } : iv;
+        })
       : isPlanLinkedWorkout
       ? (
           plannedHasMeasuredEvidence
@@ -3544,11 +3550,13 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     : undefined;
   
   // Interval-by-interval breakdown: merge micro-segments (<0.25 mi or <2 min) so steady runs show one row
-  const intervalsForBreakdown = workIntervals.length > 0
+  // Watch laps (paired or not, 2026-09-16) are all shown, in the order recorded — not only the paired reps.
+  const rowsAreWatchLaps = intervals.some((i: any) => ['lap', 'overall'].includes(String(i?.role || '').toLowerCase()));
+  const intervalsForBreakdown = workIntervals.length > 0 && !rowsAreWatchLaps
     ? workIntervals
     : sortIntervalsChrono(intervals.filter((i: any) => i?.executed));
   // The watch's own laps are shown as recorded — a 90 m lap is not merged into its neighbour (2026-09-14).
-  const mergedForBreakdown = intervalsForBreakdown.some((i: any) => ['lap', 'overall'].includes(String(i?.role || '').toLowerCase()))
+  const mergedForBreakdown = rowsAreWatchLaps
     ? intervalsForBreakdown
     : mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
   const intervalBreakdown = generateIntervalBreakdown(mergedForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
@@ -4563,7 +4571,7 @@ function buildSessionIntervalRows(
   const isStructuredIntervalSession = expectedWorkRows >= 2;
 
   // ⛔ ROWS FROM THE WATCH ARE READY (2026-09-15): unmatched laps, or a structured run with no laps, carry no planned
-  // step ids by design. The table reads them from the breakdown; the missing-steps check below is for plan-aligned runs.
+  // step ids by design; with paired laps (2026-09-16) only the paired reps carry one. The table reads them from the breakdown; the missing-steps check below is for plan-aligned runs.
   if (rowsComeFromTheWatch(workout?.computed?.alignment_mode)) {
     return {
       rows: [],

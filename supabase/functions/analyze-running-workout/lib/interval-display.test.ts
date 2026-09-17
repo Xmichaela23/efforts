@@ -4,6 +4,7 @@ import { rowsComeFromTheWatch } from './interval-display.ts';
 
 Deno.test('unmatched laps and a structured run with no laps are ready, not missing', () => {
   assertEquals(rowsComeFromTheWatch('laps-unmatched'), true);
+  assertEquals(rowsComeFromTheWatch('laps-paired'), true);
   assertEquals(rowsComeFromTheWatch('no-laps-whole-run'), true);
 });
 

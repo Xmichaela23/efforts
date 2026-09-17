@@ -268,8 +268,10 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
   const isSwim = sport === 'swim' || sport === 'lap_swimming' || sport === 'open_water_swimming';
   
   // For RUNS: Show distance or time only (pace range will be shown as subtitle in UI)
+  // ⛔ A TIMED STEP PRINTS ITS TIME (2026-09-16): `distanceDerived` is the distance materialize-plan worked out from
+  // time × pace; the page prescribes the time, so a 4:00 rep read "0.38 mi" here.
   if (isRun) {
-    const meters = deriveMetersFromPlannedStep(st);
+    const meters = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
     const seconds = deriveSecondsFromPlannedStep(st);
     
     // Priority 1: If it's a DISTANCE-based step, show distance
@@ -357,6 +359,11 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
 // -------------------------- Align config & types --------------------------
 type Sport = 'run'|'ride'|'swim'|'walk'|'strength';
 
+/**
+ * OURS — `ALIGN.tol`, how close a watch lap must be to a planned step to count as that step: a run step of 1 km or less
+ * within 10 m, longer within 2%; a run work step within 3 s, a recovery within 8 s (ride 5% / 2 s / 6 s; swim half a
+ * length / 2 s / 5 s). No app publishes a figure; kept as found (ledger row in docs/STATE-SOURCES.md, 2026-09-16).
+ */
 const ALIGN = {
   idle_speed_mps: 0.3,
   min_work_slice_s: 60,
@@ -1147,7 +1154,9 @@ Deno.serve(async (req) => {
     // helpers
     function stepLapWithinTolerance(st: any, L: Lap): boolean {
       const role = stepRole(st);
-      const targetM = deriveMetersFromPlannedStep(st);
+      // ⛔ A TIMED STEP IS MATCHED ON TIME (2026-09-16). Its `distanceDerived` distance is time × the target pace, so a
+      // rep run faster or slower than the target never fitted it — no lap on Michael's 6 × 4:00 matched its step.
+      const targetM = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
       const targetS = deriveSecondsFromPlannedStep(st);
       if (targetM && st?.type !== 'time') {
         if (sport === 'run') {
@@ -1196,7 +1205,7 @@ Deno.serve(async (req) => {
         if ((rows[j].v ?? 0) > floor) movingSec += dt;
       }
       const pctMoving = totalSec ? Math.round(100 * movingSec / totalSec) : null;
-      const tm = deriveMetersFromPlannedStep(st);
+      const tm = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
       const ts = deriveSecondsFromPlannedStep(st);
       const overlap = (() => {
         if (tm) {
@@ -1552,8 +1561,13 @@ Deno.serve(async (req) => {
      *   · MATCHED only when it is clear: no more laps than planned steps, and every lap, in order, fits its
      *     step's time or distance within the existing tolerance. Then the rows take the steps' names and ranges,
      *     and planned steps after the last lap stay "not done" — they were owed.
-     *   · Otherwise the rows read "Lap 1…N" with no plan, no range, no colour, and no "not done" rows; the analyzer
-     *     scores Execution on duration only.
+     *   · ⛔ WHEN THAT FAILS, THE WORK REPS ARE STILL PAIRED (2026-09-16, Michael's 6 × 4:00: 12 laps against 13 steps,
+     *     the watch joined the last recovery and the cool-down, and no rep was judged). Each planned work step, in
+     *     order, takes the next lap that fits it on the same tolerance. A paired lap takes the step's id, name and
+     *     range and is judged; every other lap reads "Lap N"; a work step no lap fits is a "not matched" row. Mode
+     *     `laps-paired`; the analyzer scores the paired reps' pace plus time.
+     *   · With no rep paired the rows read "Lap 1…N" with no plan, no range, no colour, and no "not done" rows; the
+     *     analyzer scores Execution on duration only.
      * ⚠️ OURS — "structured": the plan has two or more work steps. A steady planned run keeps the existing path,
      * so a watch's automatic mile laps do not turn an easy run into unlabelled rows.
      * The watch's own step type per lap (in its activity file) is not read yet — a later build.
@@ -1591,12 +1605,49 @@ Deno.serve(async (req) => {
           }
           snapMode = 'laps-matched';
         } else {
+          const measuredLap = (i: number) => {
+            const [a, b] = lapWins[i];
+            return { ...placed[i].L, dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
+          };
+          const stepForLap = new Map<number, any>();
+          const unpairedWork: any[] = [];
+          let nextLap = 0;
+          for (const st of plannedSteps.filter((x: any) => stepRole(x) === 'work')) {
+            let k = nextLap;
+            while (k < lapWins.length && !stepLapWithinTolerance(st, measuredLap(k))) k++;
+            if (k < lapWins.length) { stepForLap.set(k, st); nextLap = k + 1; } else unpairedWork.push(st);
+          }
           snapped = lapWins.map(([a, b], i) => {
-            const row = execFromIdx(rows, a, b, 'lap', 'lap');
             const n = placed[i].L.number;
+            const st = stepForLap.get(i);
+            if (st) return { ...execIntervalFromWindow(st, a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
+            const row = execFromIdx(rows, a, b, 'lap', 'lap');
             return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
           });
-          snapMode = 'laps-unmatched';
+          if (stepForLap.size > 0) {
+            for (const stNM of unpairedWork) {
+              snapped.push({
+                planned_step_id: stNM?.id ?? null,
+                planned_label: formatPlannedLabel(stNM, sport),
+                kind: stNM?.type || stNM?.kind || null,
+                role: 'work',
+                planned: {
+                  duration_s: deriveSecondsFromPlannedStep(stNM),
+                  distance_m: deriveMetersFromPlannedStep(stNM),
+                  target_pace_s_per_mi: derivePlannedPaceSecPerMi(stNM),
+                },
+                executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
+                pass_state: 'skip',
+                not_done: true,
+                not_matched: true,
+                sample_idx_start: null,
+                sample_idx_end: null,
+              });
+            }
+            snapMode = 'laps-paired';
+          } else {
+            snapMode = 'laps-unmatched';
+          }
         }
       }
     }
@@ -1707,7 +1758,7 @@ Deno.serve(async (req) => {
         alignment_mode: snapMode,
         mismatch_reason: null,
         intervals: snapped,
-        steps_not_done: snapped.filter((x: any) => x?.not_done === true).length,
+        steps_not_done: snapped.filter((x: any) => x?.not_done === true && x?.not_matched !== true).length,
         overall: {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),

@@ -38,6 +38,8 @@ type IntervalRow = {
   duration_adherence_pct: number | null;
   /** the recording ended before this planned step (a session cut short) */
   not_done?: boolean;
+  /** a planned work step no watch lap fitted (the server's `laps-paired` rows) */
+  not_matched?: boolean;
 };
 
 export type GoalRaceReferenceMode = 'projection' | 'goal';
@@ -398,7 +400,7 @@ export default function EnduranceIntervalTable({
                     )}
                   </div>
                 </td>
-                <td className={`px-2 py-1.5 font-medium ${bandClass}`}>{iv.not_done ? <span className="text-white/40">not done</span> : execCell}</td>
+                <td className={`px-2 py-1.5 font-medium ${bandClass}`}>{iv.not_done ? <span className="text-white/40">{iv.not_matched ? 'not matched' : 'not done'}</span> : execCell}</td>
                 <td className="px-2 py-1.5">{iv.not_done ? '—' : distStr}</td>
                 <td className="px-2 py-1.5">
                   <div className="font-medium">{iv.not_done ? '—' : durStr}</div>

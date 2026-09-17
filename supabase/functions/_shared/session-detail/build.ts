@@ -726,6 +726,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         pace_adherence_pct: null,
         duration_adherence_pct: null,
         not_done: true,
+        ...(iv?.not_matched === true ? { not_matched: true } : {}),
       });
     }
   } catch { /* a missing not-done row is nothing lost */ }
