@@ -14,6 +14,42 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED (2026-09-16) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
+
+`calendar-sync` records a fingerprint of every copy it sends (Garmin: delete + resend on change; Intervals: update
+in place; removes rows deleted or moved out of the 14-day window). The manual "Send to Garmin" button
+(`send-workout-to-garmin`) writes its id on the workout row only, not in the sync's record, so the next sync can
+send a second copy and the button's copy is never removed when the row changes or is deleted. Read from the code,
+not reproduced. Fix: the button records its send the same way the sync does (one record of what was sent). One
+function. After the one-truth workorder.
+
+## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: REP PACE AT 90% AND "RPE 8–10" BOTH LOOK LIKE THE WRONG NUMBER
+
+Michael's plan prints the near-threshold run as 6 × 0.41 mi at 9:38–10:02/mi (90% of his 8:51 threshold ± 2%) with a
+1:00 jog; the 10/28 row prints 10:26–10:52 (90% of 9:35). p233 gives 90% as the RECOVERY intensity and the work at
+95–105%. The row also prints "effort 8–10" (OURS, `materialize-plan:698-699`); threshold effort is about 7 on the
+CR-10 scale (Foster; the book's "RPE 9/10" is the ME lift, p205). A read-only trace is running in a terminal: name
+the archetype, the page's work and recovery percentages, and the line in `_shared/endurance-library` that prices the
+reps. Then one fix: reps at the page's work percentage, recovery at 90%, RPE target from the page or struck. Words
+to Michael before the build.
+
+## QUEUED (Michael, 2026-09-16: "it needs a cue?") — A NOTICE WHEN UPCOMING ROWS PREDATE A RULE CHANGE
+
+A live plan rebuilds only on a tap (Plans admin "Restate weights from logged tests") or after a logged lift; the app
+never rewrites it silently (proposed-then-accepted). When the server's pricing rules change (2026-09-16: bench
+re-price, per-day lower-body cut, recovery-step pace), nothing tells the athlete their upcoming rows are stale.
+Build: the composer stamps its rules version on each row; when the deployed version is newer than the rows', Today
+(or Adjust) shows one line with a rebuild tap. Words to Michael. After the one-truth workorder.
+
+## RULED (Michael, 2026-09-16: "the break is the heart rate target") — RECOVERIES INSIDE HARD SESSIONS CARRY NO HEART-RATE RANGE
+
+A near-threshold run printed its 1:00 jogs as "HR 138–144 · ref 10:05–11:25/mi", the easy zone-2 range. Heart rate
+cannot fall from a threshold rep into zone 2 in a minute; the range is unreachable there. Session 6 flagged the same
+on the anaerobic ride's 50% jog. Rule: a recovery step inside a hard run or ride prints the page's pace or power for
+that step (p233: "1 minute @ 90%"; p231: 20 s @ 50%), never the easy heart-rate range. The heart-rate range stays on
+warm-ups, cool-downs and easy sessions. Where it lives: `materialize-plan stampRunPrescription` marks every recovery
+heart-rate prescribed. Build after the Stage 7 final pass reports.
+
 ## DONE 2026-09-15 — ANAEROBIC RIDE: THE FLOOR, THE DRIFT GATE AND THE EFFICIENCY ROW
 
 One-truth workorder Stage 3 session 6. All three items shipped together; deployed, throwaway-checked on Garmin and
