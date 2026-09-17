@@ -13,11 +13,11 @@ function applyRuntimeLayoutOverrides() {
       style.textContent = `
       /* Pre-seed final targets to avoid first-paint jump - compact height for emphasis on Today */
       :root { --cal-cell-h: 100px; }
-      .mobile-tabbar {
-        padding-top: 8px !important;
-        padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
-        height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) !important;
-      }
+      /* ⛔ NO TAB BAR RULE HERE (2026-09-17, Michael: "the nav buttons are too low, in the iOS screen triggers").
+         This block set the bar's bottom padding to (safe area − 34 px) with !important, which is ZERO on every
+         Face ID iPhone: the buttons sat inside the home-indicator swipe zone, and index.css's own rule —
+         safe area + --tabbar-extra, raised on 2026-09-06 for exactly this complaint — never applied. The
+         stylesheet owns the bar now; the + button and every screen's bottom padding already read its numbers. */
       `;
       document.head.appendChild(style);
     }

@@ -1731,7 +1731,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   'bg-white/[0.10] text-white border-white/55';
                 const tabStyle: React.CSSProperties = {
                   padding: '10px 14px',
-                  minHeight: '44px',
+                  // 44 → 48 (2026-09-17): Apple's minimum hit target is 44×44 pt, Material 3's 48×48 dp. The bar sat
+                  // at the bare minimum next to the phone's swipe-up zone; 48 still fits --tabbar-h (8 pt top + 48).
+                  minHeight: '48px',
                   boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.10) inset, 0 6px 16px rgba(0, 0, 0, 0.35)',
                 };
                 const lampStyle = (active: boolean): React.CSSProperties => ({

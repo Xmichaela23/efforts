@@ -45,7 +45,7 @@
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --tabbar-extra: 30px; /* iOS swipe-up gesture safe zone; 18 → 30 on 2026-09-06 (Michael: the tabs sit low, hard to hit) */
+    --tabbar-extra: 8px; /* the gap ABOVE the iPhone's home-indicator zone (env(safe-area-inset-bottom)); 30 → 8 on 2026-09-17 when a start-up override that zeroed the safe area came out — 30 was set 2026-09-06 but never applied, and on top of the 34 pt zone it would lift the buttons ~64 pt. Apple's own tab bars sit directly on the zone. */
     /* Make Today readable while letting calendar fill remaining space */
     --todays-h: clamp(10rem, 20vh, 14rem);
     --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
@@ -864,7 +864,8 @@
 
   .tabbar-label {
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 0.78rem;
+    /* 12.5 → 14 px (2026-09-17, Michael: "a little larger, more prominent"). */
+    font-size: 14px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     opacity: 0.86;
