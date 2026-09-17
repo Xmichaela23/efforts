@@ -65,6 +65,19 @@ session is stored as `strength`, has no pounds, so the card reads "3 lifts" alon
 follows the session (jumps are not lifts). The replacement word is copy — print it and wait for Michael's yes.
 Also check the Week bar, which counts the same session.
 
+## AWAITING MICHAEL (2026-09-17) — EQUIPMENT CHIPS, THE CARRY SETUP ROW AND THE EXPORT NEED THE MERGE + PHONE BUILD
+
+D-479, ed228810 on `stage/one-truth-drift`: committed, not merged, not pushed; the 36 server functions are deployed;
+no phone build carries it. The server half was checked 2026-09-17 on five throwaway accounts (deleted): back
+extension bench builds "Back Extension" with the six-line how-to; the Sled chip offers Farmers Carry / Sled Push /
+Sled Pull and a sled pick holds on every week; barbell + rack + bench builds Farmers Carry on the Carry row; home
+gym opens the machine press row on Dumbbell Bench Press; commercial gym unchanged (Smith Machine Press, GHD Back
+Extension, Machine Back Extension). The export code, run on this computer against a home and a commercial plan
+with all 12 weeks loaded, printed the session screen's name on all 600 exercise rows.
+
+Before he can see any of it: the merge + phone build. Look for: the "Back extension bench" and "Sled" chips on the
+equipment list; the Day 4 Carry row on Ride + Strength setup; exported lift names matching the phone.
+
 ## AWAITING MICHAEL (2026-09-16 night) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
 
 `_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
