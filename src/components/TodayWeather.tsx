@@ -96,7 +96,10 @@ const TodayWeather: React.FC<{
       className={`flex flex-col gap-1 ${className}`}
       style={{ color: 'rgba(255,255,255,0.62)', ...style }}
     >
-      {/* ⛔ THREE LINES SINCE 2026-09-17 (Michael, screenshot): the reading with sunrise and sunset at the far end
+      {/* ⛔ 12 px, NOT 11 (2026-09-17, Michael: "can it be a little larger?"). 11 is Apple's smallest text style
+          (Caption 2); 12 is Caption 1. 13 would wrap the conditions line on most phones. On a 375-wide phone the
+          sun times and the wind drop to their own lines. The credit is 60% white, like the card's other small words.
+          ⛔ THREE LINES SINCE 2026-09-17 (Michael, screenshot): the reading with sunrise and sunset at the far end
           of its line; the conditions; the city with the credit. It was four — sunrise had its own row and so
           did the credit. No word changed. The sun times wrap under the reading on a very narrow phone. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
@@ -107,12 +110,12 @@ const TodayWeather: React.FC<{
           </span>
           {/* ⚠️ SAME WORDING THE SESSION HEADER ALREADY USES — "Feels like N°" (`WeatherDisplay`). */}
           {feels != null ? (
-            <span className="text-[0.72rem] font-light tabular-nums whitespace-nowrap">Feels like {feels}°</span>
+            <span className="text-[12.5px] font-light tabular-nums whitespace-nowrap">Feels like {feels}°</span>
           ) : null}
         </div>
         {/* Sunrise and sunset are the icons, so the pair carries two times and no labels. */}
         {(up || down) ? (
-          <div className="flex items-center gap-x-3 text-[0.7rem] font-light tabular-nums">
+          <div className="flex items-center gap-x-3 text-[12px] font-light tabular-nums">
             {up ? (
               <span className={chip}>
                 <Sunrise aria-hidden="true" className="h-3 w-3" />
@@ -131,7 +134,7 @@ const TodayWeather: React.FC<{
 
       {/* Humidity with the dew point beside it, then wind. Same forms `WeatherDisplay` prints. */}
       {(humidity != null || dew != null || wind != null) ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.7rem] font-light tabular-nums">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] font-light tabular-nums">
           {humidity != null ? (
             <span className={chip}>
               <Droplets aria-hidden="true" className="h-3 w-3" />
@@ -155,15 +158,15 @@ const TodayWeather: React.FC<{
           ⛔ THE CREDIT IS A LINK, BESIDE THE DATA. Open-Meteo's licence (open-meteo.com/en/licence, read
           2026-09-17): "You must include a link next to any location Open-Meteo data are displayed." It was
           plain text, and it cannot move to the foot of the screen. The tap does not open the card behind it. */}
-      <div className="flex items-baseline justify-between gap-x-3 text-[0.7rem] font-light">
+      <div className="flex items-baseline justify-between gap-x-3 text-[12px] font-light">
         <span className="truncate min-w-0">{city ?? ''}</span>
         <a
           href="https://open-meteo.com/"
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="flex-shrink-0 whitespace-nowrap text-[11px]"
-          style={{ color: 'rgba(255,255,255,0.45)' }}
+          className="flex-shrink-0 whitespace-nowrap text-[12px]"
+          style={{ color: 'rgba(255,255,255,0.60)' }}
         >
           Weather by Open-Meteo
         </a>

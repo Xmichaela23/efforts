@@ -1423,7 +1423,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             2026-09-10) — the card set every line at 13px under session cards whose bodies run 15px,
             and read as a footnote to them. 15 / 13 / 12 is `SessionDeck`'s own scale (its body rows
             are text-[15px], its meta 13, its smallest 12), so the card now wears the deck's type. */}
-        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>form</span>
+        {/* ⛔ THE SMALL WORDS ON TODAY ARE WHITE AT 60%, NOT 45% (2026-09-17, Michael: "a little brighter and more
+            readable"). At 45% they measured 4.5:1 on the card's dark bed and 3.8:1 under its lighter top — below
+            WCAG AA's 4.5:1 for small text; at 60%, 6.9:1 and 5.4:1. The numbers stay at 92%. */}
+        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.60)' }}>form</span>
         {/* ⛔ THE SAME ⓘ STATE'S LOAD LABEL CARRIES (LoadBar.tsx) — same glyph, same dim treatment, and
             it opens the same component. It sits after the WORD, where State's sits after "LOAD", not
             at the end of the reading. It never opens State: the tap is swallowed, or reading the key
@@ -1434,7 +1437,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             onClick={(e) => { e.stopPropagation(); setShowFormKey((o) => !o); }}
             aria-label="What does form mean?"
             aria-expanded={showFormKey}
-            className="bg-transparent border-none p-0 cursor-pointer text-white/45 align-baseline text-[13px]"
+            className="bg-transparent border-none p-0 cursor-pointer text-white/60 align-baseline text-[13px]"
           >
             ⓘ
           </button>
@@ -1508,7 +1511,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               className="inline-block w-1.5 h-1.5 rounded-full shrink-0 translate-y-[-1px]"
               style={{ backgroundColor: getDisciplineColor(p.sport) }}
             />
-            {p.label ? <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{p.label}</span> : null}
+            {p.label ? <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.60)' }}>{p.label}</span> : null}
             <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.92)' }}>{p.value}</span>
           </span>
         ))}
@@ -2010,7 +2013,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {bodyTodayLine ? (
               <span
                 className="block font-light tabular-nums text-[13px]"
-                style={{ color: 'rgba(255,255,255,0.45)', marginTop: formLine ? 2 : 0, ...(asOfTodayStyle ?? {}) }}
+                style={{ color: 'rgba(255,255,255,0.60)', marginTop: formLine ? 2 : 0, ...(asOfTodayStyle ?? {}) }}
                 aria-hidden={!isTodayDate || undefined}
               >
                 {bodyTodayLine}
@@ -2026,7 +2029,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
                 not a reading. The lines above it grew; it did not, so it is still the smallest. */}
             {garminDerived && formLine ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, ...(asOfTodayStyle ?? {}) }} />
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(asOfTodayStyle ?? {}) }} />
             ) : null}
           </div>
         ) : null}
