@@ -10,6 +10,7 @@ import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { plannedDurationFields } from '../planned-duration-label.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
+import { offPrescriptionLine } from './off-prescription.ts';
 import { driftReachesLine } from '../run-pace.ts';
 import { planShare } from './swim-plan-share.ts';
 import { poolLabel } from '../swim/pool-label.ts';
@@ -1352,6 +1353,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       easy_ceiling_bpm: fin(perf?.easy_ceiling_bpm),
       easy_ceiling_anchor: (perf?.easy_ceiling_anchor ?? null) as any,
       performance_assessment: granular?.performance_assessment ?? null,
+      /**
+       * ⛔ THE ONE LINE THAT SAYS A SESSION CAME IN OFF ITS PRESCRIPTION (2026-09-17, WORKORDER Stage D1) —
+       * `off-prescription.ts`, off the bands already stamped on the rows. Null on a session that landed, on one
+       * that fell both ways, and on anything with fewer than two judged work reps. The rows are unchanged.
+       */
+      off_prescription: offPrescriptionLine(intervals, type === 'ride'),
       assessed_against: assessedAgainst,
       status_label: sessionState?.glance?.status_label ?? null,
       gap_adjusted: !!perf?.gap_adjusted,

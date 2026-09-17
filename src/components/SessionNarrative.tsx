@@ -45,6 +45,8 @@ interface SessionNarrativeProps {
       power_adherence?: number | null;
       duration_adherence?: number | null;
       performance_assessment?: string | null;
+      /** One line when the session came in off its prescription — `off-prescription.ts` (2026-09-17). */
+      off_prescription?: { side?: string; outside?: number; judged?: number; line?: string | null } | null;
       assessed_against?: string | null;
       status_label?: string | null;
     };
@@ -377,6 +379,12 @@ export default function SessionNarrative({
           ? <div className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">{parts.join(' · ')}</div>
           : null;
       })()}
+      {/* ⛔ THE SESSION CAME IN OFF ITS PRESCRIPTION (2026-09-17, WORKORDER Stage D1). One server-written line
+          under the header; the rep rows below are unchanged. server-word: `execution.off_prescription.line`,
+          composed by `_shared/session-detail/off-prescription.ts` — printed, never decided here. */}
+      {typeof sd?.execution?.off_prescription?.line === 'string' && sd.execution.off_prescription.line && (
+        <p className="text-sm text-gray-200 leading-relaxed">{sd.execution.off_prescription.line}</p>
+      )}
       {hasRaceDebrief && (
         <div className="space-y-1.5">
           {raceDebriefSections ? (

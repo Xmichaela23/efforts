@@ -1447,12 +1447,16 @@ Deno.serve(async (req)=>{
       }
     } catch {}
 
+    // ⛔ HOISTED (2026-09-17, WORKORDER Stage D): the queued athlete-pipeline job at the end of this handler
+    // names the workout it has to run behind, and `wid` lived and died inside the block below.
+    let ingestedWorkoutId: string | null = null;
     // Fire-and-forget: auto-attach to planned and compute summaries/analysis for zero-touch UX
     try {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auto-attach-planned`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
       const { data: justUpserted2 } = await supabase.from('workouts').select('id,type,workout_status,gear_id').eq('user_id', row.user_id).eq(onConflict.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id).maybeSingle();
       const wid = justUpserted2?.id;
+      ingestedWorkoutId = wid ?? null;
       const workoutType = justUpserted2?.type;
       const workoutStatus = justUpserted2?.workout_status;
       const existingGearId = justUpserted2?.gear_id;
@@ -1545,9 +1549,24 @@ Deno.serve(async (req)=>{
       // ⚠️ The `provider === 'garmin'` guard STAYS: Strava's own chains (`strava-webhook`,
       // `import-strava-history`) already run this pipeline, and firing it here too would double the
       // work on every Strava activity. Same rule, still one caller per provider.
+      /**
+       * ⛔ AND IT RUNS AFTER THE WORKOUT'S OWN NUMBERS EXIST, NOT BEFORE (2026-09-17, WORKORDER Stage D).
+       *
+       * This was AWAITED here, inline, while `recompute-workout` — which writes the session's
+       * `run_best_distances` and `pace_curve` — was QUEUED a few lines above and ran later. So the learner
+       * re-read the athlete from a database that did not yet contain the session that had just finished, and
+       * every Garmin ride and run was learned one session behind.
+       *
+       * ⚠️ WHAT THIS COST, and it is the case that opened this work order: Michael's 2026-09-16 near-threshold
+       * run. Recomputing his fit by hand off the stored bests, the session's own 5 km best moves critical speed
+       * from 357 s/km (9:35/mi, the number he had just accepted) to 346 s/km (9:16/mi). Nothing offered it,
+       * because the learner had already run without it.
+       *
+       * Queued behind the recompute job for the same workout, so `run-jobs` runs them in order. It is the same
+       * pipeline, the same once-per-completed-workout rule and the same provider guard — only the ORDER changes.
+       */
       if (provider === 'garmin' && row.workout_status === 'completed') {
-        const { runPostImportAthletePipeline } = await import('../_shared/post-import-athlete-pipeline.ts');
-        await runPostImportAthletePipeline(String(userId), 'ingest-activity');
+        await enqueueOrCall('post-import-athlete-pipeline', { user_id: String(userId), source: 'ingest-activity' }, { user_id: String(userId), workout_id: ingestedWorkoutId });
       }
     } catch (pipeErr) {
       console.error('[ingest-activity] post-import athlete pipeline:', pipeErr);

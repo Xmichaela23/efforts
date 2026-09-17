@@ -28,7 +28,9 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 /** Only these functions can be reached through the queue; a row with any other kind fails at once. */
-const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync']);
+// `post-import-athlete-pipeline` joined 2026-09-17 (WORKORDER Stage D): the athlete's numbers are re-read
+// AFTER the session's own best efforts exist, which means behind that workout's `recompute-workout` job.
+const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync', 'post-import-athlete-pipeline']);
 /** OURS — stop claiming after 40 s; a tick then ends well inside the edge wall-clock cap. */
 const CLAIM_BUDGET_MS = 40_000;
 /** OURS — one job may take at most 90 s; recompute-workout's whole chain runs in well under that. */

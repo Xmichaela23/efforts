@@ -204,6 +204,12 @@ export type SessionDetailV1 = {
      *  The screen says which, because a bar built on an observed peak deserves the word "estimated". */
     easy_ceiling_anchor?: 'threshold' | 'max_hr' | 'none' | null;
     performance_assessment: string | null;
+    /**
+     * 2026-09-17 (WORKORDER Stage D1): one line under the session header when half or more of the judged work
+     * reps fell outside their range on the SAME side — "All six reps were faster than the 10:26–10:52/mi asked
+     * for. They ran 8:06–8:38/mi." Null otherwise; the rep rows carry the rest. `_shared/session-detail/off-prescription.ts`.
+     */
+    off_prescription?: { side: 'above' | 'below'; outside: number; judged: number; line: string } | null;
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;
     /** True when pace_adherence was scored on Grade-Adjusted Pace (Minetti model). */
