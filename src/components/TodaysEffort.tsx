@@ -1973,7 +1973,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           * ⚠️ THE GARMIN LINE KEEPS ITS RULE: a Garmin connection or row, and a form number to credit.
           * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
           */}
-        {formLine || bodyTodayLine ? (
+        {formLine || bodyTodayLine || weekTotalsLine ? (
           /**
            * ⚠️ A DIV, NOT A BUTTON, SINCE THE ⓘ WENT IN (2026-09-10) — a button inside a button is
            * invalid HTML and the inner one stops working. The card keeps the role, the label and the
@@ -2025,11 +2025,28 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
               </div>
             ) : null}
-            {/* ⛔ THE WEEK'S TOTALS LEFT THE HEADER (2026-09-17, Michael) — their own card under the sessions. */}
+            {/**
+              * ⛔ THE WEEK'S TOTALS ARE BACK IN THIS SECTION (2026-09-17, same day they left it). As their own card under
+              * the sessions they needed a scroll on a two-session day, and the Garmin line below credits them as well
+              * as form — so the line sat apart from half of what it credits. One section, in reading order: form, the
+              * effort line, the week's totals, the Garmin credit. A separate card at the top was measured against this
+              * and cost ~20 pt of card gap, which pushed the second session's last line under the fold.
+              * ⚠️ The totals follow the week of the day on screen, so unlike form they print on every day.
+              */}
+            {weekTotalsLine ? (
+              <span
+                className="block font-light tabular-nums"
+                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine || bodyTodayLine ? 2 : 0 }}
+              >
+                {weekTotalsLine}
+              </span>
+            ) : null}
             {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
                 not a reading. The lines above it grew; it did not, so it is still the smallest. */}
-            {garminDerived && formLine ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(asOfTodayStyle ?? {}) }} />
+            {/* ⛔ THE CREDIT SHOWS WHENEVER A NUMBER IT CREDITS SHOWS — form on today, the totals on any day. Hidden
+                (space kept) only on a day with no totals, where form is the only thing it would credit. */}
+            {garminDerived && (formLine || weekTotalsLine) ? (
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(weekTotalsLine ? {} : (asOfTodayStyle ?? {})) }} />
             ) : null}
           </div>
         ) : null}
@@ -2475,41 +2492,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
           </div>
         )}
-        {/**
-          * ⛔ THE WEEK'S TOTALS ARE THEIR OWN CARD, UNDER THE DAY (2026-09-17, Michael: "can the weekly load be its own
-          * card at the bottom"). They sat in the header under form, which put a week's numbers between today's readings
-          * and today's sessions. Same line, same words, same sport dots; the header is one line shorter and the
-          * sessions start higher. It follows the week of the day on screen, so it is right on every day, a rest day
-          * included. Nothing done that week, no card. The tap opens State, as the header section's did.
-          * ⚠️ NO HEADING ON THE CARD — a label would be new words.
-          */}
-        {weekTotalsLine ? (
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="The week so far — open State"
-            onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return;
-              e.preventDefault(); e.stopPropagation();
-              try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
-            }}
-            className="w-full text-left galaxy-card readout-texture readout-texture--spectral cursor-pointer"
-            style={{
-              borderRadius: 18,
-              padding: '12px 16px',
-              margin: '0 0 20px',
-              border: 'none',
-              boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 10px 28px rgba(0,0,0,0.45)',
-              backdropFilter: 'blur(12px) saturate(1.05)',
-              WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
-            }}
-          >
-            <span className="block font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.84)' }}>
-              {weekTotalsLine}
-            </span>
-          </div>
-        ) : null}
         </div>
         </div>
 
