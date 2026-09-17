@@ -7,6 +7,24 @@ import {
 
 export type { SessionWeatherForDisplay };
 
+/**
+ * ⛔ THE PHONE KEEPS EACH READING WHILE THE APP IS OPEN (2026-09-17, Michael). Swiping the Today card between days
+ * asked the server again for a day already on screen a moment ago, and the block sat empty for the round trip.
+ * A reading for today, a future day or the last 5 days is kept 15 minutes — the server's own shared-cache time for
+ * those days, since they still change. An older day's reading does not change and is kept until the app closes.
+ * Nothing is written to storage.
+ */
+const READING_CACHE = new Map<string, { weather: SessionWeatherForDisplay; heatNote: string | null; at: number }>();
+// OURS — 15 minutes, matching get-weather's shared cache for days that still change; 5 days = its archive lag (FIELD)
+const CHANGING_KEEP_MS = 15 * 60 * 1000;
+const ARCHIVE_LAG_DAYS = 5;
+function readingStillChanges(timestamp: string, current: boolean | undefined): boolean {
+  if (current) return true;
+  const day = String(timestamp).slice(0, 10);
+  const cutoff = new Date(Date.now() - ARCHIVE_LAG_DAYS * 86400000).toISOString().slice(0, 10);
+  return !(day < cutoff);
+}
+
 interface UseWeatherProps {
   lat?: number;
   lng?: number;
@@ -43,6 +61,15 @@ export function useWeather({
     }
 
     let cancelled = false;
+    const cacheKey = JSON.stringify([Number(lat), Number(lng), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]);
+    const kept = READING_CACHE.get(cacheKey);
+    if (kept && (!readingStillChanges(timestamp, current) || Date.now() - kept.at < CHANGING_KEEP_MS)) {
+      setWeather(kept.weather);
+      setHeatNote(kept.heatNote);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     // ⛔ A NEW DAY CLEARS THE OLD READING FIRST (2026-09-17) — otherwise yesterday's weather sits under today's date
     // until the fetch lands, now that the Today card asks for every day.
     setWeather(null);
@@ -73,8 +100,10 @@ export function useWeather({
 
         if (data?.weather) {
           const parsed = parseWorkoutWeatherDataForDisplay(data.weather);
+          const note = typeof data?.heat_note === 'string' && data.heat_note ? data.heat_note : null;
+          if (parsed) READING_CACHE.set(cacheKey, { weather: parsed, heatNote: note, at: Date.now() });
           setWeather(parsed);
-          setHeatNote(typeof data?.heat_note === 'string' && data.heat_note ? data.heat_note : null);
+          setHeatNote(note);
         } else if (data?.error) {
           setError(String(data.error));
         }
