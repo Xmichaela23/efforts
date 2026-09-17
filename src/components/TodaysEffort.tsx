@@ -1970,7 +1970,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           * ⚠️ THE GARMIN LINE KEEPS ITS RULE: a Garmin connection or row, and a form number to credit.
           * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
           */}
-        {formLine || weekTotalsLine ? (
+        {formLine || bodyTodayLine ? (
           /**
            * ⚠️ A DIV, NOT A BUTTON, SINCE THE ⓘ WENT IN (2026-09-10) — a button inside a button is
            * invalid HTML and the inner one stops working. The card keeps the role, the label and the
@@ -2022,14 +2022,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
               </div>
             ) : null}
-            {weekTotalsLine ? (
-              <span
-                className="block font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 2 : 0 }}
-              >
-                {weekTotalsLine}
-              </span>
-            ) : null}
+            {/* ⛔ THE WEEK'S TOTALS LEFT THE HEADER (2026-09-17, Michael) — their own card under the sessions. */}
             {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
                 not a reading. The lines above it grew; it did not, so it is still the smallest. */}
             {garminDerived && formLine ? (
@@ -2479,6 +2472,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
           </div>
         )}
+        {/**
+          * ⛔ THE WEEK'S TOTALS ARE THEIR OWN CARD, UNDER THE DAY (2026-09-17, Michael: "can the weekly load be its own
+          * card at the bottom"). They sat in the header under form, which put a week's numbers between today's readings
+          * and today's sessions. Same line, same words, same sport dots; the header is one line shorter and the
+          * sessions start higher. It follows the week of the day on screen, so it is right on every day, a rest day
+          * included. Nothing done that week, no card. The tap opens State, as the header section's did.
+          * ⚠️ NO HEADING ON THE CARD — a label would be new words.
+          */}
+        {weekTotalsLine ? (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="The week so far — open State"
+            onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault(); e.stopPropagation();
+              try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
+            }}
+            className="w-full text-left galaxy-card readout-texture readout-texture--spectral cursor-pointer"
+            style={{
+              borderRadius: 18,
+              padding: '12px 16px',
+              margin: '0 0 20px',
+              border: 'none',
+              boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 10px 28px rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(12px) saturate(1.05)',
+              WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
+            }}
+          >
+            <span className="block font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.84)' }}>
+              {weekTotalsLine}
+            </span>
+          </div>
+        ) : null}
         </div>
         </div>
 
