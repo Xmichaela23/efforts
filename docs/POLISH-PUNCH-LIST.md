@@ -84,6 +84,14 @@ with all 12 weeks loaded, printed the session screen's name on all 600 exercise 
 Before he can see any of it: the merge + phone build. Look for: the "Back extension bench" and "Sled" chips on the
 equipment list; the Day 4 Carry row on Ride + Strength setup; exported lift names matching the phone.
 
+## AWAITING MICHAEL (2026-09-17) — STATE'S BIKE ROW PRINTS ADJUST'S WORD
+
+df71a674, NOT pushed. `coach`, `save-baselines`, `export-data` deployed (payload v212). State's bike row needs the
+phone build. Look for: "FTP 168 W · accepted from your rides" on State, the same words Adjust prints; no "tested" or
+"estimated" on that row. Throwaway check 2026-09-17, five FTP states, State's word = Adjust's word in all five
+(two rounds: the first round's script read Adjust's reply at the wrong place). BODY stays on State; the stale
+"REMOVED from State" sentence is gone from STATE-SOURCES.
+
 ## AWAITING MICHAEL (2026-09-16 night) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
 
 `_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
