@@ -113,7 +113,11 @@ called with `recentDays` at `coach/index.ts` BODY block). Older than the 2026-09
 number on State and on Today's new line. Third stale test, same day: `coach/strength-logged-sets.test.ts`
 "others: not main…" fails on unchanged code.
 
-## QUEUED (2026-09-17) — THREE STALE TESTS ARE RED ON UNCHANGED CODE
+## [x] CLOSED 2026-09-17 (Stage A, sessions-respond workorder) — THREE STALE TESTS ARE RED ON UNCHANGED CODE
+
+> (1) and (3) were stale and are updated. (2) is not a stale test: the app is wrong, filed below as "KB SWING". Every
+> other red check got a verdict in the same pass. Everything below is history.
+
 
 (3) `coach/strength-logged-sets.test.ts` "others: not main, a weight logged, most-logged first, at most eight".
 
@@ -121,6 +125,34 @@ Both fail before and after the 2026-09-16/17 sessions; neither was touched. (1) 
 "nothing on file: nothing to print" — expects `{ power, swim_pace, run_easy_hr }` and the function now also
 returns `readout`. (2) `src/lib/strength-gear-catalogue.test.ts` "A PLURAL AND ITS SINGULAR AGREE". Read each
 before changing it: decide whether the test or the code is stale.
+
+## QUEUED (2026-09-17, Stage A, check left red) — KB SWING IS OFFERED TO AN ATHLETE WITH DUMBBELLS AND NO KETTLEBELL
+
+`src/lib/strength-gear.ts:758` lets "KB swing" be done with dumbbells; the three other spellings (`kb swings` :664,
+`kettlebell swing` :663) need a kettlebell, and the comment directly above :758 says "A KETTLEBELL SWING NEEDS A
+KETTLEBELL". "KB swing" is the spelling p220's secondary hinge row prints (`_shared/standing-plan/frames.ts:219`). What the
+athlete sees: with Dumbbells ticked and no Kettlebell, the hinge row can offer "KB Swing"; the same athlete is refused
+"KB Swings" and "Kettlebell Swing" (checked on HEAD with `canPerform`). Added in 93afbbf3 (2026-08-29). Which side is
+right (dumbbells allowed or not) is the fix's question. Red check: `src/lib/strength-gear-catalogue.test.ts` "A PLURAL
+AND ITS SINGULAR AGREE".
+
+## QUEUED (2026-09-17, Stage A, check left red) — SEATED DB PRESS PRINTS ONE WEIGHT WITH NO "EACH"
+
+`src/lib/exercise-config.ts:3181` marks `seated db press` as one total weight; the other two-dumbbell presses are
+per hand (`dumbbell shoulder press`, :630). What the athlete sees: the planned row prints a bare "90 lb"
+(`materialize-plan/index.ts:2634-2638`) where a dumbbell press prints "45 lb each", so they cannot tell one dumbbell
+from both. That 90 lb means both dumbbells together is an inference: the entry is 0.45 × bench and says neither. Added
+in 817af3de. Red check: `src/lib/exercise-config.reconcile.test.ts` "THE PER-HAND AUDIT".
+
+## QUEUED (2026-09-17, Stage A, checks left red) — ELEVEN MOVEMENTS HAVE NO TYPE
+
+Weighted reverse hyper, split squat, freestanding barbell calf raise, seated calf raise, GHD back extension, machine
+back extension, behind-the-neck DB triceps extension, rear delt machine, weighted knee raise, machine hip thrust,
+Smith machine hip thrust: in `src/lib/exercise-config.ts:3234-3249`, missing from the type table
+(`src/lib/exercise-role.ts:337`). Each falls back to "loaded accessory" and logs an "UNMAPPED" warning on every
+lookup. For ten that fallback is the right type. GHD back extension is logged with no weight box (:3237) but typed as
+loaded; what that changes on a screen is not traced. Added in 544881e6. Red checks:
+`src/lib/exercise-role.type.test.ts`, both COVERAGE tests.
 
 ## [x] SEEN ON THE WEB 2026-09-17 (pushed) — STATE'S BIKE ROW PRINTS ADJUST'S WORD
 
