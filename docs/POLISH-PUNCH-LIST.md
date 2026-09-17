@@ -84,6 +84,13 @@ with all 12 weeks loaded, printed the session screen's name on all 600 exercise 
 Before he can see any of it: the merge + phone build. Look for: the "Back extension bench" and "Sled" chips on the
 equipment list; the Day 4 Carry row on Ride + Strength setup; exported lift names matching the phone.
 
+## QUEUED (2026-09-17) — TWO STALE TESTS ARE RED ON UNCHANGED CODE
+
+Both fail before and after the 2026-09-16/17 sessions; neither was touched. (1) `save-baselines/zones.test.ts`
+"nothing on file: nothing to print" — expects `{ power, swim_pace, run_easy_hr }` and the function now also
+returns `readout`. (2) `src/lib/strength-gear-catalogue.test.ts` "A PLURAL AND ITS SINGULAR AGREE". Read each
+before changing it: decide whether the test or the code is stale.
+
 ## AWAITING MICHAEL (2026-09-17) — STATE'S BIKE ROW PRINTS ADJUST'S WORD
 
 df71a674, NOT pushed. `coach`, `save-baselines`, `export-data` deployed (payload v212). State's bike row needs the
