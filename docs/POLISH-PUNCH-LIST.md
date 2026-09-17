@@ -14,6 +14,16 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## OPEN (2026-09-16 evening, Michael's near-threshold run) — LAP COUNT ≠ STEP COUNT → NO PACE VERDICT AT ALL
+
+A 6 × 4:00 near-threshold run came in as 12 Garmin laps against 13 plan steps (WU, 6 work, 5 recovery, CD; the
+watch folded the last recovery + CD). The match failed, the table fell back to watch laps with no colour, and
+Execution scored 95% from duration alone ("efforts & time" = 45 of 47 min). The six work laps ran 8:06–8:38 against
+a 10:26–10:52 target and nothing said so. Rule to trace and set: when counts differ, match work laps to work steps
+by order (the D-laps work: `_shared/session-detail/interval-compare.ts`, the laps-as-rows fallback from
+6f3d7c19/44a1ab79), judge the matched ones, and print what was not matched. Execution must not read 95% on a run
+whose every work rep was outside its range. Report before building.
+
 ## QUEUED (2026-09-16) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
 
 `calendar-sync` records a fingerprint of every copy it sends (Garmin: delete + resend on change; Intervals: update
@@ -23,15 +33,17 @@ send a second copy and the button's copy is never removed when the row changes o
 not reproduced. Fix: the button records its send the same way the sync does (one record of what was sent). One
 function. After the one-truth workorder.
 
-## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: REP PACE AT 90% AND "RPE 8–10" BOTH LOOK LIKE THE WRONG NUMBER
+## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: THE PACE IS THE PAGE'S; "RPE 8–10" AND THE PHONE'S "0.41 mi" ARE NOT
 
-Michael's plan prints the near-threshold run as 6 × 0.41 mi at 9:38–10:02/mi (90% of his 8:51 threshold ± 2%) with a
-1:00 jog; the 10/28 row prints 10:26–10:52 (90% of 9:35). p233 gives 90% as the RECOVERY intensity and the work at
-95–105%. The row also prints "effort 8–10" (OURS, `materialize-plan:698-699`); threshold effort is about 7 on the
-CR-10 scale (Foster; the book's "RPE 9/10" is the ME lift, p205). A read-only trace is running in a terminal: name
-the archetype, the page's work and recovery percentages, and the line in `_shared/endurance-library` that prices the
-reps. Then one fix: reps at the page's work percentage, recovery at 90%, RPE target from the page or struck. Words
-to Michael before the build.
+Traced 2026-09-16 (read-only): both rows are `below_threshold` level 2, p234 "6 rounds of 4 min @ 90% / 1 min @
+VT1" — the reps at 90% are the page's number (`_shared/endurance-library/source-rules.ts:906,916`; priced at
+`generate.ts:116-117`, `plan-tokens/quality-work.ts:239`). My suspicion that 90% was the recovery percentage was
+wrong; that is `short_above`'s float. Two things remain: (1) "RPE 8–10" (OURS, `materialize-plan:698-699`) on a 90%
+step and on `short_above`'s 90% float — too high for sub-threshold work; take the target from the page or strike it
+(Michael 2026-09-16: threshold effort is about 7); (2) "0.41 mi" is the Planned tab converting 4:00 at pace into a
+distance on the phone (`c/StructuredPlannedView.tsx:193`) — the page prescribes time; print 4:00; this is a rule (a)
+hit the guard's pattern missed — add the pattern. Open question for Michael: the rows re-priced from 8:51 to 9:35 —
+did he tap "use 9:35"? If not, the rebuild took a measured value without an accept (proposed-then-accepted breach).
 
 ## QUEUED (Michael, 2026-09-16: "it needs a cue?") — A NOTICE WHEN UPCOMING ROWS PREDATE A RULE CHANGE
 
@@ -45,8 +57,9 @@ Build: the composer stamps its rules version on each row; when the deployed vers
 
 A near-threshold run printed its 1:00 jogs as "HR 138–144 · ref 10:05–11:25/mi", the easy zone-2 range. Heart rate
 cannot fall from a threshold rep into zone 2 in a minute; the range is unreachable there. Session 6 flagged the same
-on the anaerobic ride's 50% jog. Rule: a recovery step inside a hard run or ride prints the page's pace or power for
-that step (p233: "1 minute @ 90%"; p231: 20 s @ 50%), never the easy heart-rate range. The heart-rate range stays on
+on the anaerobic ride's 50% jog. Rule (corrected 2026-09-16 evening after the below_threshold trace): a recovery step prints whatever the page gives THAT
+break — easy/VT1 where the page says VT1 (p234 below_threshold: "1 min @ VT1" keeps the easy range), a pace where it
+says a percentage (p233 short_above "1:30 @ 90%"; p231 20 s @ 50%). Never a range the page does not print. The heart-rate range stays on
 warm-ups, cool-downs and easy sessions. Where it lives: `materialize-plan stampRunPrescription` marks every recovery
 heart-rate prescribed. Build after the Stage 7 final pass reports.
 

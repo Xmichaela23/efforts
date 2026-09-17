@@ -1,6 +1,48 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-15, PM chat — the whole app on one truth; ride power, run pace, threshold, laps, effort PUSHED AND DEPLOYED, mostly not phone-checked)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-16 night, PM chat — the one-truth workorder is DONE; branch `stage/one-truth-drift` PUSHED, 41+ functions DEPLOYED, Michael's last 16 weeks RECALCULATED, NOT merged to main, partly phone-checked)
+
+> **Your job:** the first item on `docs/POLISH-PUNCH-LIST.md`: a structured run whose watch laps do not match the
+> plan's step count gets NO pace verdict (laps shown, execution scored on time only). Michael's 2026-09-16
+> near-threshold run: 12 laps vs 13 steps, six work laps at 8:06–8:38 against a 10:26–10:52 target, execution read
+> 95%. Trace `_shared/session-detail/interval-compare.ts` and the laps-as-rows fallback (6f3d7c19, 44a1ab79) first;
+> then match work laps to work steps by order, judge them, print what was not matched. Same session: the planned
+> line's "RPE 8–10" on sub-threshold work (OURS, `materialize-plan:698-699`) and the Planned tab's "0.41 mi" for a
+> 4:00 step (`c/StructuredPlannedView.tsx:193`, phone maths the guard missed — add the pattern). Report, wait for go.
+>
+> **What shipped 2026-09-15/16 — do not redo.** `docs/WORKORDER-app-one-truth-2026-09-15.md` §8 has every row.
+> Stages 0–7 done: 514 numbers mapped (`TRUTH-MAP.md` §7), 42 verified breaks (§8.0), five book/field rulings
+> accepted (§9), 32 of 42 fixed in Stage 3, Adjust/Baselines/State/Performance/Details/logger read one server
+> payload each in the athlete's unit (Stage 4), 194 constants cited + 863 OURS + 449 ledger rows (Stage 5,
+> `docs/STAGE5-REPORT-2026-09-16.md`), the guard built and EVERY rule on FAIL (`npm run lint:truth`, runs inside
+> `npm run build`; `docs/DESIGN-one-truth-guard.md`), final pass 681 numbers / 0 breaks
+> (`docs/STAGE7-FINAL-PASS-2026-09-16.md`). Rules added to §1/§5 of the workorder: rule 7 (the device's number
+> wins), fix-in-place (no new function/file/column/screen), recalculate 16 weeks not history, throwaway checks one
+> round by default (Supabase Disk IO warning 2026-09-16). Scope ruling §3a: race path + season wizard PARKED.
+>
+> **Michael's state (2026-09-16 night):** threshold pace 9:35 ACCEPTED at 17:48 (was 8:51); the trace says his reps
+> tonight (8:06–8:38 at HR 153–164 < LTHR 162) mean 9:35 is too slow — he was told a retest settles it. Plan
+> rebuilt on the final code, 50/50 rows, lines on every run/ride, lifts unchanged.
+>
+> **Still open, in order (all on the punch list):** (1) the lap-count verdict gap above · (2) RPE label + "0.41 mi"
+> · (3) a notice + tap when upcoming rows predate a rule change (words to Michael) · (4) manual "Send to Garmin"
+> not recorded by the sync · (5) inbound source per sport for Intervals/Wahoo/Zwift with cross-source dedupe —
+> DESIGN BRIEF first (`FOUNDATION`: no inbound Strava off switch exists; "Garmin only" = Garmin first) · (6) metric
+> plan builder rounds in pounds · (7) unattached-ride drift, title prefix, header re-pop, smart plates, zone-5 edge,
+> one-beat trim. Merge to main is Michael's decision (Netlify web client is behind the server until then).
+>
+> **UNVERIFIED (what would settle it):** Strava connect no longer wiping typed HR setup, the Strava webhook path and
+> the checkpoint screen were never exercised on a throwaway (Stage 7 s1/s2 "not exercised") — a real reconnect or a
+> week-7 account. The "swam as planned" migration ran (24 rows) but no swim has been logged since. Phone-checked by
+> Michael: Adjust (9:35 accepted, "today" retest lines), the Planned tab, the near-threshold run's Performance.
+> Everything else is throwaway-checked only.
+>
+> **Rules that bind you (Michael, this week):** never build beside what exists; every number has a page/vendor or
+> says OURS with a ledger row; the phone prints, the server computes, the device's number wins; commit exact files,
+> never -a; commit/push/deploy wait for his word; throwaway accounts one round; recalculate 16 weeks; no
+> notify-admin-signup emails for `@example.com` / `burner-` accounts (deployed 2026-09-16).
+
+## (older banner) (written 2026-09-15, PM chat — the whole app on one truth; ride power, run pace, threshold, laps, effort PUSHED AND DEPLOYED, mostly not phone-checked)
 
 > **Your job:** run `docs/WORKORDER-app-one-truth-2026-09-15.md`. It is the final clean-up of every number the app
 > shows: one source per number, all maths on the server, every formula from the book or commercial practice (or
