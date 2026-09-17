@@ -38,7 +38,7 @@ call returns 401 (`:152-180`, `:437`). Disconnect inside Efforts and delete-acco
 the stored tokens (reuse what `disconnect-connection` does, minus the call to Strava). Then resubmit the form with
 a note: webhooks in use, no polling, deauthorization handled. Read from the code, not exercised on a live account.
 
-## QUEUED (2026-09-16 night) — INTERVALS.ICU SYNC REJECTS A RIDE STEP WITH A FLOOR AND NO CEILING
+## [x] DONE 2026-09-16 night (cea4d5fb, deployed, sync re-run: 2 rides sent, 0 errors; not looked at in Intervals.icu) — INTERVALS.ICU SYNC REJECTED A RIDE STEP WITH A FLOOR AND NO CEILING
 
 `calendar-sync` run 2026-09-16 returned, for two planned rides (e6745501, 775af67b): `intervals_icu · step 1:
 unreadable power range {"lower":185}`. That is the anaerobic ride's p237 work (a floor, no ceiling, c96a20d0); the
