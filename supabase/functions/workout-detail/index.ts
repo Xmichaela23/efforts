@@ -121,7 +121,7 @@ function msFromTimestampField(v: unknown): number | null {
  * Persisted session_detail_v1 is stale → run the full snapshot pipeline.
  * `session_detail_updated_at` is set by merge_session_detail_v1_into_workout_analysis (JSONB on workouts).
  */
-function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_id?: string | null }, analysis: Record<string, unknown>): boolean {
+function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_id?: string | null; analysis_updated_at?: string | null }, analysis: Record<string, unknown>): boolean {
   const sessionDetail = analysis?.session_detail_v1 as Record<string, unknown> | undefined;
   if (!sessionDetail || typeof sessionDetail !== 'object') return true;
 
@@ -192,6 +192,17 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
   if (rec != null) {
     const recMs = msFromTimestampField(rec);
     if (recMs != null && recMs > writtenMs) return true;
+  }
+
+  // ⛔ AN ANALYSIS NEWER THAN THE COPY (2026-09-16, Stage 7 session 3). `compute-workout-analysis` writes `computed`
+  // through `merge_computed`, which moves neither `updated_at` nor `recomputed_at`; a run analysed outside the
+  // recompute chain kept its old distance and pace on Performance while Details (built per read) printed the new ones.
+  // `analysis_updated_at` is stamped by trigger when `analysis_status` changes (migration 20260907070000); saving
+  // this copy changes no status, so it cannot re-trigger itself.
+  const aUa = workoutRow?.analysis_updated_at;
+  if (aUa != null) {
+    const aMs = msFromTimestampField(aUa);
+    if (aMs != null && aMs > writtenMs) return true;
   }
 
   const wUa = workoutRow?.updated_at;
