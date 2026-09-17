@@ -84,6 +84,22 @@ with all 12 weeks loaded, printed the session screen's name on all 600 exercise 
 Before he can see any of it: the merge + phone build. Look for: the "Back extension bench" and "Sled" chips on the
 equipment list; the Day 4 Carry row on Ride + Strength setup; exported lift names matching the phone.
 
+## AWAITING MICHAEL (2026-09-17) — BODY: ONE LINE ON TODAY, NUMBERS ONLY ON STATE BELOW THE TRENDS
+
+091b034d, NOT pushed. `coach` deployed (v213). Needs the phone/web build. Look for: Today, under the form line,
+"effort 6.0 of 10 · soreness 2.6 of 7 · last 7 days"; on any other day form, that line and the Garmin line are
+blank and the card keeps its height; State's BODY sits under the bike/run/strength rows with no "a bit harder
+than usual", no "above your normal" and no sentences. Throwaway check 2026-09-17, one round, 7 of 7.
+⚠️ Until the build lands, the live web app still draws BODY in the top card, now without the words.
+
+## QUEUED (2026-09-17, seen in the BODY throwaway) — SORENESS READS 8 DAYS UNDER A "last 7 days" LABEL
+
+Runs on days 1, 3, 5 and 7 before today: effort counted 3 sessions, soreness counted 4 entries (it took day 7).
+The soreness window is one day wider than the effort window it shares a label with (`resolveCurrentSoreness`,
+called with `recentDays` at `coach/index.ts` BODY block). Older than the 2026-09-17 change; it moves the soreness
+number on State and on Today's new line. Third stale test, same day: `coach/strength-logged-sets.test.ts`
+"others: not main…" fails on unchanged code.
+
 ## QUEUED (2026-09-17) — TWO STALE TESTS ARE RED ON UNCHANGED CODE
 
 Both fail before and after the 2026-09-16/17 sessions; neither was touched. (1) `save-baselines/zones.test.ts`
