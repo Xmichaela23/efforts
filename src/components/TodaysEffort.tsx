@@ -1766,8 +1766,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           willChange: 'transform',
         }}
         onPointerDown={(e) => {
-          // A gesture that starts inside a deck is the deck's.
-          if ((e.target as Element | null)?.closest?.('[data-deck]')) return;
+          // A gesture that starts inside a deck is the deck's. Its movement is cleared all the same, or the tap
+          // guard below would read the last day swipe's distance and swallow a real tap on the deck.
+          if ((e.target as Element | null)?.closest?.('[data-deck]')) { daySwipe.current = { ...daySwipe.current, active: false, axis: null, movedAny: 0 }; return; }
           daySwipe.current = {
             active: true, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp,
             vx: 0, dx: 0, axis: null, movedAny: 0,
@@ -1811,6 +1812,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const g = daySwipe.current;
           g.active = false;
           if (g.axis === 'x') { setDaySlideRaw(false); setDaySlideX(0); }
+        }}
+        /* ⛔ A SIDEWAYS DRAG IS NOT A TAP (2026-09-17, Michael: sliding between days sometimes opened a workout).
+           The browser still fires a click when a swipe lifts over a session card. The chevrons already asked
+           `movedAny`; every card under the panel now gets the same answer, caught here before it reaches them.
+           Only a drag that locked sideways is stopped — a vertical scroll ending on a card is left to the browser. */
+        onClickCapture={(e) => {
+          const g = daySwipe.current;
+          if (g.axis === 'x' && g.movedAny > DAY_SWIPE_AXIS_PX) { e.preventDefault(); e.stopPropagation(); }
         }}
       >
         {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
