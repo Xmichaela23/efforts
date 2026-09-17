@@ -474,7 +474,14 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               else if (/kick/.test(cue)) label = 'Kick'
               else if (/aerobic/.test(cue)) label = 'Aerobic'
             }
+            /**
+             * ⛔ A TIMED STEP CARRIES NO DISTANCE INTO THE EXPORT (2026-09-16). This copy kept `distanceMeters` and
+             * dropped `distanceDerived`, and on a run a distance suppresses the duration — so the 2026-08-31 rule
+             * below never saw the mark, and a 6 × 4:00 run reached the watch as 6 × 656 m (Michael's 16 Sep run:
+             * six laps of 0.41 mi at 3:18–3:31, jogs at 59 s). With no distance here the step keeps its seconds.
+             */
             const meters = ((): number | undefined => {
+              if ((st as any)?.distanceDerived === true) return undefined
               const m1 = num((st as any)?.distance_m)
               const m2 = num((st as any)?.distanceMeters)
               const yd = num((st as any)?.distance_yd)
