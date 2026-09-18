@@ -142,6 +142,8 @@ the diff, not only the report. Never state a number about Michael's plan without
 evidence ("I read", "I am inferring"). Talk plain: what he would see, no function names unless asked, no idioms. Say
 something once.
 
+⛔ **Before any work order adds a trigger, a line, an offer or a score: name the existing path that already produces that outcome, and why it did not fire.** Build only when there is none. (2026-09-17: a "two in a row" order was written beside the post-run offer card, which already offers a new threshold/FTP. Dropped before it shipped.)
+
 ## 6. Status (each stage updates its row)
 
 | Stage | State | Date | Notes |
