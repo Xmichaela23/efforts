@@ -209,6 +209,37 @@ export function paceRangeBand(
   return 'in';
 }
 
+/**
+ * Moving seconds between samples s and e whose pace sits inside [lower, upper] s/mi — the range itself, no
+ * allowance, the same moving rule as `movingSecondsBetween`. The Execution score's numerator for one rep
+ * (Garmin, "Workout Execution Score": time in the target range; `./execution-score.ts`).
+ */
+export function secondsInPaceRangeBetween(
+  samples: ReadonlyArray<RunSample>,
+  s: number,
+  e: number,
+  lowerSecPerMi: number | null | undefined,
+  upperSecPerMi: number | null | undefined,
+): number | null {
+  const lo = num(lowerSecPerMi);
+  const hi = num(upperSecPerMi);
+  if (lo == null || hi == null || !(lo > 0) || !(hi >= lo)) return null;
+  let inRange = 0;
+  const end = Math.min(e, samples.length - 1);
+  for (let i = Math.max(1, s + 1); i <= end; i += 1) {
+    const t1 = num(samples[i]?.t);
+    const t0 = num(samples[i - 1]?.t);
+    if (t1 == null || t0 == null) continue;
+    const dt = t1 - t0;
+    if (!(dt > 0) || dt > SAMPLE_BREAK_S) continue;
+    const v = speedAt(samples, i, dt);
+    if (v < STOPPED_BELOW_MPS) continue;
+    const pace = METERS_PER_MILE / v;
+    if (pace >= lo && pace <= hi) inRange += dt;
+  }
+  return inRange;
+}
+
 /** Viada p107: drift has reached the line at 5.0%. */
 export function driftReachesLine(pct: number | null | undefined): boolean {
   const n = num(pct);

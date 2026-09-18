@@ -108,6 +108,26 @@ export function pedalingAveragePowerW(
 }
 
 /**
+ * Share of the stream's samples (zeros kept — coasting is 0 W) at or above the floor and, when there is a ceiling,
+ * at or under it; the caller multiplies by the interval's seconds. A floor with no ceiling (p237) counts every
+ * sample at or above the floor. The Execution score's numerator for one interval (Garmin, "Workout Execution
+ * Score": time in the target range; `./execution-score.ts`).
+ */
+export function shareInPowerRange(
+  stream: ReadonlyArray<number>,
+  lowerW: number | null | undefined,
+  upperW: number | null | undefined,
+): number | null {
+  const lo = Number(lowerW);
+  if (!stream.length || !(Number.isFinite(lo) && lo > 0)) return null;
+  const hiRaw = Number(upperW);
+  const hi = upperW != null && Number.isFinite(hiRaw) && hiRaw >= lo ? hiRaw : Infinity;
+  let inRange = 0;
+  for (const p of stream) if (p >= lo && p <= hi) inRange += 1;
+  return inRange / stream.length;
+}
+
+/**
  * The ONE number a stretch of riding is judged by: normalized power when the stretch is 20 minutes or
  * longer, average power (zeros included) when shorter. The segment row, its colour, the adherence lines
  * and the Execution score all read this.

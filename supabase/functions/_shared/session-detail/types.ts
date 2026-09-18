@@ -210,6 +210,11 @@ export type SessionDetailV1 = {
      * for. They ran 8:06–8:38/mi." Null otherwise; the rep rows carry the rest. `_shared/session-detail/off-prescription.ts`.
      */
     off_prescription?: { side: 'above' | 'below'; outside: number; judged: number; line: string } | null;
+    /**
+     * 2026-09-17: the words under the Execution number — "5 of 6 reps in range" (work reps; the rows' own in-range
+     * test) or "Time in easy HR" (an easy session). Null when there is no score. `build.ts executionLine`.
+     */
+    execution_line?: string | null;
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;
     /** True when pace_adherence was scored on Grade-Adjusted Pace (Minetti model). */
@@ -959,7 +964,8 @@ export type SessionInterpretation = {
   training_effect: {
     intended_stimulus: string;
     actual_stimulus: string;
-    alignment: 'on_target' | 'partial' | 'missed' | 'exceeded';
+    /** Null on a run, ride or swim since 2026-09-17: Garmin's Execution bands no score. */
+    alignment: 'on_target' | 'partial' | 'missed' | 'exceeded' | null;
   };
   weekly_impact: {
     load_status: 'under' | 'on_track' | 'over';

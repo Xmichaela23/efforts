@@ -61,6 +61,30 @@ export function timeUnderCeiling(
   return { pct: Math.round((under / total) * 100), under_s: under, total_s: total };
 }
 
+/**
+ * Seconds spent moving with heart rate at or under the ceiling — the Execution score's numerator on an easy session
+ * (`./execution-score.ts`, Garmin's time in the target range). A stop is not time in range, as a paused watch does
+ * not count it; a second with no heart rate is not in range either.
+ * ⚠️ `seconds` and `moving` are the caller's: a run's analyzer sample is one second (`duration_s`), a ride's is the
+ * gap to the next sample on its own clock; a run passes the run pace rule's stopped line (`./run-pace.ts`), a ride
+ * the same line on speed and every second when it recorded no speed at all (a trainer).
+ */
+export function movingSecondsUnderCeiling(
+  samples: ReadonlyArray<{ seconds: number; hr: number | null | undefined; moving: boolean }>,
+  ceiling: number | null,
+): number | null {
+  if (!ceiling || !samples.length) return null;
+  let under = 0;
+  for (const x of samples) {
+    const dt = Number(x?.seconds);
+    if (!(dt > 0) || !x.moving) continue;
+    const hr = num(x.hr);
+    if (hr == null || hr > 240) continue;
+    if (hr <= ceiling) under += dt;
+  }
+  return under;
+}
+
 /** Share of sampled time at or under the ceiling, 0-100. Thin wrapper over the measurement above. */
 export function timeUnderCeilingPct(
   hrSamples: Array<number | null | undefined>,

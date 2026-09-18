@@ -477,19 +477,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   if (executionScore === null && Number.isFinite(sessionState?.glance?.execution_score)) {
     executionScore = sessionState.glance.execution_score;
   }
+  // ⛔ A ZERO IS A SCORE (2026-09-17). Execution is time in the target range (`_shared/execution-score.ts`), and a
+  // session with every rep outside its range scores 0. This used to replace a 0 with the average of pace, power
+  // and duration — a third blend, OURS, that would have printed a passing number on exactly that session.
   if (executionScore === 0) {
     const fromPerf = fin(perf?.execution_adherence);
-    if (fromPerf != null && fromPerf > 0) {
-      executionScore = fromPerf;
-    } else {
-      const parts: number[] = [];
-      if (paceAdherence != null && paceAdherence > 0) parts.push(paceAdherence);
-      if (powerAdherence != null && powerAdherence > 0) parts.push(powerAdherence);
-      if (durationAdherence != null && durationAdherence > 0) parts.push(durationAdherence);
-      if (parts.length > 0) {
-        executionScore = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
-      }
-    }
+    if (fromPerf != null && fromPerf > 0) executionScore = fromPerf;
   }
   // A test has no execution score — never let one leak onto the Performance screen (Q-097/Q-102).
   if (isTest) executionScore = null;
@@ -1359,6 +1352,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * that fell both ways, and on anything with fewer than two judged work reps. The rows are unchanged.
        */
       off_prescription: offPrescriptionLine(intervals, type === 'ride'),
+      /**
+       * ⛔ THE LINE UNDER THE EXECUTION NUMBER (2026-09-17, approved words: "5 of 6 reps in range" / "Time in easy HR").
+       * The rep count is the rows' own test — a work rep is in range when its average sits inside the range, the
+       * band `interval-compare.ts` stamped — so the line and the rows cannot disagree.
+       */
+      execution_line: executionLine(perf?.execution_basis, intervals, type === 'ride'),
       assessed_against: assessedAgainst,
       status_label: sessionState?.glance?.status_label ?? null,
       gap_adjusted: !!perf?.gap_adjusted,
@@ -2484,6 +2483,22 @@ export function buildAnalysisDetailRows(
 }
 
 /** Lowest pace_adherence_pct among work intervals (when present). */
+/**
+ * The words under the Execution number. Work reps: how many of the judged work rows landed in range. Easy: the
+ * approved label. Anything else, or no judged rows: nothing.
+ * ⚠️ THE RIDE NOUN "intervals" IS NOT YET APPROVED (Michael approved the run's "reps"; the off-prescription line
+ * already says "intervals" on a ride). Awaiting his word.
+ */
+function executionLine(basis: unknown, intervals: SessionDetailV1['intervals'], isRide: boolean): string | null {
+  if (basis === 'easy_hr') return 'Time in easy HR';
+  if (basis !== 'work_time_in_range') return null;
+  const judged = (intervals ?? []).filter((iv) => !iv?.not_done && iv?.interval_type === 'work'
+    && (iv?.executed?.band === 'in' || iv?.executed?.band === 'above' || iv?.executed?.band === 'below'));
+  if (!judged.length) return null;
+  const inRange = judged.filter((iv) => iv.executed.band === 'in').length;
+  return `${inRange} of ${judged.length} ${isRide ? 'intervals' : 'reps'} in range`;
+}
+
 function minWorkIntervalPacePct(intervals: SessionDetailV1['intervals']): number | null {
   let min: number | null = null;
   for (const iv of intervals) {
@@ -2605,52 +2620,21 @@ function buildSessionInterpretation(params: {
     namePrefix + (plannedSession?.prescription ?? planContextSummary ?? 'Complete the planned session');
 
   let actualStimulus: string;
-  let alignment: 'on_target' | 'partial' | 'missed' | 'exceeded' = 'on_target';
+  let alignment: 'on_target' | 'partial' | 'missed' | 'exceeded' | null = 'on_target';
 
   if (type === 'run' || type === 'ride' || type === 'swim') {
+    // ⛔ 2026-09-17: "pace NN%" is gone — on a run pace IS Execution now (Garmin's time in range). The "Scores diverge"
+    // sentence (12 points, OURS), the "one work rep was only ~NN%" sentence (88%, OURS) and the alignment cuts
+    // (105 / 92 / 78, OURS) read the old blended scores and went with them. Garmin bands no score, so an endurance
+    // session carries no alignment word.
     const parts: string[] = [];
     if (executionScore != null) parts.push(`execution ${Math.round(executionScore)}%`);
     if (durationAdherence != null) parts.push(`duration ${Math.round(durationAdherence)}%`);
-    if (paceAdherence != null) parts.push(`pace ${Math.round(paceAdherence)}%`);
-    else if (powerAdherence != null) parts.push(`power ${Math.round(powerAdherence)}%`);
-
-    const metrics: number[] = [];
-    if (executionScore != null) metrics.push(executionScore);
-    if (paceAdherence != null) metrics.push(paceAdherence);
-    if (powerAdherence != null) metrics.push(powerAdherence);
-    if (durationAdherence != null) metrics.push(durationAdherence);
-
-    const minPct = metrics.length ? Math.min(...metrics) : null;
-    const maxPct = metrics.length ? Math.max(...metrics) : null;
-    const spread = minPct != null && maxPct != null ? maxPct - minPct : 0;
-
-    if (parts.length > 0) {
-      actualStimulus = `Versus plan: ${parts.join(', ')}.`;
-      // OURS — `buildSessionInterpretation` scores 12 points apart read "diverge"; a rep under 88% is named; no source, kept as found
-      if (spread >= 12) {
-        actualStimulus += ' Scores diverge — treat the lowest % as the limiting factor, not the highest.';
-      }
-      const wiv = minWorkIntervalPacePct(intervals);
-      if (wiv != null && wiv < 88) {
-        actualStimulus +=
-          ` One work rep was only ~${Math.round(wiv)}% vs its pace window; the headline pace chip blends all intervals.`;
-      }
-    } else {
-      actualStimulus = planContextSummary ?? 'Session completed';
-    }
-
-    if (minPct != null) {
-      // OURS — `buildSessionInterpretation` alignment cuts: 105% exceeded, 92% on target, 78% partial, else missed; no source, kept as found
-      if (minPct >= 105) {
-        alignment = 'exceeded';
-      } else if (minPct >= 92) {
-        alignment = 'on_target';
-      } else if (minPct >= 78) {
-        alignment = 'partial';
-      } else {
-        alignment = 'missed';
-      }
-    }
+    // A swim's Execution is not time in range (its own analyzer, unchanged), so its pace stays.
+    if (type === 'swim' && paceAdherence != null) parts.push(`pace ${Math.round(paceAdherence)}%`);
+    else if (type === 'ride' && powerAdherence != null) parts.push(`power ${Math.round(powerAdherence)}%`);
+    actualStimulus = parts.length > 0 ? `Versus plan: ${parts.join(', ')}.` : (planContextSummary ?? 'Session completed');
+    alignment = null;
   } else {
     const execPct = executionScore ?? paceAdherence ?? powerAdherence ?? durationAdherence;
     if (execPct != null) {

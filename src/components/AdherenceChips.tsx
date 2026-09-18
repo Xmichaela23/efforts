@@ -18,6 +18,8 @@ interface AdherenceChipsProps {
       easy_total_s?: number | null;
       /** 2026-09-16: "22 of 35 min" — the Easy chip's line, rounded once, on the server. */
       easy_line?: string | null;
+      /** 2026-09-17: the words under Execution — "5 of 6 reps in range" / "Time in easy HR". */
+      execution_line?: string | null;
       easy_ceiling_bpm?: number | null;
       easy_ceiling_anchor?: string | null;
       performance_assessment?: string | null;
@@ -203,7 +205,9 @@ export default function AdherenceChips({
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
     // Power reads live in the Insights text.
-    const executionSubtitle = 'efforts & time';
+    // ⛔ THE LINE UNDER EXECUTION IS THE SERVER'S (2026-09-17) — "5 of 6 reps in range" or "Time in easy HR".
+    // Execution is time in the target range now (Garmin's method), no longer efforts and time together.
+    const executionSubtitle = ex?.execution_line ?? '';
 
     const completedDurS = sd.completed_totals?.duration_s ?? null;
     const plannedDurS = sd.planned_totals?.duration_s ?? null;
@@ -363,7 +367,7 @@ export default function AdherenceChips({
                 sentence saying why; `chipNote` keeps the Drift label with the words under it. */}
             {rowOf([
               loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,
-              executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, 'efforts & time')}</React.Fragment> : null,
+              executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, executionSubtitle)}</React.Fragment> : null,
               durationValue ? <React.Fragment key="du">{chipText('Duration', durationValue, 'of plan')}</React.Fragment> : null,
               driftValue != null
                 ? <React.Fragment key="dr">{chipText('Drift', driftValue, driftSubtitle)}</React.Fragment>

@@ -5,9 +5,9 @@
 //           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
-import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
+import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds, secondsInPaceRangeBetween } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
-import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW } from '../_shared/ride-power.ts';
+import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW, shareInPowerRange } from '../_shared/ride-power.ts';
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -1067,6 +1067,29 @@ Deno.serve(async (req) => {
       return { avg_power_w: r(avgW), normalized_power_w: r(npW), judged_power_w: r(judged.watts), judged_power_basis: judged.basis };
     }
 
+    /**
+     * ⛔ EXECUTION'S NUMERATOR, COUNTED WHERE THE REP IS CUT (2026-09-17, Garmin's method — `_shared/execution-score.ts`).
+     * Seconds of this segment inside its step's own range: a run's moving seconds whose pace sits in the printed pace
+     * range, a ride's seconds whose watts sit in the printed power range (a floor-only step, p237, counts at or above
+     * its floor). No allowance either side. Counted here because these are the samples the segment was cut from; the
+     * analyzers' own sample lists drop seconds and their positions do not line up with these. Null with no range.
+     */
+    function segmentInRange(st:any, sIdx:number, eIdx:number, segSec:number|null): { in_range_s: number|null } {
+      if (st == null || segSec == null || !(eIdx > sIdx)) return { in_range_s: null };
+      if (sport === 'run' || sport === 'walk') {
+        const pr = st?.pace_range;
+        const s = secondsInPaceRangeBetween(rows, sIdx, eIdx, pr?.lower, pr?.upper);
+        return { in_range_s: s != null ? Math.round(s) : null };
+      }
+      if (sport === 'ride') {
+        const pr = st?.power_range || st?.powerRange;
+        if (_rideStream == null || _rideStream.length !== rows.length) _rideStream = powerStreamW(rows.map((r:any) => r?.p));
+        const share = shareInPowerRange(_rideStream.slice(Math.max(0, sIdx), Math.max(sIdx, eIdx) + 1), pr?.lower, pr?.upper);
+        return { in_range_s: share != null ? Math.round(share * segSec) : null };
+      }
+      return { in_range_s: null };
+    }
+
     type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number; number:number };
     function normalizeLaps(raw:any): Lap[] {
       if (!raw) return [];
@@ -1253,6 +1276,7 @@ Deno.serve(async (req) => {
           avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
           avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
           ...segmentPower(sIdx, eIdx, segSec),
+          ...segmentInRange(st, sIdx, eIdx, segMovingSec ?? segSec),
           provenance: 'lap',
           pct_moving: pctMoving,
           pace_uses_planned_distance: false
@@ -2303,7 +2327,8 @@ Deno.serve(async (req) => {
         gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
         avg_hr: segHr,
         avg_cadence_spm: segCad,
-        ...(segSec != null ? segmentPower(sIdx, eIdx, segSec) : { avg_power_w: segPwr })
+        ...(segSec != null ? segmentPower(sIdx, eIdx, segSec) : { avg_power_w: segPwr }),
+        ...segmentInRange(st, sIdx, eIdx, segMovingSec ?? segSec)
       };
 
       const plannedData = {

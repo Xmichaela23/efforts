@@ -6,7 +6,8 @@ import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
 import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
-import { calculateGarminExecutionScore, getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
+import { getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
+import { executionFromEasyHr, executionFromWorkReps } from '../_shared/execution-score.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
@@ -39,7 +40,8 @@ import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, frielRunZones } from '../_shared/easy-hr.ts';
-import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
+import { movingSecondsUnderCeiling, timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
+import { paceRangeBand, STOPPED_SLOWER_THAN_S_PER_MI } from '../_shared/run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 // =============================================================================
@@ -1287,11 +1289,9 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // No need to fetch existing analysis - we're replacing it entirely with new structure
     console.log('🔍 Generating fresh workout_analysis with new structure');
     
-    // 🎯 GARMIN-STYLE PERFORMANCE CALCULATION
-    // Penalty-based execution scoring (honest assessment of workout compliance)
-    
+    // Execution is set once, at the serialization boundary below (Garmin's time in the target range).
     let performance: Record<string, any> = {
-      execution_adherence: 0,
+      execution_adherence: null,
       pace_adherence: 0,
       duration_adherence: 0,
       completed_steps: 0,
@@ -1302,9 +1302,6 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     if (computedIntervals.length > 0) {
       const completedCount = computedIntervals.filter((i: any) => i.executed).length;
       performance.completed_steps = completedCount;
-      
-      // Calculate Garmin-style execution score using penalty system (for execution score only)
-      const executionAnalysis = calculateGarminExecutionScore(computedIntervals, plannedWorkout);
       
       // ✅ PACE ADHERENCE CALCULATION
       // - Single-interval steady-state runs: Use average pace vs target range (100% if average is in range)
@@ -1515,17 +1512,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       }
       performance.gap_adjusted = !!(analysis as any).gap_adjusted;
       
-      // OURS — `execution_adherence` 50/50 pace and duration; no source (D-368: none of the reference apps makes one execution score), kept as found
-      // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
-      // Will be recalculated after plannedPaceInfo is extracted to include average pace adherence
-      performance.execution_adherence = Math.round(
-        (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
-      );
-      
-      console.log(`🎯 Using adherence scores:`);
-      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (${isSingleIntervalSteadyState ? 'AVERAGE pace' : 'per-interval AVERAGE pace'})`);
-      console.log(`🎯 Duration adherence: ${granularDurationAdherence}% (from moving time)`);
-      console.log(`🎯 Overall execution: ${performance.execution_adherence}% = (${performance.pace_adherence}% + ${performance.duration_adherence}%) / 2`);
+      console.log(`🎯 Pace adherence: ${granularPaceAdherence}% · duration adherence: ${granularDurationAdherence}% (Execution is set at the serialization boundary)`);
     }
 
     const plannedWorkStepsForContract = getPlannedWorkSteps(plannedWorkout);
@@ -1533,7 +1520,6 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     const looksPlanLinkedZeroed =
       !!plannedWorkout &&
       plannedWorkStepsForContract.length > 0 &&
-      performance.execution_adherence === 0 &&
       performance.pace_adherence === 0 &&
       performance.duration_adherence === 0;
 
@@ -1546,8 +1532,6 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         : 0;
       performance.pace_adherence = fallbackPace;
       performance.duration_adherence = fallbackDuration;
-      // OURS — `execution_adherence` 50/50 fallback, as above; no source
-      performance.execution_adherence = Math.round((fallbackPace + fallbackDuration) / 2);
       performance.total_steps = Math.max(performance.total_steps, plannedWorkStepsForContract.length);
       console.warn('⚠️ [PLAN CONTRACT GUARD] Recovered plan-linked adherence from granular metrics to avoid invalid 0/0/0 payload.', {
         workout_id,
@@ -1595,10 +1579,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // threshold anchor `lthr`. Translate at the boundary rather than teaching the client a second
         // word for one thing (the ride already emits `threshold`).
         performance.easy_ceiling_anchor = runEasyBand.anchor === 'lthr' ? 'threshold' : runEasyBand.anchor;
-        // ⚠️ THE SCORE IS NOT SET HERE. Four later blocks in this function recompute
-        // `execution_adherence` from (pace + duration) / 2, so anything written at this point is
-        // silently overwritten before the analysis is saved. See applyEasyGovernorToExecution() at
-        // the serialization boundary — that is the last word.
+        // The score is not set here — Execution is set once at the serialization boundary.
         console.log(`🫀 [EASY GOVERNOR] ${intensityAdherence}% of time at or under ${runEasyBand.ceiling} bpm (${runEasyBand.anchor})`);
       }
     }
@@ -1765,10 +1746,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         console.log('🎯 [PLANNED PACE] Extracted pace info:', JSON.stringify(plannedPaceInfo));
         console.log('🎯 [PLANNED PACE] Lower:', plannedPaceInfo?.lower, 'Upper:', plannedPaceInfo?.upper);
         
-        // ✅ Overall adherence already calculated above: (pace_adherence + duration_adherence) / 2
-        // pace_adherence = based on AVERAGE pace being in range
-        // duration_adherence = based on moving time vs planned time
-        console.log(`🎯 [OVERALL ADHERENCE] Final: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
+        console.log(`🎯 [ADHERENCE] pace ${performance.pace_adherence}% · duration ${performance.duration_adherence}%`);
       }
     }
 
@@ -1783,18 +1761,11 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       detailedAnalysis = { error: 'Failed to generate detailed analysis', message: error.message };
     }
 
-    // Recalculate execution score from interval_breakdown
-    // Weighted average: Warmup 15%, Work intervals 60%, Recoveries 10%, Cooldown 15%
-    console.log(`🔍 [EXECUTION SCORE DEBUG] Checking conditions:`);
-    console.log(`   - detailedAnalysis exists: ${!!detailedAnalysis}`);
-    console.log(`   - interval_breakdown exists: ${!!detailedAnalysis?.interval_breakdown}`);
-    console.log(`   - interval_breakdown.available: ${detailedAnalysis?.interval_breakdown?.available}`);
-    console.log(`   - interval_breakdown.intervals: ${Array.isArray(detailedAnalysis?.interval_breakdown?.intervals) ? detailedAnalysis.interval_breakdown.intervals.length : 'not array'}`);
+    // Pace adherence from the interval breakdown (work reps only). Execution does not read it.
     if (detailedAnalysis && detailedAnalysis.interval_breakdown && detailedAnalysis.interval_breakdown.available) {
       // interval_breakdown is an object with .intervals array (not .summary)
       const breakdownData = detailedAnalysis.interval_breakdown;
       const intervalBreakdown = Array.isArray(breakdownData.intervals) ? breakdownData.intervals : [];      
-      console.log(`🔍 [EXECUTION SCORE DEBUG] Entered calculation block, intervalBreakdown.length: ${intervalBreakdown.length}`);
       if (intervalBreakdown.length > 0) {
         // ✅ RECALCULATE PACE ADHERENCE from interval_breakdown (correct per-interval average pace adherence)
         // CRITICAL: Only use WORK intervals for pace adherence (matches Summary view - single source of truth)
@@ -1827,18 +1798,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           // This ensures breakdown text uses the correct value
           if (enhancedAnalysis.performance) {
             enhancedAnalysis.performance.pace_adherence = avgPaceAdherence;
-            // OURS — `execution_adherence` 50/50 pace and duration, as above; no source
-            enhancedAnalysis.performance.execution_adherence = Math.round(
-              (avgPaceAdherence * 0.5) + (performance.duration_adherence * 0.5)
-            );
           }
-          
-          // Recalculate execution adherence with corrected pace adherence
-          // OURS — `execution_adherence` 50/50 pace and duration, as above; no source
-          performance.execution_adherence = Math.round(
-            (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
-          );
-          console.log(`🔍 [EXECUTION] Recalculated: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
           
           // Update detailedAnalysis.interval_breakdown section text with corrected pace adherence
           // This ensures the breakdown text shows the correct overall percentage (matches Summary view)
@@ -1864,92 +1824,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           }
         }
         
-        // First pass: count intervals by type to calculate per-interval weights
-        const warmupIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'warmup');
-        const workIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'work');
-        const recoveryIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'recovery');
-        const cooldownIntervals = intervalBreakdown.filter(i => String(i.interval_type || '').toLowerCase() === 'cooldown');
-        
-        // Calculate per-interval weights (divide total segment weight by count)
-        const warmupWeightPerInterval = warmupIntervals.length > 0 ? 0.15 / warmupIntervals.length : 0;
-        const workWeightPerInterval = workIntervals.length > 0 ? 0.60 / workIntervals.length : 0;
-        const recoveryWeightPerInterval = recoveryIntervals.length > 0 ? 0.10 / recoveryIntervals.length : 0;
-        const cooldownWeightPerInterval = cooldownIntervals.length > 0 ? 0.15 / cooldownIntervals.length : 0;
-        
-        let weightedSum = 0;
-        let totalWeight = 0;
-        const segmentScores: any[] = [];
-        
-        for (const interval of intervalBreakdown) {
-          const intervalType = String(interval.interval_type || '').toLowerCase();
-          let weight = 0;
-          
-          // Assign per-interval weights based on interval type
-          if (intervalType === 'warmup') {
-            weight = warmupWeightPerInterval;
-          } else if (intervalType === 'work') {
-            weight = workWeightPerInterval;
-          } else if (intervalType === 'recovery') {
-            weight = recoveryWeightPerInterval;
-          } else if (intervalType === 'cooldown') {
-            weight = cooldownWeightPerInterval;
-          }
-          
-          if (weight > 0) {
-            // ✅ FIX: Use actual pace and duration adherence, not performance_score
-            // performance_score from interval_breakdown uses average pace (100%), not time-in-range (66%)
-            // Overall adherence should reflect actual execution consistency, not just hitting an average
-            const paceAdherence = interval.pace_adherence_percent || 0;
-            const durationAdherence = interval.duration_adherence_percent || 0;
-            
-            // Calculate segment score from actual adherence metrics (50% pace, 50% duration)
-            const segmentScore = (paceAdherence + durationAdherence) / 2;
-            
-            const weightedContribution = segmentScore * weight;
-            weightedSum += weightedContribution;
-            totalWeight += weight;
-            
-            segmentScores.push({
-              type: intervalType,
-              interval_number: interval.interval_number || interval.recovery_number || '',
-              performance_score: segmentScore,
-              pace_adherence: paceAdherence,
-              duration_adherence: durationAdherence,
-              weight: weight,
-              weighted_contribution: weightedContribution
-            });
-          }
-        }
-        
-        if (totalWeight > 0) {
-          const calculatedExecutionScore = Math.round(weightedSum / totalWeight);
-          // ✅ Keep the correct calculation: (pace_adherence + duration_adherence) / 2
-          // pace_adherence = average pace in range (100% if average is within target)
-          // duration_adherence = moving time vs planned time
-          // Only use interval_breakdown calculation as fallback
-          if (performance.pace_adherence > 0 && performance.duration_adherence > 0) {
-            // Already calculated correctly above - don't overwrite
-            console.log(`🎯 [EXECUTION SCORE] Keeping main calculation: ${performance.execution_adherence}% = (${performance.pace_adherence}% pace + ${performance.duration_adherence}% duration) / 2`);
-            console.log(`🎯 [EXECUTION SCORE] (Interval breakdown alternative would be: ${calculatedExecutionScore}%)`);
-          } else {
-            // Fallback: use interval_breakdown calculation if pace/duration not available
-            performance.execution_adherence = calculatedExecutionScore;
-          }
-          
-          console.log(`🎯 [EXECUTION SCORE] Recalculated from detailed_analysis.interval_breakdown:`);
-          console.log(`   - Interval counts: Warmup=${warmupIntervals.length}, Work=${workIntervals.length}, Recovery=${recoveryIntervals.length}, Cooldown=${cooldownIntervals.length}`);
-          console.log(`   - Per-interval weights: Warmup=${(warmupWeightPerInterval*100).toFixed(1)}%, Work=${(workWeightPerInterval*100).toFixed(1)}%, Recovery=${(recoveryWeightPerInterval*100).toFixed(1)}%, Cooldown=${(cooldownWeightPerInterval*100).toFixed(1)}%`);
-          console.log(`   - Segment breakdown:`);
-          segmentScores.forEach(seg => {
-            console.log(`     ${seg.type} ${seg.interval_number || ''}: score=${seg.performance_score.toFixed(1)}%, pace=${seg.pace_adherence.toFixed(1)}%, duration=${seg.duration_adherence.toFixed(1)}%, weight=${(seg.weight*100).toFixed(2)}%, contribution=${seg.weighted_contribution.toFixed(2)}`);
-          });
-          console.log(`   - Weighted sum: ${weightedSum.toFixed(2)}`);
-          console.log(`   - Total weight: ${totalWeight.toFixed(2)}`);
-          console.log(`   - Weighted average: ${(weightedSum / totalWeight).toFixed(2)}%`);
-          console.log(`   - Final execution score (rounded): ${calculatedExecutionScore}%`);
-        }
-        }
-
+      }
     }
 
     // Store enhanced intervals back to computed.intervals (single source of truth)
@@ -2014,42 +1889,62 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // NOTE: analysis (with series) is NOT included — it's owned by compute-workout-analysis
     // and preserved by the JSONB || merge operator in merge_computed RPC.
     
-    // ⛔ THE EASY GOVERNOR GETS THE LAST WORD ON THE SCORE (2026-08-02).
-    // Michael, on a run he executed exactly as written: pace 100%, Easy 49%, Execution 88%.
-    // 88 is (100 pace + 76 duration) / 2 — the pace number the same screen refuses to show him.
-    //
-    // The first version of this change set the score next to the measurement, ~400 lines up. It was
-    // overwritten every time: FOUR later blocks in this function recompute execution_adherence from
-    // (pace + duration) / 2, the last of them after the interval breakdown is rebuilt. A green suite
-    // and a rendering chip both said it worked. It did not. So the override moved HERE — the
-    // serialization boundary, after every recalculation, with nothing downstream of it.
-    //
-    // ⚠️ THIS IS WHY THE SCREEN CONTRADICTED ITSELF. Pace adherence stays in the payload (it is a
-    // true fact and the coach reads it), it simply stops deciding the score on a session that was
-    // never asked to hit a pace ([D-362]).
-    if (
-      Number.isFinite((performance as any).intensity_adherence) &&
-      Number.isFinite(performance.duration_adherence)
-    ) {
-      // OURS — `execution_adherence` 50/50 time in the easy band and duration; no source, kept as found
-      const governed = Math.round(
-        (Number((performance as any).intensity_adherence) * 0.5) +
-        (Number(performance.duration_adherence) * 0.5),
-      );
-      console.log(`🫀 [EASY GOVERNOR] execution ${performance.execution_adherence}% → ${governed}% (intensity ${(performance as any).intensity_adherence}% + duration ${performance.duration_adherence}%) / 2`);
-      performance.execution_adherence = governed;
-      // Keep the narrative copy in step — breakdown text reads this one.
-      if (enhancedAnalysis?.performance) enhancedAnalysis.performance.execution_adherence = governed;
-    }
-
-    // ⛔ LAPS THAT DID NOT MATCH THE PLAN (2026-09-14, Michael): no lap can be judged against a planned range, so
-    // Execution is the duration share alone and there is no pace score. `compute-workout-summary` decides the match.
-    if (['laps-unmatched', 'no-laps-whole-run'].includes(String((workout as any)?.computed?.alignment_mode || '')) && Number.isFinite(performance.duration_adherence)) {
-      console.log(`🏃 [LAPS UNMATCHED] execution ${performance.execution_adherence}% → duration only ${performance.duration_adherence}%`);
-      performance.execution_adherence = Math.round(Number(performance.duration_adherence));
-      (performance as any).pace_adherence = null;
+    /**
+     * ⛔ EXECUTION = TIME IN THE TARGET RANGE, GARMIN'S METHOD (2026-09-17, Michael approved) — `_shared/execution-score.ts`
+     * carries the manual's words and URL. Set ONCE, here, after everything else; nothing below rewrites it.
+     *   · Easy run (a heart-rate target): moving seconds at or under the easy ceiling ÷ the session's moving seconds.
+     *   · Any other run with work reps that carry a pace range: seconds inside each rep's own range (counted per
+     *     second by compute-workout-summary, `executed.in_range_s`) ÷ those reps' moving seconds. The range is the
+     *     plan's as printed — read off the plan step, never the widened copy the granular read uses. Warm-up, jogs
+     *     and cool-down are left out (OURS for the first two; Garmin for the cool-down).
+     *   · FALLBACK (OURS): a rep with no per-second count is judged on its average — all of it or none of it.
+     *   · Laps that could not be placed against the plan (`laps-unmatched`, `no-laps-whole-run`), or no target at all:
+     *     no score. The Duration tile still says how long.
+     * DELETED with this: the 50/50 pace + duration blend (four places), the 15/60/10/15 segment blend, the easy
+     * governor's 50/50 and the duration-only score on unmatched laps.
+     */
+    {
+      const alignmentMode = String((workout as any)?.computed?.alignment_mode || '');
+      let execPct: number | null = null;
+      let execBasis: 'work_time_in_range' | 'easy_hr' | null = null;
+      let repsInRange = 0, repsJudged = 0, fallbackReps = 0;
+      if (_hasLinkedPlan && isEasyPrescribedRun(classifiedTypeKey) && runEasyBand.ceiling != null) {
+        // Each analyzer sample is one second (`duration_s`, the extractor's own); stopped seconds carry no pace.
+        const under = movingSecondsUnderCeiling(
+          sensorData.map((x: any) => ({
+            seconds: Number(x?.duration_s) || 1,
+            hr: x?.heart_rate,
+            moving: Number(x?.pace_s_per_mi) > 0 && Number(x?.pace_s_per_mi) <= STOPPED_SLOWER_THAN_S_PER_MI,
+          })),
+          runEasyBand.ceiling,
+        );
+        execPct = executionFromEasyHr(under, completedMovingSeconds(workout));
+        if (execPct != null) execBasis = 'easy_hr';
+      } else if (_hasLinkedPlan && !['laps-unmatched', 'no-laps-whole-run'].includes(alignmentMode)) {
+        const reps = computedIntervals
+          .filter((iv: any) => String(iv?.role ?? iv?.kind ?? '').toLowerCase() === 'work' && iv?.not_done !== true && iv?.executed)
+          .map((iv: any) => {
+            const range = (iv?.planned_step_id != null ? planStepsById.get(String(iv.planned_step_id))?.pace_range : null) ?? iv?.pace_range ?? null;
+            const secs = Number(iv.executed?.moving_s ?? iv.executed?.duration_s) || null;
+            // The summary step's segment pace on moving seconds — the pace the rep row prints and bands.
+            const avg = Number(iv.executed?.avg_pace_s_per_mi) || null;
+            const band = paceRangeBand(avg, range?.lower, range?.upper);
+            return { seconds: secs, in_range_s: iv.executed?.in_range_s ?? null, average_in_range: band == null ? null : band === 'in' };
+          });
+        const r = executionFromWorkReps(reps);
+        execPct = r.pct;
+        repsInRange = r.reps_in_range; repsJudged = r.reps_judged; fallbackReps = r.fallback_reps;
+        if (execPct != null) execBasis = 'work_time_in_range';
+      }
+      console.log(`🎯 [EXECUTION] ${execPct ?? '—'}% (${execBasis ?? 'no target'}; reps in range ${repsInRange}/${repsJudged}; fallback ${fallbackReps})`);
+      performance.execution_adherence = execPct;
+      performance.execution_basis = execBasis;
+      performance.execution_reps_in_range = execBasis === 'work_time_in_range' ? repsInRange : null;
+      performance.execution_reps_judged = execBasis === 'work_time_in_range' ? repsJudged : null;
+      performance.execution_fallback_reps = execBasis === 'work_time_in_range' ? fallbackReps : null;
+      if (['laps-unmatched', 'no-laps-whole-run'].includes(alignmentMode)) (performance as any).pace_adherence = null;
       const ep = (enhancedAnalysis as any)?.performance;
-      if (ep) { ep.execution_adherence = performance.execution_adherence; ep.pace_adherence = null; }
+      if (ep) { ep.execution_adherence = execPct; if (['laps-unmatched', 'no-laps-whole-run'].includes(alignmentMode)) ep.pace_adherence = null; }
     }
 
     // Create analysis_v2 with version metadata

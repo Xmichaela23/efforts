@@ -4,7 +4,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
-import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
+import { movingSecondsUnderCeiling, timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
+import { executionFromEasyHr, executionFromWorkReps } from '../_shared/execution-score.ts';
+import { SAMPLE_BREAK_S, STOPPED_BELOW_MPS } from '../_shared/run-pace.ts';
+import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { composeBikeInsight, buildBikeInsightInputFromPacket } from '../_shared/insights/bike-insights.ts';
@@ -131,59 +134,6 @@ interface EnhancedAdherence {
   total_time_s: number;
   samples_in_range: number;
   samples_outside_range: number;
-}
-
-// Garmin-style execution scoring interfaces
-type SegmentType = 'warmup' | 'cooldown' | 'work_interval' | 'tempo' | 'sweet_spot' | 'recovery' | 'endurance';
-
-interface SegmentConfig {
-  tolerance: number; // percentage
-  weight: number;
-}
-
-interface SegmentPenalty {
-  segment_idx: number;
-  type: SegmentType;
-  adherence: number;
-  deviation: number;
-  tolerance: number;
-  base_penalty: number;
-  direction_penalty: number;
-  total_penalty: number;
-  reason: string;
-}
-
-interface WorkoutExecutionAnalysis {
-  overall_execution: number;
-  power_execution: number;
-  duration_adherence: number;
-  segment_summary: {
-    work_intervals: {
-      completed: number;
-      total: number;
-      avg_adherence: number;
-      within_tolerance: number;
-    };
-    recovery: {
-      completed: number;
-      total: number;
-      avg_adherence: number;
-      below_target: number;
-    };
-    warmup: {
-      adherence: number;
-      status: 'good' | 'acceptable' | 'poor';
-    };
-    cooldown: {
-      adherence: number;
-      duration_pct: number;
-      status: 'good' | 'acceptable' | 'poor';
-    };
-  };
-  penalties: {
-    total: number;
-    by_segment: SegmentPenalty[];
-  };
 }
 
 // =============================================================================
@@ -345,22 +295,6 @@ export function generateCyclingAdherenceSummary(opts: {
   };
 }
 
-// Garmin-style execution scoring configuration
-// Tolerance guidelines for power:
-// - Quality/intervals: ±5% (tighter)
-// - Sweet spot/tempo: ±7% (moderate)
-// - Endurance: ±10% (looser)
-// OURS — `SEGMENT_CONFIG` power tolerances and weights; "Garmin-style" names the approach, no Garmin document with these numbers is in the repo; kept as found
-const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
-  warmup: { tolerance: 15, weight: 0.5 },
-  cooldown: { tolerance: 15, weight: 0.3 },
-  work_interval: { tolerance: 5, weight: 1.0 },
-  tempo: { tolerance: 7, weight: 1.0 },
-  sweet_spot: { tolerance: 7, weight: 1.0 },
-  recovery: { tolerance: 20, weight: 0.7 },
-  endurance: { tolerance: 10, weight: 0.8 }
-};
-
 // CORS helper function
 function corsHeaders(): Record<string, string> {
   return {
@@ -425,56 +359,6 @@ function calculateHeartRateZones(maxHR: number): HeartRateZones {
     zone4: { lower: maxHR * 0.80, upper: maxHR * 0.90, name: 'Zone 4' },
     zone5: { lower: maxHR * 0.90, upper: maxHR * 1.00, name: 'Zone 5' }
   };
-}
-
-/**
- * Infer segment type from interval data and planned step
- */
-function inferSegmentType(segment: any, plannedStep: any, plannedWorkout?: any): SegmentType {
-  const role = segment.role;
-  const token = plannedStep?.token || '';
-  
-  if (role === 'warmup') return 'warmup';
-  if (role === 'cooldown') return 'cooldown';
-  if (role === 'recovery') return 'recovery';
-  
-  if (role === 'work') {
-    // Distinguish interval vs tempo vs sweet spot based on token patterns
-    if (token.includes('interval_') || token.includes('vo2')) {
-      return 'work_interval'; // Short, high intensity
-    }
-    if (token.includes('tempo_') || token.includes('threshold')) {
-      return 'tempo'; // Sustained threshold effort
-    }
-    if (token.includes('sweet_spot') || token.includes('ss_')) {
-      return 'sweet_spot'; // Between tempo and threshold
-    }
-    if (token.includes('endurance') || token.includes('z2')) {
-      return 'endurance'; // Zone 2 endurance
-    }
-    
-    // Check workout description
-    const workoutDesc = (plannedWorkout?.description || plannedWorkout?.name || '').toLowerCase();
-    if (workoutDesc.includes('sweet spot') || workoutDesc.includes('ss')) {
-      return 'sweet_spot';
-    }
-    if (workoutDesc.includes('tempo') || workoutDesc.includes('threshold')) {
-      return 'tempo';
-    }
-    
-    // Default to endurance for long steady efforts
-    const durationMin = segment.executed?.duration_s 
-      ? segment.executed.duration_s / 60 
-      : (segment.planned?.duration_s ? segment.planned.duration_s / 60 : 0);
-    // OURS — over 20 min = endurance segment; no page, kept as found
-    if (durationMin > 20) {
-      return 'endurance';
-    }
-    
-    return 'work_interval';
-  }
-  
-  return 'endurance'; // Default
 }
 
 /**
@@ -1042,6 +926,8 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       avg_power_watts: Math.round(actualPower),
       power_basis: interval.executed?.judged_power_basis ?? null,
       power_band: isRecovery ? null : powerRangeBand(actualPower, plannedPowerLower, plannedPowerUpper),
+      // Seconds inside the planned range, counted per second by compute-workout-summary — Execution's numerator.
+      in_range_s: isRecovery ? null : (interval.executed?.in_range_s ?? null),
       normalized_power_w: Math.round(normalizedPower),
       power_adherence_percent: isRecovery ? null : Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
@@ -1319,7 +1205,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
         planned_id, user_id, date, moving_time, duration, distance, elevation_gain, workout_status, workload_actual, workload_planned,
-        achievements, weather_data, rpe
+        achievements, weather_data, rpe, metrics
       `)
       .eq('id', workout_id)
       .single();
@@ -1656,16 +1542,47 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       : timeUnderCeiling(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);
     const intensityAdherence = easyRead?.pct ?? null;
 
-    // OURS — `executionAdherence` 70/30 power / duration, 50/50 time under the easy ceiling / duration; no source (running's 50/50 is OURS too, D-368), kept as found
-    // Weighting mirrors running's 50/50 pace+duration: the two halves of "did you do the session" are
-    // how long, and how hard. Power's 70/30 stays where power was actually prescribed.
-    // No ceiling resolvable (no threshold HR, no max HR) → duration alone, and the row says so rather
-    // than inventing a gate.
-    const executionAdherence = hasGradedPower
-      ? Math.round((powerAdherence * 0.7) + (durationAdherenceValue * 0.3))
-      : (intensityAdherence != null
-        ? Math.round((intensityAdherence * 0.5) + (durationAdherenceValue * 0.5))
-        : durationAdherenceValue);
+    /**
+     * ⛔ EXECUTION = TIME IN THE TARGET RANGE, GARMIN'S METHOD (2026-09-17, Michael approved) — `_shared/execution-score.ts`.
+     *   · Work intervals with a power range: seconds inside each interval's own range (counted per second by
+     *     compute-workout-summary; a floor-only step, p237, counts at or above its floor) ÷ those intervals' seconds.
+     *     FALLBACK (OURS): an interval with no per-second count is judged on its judged power — all of it or none.
+     *   · An easy ride with no watts (a heart-rate target): moving seconds at or under the easy ceiling ÷ the ride's
+     *     moving seconds.
+     *   · No target at all: no score.
+     * DELETED: the 70/30 power + duration blend and the 50/50 easy + duration blend. Power adherence (work counted
+     * twice) stays as its own number — the written read and the chips still print it — and no longer feeds this.
+     */
+    const workReps = (Array.isArray(intervalBreakdown) ? intervalBreakdown : [])
+      .filter((iv: any) => iv?.interval_type === 'work' && iv?.power_band != null)
+      .map((iv: any) => ({ seconds: iv.actual_duration_s, in_range_s: iv.in_range_s ?? null, average_in_range: iv.power_band === 'in' }));
+    const repResult = executionFromWorkReps(workReps);
+    let executionAdherence: number | null = null;
+    let executionBasis: 'work_time_in_range' | 'easy_hr' | null = null;
+    if (repResult.pct != null) {
+      executionAdherence = repResult.pct;
+      executionBasis = 'work_time_in_range';
+    } else if (!hasGradedPower && easyCeiling.ceiling != null) {
+      const rideHasSpeed = sensorData.some((x: any) => Number(x?.speed) > 0);
+      const under = movingSecondsUnderCeiling(
+        sensorData.map((x: any, i: number) => {
+          // The gap to the next sample on the ride's own clock; a break longer than the run rule's is not riding.
+          const t0 = Number(x?.t ?? x?.timestamp), t1 = Number(sensorData[i + 1]?.t ?? sensorData[i + 1]?.timestamp);
+          const dt = Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0 && t1 - t0 <= SAMPLE_BREAK_S ? t1 - t0 : (i === sensorData.length - 1 ? 1 : 0);
+          return {
+            seconds: dt,
+            hr: x?.heart_rate,
+            // A trainer ride records no speed: every second is moving. Outside, the run rule's stopped line on speed.
+            // OURS — `movingSecondsUnderCeiling` on a ride borrows the run's stopped line; no ride-specific line is published
+            moving: rideHasSpeed ? Number(x?.speed) >= STOPPED_BELOW_MPS : true,
+          };
+        }),
+        easyCeiling.ceiling,
+      );
+      executionAdherence = executionFromEasyHr(under, completedMovingSeconds(workout));
+      if (executionAdherence != null) executionBasis = 'easy_hr';
+    }
+    console.log(`🎯 [EXECUTION] ${executionAdherence ?? '—'}% (${executionBasis ?? 'no target'}; intervals in range ${repResult.reps_in_range}/${repResult.reps_judged}; fallback ${repResult.fallback_reps})`);
     
     // D-035: Unlinked-ride null-override. Without a plan, "adherence" is
     // meaningless — there's nothing to be measured against. power_variability
@@ -1680,6 +1597,10 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       // type-debt errors filed in MAINTENANCE-DEBT.md (analyze-cycling-workout's
       // local performance type was narrower than what runtime constructs/reads).
       execution_score: executionAdherence,
+      execution_basis: executionBasis,
+      execution_reps_in_range: executionBasis === 'work_time_in_range' ? repResult.reps_in_range : null,
+      execution_reps_judged: executionBasis === 'work_time_in_range' ? repResult.reps_judged : null,
+      execution_fallback_reps: executionBasis === 'work_time_in_range' ? repResult.fallback_reps : null,
       // NULL, not 0, when no power was prescribed — see the comment above.
       power_adherence: hasGradedPower ? powerAdherence : null,
       duration_adherence: durationAdherenceValue,
@@ -1706,6 +1627,10 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     } : {
       execution_adherence: null,
       execution_score: null,
+      execution_basis: null,
+      execution_reps_in_range: null,
+      execution_reps_judged: null,
+      execution_fallback_reps: null,
       power_adherence: null,
       duration_adherence: null,
       intensity_adherence: null,
@@ -1724,7 +1649,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     console.log(`🎯 Cycling performance metrics:`);
     console.log(`  - Power adherence: ${powerAdherence}% (work intervals 2x weighted)`);
     console.log(`  - Duration adherence: ${durationAdherenceValue}%`);
-    console.log(`  - Execution adherence: ${executionAdherence}% = (${powerAdherence}% × 0.7) + (${durationAdherenceValue}% × 0.3)`);
+    console.log(`  - Execution: ${executionAdherence ?? '—'}% (${executionBasis ?? 'no target'})`);
 
     // Legacy AI insights are deprecated. Cycling V1 uses a deterministic fact packet + single coaching paragraph.
     const insights: any = null;
@@ -2763,10 +2688,9 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       workout_id: workout_id,
       discipline: 'ride',
       glance: {
-        status_label: typeof performance?.execution_score === 'number'
-          // OURS — execution 85 / 70 glance bands; no page, kept as found
-          ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
-          : null,
+        // ⛔ THE 85 / 70 GLANCE BANDS ARE DELETED (2026-09-17). They were OURS, fed only this label off the old blended
+        // score, and nothing on the phone printed it. Garmin's manual bands no score.
+        status_label: null,
         execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
         // Variance gate (D-NNN). See _varGateRide computation above.
         is_mixed_effort: _varGateRide.is_mixed_effort,
