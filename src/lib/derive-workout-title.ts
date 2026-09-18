@@ -48,6 +48,15 @@ function stripTrailingDateSuffix(name: string): string {
   return name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
 }
 
+/**
+ * A workout Intervals.icu pushes to Zwift comes back (via Strava) named "Zwift - Intervals icu: Anaerobic Ride":
+ * the delivering apps' names in front of the workout's own. The title is the part after the colon.
+ */
+function stripDeliveryPrefix(name: string): string {
+  const rest = name.replace(/^zwift\s*[-–—]\s*[^:]{1,40}:\s*/i, '').trim();
+  return rest || name;
+}
+
 function hasTag(workout: WorkoutLike, tag: string): boolean {
   const t = workout?.tags;
   if (!Array.isArray(t)) return false;
@@ -90,7 +99,7 @@ export function deriveWorkoutTitle(workout: WorkoutLike | null | undefined): str
   if (!workout) return 'Session';
 
   const type = String(workout?.type ?? workout?.workout_type ?? '').toLowerCase();
-  const nm = stripTrailingDateSuffix(String(workout?.name ?? workout?.title ?? '').trim());
+  const nm = stripDeliveryPrefix(stripTrailingDateSuffix(String(workout?.name ?? workout?.title ?? '').trim()));
   const desc = descText(workout);
   const steps = stepsText(workout);
 

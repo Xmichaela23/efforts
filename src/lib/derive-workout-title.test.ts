@@ -224,3 +224,8 @@ Deno.test('divergence closure: tempo run drawer + chip agree', () => {
   const w = { type: 'run', name: 'Tempo Run — 5 mi at threshold', description: 'WU 1.5mi, 5mi at threshold, CD 1mi' };
   assertEquals(deriveWorkoutTitle(w), 'Tempo Run — 5 mi at threshold');
 });
+
+Deno.test('a Zwift ride built in Intervals.icu drops the delivering apps from its title', () => {
+  assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Zwift - Intervals icu: Anaerobic Ride' }), 'Anaerobic Ride');
+  assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Zwift - Watopia' }), 'Zwift - Watopia');
+});
