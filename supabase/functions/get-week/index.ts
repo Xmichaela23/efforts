@@ -971,7 +971,7 @@ Deno.serve(async (req)=>{
           n + (Array.isArray(ex?.sets) ? ex.sets.filter((s: any) => isPerformedSet(s) && (Number(s?.reps) || 0) > 0).length : 0), 0)
         : null;
       // ⛔ THE FINISHED SESSION'S WORDS, IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 1) — see `doneLines`.
-      const lines = doneLines({ type, status, executed, moving_seconds: movingSeconds, strength_volume_lb: strengthVolumeLb, workout_analysis: w?.workout_analysis ?? null }, fmt);
+      const lines = doneLines({ type, status, planned, executed, moving_seconds: movingSeconds, strength_volume_lb: strengthVolumeLb, workout_analysis: w?.workout_analysis ?? null }, fmt);
       return {
         id: w.id,
         date,

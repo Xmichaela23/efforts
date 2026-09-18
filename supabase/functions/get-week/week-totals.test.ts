@@ -90,3 +90,16 @@ Deno.test('a lift: grouped weight and the lift count', () => {
   assertEquals(imp.done_headline, '3,725 lb · 3 lifts');
   assertEquals(doneLines(lift, displayFormat(true)).done_volume, '1,690 kg');
 });
+
+Deno.test('the plyo day: its done line counts exercises, and the Week bar does not count it as a lift', () => {
+  const plyo = {
+    type: 'strength', status: 'completed', is_executed: true, strength_volume_lb: null,
+    planned: { tags: ['plyo'] },
+    executed: { strength_exercises: [{ sets: [{}] }, { sets: [{}] }, { sets: [{}] }] },
+  };
+  assertEquals(doneLines(plyo, displayFormat(false)).done_headline, '3 exercises');
+  const lift = { type: 'strength', status: 'completed', is_executed: true, planned: { tags: [] } };
+  const t = weekBarTotals([plyo, lift]);
+  assertEquals(t.lifts_planned, 1);
+  assertEquals(t.lifts_done, 1);
+});

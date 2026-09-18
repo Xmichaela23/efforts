@@ -12,7 +12,7 @@
  *     states one (the distance steps), whether done yet or not.
  *   · done minutes / metres — every executed session (`is_executed`), at its moving time and its
  *     recorded distance, planned or not.
- *   · lifts — counted, not timed: planned lifts, and executed ones.
+ *   · lifts — counted, not timed: planned lifts, and executed ones. The plyo day is not a lift.
  * ⚠️ PER SESSION, MINUTES ARE ROUNDED BEFORE THEY ARE ADDED, as the bar did.
  */
 import { clock, displayFormat, durationClock, M_PER_MI, M_PER_YD, type DisplayFormat } from '../_shared/display-format.ts';
@@ -47,6 +47,9 @@ export function weekBarTotals(items: ReadonlyArray<Item> | null | undefined, fmt
     const planned = it?.planned && typeof it.planned === 'object' ? it.planned : null;
     const done = it?.is_executed === true;
     if (type === 'strength') {
+      // The plyo day is stored as `strength` and is not a lift — excluded by its `plyo` tag, never by its name
+      // (the rule `_shared/week-one-summary.ts` keeps).
+      if (isPlyoDay(it)) continue;
       if (planned) out.lifts_planned += 1;
       if (done) out.lifts_done += 1;
       continue;
@@ -85,7 +88,7 @@ const pos = (v: unknown): number | null => {
  *   · `done_metrics`  — Today: distance · pace / speed / per-100 · bpm · climb (up to four).
  *   · `done_distance` — "5.0 mi" (1 dp mi / km); the session card and the Week row.
  *   · `done_volume`   — a lift's "3,725 lb"; the Week row.
- *   · `done_headline` — the session card: "5.0 mi · 48:00" or "3,725 lb · 3 lifts".
+ *   · `done_headline` — the session card: "5.0 mi · 48:00" or "3,725 lb · 3 lifts" ("3 exercises" on the plyo day).
  * ⚠️ ONE DISTANCE: `executed.overall.distance_m` — the analysis's stored total, the device's own first (rule 7) —
  * which is also what Performance's `completed_totals.distance_m` is built from. The stored session detail is read
  * only when the overall carries none: a stored detail is rebuilt when the session is opened, so after a
@@ -97,6 +100,12 @@ export type DoneLines = {
   done_volume: string | null;
   done_headline: string | null;
 };
+
+/** The plyo day: a `strength` row whose plan carries the `plyo` tag. */
+export function isPlyoDay(item: Item): boolean {
+  const tags = item?.planned?.tags ?? item?.tags;
+  return Array.isArray(tags) && tags.some((t: unknown) => String(t).toLowerCase() === 'plyo');
+}
 
 export function doneDistanceMeters(item: Item): number | null {
   const totals = item?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
@@ -113,7 +122,9 @@ export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
     const done_volume = fmt.weightGrouped(item?.strength_volume_lb);
     const exercises = Array.isArray(item?.executed?.strength_exercises) ? item.executed.strength_exercises : [];
     const lifts = exercises.filter((ex: Item) => Array.isArray(ex?.sets) && ex.sets.length > 0).length;
-    const parts = [done_volume, lifts > 0 ? `${lifts} ${lifts === 1 ? 'lift' : 'lifts'}` : null].filter(Boolean);
+    // Jumps are not lifts: the plyo day counts "exercises" (Michael, 2026-09-17, approved "3 exercises").
+    const [one, many] = isPlyoDay(item) ? ['exercise', 'exercises'] : ['lift', 'lifts'];
+    const parts = [done_volume, lifts > 0 ? `${lifts} ${lifts === 1 ? one : many}` : null].filter(Boolean);
     return { ...none, done_volume, done_headline: parts.length ? parts.join(' · ') : null };
   }
 
