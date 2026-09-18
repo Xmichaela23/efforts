@@ -38,7 +38,7 @@ export type ExecutionSection = {
   in_range_s: number | null | undefined;
   /** Whether the section's average sits inside the range — the rows' test, and the fallback. Null when not judged. */
   average_in_range: boolean | null | undefined;
-  /** A work rep — counted in "5 of 6 reps in range". */
+  /** A work rep done. */
   is_rep: boolean;
 };
 
@@ -47,7 +47,7 @@ export type ExecutionResult = {
   pct: number | null;
   completion_pct: number | null;
   intensity_pct: number | null;
-  /** Work reps done whose average sits inside the range ("5 of 6 reps in range"). */
+  /** Work reps done whose average sits inside the range. */
   reps_in_range: number;
   /** Work reps done and judged. */
   reps_judged: number;

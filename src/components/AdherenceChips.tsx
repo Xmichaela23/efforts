@@ -18,7 +18,7 @@ interface AdherenceChipsProps {
       easy_total_s?: number | null;
       /** 2026-09-16: "22 of 35 min" — the Easy chip's line, rounded once, on the server. */
       easy_line?: string | null;
-      /** 2026-09-17: the words under Execution — "5 of 6 reps in range" / "Time in easy HR". */
+      /** 2026-09-17: the words under Execution — "4 of 6 reps done" / "Time in easy HR". */
       execution_line?: string | null;
       easy_ceiling_bpm?: number | null;
       easy_ceiling_anchor?: string | null;
@@ -205,7 +205,7 @@ export default function AdherenceChips({
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
     // Power reads live in the Insights text.
-    // ⛔ THE LINE UNDER EXECUTION IS THE SERVER'S (2026-09-17) — "5 of 6 reps in range" or "Time in easy HR".
+    // ⛔ THE LINE UNDER EXECUTION IS THE SERVER'S (2026-09-17) — "4 of 6 reps done" or "Time in easy HR".
     // Execution is time in the target range now (Garmin's method), no longer efforts and time together.
     const executionSubtitle = ex?.execution_line ?? '';
 

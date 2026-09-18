@@ -1353,9 +1353,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        */
       off_prescription: offPrescriptionLine(intervals, type === 'ride'),
       /**
-       * ⛔ THE LINE UNDER THE EXECUTION NUMBER (2026-09-17, approved words: "5 of 6 reps in range" / "Time in easy HR").
-       * The rep count is the rows' own test — a work rep is in range when its average sits inside the range, the
-       * band `interval-compare.ts` stamped — so the line and the rows cannot disagree.
+       * ⛔ THE LINE UNDER THE EXECUTION NUMBER (2026-09-17, approved words: "4 of 6 reps done" / "4 of 6 intervals done" /
+       * "Time in easy HR"). Counted off the same work rows the table prints, "not done" rows included.
        */
       execution_line: executionLine(perf?.execution_basis, intervals, type === 'ride'),
       assessed_against: assessedAgainst,
@@ -2484,19 +2483,17 @@ export function buildAnalysisDetailRows(
 
 /** Lowest pace_adherence_pct among work intervals (when present). */
 /**
- * The words under the Execution number. Work reps: how many of the judged work rows landed in range. Easy: the
- * approved label. Anything else, or no judged rows: nothing.
- * ⚠️ THE RIDE NOUN "intervals" IS NOT YET APPROVED (Michael approved the run's "reps"; the off-prescription line
- * already says "intervals" on a ride). Awaiting his word.
+ * The words under the Execution number (approved by Michael 2026-09-17): work reps done against work reps planned —
+ * "4 of 6 reps done", "4 of 6 intervals done" on a ride — or "Time in easy HR" on an easy session. A rep the recording
+ * never reached is a "not done" row, so it counts as planned and not done. Anything else: nothing.
  */
 function executionLine(basis: unknown, intervals: SessionDetailV1['intervals'], isRide: boolean): string | null {
   if (basis === 'easy_hr') return 'Time in easy HR';
   if (basis !== 'work_time_in_range') return null;
-  const judged = (intervals ?? []).filter((iv) => !iv?.not_done && iv?.interval_type === 'work'
-    && (iv?.executed?.band === 'in' || iv?.executed?.band === 'above' || iv?.executed?.band === 'below'));
-  if (!judged.length) return null;
-  const inRange = judged.filter((iv) => iv.executed.band === 'in').length;
-  return `${inRange} of ${judged.length} ${isRide ? 'intervals' : 'reps'} in range`;
+  const planned = (intervals ?? []).filter((iv) => iv?.interval_type === 'work');
+  if (!planned.length) return null;
+  const done = planned.filter((iv) => !iv?.not_done).length;
+  return `${done} of ${planned.length} ${isRide ? 'intervals' : 'reps'} done`;
 }
 
 function minWorkIntervalPacePct(intervals: SessionDetailV1['intervals']): number | null {

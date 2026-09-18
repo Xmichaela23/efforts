@@ -211,8 +211,8 @@ export type SessionDetailV1 = {
      */
     off_prescription?: { side: 'above' | 'below'; outside: number; judged: number; line: string } | null;
     /**
-     * 2026-09-17: the words under the Execution number — "5 of 6 reps in range" (work reps; the rows' own in-range
-     * test) or "Time in easy HR" (an easy session). Null when there is no score. `build.ts executionLine`.
+     * 2026-09-17: the words under the Execution number — "4 of 6 reps done" (work reps done against planned; "intervals" on a
+     * ride) or "Time in easy HR" (an easy session). Null when there is no score. `build.ts executionLine`.
      */
     execution_line?: string | null;
     assessed_against: 'plan' | 'actual' | null;
