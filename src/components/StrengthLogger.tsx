@@ -19,6 +19,7 @@ import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-al
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
 import {
   getExerciseConfig,
+  getMovementGroup,
 } from '@/lib/exercise-config';
 import { canonicalize } from '@shared/canonicalize';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -5424,6 +5425,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const exIsAssistCapable = isAssistCapableMove(exercise.name);
                   const exIsBodyweight = isBodyweightMove(exercise.name);
                   const exIsPlyo = exEquip === 'plyo' || isPlyometric(exercise.name);
+                  // One-arm movement (catalogue `isUnilateral`, upper body): the reps are per arm, one row covers both
+                  // arms (Michael 2026-09-18, approved words "target 2-4 per arm · 3 to 4 in reserve"). The flag also
+                  // marks one-leg and one-side core movements; "per arm" stays off those.
+                  const exPerArm = getExerciseConfig(exercise.name)?.isUnilateral === true
+                    && getMovementGroup(exercise.name) === 'upper';
                   const exIsBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
                   const exLoggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                   const priorSetsForEx = previousSessionByName[historyKey(exercise.name)];
@@ -6064,7 +6070,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           ? (exercise.target_reps ? `AMRAP · ${String(exercise.target_reps).replace(/\+$/, '')} minimum` : null)
                           : (exHasRepTotal
                             ? null
-                            : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
+                            : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}${exPerArm ? ' per arm' : ''}` : null));
                         // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — its words are the target line.
                         const targetHint = exIsPlyo ? null : (exercise.prescription_words
                           ?? ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null));
