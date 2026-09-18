@@ -27,7 +27,7 @@ Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall,
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
 start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
 
-## QUEUED (2026-09-18, seen in the ride-limits throwaway) — A RIDE WITH NO POWER DATA PRINTS "0 W", MARKED IN RANGE
+## [x] CLOSED 2026-09-18 (e3f5c9d7, deployed) — A RIDE WITH NO POWER DATA PRINTS "0 W", MARKED IN RANGE
 
 An easy endurance ride recorded with no power meter scores on heart rate (6be65b0b), but its Performance row still
 prints "0 W" and marks it in range against "under 126 W". It should print no watts and no in-range mark. Only riders
@@ -46,7 +46,7 @@ reps per side — 10 left and 10 right is 10 reps, not 20; if one arm gets fewer
 Approved words (Michael, 2026-09-18), for every movement the catalogue marks one-arm, read off that one flag:
 `target 2-4 per arm · 3 to 4 in reserve`. One row per set covers both arms.
 
-## QUEUED (2026-09-18, seen on Michael's 2026-09-14 run) — A 47-SECOND WALK WAS PAIRED WITH A 0:45 REP
+## [x] CLOSED 2026-09-18 (e3f5c9d7, deployed, recalculated; 14 Sep now reads no execution score) — A 47-SECOND WALK WAS PAIRED WITH A 0:45 REP
 
 A session whose watch laps do not fit the plan (the athlete ran the rep block as one lap) still paired one short
 stray lap — 0:47 at 18:16/mi — with the first 0:45 rep, because lap-to-step pairing matches on time alone. Result:
@@ -379,7 +379,7 @@ shrink"):** the FULL weather block shows on every day, so the card never changes
 - Server work, not the phone's: the weather for a date comes from the server (one fetch path, cached per
   place + date); the phone prints it.
 
-## QUEUED — SMART PLATE MATH IN THE LOGGER (Michael, 2026-09-15, "nice to have, don't get stuck on it")
+## [x] CLOSED 2026-09-18 (f579a1ad, pushed; phone build) — SMART PLATE MATH IN THE LOGGER
 
 After the one-truth workorder's Stage 4 has touched the logger. The plate popover (`src/components/StrengthLogger.tsx:488-564`)
 works each set from scratch, greedy from the biggest plate, fixed rack 45/35/25/10/5/2.5 per side. Smart = read the
