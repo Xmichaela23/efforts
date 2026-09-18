@@ -1,6 +1,19 @@
 import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { extendTailwindMerge } from "tailwind-merge"
 import { formatPace as formatPaceShared } from "@/utils/workoutFormatting"
+
+// ⛔ THE TYPE TOKENS ARE SIZES (2026-09-18, tailwind.config.ts). tailwind-merge only knows Tailwind's own
+// `text-xs … text-9xl`; left alone it read `text-caption` as a colour, so `cn("text-sm", "text-caption text-label")`
+// dropped the size and kept `text-sm`. Registered here so a token size replaces a default one and a label colour
+// replaces a colour — never each other.
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["title1", "title3", "body", "subhead", "footnote", "caption"] }],
+      "text-color": [{ text: ["label", "label-secondary", "label-tertiary"] }],
+    },
+  },
+})
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
