@@ -10,6 +10,7 @@ import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import { requireUser } from '../_shared/require-user.ts';
 import { buildIntakeReadout, type SessionFrequencyAsk } from './intake-readout.ts';
 import { buildHistoryReadout, HISTORY_WINDOW_DAYS, type HistoryAsk } from './history-readout.ts';
+import { buildHomeLine } from './home-line.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -76,7 +77,9 @@ Deno.serve(async (req) => {
         });
       })()
       : null;
-    return new Response(JSON.stringify({ arc: { ...arc, builder: history ? { ...builder, history } : builder } }), {
+    // Today's block label and season link (`home-line.ts`); the phone prints them.
+    const home_line = buildHomeLine(arc as Parameters<typeof buildHomeLine>[0], focusDateISO);
+    return new Response(JSON.stringify({ arc: { ...arc, home_line, builder: history ? { ...builder, history } : builder } }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

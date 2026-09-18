@@ -49,7 +49,6 @@ import { skipReasonLabel } from '@/lib/skip-session-reasons';
 import { useNavigate } from 'react-router-dom';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcContextPayload } from '@/lib/fetch-arc-context';
-import { buildArcLine, arcLineNeedsGoalsSetup, type ArcForHomeLine } from '@/lib/build-arc-line';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 
 // Component for expandable workout cards with fixed height
@@ -251,24 +250,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     };
   }, []);
 
-  const arcLineText = useMemo(
-    () => (homeArcReady ? buildArcLine(homeArc as ArcForHomeLine) : ''),
-    [homeArcReady, homeArc]
-  );
-  const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc as ArcForHomeLine), [homeArc]);
-
   /**
-   * ⛔ THE BLOCK LABEL, RIGHT-ALIGNED ON THE DATE LINE (Michael, 2026-09-09). It is the FIRST
-   * segment of the arc line — "Build block", "Recovery", "Base" — which used to have a row of its
-   * own under the date. ⚠️ THE STRING IS NOT REBUILT HERE: it is `buildArcLine`'s output, cut at the
-   * separator that line already uses, so the label and the sentence cannot drift.
-   * ⚠️ NOT WHEN THE ARC LINE IS THE SEASON CTA — that one is a door and keeps its own row.
+   * ⛔ THE BLOCK LABEL AND THE SEASON LINK ARE THE SERVER'S (2026-09-18, Stage C follow-up): `get-arc-context`
+   * sends `home_line`, the phone prints it. The label rides right-aligned on the date line (Michael, 2026-09-09);
+   * the season link keeps its own row, because it is a door.
    */
-  const blockLabel = useMemo(() => {
-    if (!homeArcReady || !arcLineText || arcNeedsGoals) return null;
-    const head = arcLineText.split('·')[0]?.trim();
-    return head || null;
-  }, [homeArcReady, arcLineText, arcNeedsGoals]);
+  const homeLine = homeArcReady ? homeArc?.home_line ?? null : null;
+  const blockLabel = homeLine?.block_label ?? null;
+  const seasonCta = homeLine?.season_cta ?? null;
 
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
@@ -2073,35 +2062,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
         {/* ⚠️ THE ARC LINE KEEPS ITS OWN ROW ONLY WHEN IT IS A DOOR. Its block label now rides on
             the date line; the rest of the sentence is still worth a line when it asks for a tap. */}
-        {homeArcReady && arcLineText && arcNeedsGoals && !noPlanYet ? (
+        {seasonCta && !noPlanYet ? (
           <div className="flex-shrink-0 px-2 pt-1">
-            {arcNeedsGoals ? (
-              <button
-                type="button"
-                onClick={() => navigate('/goals')}
-                className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
-                style={{
-                  fontSize: 'var(--type-caption)',
-                  fontWeight: 400,
-                  letterSpacing: '0.02em',
-                  color: 'var(--label-secondary)',
-                }}
-              >
-                {arcLineText}
-              </button>
-            ) : (
-              <p
-                className="m-0"
-                style={{
-                  fontSize: 'var(--type-caption)',
-                  fontWeight: 400,
-                  letterSpacing: '0.02em',
-                  color: 'var(--label-secondary)',
-                }}
-              >
-                {arcLineText}
-              </p>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate('/goals')}
+              className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
+              style={{
+                fontSize: 'var(--type-caption)',
+                fontWeight: 400,
+                letterSpacing: '0.02em',
+                color: 'var(--label-secondary)',
+              }}
+            >
+              {seasonCta}
+            </button>
           </div>
         ) : null}
 

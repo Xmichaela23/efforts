@@ -397,6 +397,14 @@
           "weatherIconFor(",
           "c >= 95 && c <= 99"
         ]
+      },
+      {
+        "field": "get-arc-context arc.home_line",
+        "words": [
+          "Set up your season",
+          "Build block",
+          "buildArcLine("
+        ]
       }
     ]
   }
