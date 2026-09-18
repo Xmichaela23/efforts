@@ -78,7 +78,9 @@ export function hrOuterBand(range: Band): Band {
 }
 
 /** The cue for one computed step, or null when the step carries no range to cue against. */
-export function liveCueFor(step: { pace_range?: unknown; hr_range?: unknown } | null | undefined): LiveCue | null {
+export function liveCueFor(step: { pace_range?: unknown; hr_range?: unknown; watch_target?: unknown } | null | undefined): LiveCue | null {
+  // A step the watch gets as time only is not cued on the phone either (2026-09-17).
+  if (step?.watch_target === 'none') return null;
   const pace = isBand(step?.pace_range) ? paceOuterBand(step!.pace_range as Band) : undefined;
   const hr = isBand(step?.hr_range) ? hrOuterBand(step!.hr_range as Band) : undefined;
   if (!pace && !hr) return null;

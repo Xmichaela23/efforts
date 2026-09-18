@@ -710,26 +710,46 @@ export function stampRunPrescription(tok: string, steps: any[], baselines: Basel
    * ⛔ A RECOVERY INSIDE A HARD RUN IS PRESCRIBED BY ITS PACE, NOT BY HEART RATE (Michael, 2026-09-16: "the break is
    * the heart rate target"). Heart rate cannot fall from a threshold rep into zone 2 inside a minute, so the easy range
    * is unreachable there. The step keeps the pace the page gives it (p231 "20 s @ 50%" → threshold ÷ 0.50; "@ VT1" →
-   * the easy pace, printed as the easy range). The heart-rate range stays on warm-ups, cool-downs, and the recoveries
-   * of an easy run (its strides).
+   * the easy pace, printed as the easy range). The heart-rate range stays on the recoveries of an easy run (its strides);
+   * warm-ups and cool-downs carry the easy pace and no heart rate since 2026-09-17 (below).
    */
   const easySession = isEasyToken || /^strides_/.test(t);
+  const easyRange = (baselines as any)?._resolvedEasyRange as { lo: number; hi: number } | undefined;
   for (const s of steps) {
     if (!s || typeof s !== 'object') continue;
     const kind = String(s.kind ?? '');
     const atEasyPace = s.pace_sec_per_mi == null || (easyBand != null && s.pace_sec_per_mi === easyBand);
-    if (kind === 'recovery' && !easySession) {
-      const easyRange = (baselines as any)?._resolvedEasyRange as { lo: number; hi: number } | undefined;
+    /**
+     * ⛔ WARM-UP AND COOL-DOWN: EASY PACE ON THE SCREEN, TIME ONLY ON THE WATCH (Michael, 2026-09-17). The book
+     * prints them as "10-min easy jog" / "8-min easy jog" (p231–235) with no pace and no heart rate. They carried the
+     * easy heart-rate range, and the watch buzzed when the athlete eased off under it. The screen shows the easy
+     * pace range (Friel run Z2, the one `_resolvedEasyRange` already holds); `watch_target: 'none'` sends the step
+     * as time with no target. Supersedes the 2026-09-02 heart-rate rule for these two steps only.
+     */
+    if (kind === 'warmup' || kind === 'cooldown') {
+      s.watch_target = 'none';
       if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
       continue;
     }
-    const easyStep = kind === 'warmup' || kind === 'cooldown' || kind === 'recovery' || (isEasyToken && kind === 'work' && atEasyPace);
+    /**
+     * ⛔ A RECOVERY JOG GETS A WATCH TARGET ONLY WHERE THE PAGE PRINTS A PERCENTAGE (Michael, 2026-09-17) — the
+     * ladder's "@ 60%", the forty-twenty's "@ 50%". "@ VT1", "easy jog", "rest" and "recovery walk/jog" go as time
+     * only; they are priced at the easy pace, which is how they are told apart here. The screen keeps the pace.
+     * The strides' lap-button recoveries in an easy run go as time only too, as they did.
+     */
+    if (kind === 'recovery' && (!easySession || s.lap_button === true)) {
+      if (atEasyPace) s.watch_target = 'none';
+      if (!easySession) {
+        if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
+        continue;
+      }
+    }
+    const easyStep = kind === 'recovery' || (isEasyToken && kind === 'work' && atEasyPace);
     if (easyStep) {
       s.prescription = 'heart_rate';
       if (hr) s.hr_range = { lower: hr.lower, upper: hr.upper };
       // ⛔ THE EASY PACE RANGE, NOT ±6% AROUND ONE PACE (2026-09-15, D-478). A step priced at the easy pace shows the
       // Friel Zone 2 range off threshold (× 1.14 to × 1.29); `toV3Step` keeps an array `pace_range` over its tolerance.
-      const easyRange = (baselines as any)?._resolvedEasyRange as { lo: number; hi: number } | undefined;
       if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
       continue;
     }
@@ -4009,6 +4029,8 @@ export function toV3Step(st: any, row?: any): any {
   if (st?.hr_range && typeof st.hr_range.lower === 'number' && typeof st.hr_range.upper === 'number') {
     out.hr_range = { lower: Math.round(st.hr_range.lower), upper: Math.round(st.hr_range.upper) };
   }
+  // Time only on the watch (and no cue on the phone): warm-up, cool-down, and a jog the page gives no percentage.
+  if (st?.watch_target === 'none') out.watch_target = 'none';
   // The phone recording screen's cue: the outer band and the words, decided here (H-D16, 2026-09-10).
   const liveCue = liveCueFor(out);
   if (liveCue) out.live_cue = liveCue;

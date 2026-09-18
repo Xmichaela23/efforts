@@ -16,9 +16,9 @@ Deno.test('the approved forty-twenty line, word for word, no effort number (2026
     { kind: 'cooldown', seconds: 480, distanceDerived: true, pace_range: easy, prescription: 'heart_rate' },
   ];
   assertEquals(plannedStepLines(steps, { units: 'imperial', sport: 'run' }), [
-    '10:00 warm-up · ref 8:33–9:41/mi',
+    '10:00 warm-up · easy pace 8:33–9:41/mi',
     '5 sets of 4 × 40 s @ 5:39–5:53/mi, 20 s @ 14:06–15:54/mi between · 2:00 @ 8:33–9:41/mi between sets',
-    '8:00 cool-down · ref 8:33–9:41/mi',
+    '8:00 cool-down · easy pace 8:33–9:41/mi',
   ]);
 });
 
@@ -111,4 +111,20 @@ Deno.test('Sprint / Power: the all-out line when a work step carries no target, 
 Deno.test('no other family gets an effort line, and no line carries an effort number', () => {
   const lines = plannedStepLines([W(300, 490, 510), R(90, 513, 581), W(300, 490, 510)], { sport: 'run', family: 'run_near_threshold' });
   assertEquals(lines, ['2 × 5:00 @ 8:10–8:30/mi, 1:30 @ 8:33–9:41/mi between']);
+});
+
+/** ⛔ The approved warm-up and cool-down lines, word for word (Michael, 2026-09-17). */
+Deno.test('a run warm-up and cool-down print "easy pace" and the range; /km for a metric athlete', () => {
+  const E = { lower: 656, upper: 742 };
+  const wu: PlannedStep = { kind: 'warmup', seconds: 600, distanceDerived: true, pace_range: E };
+  const cd: PlannedStep = { kind: 'cooldown', seconds: 480, distanceDerived: true, pace_range: E };
+  const rep = W(240, 469, 489);
+  assertEquals(plannedStepLines([wu, rep, cd], { sport: 'run', units: 'imperial' }), [
+    '10:00 warm-up · easy pace 10:56–12:22/mi',
+    '4:00 @ 7:49–8:09/mi',
+    '8:00 cool-down · easy pace 10:56–12:22/mi',
+  ]);
+  const metric = plannedStepLines([wu, rep, cd], { sport: 'run', units: 'metric' });
+  assertEquals(metric[0], '10:00 warm-up · easy pace 6:48–7:41/km');
+  assertEquals(metric[2], '8:00 cool-down · easy pace 6:48–7:41/km');
 });

@@ -112,13 +112,20 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const cs = (typeof i === 'number') ? computedSteps[i] : undefined
       if (typeof i === 'number') ptr[bucket] = (ptr[bucket] ?? 0) + 1
       if (!cs) { return }
+      /**
+       * ⛔ TIME ONLY, NO TARGET (Michael, 2026-09-17). materialize-plan stamps `watch_target: 'none'` on a run's
+       * warm-up and cool-down (the book's "easy jog", p231–235, prints no pace or heart rate) and on a recovery jog
+       * the page gives no percentage ("@ VT1", "easy jog", "rest"). The heart-rate range these steps went with
+       * (2026-09-02) made the watch buzz when the athlete eased off. Rows materialized before keep it until rebuilt.
+       */
+      if ((cs as any)?.watch_target === 'none') { clearTargets(step); return }
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
       if (hasTarget) return
       // ⛔ HEART-RATE PRESCRIBED STEPS GO TO THE WATCH AS A HEART-RATE RANGE (Michael, 2026-09-02,
-      // ruling 6). Easy run steps carry `hr_range` (bpm) from the materializer; the pace on them is a
-      // reference band and is deliberately NOT sent — a SPEED target would make the watch nag about
-      // the reference. Applies to any sport that carries the field.
+      // ruling 6) — the steps of an easy RUN only since 2026-09-17: a warm-up or cool-down inside a session
+      // is stamped time-only above. The pace on an easy step is a reference band and is deliberately NOT
+      // sent — a SPEED target would make the watch nag about the reference.
       const hrr: any = (cs as any)?.hr_range
       const hrLo = Number(hrr?.lower), hrHi = Number(hrr?.upper)
       if (Number.isFinite(hrLo) && Number.isFinite(hrHi) && hrLo > 0 && hrHi > hrLo) {
@@ -321,11 +328,6 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   // Carry-forward last known SPEED range for RUNNING steps without explicit targets (non-rest)
   let lastSpeedLow: number | null = null
   let lastSpeedHigh: number | null = null
-  // Track easy/jog targets for REST from previous rests or warmup
-  let lastRestLow: number | null = null
-  let lastRestHigh: number | null = null
-  let lastWarmLow: number | null = null
-  let lastWarmHigh: number | null = null
 
   // Attempt 0: Build intervals directly from structured JSON (no DB dependence on materializer)
   const intervalsFromStructured = (() => {
@@ -665,6 +667,10 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             normalizeTargetBounds(step)
           } else {
             clearTargets(step)
+            // ⛔ A RUN'S RECOVERY JOG CARRIES THE PACE THE PAGE PRINTS FOR IT (2026-09-17) — the ladder's "@ 60%".
+            // Every rest went with no target before, even those. The computed step decides: a jog the page gives
+            // no percentage is stamped time-only and stays clear.
+            if (sport === 'RUNNING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
           }
           // Update or carry-forward SPEED targets for RUNNING
           if (sport === 'RUNNING') {
@@ -678,25 +684,9 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
                 step.targetValueLow = lastSpeedLow
                 step.targetValueHigh = lastSpeedHigh
               }
-            } else if (step.intensity === 'REST' || step.intensity === 'RECOVERY') {
-              if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-                lastRestLow = Number((step as any).targetValueLow)
-                lastRestHigh = Number((step as any).targetValueHigh)
-              } else if (step.targetType !== 'HEART_RATE' && lastRestLow != null && lastRestHigh != null) {
-                step.targetType = 'SPEED'
-                step.targetValueLow = lastRestLow
-                step.targetValueHigh = lastRestHigh
-              } else if (step.targetType !== 'HEART_RATE' && lastWarmLow != null && lastWarmHigh != null) {
-                step.targetType = 'SPEED'
-                step.targetValueLow = lastWarmLow
-                step.targetValueHigh = lastWarmHigh
-              }
-            } else if (step.intensity === 'WARMUP') {
-              if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-                lastWarmLow = Number((step as any).targetValueLow)
-                lastWarmHigh = Number((step as any).targetValueHigh)
-              }
             }
+            // ⛔ A RECOVERY NO LONGER BORROWS THE LAST REST'S OR THE WARM-UP'S PACE (2026-09-17). A jog carries
+            // its own page percentage or goes as time only; a borrowed pace was a target the page never printed.
           }
           steps.push(step)
           stepId += 1
@@ -768,6 +758,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       normalizeTargetBounds(step)
     } else {
       clearTargets(step)
+      // A run's recovery jog carries the page's percentage pace, or nothing — see the segment path above.
+      if (sport === 'RUNNING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
     }
     if (sport === 'RUNNING') {
       const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
@@ -780,25 +772,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           step.targetValueLow = lastSpeedLow
           step.targetValueHigh = lastSpeedHigh
         }
-      } else if (step.intensity === 'REST' || step.intensity === 'RECOVERY') {
-        if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-          lastRestLow = Number((step as any).targetValueLow)
-          lastRestHigh = Number((step as any).targetValueHigh)
-        } else if (step.targetType !== 'HEART_RATE' && lastRestLow != null && lastRestHigh != null) {
-          step.targetType = 'SPEED'
-          step.targetValueLow = lastRestLow
-          step.targetValueHigh = lastRestHigh
-        } else if (step.targetType !== 'HEART_RATE' && lastWarmLow != null && lastWarmHigh != null) {
-          step.targetType = 'SPEED'
-          step.targetValueLow = lastWarmLow
-          step.targetValueHigh = lastWarmHigh
-        }
-      } else if (step.intensity === 'WARMUP') {
-        if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-          lastWarmLow = Number((step as any).targetValueLow)
-          lastWarmHigh = Number((step as any).targetValueHigh)
-        }
       }
+      // A recovery no longer borrows a pace — see the segment path above.
     }
     steps.push(step)
     stepId += 1

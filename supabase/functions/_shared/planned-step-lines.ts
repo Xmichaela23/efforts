@@ -138,9 +138,28 @@ function targetText(s: PlannedStep, opts: StepLineOptions): string {
   return isRecovery(s) ? ' easy' : '';
 }
 
+// FIELD — definition: 1 mi = 1.609344 km.
+const KM_PER_MI = 1.609344;
+
+/** A pace range in the athlete's own unit: /km for a metric athlete, /mi otherwise. */
+function paceTextInUnits(s: PlannedStep, opts: StepLineOptions): string | undefined {
+  if (String(opts.units || '').toLowerCase() !== 'metric') return paceText(s, opts);
+  const pr = s?.pace_range as any;
+  const lo = Array.isArray(pr) ? Number(pr[0]) : Number(pr?.lower);
+  const hi = Array.isArray(pr) ? Number(pr[1]) : Number(pr?.upper);
+  if (lo > 0 && hi > 0) return `${clock(lo / KM_PER_MI)}–${clock(hi / KM_PER_MI)}/km`;
+  return paceText(s, opts);
+}
+
 function wrapperLine(s: PlannedStep, word: string, opts: StepLineOptions): string {
   const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s);
   const len = lengthText(s, opts);
+  /**
+   * ⛔ A RUN'S WARM-UP AND COOL-DOWN PRINT THE EASY PACE (Michael's words, approved 2026-09-17):
+   *   10:00 warm-up · easy pace 10:56–12:22/mi
+   * The book prints "10-min easy jog" (p231–235); the watch gets the step as time only. /km for a metric athlete.
+   */
+  if (!hr && pace && opts.sport === 'run' && !opts.raceDay) return `${len} ${word} · easy pace ${paceTextInUnits(s, opts)}`;
   if (hr) return `${len} ${word} · ${hr}${pace ? ` · ref ${pace}` : ''}`;
   if (pace) return `${len} ${word} · ${s?.prescription === 'heart_rate' ? 'ref ' : ''}${pace}`;
   if (pow) return `${len} ${word} · ${pow}`;

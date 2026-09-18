@@ -14,7 +14,7 @@ const expand = (tok: string, b: any = baselines) => stampRunPrescription(tok, ex
 const work = (steps: any[]) => steps.filter((s) => s.kind === 'work');
 
 Deno.test('an easy run is prescribed by heart rate: every step carries the zone and says so; the pace stays as a reference', () => {
-  for (const tok of ['run_easy_30min', 'longrun_90min_easypace', 'warmup_run_10min_easy', 'cooldown_run_8min_easy']) {
+  for (const tok of ['run_easy_30min', 'longrun_90min_easypace']) {
     const steps = expand(tok);
     assert(steps.length > 0, tok);
     for (const s of steps) {
@@ -136,4 +136,40 @@ Deno.test('no hard run token stamps an effort number (2026-09-17)', () => {
   for (const tok of ['interval_6x240s_90pct_r60s', 'round_3x_40s130-r20s50-40s130-r20s50_R120s', 'run_sprint_8x10s_r90s', 'run_vo2_5x3min_z5']) {
     for (const s of expand(tok)) assertEquals(s.target_rpe, undefined, tok);
   }
+});
+
+/**
+ * ⛔ WARM-UP AND COOL-DOWN: EASY PACE ON THE SCREEN, TIME ONLY ON THE WATCH (Michael, 2026-09-17). A recovery jog goes
+ * to the watch with a target only where the page prints a percentage; "@ VT1", "easy jog" and "rest" go as time only.
+ */
+Deno.test('warm-up and cool-down carry the easy pace range, no heart rate, and go to the watch as time only', () => {
+  const b = { ...baselines, _resolvedEasySecPerMi: 547, _resolvedEasyRange: { lo: 513, hi: 581 } };
+  for (const tok of ['warmup_run_10min_easy', 'cooldown_run_8min_easy']) {
+    for (const s of expand(tok, b)) {
+      assertEquals(s.prescription, undefined, tok);
+      assertEquals(s.hr_range, undefined, tok);
+      assertEquals(s.pace_range, [513, 581], tok);
+      assertEquals(s.watch_target, 'none', tok);
+      const v3 = toV3Step(s, { type: 'run', date: '2026-09-18' });
+      assertEquals(v3.watch_target, 'none');
+      assertEquals(v3.live_cue, undefined, 'no phone cue on a time-only step');
+    }
+  }
+});
+
+Deno.test('a recovery jog: a page percentage keeps its watch target; VT1 and an easy jog go as time only', () => {
+  const b = { ...baselines, _resolvedEasySecPerMi: 547, _resolvedEasyRange: { lo: 513, hi: 581 } };
+  const rec = (tok: string) => expand(tok, b).filter((s) => s.kind === 'recovery');
+  const pct = rec('round_3x_40s130-r20s50-40s130-r20s50_R120s');
+  const atFifty = pct.filter((s) => s.duration_s === 20);
+  assert(atFifty.length > 0);
+  for (const s of atFifty) assertEquals(s.watch_target, undefined, '@ 50% is a target');
+  for (const s of pct.filter((x) => x.duration_s === 120)) assertEquals(s.watch_target, 'none', 'the rest between sets');
+  for (const s of rec('round_2x_15s130-45s105-r60svt1_R120s')) assertEquals(s.watch_target, 'none', '@ VT1');
+  for (const s of rec('interval_6x240s_90pct_R60s')) assertEquals(s.watch_target, 'none', 'the float');
+  for (const s of rec('strides_6x20s')) assertEquals(s.watch_target, 'none', 'a stride recovery');
+});
+
+Deno.test('the easy run itself keeps its heart-rate prescription and its watch target', () => {
+  for (const s of expand('run_easy_30min')) { assertEquals(s.hr_range, HR); assertEquals(s.watch_target, undefined); }
 });
