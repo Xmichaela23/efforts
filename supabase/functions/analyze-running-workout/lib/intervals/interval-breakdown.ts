@@ -40,6 +40,16 @@ function reconcilePaceFromDurationDistance(
   return disagree ? derived : reportedPaceSPerMi;
 }
 
+/** A row's type from its step role: a bare watch lap or the whole-run row is `lap`; otherwise the step's own role. */
+function rowTypeFromRole(role: unknown): 'lap' | 'warmup' | 'cooldown' | 'recovery' | 'work' {
+  const r = String(role || '').toLowerCase();
+  if (r === 'lap' || r === 'overall') return 'lap';
+  if (r.includes('warm')) return 'warmup';
+  if (r.includes('cool')) return 'cooldown';
+  if (r.includes('recover') || r === 'rest' || r === 'jog') return 'recovery';
+  return 'work';
+}
+
 /**
  * Generate detailed interval breakdown with pace, duration, HR, and elevation metrics
  */
@@ -272,13 +282,8 @@ export function generateIntervalBreakdown(
       paceAdherenceOut = NaN; // JSON → null downstream; UI can omit chip
     }
 
-    // Calculate overall performance score
-    // OURS — `overallScore` 70% pace, 30% duration per segment; no source, kept as found
-    // Weight pace more heavily (70%) than duration (30%) for interval workouts
-    // Pace is more important than exact duration match
-    const overallScore = Number.isFinite(paceAdherenceOut)
-      ? (paceAdherenceOut * 0.7) + (durationAdherence * 0.3)
-      : durationAdherence;
+    // ⛔ THE 70/30 SEGMENT "PERFORMANCE SCORE" IS DELETED (2026-09-17). It fed a summary text nothing reads and a
+    // 90 / 80 / 70 band count; Execution is time in range now (`_shared/execution-score.ts`).
     
     // Calculate heart rate metrics for this work interval
     let hrMetrics = calculateIntervalHeartRate(sensorData || [], interval.sample_idx_start, interval.sample_idx_end);
@@ -304,7 +309,6 @@ export function generateIntervalBreakdown(
       console.log(`  Actual pace: ${actualPace}s/mi (${actualPace > 0 ? `${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi` : 'N/A'})`);
       console.log(`  Pace adherence: ${Math.round(paceAdherence)}%`);
       console.log(`  Duration adherence: ${Math.round(durationAdherence)}%`);
-      console.log(`  Performance score: ${Math.round(overallScore)}%`);
       console.log(`  HR: avg=${hrMetrics.avg_heart_rate_bpm}, max=${hrMetrics.max_heart_rate_bpm}, min=${hrMetrics.min_heart_rate_bpm}`);
       console.log(`  Elevation: gain=${elevationMetrics.elevation_gain_m}m, loss=${elevationMetrics.elevation_loss_m}m, grade=${elevationMetrics.avg_grade_percent}%`);
     }
@@ -361,7 +365,10 @@ export function generateIntervalBreakdown(
       })(),
       // A watch lap that could not be matched to a planned step is a lap, not a rep (2026-09-14).
       // A lap not matched to the plan, or a structured run's one whole-run row: shown, never judged as a rep.
-      interval_type: ['lap', 'overall'].includes(String(interval.role || '').toLowerCase()) ? 'lap' : 'work',
+      // ⛔ AND A WATCH LAP PAIRED WITH A WARM-UP, JOG OR COOL-DOWN IS THAT STEP, NOT A REP (2026-09-17). On the
+      // watch-row paths every lap reaches this map, and every one that was not a bare lap was typed `work` — seven
+      // "work" rows on a six-rep run, the warm-up among them. The step's own role, as compute-workout-summary set it.
+      interval_type: rowTypeFromRole(interval.role),
       interval_number: index + 1,
       interval_id: interval.planned_step_id || interval.id || null,
       planned_duration_s: plannedDuration,
@@ -388,7 +395,6 @@ export function generateIntervalBreakdown(
         ? formatPaceRangeDisplay(workRangeLower, workRangeUpper)
         : (plannedPace > 0 ? formatPaceDisplay(plannedPace) : '—'),
       pace_adherence_percent: Number.isFinite(paceAdherenceOut) ? paceAdherenceOut : null,
-      performance_score: Math.round(overallScore),
       // Heart rate metrics
       avg_heart_rate_bpm: hrMetrics.avg_heart_rate_bpm,
       max_heart_rate_bpm: hrMetrics.max_heart_rate_bpm,
@@ -433,17 +439,6 @@ export function generateIntervalBreakdown(
     const secs = Math.round(seconds % 60);
     return `${mins}:${String(secs).padStart(2, '0')}/mi`;
   };
-  
-  // Calculate summary first (needed for coaching insight)
-  const summary = breakdown.reduce((acc, i) => {
-    acc.total += i.performance_score;
-    // OURS — segment score bands 90 / 80 / 70; no page, kept as found
-    if (i.performance_score >= 90) acc.high++;
-    else if (i.performance_score >= 80) acc.good++;
-    else if (i.performance_score >= 70) acc.fair++;
-    else acc.poor++;
-    return acc;
-  }, { total: 0, high: 0, good: 0, fair: 0, poor: 0 });
   
   // Analyze warmup, recovery, and cooldown segments for pacing analysis
   let pacingAnalysisText = '';
@@ -662,9 +657,14 @@ export function generateIntervalBreakdown(
   
   // Build complete breakdown array with warmup, recovery, and cooldown
   const completeBreakdown: any[] = [];
+  // ⛔ WATCH LAPS ARE ALREADY EVERY ROW, IN THE ORDER RECORDED (2026-09-17). The caller passes every lap when any
+  // row is a bare lap; adding the warm-up, jogs and cool-down again below printed them twice.
+  const rowsAreWatchLaps = intervalsToAnalyze.some((i: any) => ['lap', 'overall'].includes(String(i?.role || '').toLowerCase()));
   
     // Add warmup if it exists
-    if (allIntervals && allIntervals.length > 0) {
+    if (rowsAreWatchLaps) {
+      completeBreakdown.push(...breakdown);
+    } else if (allIntervals && allIntervals.length > 0) {
       const warmupInterval = allIntervals.find((i: any) => (i.role === 'warmup' || i.kind === 'warmup') && i.executed);
       if (warmupInterval) {
         // ✅ USE SAME SOURCE AS SUMMARY/DETAILS - get pace_range from planned step
@@ -689,13 +689,10 @@ export function generateIntervalBreakdown(
         let warmupDurationAdherence = 0;
         if (warmupPlannedDuration > 0 && warmupActualDuration > 0) {
           const durationDelta = Math.abs(warmupActualDuration - warmupPlannedDuration);
-          // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
+          // OURS — duration score = 100 minus the gap as a percent of planned; no source, kept as found
           warmupDurationAdherence = Math.max(0, 100 - (durationDelta / warmupPlannedDuration) * 100);
         }
 
-        // Calculate performance score using 70/30 weighting (pace/duration) - same as work intervals
-        const warmupPerformanceScore = (warmupPaceAdherence * 0.7) + (warmupDurationAdherence * 0.3);
-        
         // Calculate HR and elevation
         const warmupHR = calculateIntervalHeartRate(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end);
         const warmupElevation = calculateIntervalElevation(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end);
@@ -721,7 +718,6 @@ export function generateIntervalBreakdown(
           actual_pace_min_per_mi: warmupActualPace > 0 ? Math.round(warmupActualPace / 60 * 100) / 100 : 0,
           gap_pace_s_per_mi: segmentGap(warmupInterval),
           pace_adherence_percent: Math.round(warmupPaceAdherence),
-          performance_score: Math.round(warmupPerformanceScore),
           avg_heart_rate_bpm: warmupHR.avg_heart_rate_bpm,
           max_heart_rate_bpm: warmupHR.max_heart_rate_bpm,
           min_heart_rate_bpm: warmupHR.min_heart_rate_bpm,
@@ -790,12 +786,9 @@ export function generateIntervalBreakdown(
         let recDurationAdherence = 0;
         if (recPlannedDuration > 0 && recActualDuration > 0) {
           const durationDelta = Math.abs(recActualDuration - recPlannedDuration);
-          // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
+          // OURS — duration score = 100 minus the gap as a percent of planned; no source, kept as found
           recDurationAdherence = Math.max(0, 100 - (durationDelta / recPlannedDuration) * 100);
         }
-        
-        // Calculate performance score using 70/30 weighting (pace/duration) - same as work intervals
-        const recPerformanceScore = (recPaceAdherence * 0.7) + (recDurationAdherence * 0.3);
         
         // Calculate HR and elevation
         const recHR = calculateIntervalHeartRate(sensorData || [], recoveryInterval.sample_idx_start, recoveryInterval.sample_idx_end);
@@ -822,7 +815,6 @@ export function generateIntervalBreakdown(
                    actual_pace_min_per_mi: recActualPace > 0 ? Math.round(recActualPace / 60 * 100) / 100 : 0,
                    gap_pace_s_per_mi: segmentGap(recoveryInterval),
                    pace_adherence_percent: Math.round(recPaceAdherence),
-                   performance_score: Math.round(recPerformanceScore),
                    avg_heart_rate_bpm: recHR.avg_heart_rate_bpm,
                    max_heart_rate_bpm: recHR.max_heart_rate_bpm,
                    min_heart_rate_bpm: recHR.min_heart_rate_bpm,
@@ -861,12 +853,9 @@ export function generateIntervalBreakdown(
       let cooldownDurationAdherence = 0;
       if (cooldownPlannedDuration > 0 && cooldownActualDuration > 0) {
         const durationDelta = Math.abs(cooldownActualDuration - cooldownPlannedDuration);
-        // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
+        // OURS — duration score = 100 minus the gap as a percent of planned; no source, kept as found
         cooldownDurationAdherence = Math.max(0, 100 - (durationDelta / cooldownPlannedDuration) * 100);
       }
-      
-      // Calculate performance score using 70/30 weighting (pace/duration) - same as work intervals
-      const cooldownPerformanceScore = (cooldownPaceAdherence * 0.7) + (cooldownDurationAdherence * 0.3);
       
         // Calculate HR and elevation
         const cooldownHR = calculateIntervalHeartRate(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end);
@@ -892,7 +881,6 @@ export function generateIntervalBreakdown(
                    actual_pace_min_per_mi: cooldownActualPace > 0 ? Math.round(cooldownActualPace / 60 * 100) / 100 : 0,
                    gap_pace_s_per_mi: segmentGap(cooldownInterval),
                    pace_adherence_percent: Math.round(cooldownPaceAdherence),
-                   performance_score: Math.round(cooldownPerformanceScore),
                    avg_heart_rate_bpm: cooldownHR.avg_heart_rate_bpm,
                    max_heart_rate_bpm: cooldownHR.max_heart_rate_bpm,
                    min_heart_rate_bpm: cooldownHR.min_heart_rate_bpm,
@@ -1035,9 +1023,6 @@ export function generateIntervalBreakdown(
     if (interval.duration_adherence_percent !== undefined) {
     sectionText += `  Duration adherence: ${interval.duration_adherence_percent}%\n`;
     }
-    if (interval.performance_score !== undefined) {
-      sectionText += `  Performance score: ${interval.performance_score}%\n`;
-    }
     if (interval.avg_heart_rate_bpm !== null && interval.avg_heart_rate_bpm !== undefined) {
       sectionText += `  Avg HR: ${interval.avg_heart_rate_bpm} bpm`;
       if (interval.max_heart_rate_bpm !== null) sectionText += ` (max: ${interval.max_heart_rate_bpm} bpm)`;
@@ -1120,12 +1105,6 @@ export function generateIntervalBreakdown(
   const totalElevationLoss = 0; // Garmin only provides gain, not loss breakdown
   
   sectionText += `SUMMARY:\n`;
-  sectionText += `- Average performance: ${Math.round(summary.total / breakdown.length)}%\n`;
-  // OURS — printed bands 90 / 80 / 70, the same as the segment score bands; no page
-  sectionText += `- High (≥90%): ${summary.high} intervals\n`;
-  sectionText += `- Good (80-89%): ${summary.good} intervals\n`;
-  sectionText += `- Fair (70-79%): ${summary.fair} intervals\n`;
-  sectionText += `- Poor (<70%): ${summary.poor} intervals\n`;
   
   // Add total elevation summary (using Garmin's barometric data)
   // Note: Per-interval elevations are GPS-estimated and may not sum to total
@@ -1276,33 +1255,13 @@ export function generateIntervalBreakdown(
   
   // Coaching insight already added at the top
 
-  // Recalculate summary for work intervals only (for performance scoring)
   const workIntervalsOnly = completeBreakdown.filter(i => i.interval_type === 'work');
-  const workSummary = workIntervalsOnly.reduce((acc, i) => {
-    if (i.performance_score !== undefined) {
-      acc.total += i.performance_score;
-      // OURS — segment score bands 90 / 80 / 70; no page, kept as found
-      if (i.performance_score >= 90) acc.high++;
-      else if (i.performance_score >= 80) acc.good++;
-      else if (i.performance_score >= 70) acc.fair++;
-      else acc.poor++;
-    }
-    return acc;
-  }, { total: 0, high: 0, good: 0, fair: 0, poor: 0 });
 
   const result = {
     available: true,
     intervals: completeBreakdown, // Use complete breakdown with warmup/recovery/cooldown
     is_auto_lap_or_split: isAutoLapOrSplit, // True when intervals are device laps or our splits, not intentional structure
     section: sectionText,  // Add section text for UI display
-    summary: {
-      average_performance_score: workSummary.total > 0 ? Math.round(workSummary.total / workIntervalsOnly.length) : 0,
-      total_intervals: workIntervalsOnly.length, // Only count work intervals for performance summary
-      high_performance_intervals: workSummary.high,
-      good_performance_intervals: workSummary.good,
-      fair_performance_intervals: workSummary.fair,
-      poor_performance_intervals: workSummary.poor
-    }
   };
   
   console.log(`✅ [INTERVAL BREAKDOWN] Generated section for ${completeBreakdown.length} total segments (${workIntervalsOnly.length} work intervals), section length: ${sectionText.length} chars`);
