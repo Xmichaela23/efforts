@@ -5,6 +5,7 @@ import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // ⛔ ONE BAND AROUND A SINGLE PERCENTAGE, DEFINED ONCE (2026-09-15) — see the note on the constant.
 // The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
 import { SINGLE_PERCENT_BAND, FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts'
+import { judgedPowerRange } from '../ride-power.ts'
 
 
 export type PlannedWorkout = {
@@ -237,9 +238,12 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           high = Math.max(low, Math.round(userFTP * FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP))
         }
         if (typeof low === 'number' && typeof high === 'number') {
+          // A single target (low == high) goes as SINGLE_PERCENT_BAND either side — the score's own rule
+          // (`ride-power.ts judgedPowerRange`), never a zero-width range on the watch (2026-09-18).
+          const sent = judgedPowerRange(low, high)
           step.targetType = 'POWER'
-          step.targetValueLow = Math.round(low)
-          step.targetValueHigh = Math.round(high)
+          step.targetValueLow = Math.round(sent.lower)
+          step.targetValueHigh = Math.round(sent.upper ?? high)
         } else {
           const center = parseW((cs as any)?.target_watts ?? (cs as any)?.targetWatts ?? (cs as any)?.target_value ?? (cs as any)?.powerTarget)
           if (typeof center === 'number' && isFinite(center)) {
@@ -1006,10 +1010,10 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       step.targetValueLow = pow.low
       step.targetValueHigh = pow.high
     } else if (pow.value != null) {
-      // Expand single wattage to ±5%
+      // A single wattage: SINGLE_PERCENT_BAND either side (TrainingPeaks ±10%, `plan-tokens/quality-work.ts`)
       const base = pow.value
-      // OURS — `applyTargets` single power text target ±5%, at least ±1; no source, kept as found
-      const band = Math.max(1, Math.round(base * 0.05))
+      // OURS — `applyTargets` the at-least-±1 floor on the single power band; no source, kept as found
+      const band = Math.max(1, Math.round(base * SINGLE_PERCENT_BAND))
       step.targetValueLow = base - band
       step.targetValueHigh = base + band
     }

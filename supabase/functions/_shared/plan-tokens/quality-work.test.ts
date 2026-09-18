@@ -37,7 +37,7 @@ const EASY = 9 * 60 + 30;
 const FTP = 210;
 const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
 /** The one band around a single printed percentage — `SINGLE_PERCENT_BAND`, transcribed as the rest is. */
-const BAND = 0.05;
+const BAND = 0.10;
 
 // ── THE FOUR BRANCHES AS THEY STOOD, VERBATIM ────────────────────────────────────────────────────
 
@@ -205,12 +205,12 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
   const anaerobic = { ...ride, floorOnlyAtOrAbovePct: FAMILIES.ride_anaerobic.workFloorPct };
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', anaerobic),
-    '8 rounds: 30 s at 252 W and up, 2:30 at 180–198 W; 4 min easy between',
+    '8 rounds: 30 s at 252 W and up, 2:30 at 170–208 W; 4 min easy between',
   );
   // And the same shape with no family floor: both steps are single percentages and both get the band.
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', ride),
-    '8 rounds: 30 s at 239–265 W, 2:30 at 180–198 W; 4 min easy between',
+    '8 rounds: 30 s at 227–277 W, 2:30 at 170–208 W; 4 min easy between',
   );
   // p238 sweet spot: the band is the token's own, and it prints as a range.
   assertEquals(

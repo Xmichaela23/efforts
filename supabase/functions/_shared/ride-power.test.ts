@@ -1,12 +1,14 @@
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   averagePowerW,
+  judgedPowerRange,
   judgedPowerW,
   normalizedPowerW,
   pedalingAveragePowerW,
   powerRangeBand,
   powerStreamW,
   readPowerW,
+  shareInPowerRange,
 } from './ride-power.ts';
 
 Deno.test('a 0 W second is a reading, not a gap', () => {
@@ -77,4 +79,21 @@ Deno.test('a floor with no ceiling: at or above the floor is in, under it is bel
   assertEquals(powerRangeBand(400, 202, undefined), 'in');
   assertEquals(powerRangeBand(201, 202, null), 'below');
   assertEquals(powerRangeBand(202, 0, null), null);     // no floor is still no verdict
+});
+
+/**
+ * ⛔ A SINGLE TARGET IS JUDGED ±SINGLE_PERCENT_BAND (2026-09-18) — TrainingPeaks' ±10%, the plan's and the Garmin
+ * send's one constant, never a zero-width range. 151 W → 136–166 W.
+ */
+Deno.test('a single target: 160 W on a 151 W step is in, the band is 136-166 W', () => {
+  assertEquals(judgedPowerRange(151, 151), { lower: 136, upper: 166 });
+  assertEquals(powerRangeBand(160, 151, 151), 'in');
+  assertEquals(powerRangeBand(136, 151, 151), 'in');
+  assertEquals(powerRangeBand(135, 151, 151), 'below');
+  assertEquals(powerRangeBand(167, 151, 151), 'above');
+  assertEquals(shareInPowerRange([160, 160, 170, 130], 151, 151), 0.5);
+});
+Deno.test('a real range and a floor pass through the judged range unchanged', () => {
+  assertEquals(judgedPowerRange(150, 167), { lower: 150, upper: 167 });
+  assertEquals(judgedPowerRange(202, null), { lower: 202, upper: null });
 });

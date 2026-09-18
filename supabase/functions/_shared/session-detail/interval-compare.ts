@@ -12,6 +12,7 @@
  */
 import type { IntervalRow, SessionDetailV1 } from './types.ts';
 import { paceRangeBand } from '../run-pace.ts';
+import { powerRangeBand } from '../ride-power.ts';
 
 export type IntervalBand = 'below' | 'in' | 'above';
 
@@ -39,11 +40,8 @@ export function powerBand(
   range: IntervalRow['planned_power_range'] | null | undefined,
 ): IntervalBand | null {
   if (!range || !(Number(range.lower_w) > 0)) return null;
-  const w = Number(watts);
-  if (watts == null || !Number.isFinite(w)) return null;
-  if (w < Number(range.lower_w)) return 'below';
-  if (range.upper_w != null && w > Number(range.upper_w)) return 'above';
-  return 'in';
+  // ⛔ ONE RULE WITH THE ANALYZER (2026-09-18): `powerRangeBand` — a single target is judged ±`SINGLE_PERCENT_BAND`.
+  return powerRangeBand(watts, range.lower_w, range.upper_w ?? null);
 }
 
 export type RaceCompareStatus = 'on' | 'near' | 'off' | 'ahead' | 'even' | 'behind';

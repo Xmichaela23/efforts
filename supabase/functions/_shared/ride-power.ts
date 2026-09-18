@@ -20,6 +20,7 @@
  */
 
 /** Seconds of effort below which normalized power is not used (TrainingPeaks / TrainerRoad, above). */
+import { SINGLE_PERCENT_BAND } from './plan-tokens/quality-work.ts';
 export const NORMALIZED_POWER_MIN_DURATION_S = 20 * 60;
 
 /** Coggan's rolling window, in samples (1 Hz recording). */
@@ -108,6 +109,25 @@ export function pedalingAveragePowerW(
 }
 
 /**
+ * ⛔ THE RANGE A RIDE STEP IS JUDGED AGAINST (2026-09-18). A step whose floor and ceiling are the same number is one
+ * power target ("151 W"), and a zero-width range fails every real second of riding. It is judged against
+ * `SINGLE_PERCENT_BAND` either side — the same ±10% (TrainingPeaks) the plan applies to a single percentage and the Garmin send
+ * applies to a single target (`plan-tokens/quality-work.ts`). The row still prints the one number; only the test widens.
+ * A floor with no ceiling (p237) and a real range pass through unchanged.
+ */
+export function judgedPowerRange(
+  lowerW: number | null | undefined,
+  upperW: number | null | undefined,
+): { lower: number; upper: number | null } {
+  const lo = Number(lowerW);
+  const hi = upperW == null ? null : Number(upperW);
+  if (lo > 0 && hi != null && hi === lo) {
+    return { lower: Math.round(lo * (1 - SINGLE_PERCENT_BAND)), upper: Math.round(lo * (1 + SINGLE_PERCENT_BAND)) };
+  }
+  return { lower: lo, upper: hi };
+}
+
+/**
  * Share of the stream's samples (zeros kept — coasting is 0 W) at or above the floor and, when there is a ceiling,
  * at or under it; the caller multiplies by the interval's seconds. A floor with no ceiling (p237) counts every
  * sample at or above the floor. The Execution score's numerator for one interval (Garmin, "Workout Execution
@@ -118,8 +138,10 @@ export function shareInPowerRange(
   lowerW: number | null | undefined,
   upperW: number | null | undefined,
 ): number | null {
-  const lo = Number(lowerW);
+  const judged = judgedPowerRange(lowerW, upperW);
+  const lo = judged.lower;
   if (!stream.length || !(Number.isFinite(lo) && lo > 0)) return null;
+  upperW = judged.upper;
   const hiRaw = Number(upperW);
   const hi = upperW != null && Number.isFinite(hiRaw) && hiRaw >= lo ? hiRaw : Infinity;
   let inRange = 0;
@@ -172,8 +194,9 @@ export function powerRangeBand(
   lowerW: number | null | undefined,
   upperW: number | null | undefined,
 ): 'below' | 'in' | 'above' | null {
-  const lo = Number(lowerW);
-  const hi = upperW == null ? Infinity : Number(upperW);
+  const judged = judgedPowerRange(lowerW, upperW);
+  const lo = judged.lower;
+  const hi = judged.upper == null ? Infinity : judged.upper;
   const w = Number(watts);
   if (watts == null || !Number.isFinite(w) || !(lo > 0) || !(hi > 0)) return null;
   if (w < lo) return 'below';

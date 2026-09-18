@@ -1,5 +1,5 @@
 import { withAlarm } from '../_shared/alarm.ts';
-import { normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
+import { judgedPowerRange, normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
@@ -476,8 +476,10 @@ function analyzeIntervalPower(
     };
   }
   
-  const lower = powerRange.lower || powerRange.min || 0;
-  const upper = powerRange.upper || powerRange.max || Infinity;
+  // A single target is judged ±SINGLE_PERCENT_BAND (`judgedPowerRange`, 2026-09-18); a range as printed.
+  const judgedR = judgedPowerRange(powerRange.lower || powerRange.min || 0, powerRange.upper || powerRange.max || null);
+  const lower = judgedR.lower;
+  const upper = judgedR.upper ?? Infinity;
   
   let inRange = 0;
   let outsideRange = 0;
@@ -643,8 +645,10 @@ function calculateSteadyStatePowerAdherence(
     };
   }
   
-  const lower = plannedPowerRange.lower || plannedPowerRange.min || 0;
-  const upper = plannedPowerRange.upper || plannedPowerRange.max || Infinity;
+  // A single target is judged ±SINGLE_PERCENT_BAND (`judgedPowerRange`, 2026-09-18); a range as printed.
+  const judgedR = judgedPowerRange(plannedPowerRange.lower || plannedPowerRange.min || 0, plannedPowerRange.upper || plannedPowerRange.max || null);
+  const lower = judgedR.lower;
+  const upper = judgedR.upper ?? Infinity;
   
   // Extract power samples
   const powerSamples = sensorData
@@ -863,18 +867,22 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     
     // Calculate power adherence using range if available
     let powerAdherence = 0;
+    // A single target is judged ±SINGLE_PERCENT_BAND (`judgedPowerRange`, 2026-09-18); the row keeps the printed number.
+    const judgedR = judgedPowerRange(plannedPowerLower, Number.isFinite(plannedPowerUpper) ? plannedPowerUpper : null);
+    const judgedLower = judgedR.lower;
+    const judgedUpper = judgedR.upper ?? Infinity;
     if (plannedPowerLower > 0 && actualPower > 0) {
       // Check if actual power is within range
       // OURS — power score = 100 inside the range, else 100 minus the gap as a percent of the nearer edge; no source, kept as found
-      if (actualPower >= plannedPowerLower && actualPower <= plannedPowerUpper) {
+      if (actualPower >= judgedLower && actualPower <= judgedUpper) {
         powerAdherence = 100;
-      } else if (actualPower < plannedPowerLower) {
+      } else if (actualPower < judgedLower) {
         // Below range - calculate how far below
-        const deviation = (plannedPowerLower - actualPower) / plannedPowerLower;
+        const deviation = (judgedLower - actualPower) / judgedLower;
         powerAdherence = Math.max(0, 100 - (deviation * 100));
       } else {
         // Above range - calculate how far above
-        const deviation = (actualPower - plannedPowerUpper) / plannedPowerUpper;
+        const deviation = (actualPower - judgedUpper) / judgedUpper;
         powerAdherence = Math.max(0, 100 - (deviation * 100));
       }
     } else if (plannedPowerCenter > 0 && actualPower > 0) {

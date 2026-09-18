@@ -615,7 +615,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           // D-089: cycling — use the power range as the planned subtitle.
           // Approved 2026-09-15: the zone rows' house style for an open bound — "202 W and up".
           if (floorOnlyPower) return `${Math.round(Number(pwLower))} W and up`;
-          if (hasPowerRange) return `${Math.round(Number(pwLower))}-${Math.round(Number(pwUpper))} W`;
+          // A single target prints once — "151 W", the not-done row's shape below (2026-09-18).
+          if (hasPowerRange) return Math.round(Number(pwLower)) === Math.round(Number(pwUpper))
+            ? `${Math.round(Number(pwLower))} W`
+            : `${Math.round(Number(pwLower))}-${Math.round(Number(pwUpper))} W`;
           return null;
         })(),
         executed: {

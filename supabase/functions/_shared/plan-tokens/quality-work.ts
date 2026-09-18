@@ -157,15 +157,13 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
  * parser, two in `get-week`, the Garmin sender's centre fallback); this is the one, and it sits
  * where a percentage becomes watts rather than where a string is re-parsed.
  *
- * // OURS — no field source. Searched TrainerRoad support + forum, Zwift support and Zwift Insider,
- * TrainingPeaks Workout Builder help + FAQ, intervals.icu forum and docs: none of them publishes a
- * tolerance for judging a single-target step. TrainingPeaks offers Target OR Range per step and does
- * not widen a Target; TrainerRoad's own workouts use a fixed 20 W spread, a different rule on a
- * different quantity, and borrowing it would be the same class of error as the ACWR clause.
+ * ⛔ ±10%, TRAININGPEAKS (2026-09-18, Michael). TrainingPeaks help, "Workout Builder" (help.trainingpeaks.com,
+ * article 115001844087): "the range on your device will show +/- 10% from the interval target … to avoid
+ * triggering device alerts/beeps". Replaces the OURS ±5% of 2026-09-15. The plan's pricing (`wattsAt`), the Garmin
+ * send and the ride score (`_shared/ride-power.ts judgedPowerRange`) all read this one constant.
  * Ledger: `docs/STATE-SOURCES.md`, row "Single-percent power band".
  */
-// OURS — `SINGLE_PERCENT_BAND` ±5% (see the block above; STATE-SOURCES single-percent power band row)
-export const SINGLE_PERCENT_BAND = 0.05;
+export const SINGLE_PERCENT_BAND = 0.10;
 
 /**
  * ⛔ THE CEILING A FLOOR-ONLY STEP LEAVES THE APP WITH — p237: *"start at 110% and progress to
