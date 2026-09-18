@@ -380,6 +380,12 @@ const ALIGN = {
    * docs/STATE-SOURCES.md.
    */
   order_lap_floor_frac: 0.5,
+  /**
+   * FIELD — the walk-to-run switch: Hreljac 1993 (Med Sci Sports Exerc 25(10), "Preferred and energetically optimal
+   * gait transition speeds in human locomotion") measured the preferred transition at 2.06 m/s (about 13:01/mi).
+   * A lap slower than this is a walk and is never paired with a work step (`lapIsWalkForStep`).
+   */
+  walk_run_transition_mps: 2.06,
   tol: {
     run:  { dist_short_m: 10, dist_long_pc: 0.02, time_work_s: 3, time_rec_s: 8 },
     ride: { dist_long_pc: 0.05, time_work_s: 2, time_rec_s: 6 },
@@ -1626,6 +1632,25 @@ Deno.serve(async (req) => {
      * so a watch's automatic mile laps do not turn an easy run into unlabelled rows.
      * The watch's own step type per lap (in its activity file) is not read yet — a later build.
      */
+    /**
+     * ⛔ A LAP AT WALKING PACE IS NEVER A WORK REP (2026-09-18, Michael's 2026-09-14 run). The pairing matched on time
+     * alone, so a 0:47 lap at 18:16/mi paired with a 0:45 rep and the run read "1 of 24 reps done", Execution 2%. A lap
+     * slower than the walk-to-run switch (`ALIGN.walk_run_transition_mps`) is not a work step's lap — unless the step
+     * itself is prescribed slower than that (a walker's plan), when the lap may be exactly what was asked.
+     */
+    const lapIsWalkForStep = (st: any, lap: { dist_m?: number; time_s?: number }): boolean => {
+      if (stepRole(st) !== 'work') return false;
+      // A walk-to-run switch is a running fact; a ride lap is never judged by it.
+      const sportW = String((w as any)?.type || '').toLowerCase();
+      if (sportW !== 'run' && sportW !== 'running') return false;
+      const t = Number(lap?.time_s), d = Number(lap?.dist_m);
+      if (!(t > 0) || !(d >= 0)) return false;
+      const walkMps = ALIGN.walk_run_transition_mps;
+      if (d / t >= walkMps) return false;
+      const targetSecPerMi = Number(derivePlannedPaceSecPerMi(st));
+      const stepIsWalkSpeed = Number.isFinite(targetSecPerMi) && targetSecPerMi > 0 && (1609.34 / targetSecPerMi) < walkMps;
+      return !stepIsWalkSpeed;
+    };
     let snapped: any[] | null = null;
     let snapMode = 'snap-to-laps';
     const structuredPlan = plannedSteps.filter((st: any) => stepRole(st) === 'work').length >= 2;
@@ -1635,7 +1660,7 @@ Deno.serve(async (req) => {
       if (lapWins.length >= 2) {
         const matched = lapWins.length <= plannedSteps.length && lapWins.every(([a, b], i) => {
           const measured = { ...placed[i].L, dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
-          return stepLapWithinTolerance(plannedSteps[i], measured);
+          return stepLapWithinTolerance(plannedSteps[i], measured) && !lapIsWalkForStep(plannedSteps[i], measured);
         });
         if (matched) {
           snapped = lapWins.map(([a, b], i) => ({ ...execIntervalFromWindow(plannedSteps[i], a, b), lap_number: placed[i].L.number, sample_idx_start: a, sample_idx_end: b }));
@@ -1668,7 +1693,7 @@ Deno.serve(async (req) => {
           let nextLap = 0;
           for (const st of plannedSteps.filter((x: any) => stepRole(x) === 'work')) {
             let k = nextLap;
-            while (k < lapWins.length && !stepLapWithinTolerance(st, measuredLap(k))) k++;
+            while (k < lapWins.length && (!stepLapWithinTolerance(st, measuredLap(k)) || lapIsWalkForStep(st, measuredLap(k)))) k++;
             if (k < lapWins.length) { stepForLap.set(k, st); nextLap = k + 1; } else unpairedWork.push(st);
           }
           snapped = lapWins.map(([a, b], i) => {
@@ -1726,7 +1751,8 @@ Deno.serve(async (req) => {
             const keep = Number.isFinite(shortestStepSec)
               ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= floor)
               : [];
-            if (keep.length === plannedSteps.length && keep.length >= 2) {
+            if (keep.length === plannedSteps.length && keep.length >= 2
+              && !keep.some((lapIdx, at) => lapIsWalkForStep(plannedSteps[at], measuredLap(lapIdx)))) {
               snapped = lapWins.map(([a, b], i) => {
                 const n = placed[i].L.number;
                 const at = keep.indexOf(i);

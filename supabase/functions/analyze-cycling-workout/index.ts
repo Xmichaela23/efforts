@@ -854,6 +854,14 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     // average power (coasting as 0 W) below that — written once by compute-workout-summary. The row, its
     // colour, power adherence, "on target" and Execution all read this one value.
     const actualPower = interval.executed?.judged_power_w ?? interval.executed?.avg_power_w ?? interval.executed?.avg_power ?? interval.granular_metrics?.avg_power ?? 0;
+    /**
+     * ⛔ A STEP RIDDEN WITH NO POWER DATA HAS NO WATTS (2026-09-18, Michael). compute-workout-summary writes no power on
+     * a step when the ride recorded none; the `?? 0` above turned that into "0 W", and p239's easy step (0 up to its
+     * ceiling) then marked 0 W in range. Such a step carries no watts, no band and no power score ("not measured",
+     * not "zero"); the ride's Execution already falls to heart rate or duration (`easyRideWithoutPower` below).
+     */
+    const stepHasPower = [interval.executed?.judged_power_w, interval.executed?.avg_power_w, interval.executed?.avg_power, interval.granular_metrics?.avg_power]
+      .some((v: unknown) => v != null && Number.isFinite(Number(v)));
     const normalizedPower = interval.executed?.normalized_power_w ?? interval.granular_metrics?.normalized_power ?? actualPower;
     const actualDistance = interval.executed?.distance_m || 0;
     
@@ -930,18 +938,18 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       // ⚠️ NULL = NO CEILING (p237's floor-only work), not "unknown". See the note above.
       planned_power_range_upper: isRecovery || !Number.isFinite(plannedPowerUpper) ? null : plannedPowerUpper,
       planned_power_w: isRecovery ? null : plannedPowerCenter,
-      actual_power_w: Math.round(actualPower),
+      actual_power_w: stepHasPower ? Math.round(actualPower) : null,
       // D-089: session_detail/build.ts:274 reads `iv.avg_power_watts` (run-aligned
       // field name) to populate IntervalRow.executed.power_watts. Cycling's
       // actual_power_w stays for in-analyzer consumers; the alias keeps the
       // session_detail builder sport-agnostic without a cycling branch.
-      avg_power_watts: Math.round(actualPower),
+      avg_power_watts: stepHasPower ? Math.round(actualPower) : null,
       power_basis: interval.executed?.judged_power_basis ?? null,
-      power_band: isRecovery ? null : powerRangeBand(actualPower, plannedPowerLower, plannedPowerUpper),
-      normalized_power_w: Math.round(normalizedPower),
-      power_adherence_percent: isRecovery ? null : Math.round(powerAdherence),
+      power_band: isRecovery || !stepHasPower ? null : powerRangeBand(actualPower, plannedPowerLower, plannedPowerUpper),
+      normalized_power_w: stepHasPower ? Math.round(normalizedPower) : null,
+      power_adherence_percent: isRecovery || !stepHasPower ? null : Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
-      adherence_percentage: isRecovery ? null : powerAdherence / 100,
+      adherence_percentage: isRecovery || !stepHasPower ? null : powerAdherence / 100,
       // Distance
       actual_distance_m: actualDistance,
       // Heart rate
