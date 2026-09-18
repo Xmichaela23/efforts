@@ -372,6 +372,19 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'pullover machine': 'loaded_accessory',
   'hip adduction machine': 'loaded_accessory',
   'cable kickback': 'loaded_accessory',
+  // The eleven added to the catalogue in 544881e6 (pp.220-223) and never typed. Ten carry a load; GHD back
+  // extension is logged with no weight box (`exercise-config.ts` displayFormat 'bodyweight'), so it is typed so.
+  'weighted reverse hyper': 'loaded_accessory',
+  'split squat': 'loaded_accessory',
+  'freestanding barbell calf raise': 'loaded_accessory',
+  'seated calf raise': 'loaded_accessory',
+  'ghd back extension': 'bodyweight',
+  'machine back extension': 'loaded_accessory',
+  'behind the neck db triceps extension': 'loaded_accessory',
+  'rear delt machine': 'loaded_accessory',
+  'weighted knee raise': 'loaded_accessory',
+  'machine hip thrust': 'loaded_accessory',
+  'smith machine hip thrust': 'loaded_accessory',
 
   // ── LOADED ACCESSORY: an implement, no tested max, no commands ───────────────────────────────
   'barbell row': 'loaded_accessory',

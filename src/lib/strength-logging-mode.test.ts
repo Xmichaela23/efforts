@@ -256,6 +256,9 @@ Deno.test('⛔ EVERY DIFFERENCE FROM THE OLD REGEX IS NAMED HERE — no silent t
     'cable woodchopper',
     // 817af3de added p221's dip machine, a weight-stack machine the table files as loaded; the old `dip` stem ate it.
     'dip machine',
+    // Typed loaded 2026-09-17 (544881e6's eleven): a barbell on the back and a seated machine; the old `calf raise` stem ate both.
+    'freestanding barbell calf raise',
+    'seated calf raise',
     'weighted single leg calf raise',
     'weighted single-leg calf raises',
   ].sort(), 'a loaded movement changed sides — a stem is matching something it should not');
