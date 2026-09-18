@@ -20,6 +20,13 @@ Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall,
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
 start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
 
+## QUEUED (2026-09-18, seen on Michael's 2026-09-14 run) — A 47-SECOND WALK WAS PAIRED WITH A 0:45 REP
+
+A session whose watch laps do not fit the plan (the athlete ran the rep block as one lap) still paired one short
+stray lap — 0:47 at 18:16/mi — with the first 0:45 rep, because lap-to-step pairing matches on time alone. Result:
+"1 of 24 reps done" and Execution 2% where 0 of 24 and 0% are true. Only bites when the laps do not fit the plan;
+worth a look when that pairing is next touched: a lap at walking pace should not pair with a work step.
+
 ## QUEUED (2026-09-17, Michael on the Pull day screen) — EVERY MOVEMENT NEEDS A HOW-TO, NOT ONLY THE HOME SUBSTITUTES
 
 The logger prints a how-to only when one exists (`StrengthLogger.tsx:5059`, the sheet at `:6909`), and the table has
