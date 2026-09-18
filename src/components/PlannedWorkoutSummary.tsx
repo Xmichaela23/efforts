@@ -372,22 +372,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           * ⚠️ IT HIDES THE TITLE AND THE DURATION ONLY. The yardage and workload chips are this
           * component's own facts, not the header's, so they keep rendering.
           */}
-        <div className="font-light tracking-normal text-base flex items-center gap-2" style={{ color: disciplineColor }}>
+        <div className="font-normal tracking-normal text-body flex items-center gap-2" style={{ color: disciplineColor }}>
           {!hideHeader && <span>{title}</span>}
           <span className="flex items-center gap-1">
             {(typeof minutes === 'number' && !hideHeader) ? (
-              <span className="text-xs text-white font-light">{minutes}:00</span>
+              <span className="text-caption text-white font-normal">{minutes}:00</span>
             ) : null}
             {swimDistanceLabel ? (
-              <span className="text-xs text-blue-300">{swimDistanceLabel}</span>
+              <span className="text-caption text-blue-300">{swimDistanceLabel}</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
               <span
-                className="inline-flex items-center gap-1 text-xs text-gray-300"
+                className="inline-flex items-center gap-1 text-caption text-label"
                 title="Planned workload: hours times intensity, one hour at threshold is 100"
               >
-                <span className="text-white/45 font-normal">Workload</span>
-                <span className="text-gray-200 tabular-nums">{Math.round(Number((workout as any).workload_planned))}</span>
+                <span className="text-label-secondary font-normal">Workload</span>
+                <span className="text-label tabular-nums">{Math.round(Number((workout as any).workload_planned))}</span>
               </span>
             ) : null}
           </span>
@@ -395,19 +395,19 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         {swimEquipment && (
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
             {swimEquipment.required.map((eq) => (
-              <span key={eq} className="text-[11px] text-blue-200/80">
+              <span key={eq} className="text-caption text-blue-200">
                 bring: {eq}
               </span>
             ))}
             {swimEquipment.optional.map((eq) => (
-              <span key={eq} className="text-[11px] text-white/45">
+              <span key={eq} className="text-caption text-label-secondary">
                 optional: {eq}
               </span>
             ))}
           </div>
         )}
         {!hideLines && !isStrength && (
-          <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
+          <div className="text-subhead text-label font-normal tracking-normal mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">
                 {/* ⛔ NO STRIDES TOOLTIP (2026-09-10, audit H-T08). Any line containing "strides" carried a
@@ -423,7 +423,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </div>
         )}
         {!hideLines && !isStrength && enduranceLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-subhead text-label font-normal tracking-normal">
             {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
@@ -431,11 +431,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             above already carries the name and time; the subtitle and bullets are where the repeated
             reserve phrases, the cues and `(was 85 lb)` lived. */}
         {!hideLines && isStrength && plainLift && plainLiftRows.length > 0 ? (
-          <div className="mt-1 text-sm text-gray-200 font-light tracking-normal">
+          <div className="mt-1 text-subhead text-label font-normal tracking-normal">
             {plainLiftRows.map((row, idx) => (
               <React.Fragment key={idx}>
                 {row.heading ? (
-                  <div className="text-[11px] uppercase tracking-[0.08em] text-white/55" style={{ marginTop: idx === 0 ? 0 : 10, marginBottom: 2 }}>
+                  <div className="text-caption uppercase tracking-[0.08em] text-label-secondary" style={{ marginTop: idx === 0 ? 0 : 10, marginBottom: 2 }}>
                     {row.heading}
                   </div>
                 ) : null}
@@ -445,17 +445,17 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </div>
         ) : null}
         {!hideLines && isStrength && !plainLift && (
-          <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
+          <div className="text-subhead text-label font-normal tracking-normal mt-1">
             <span>{lines}</span>
           </div>
         )}
         {!hideLines && isStrength && !plainLift && strengthItems.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-subhead text-label font-normal tracking-normal">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
         {!hideLines && isMobility && mobilityLines.length>0 && (
-          <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
+          <ul className="list-disc pl-5 mt-1 text-subhead text-label font-normal tracking-normal">
             {mobilityLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}

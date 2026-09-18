@@ -40,7 +40,7 @@ export default function SkipSessionReasonPanel({
     <div className="space-y-4 px-1">
       {otherSelected ? (
         <div className="space-y-3">
-          <label className="block text-[11px] font-medium uppercase tracking-wider text-white/45">
+          <label className="block text-caption font-medium uppercase tracking-wider text-label-secondary">
             Other — add a few words (optional)
           </label>
           <textarea
@@ -49,7 +49,7 @@ export default function SkipSessionReasonPanel({
             placeholder="e.g. family emergency, gym closed…"
             rows={3}
             disabled={busy}
-            className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[13px] text-white/90 placeholder:text-white/35 focus:outline-none focus:ring-1 focus:ring-white/25 resize-none"
+            className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-footnote text-label placeholder:text-label-secondary focus:outline-none focus:ring-1 focus:ring-white/25 resize-none"
           />
           <div className="flex gap-2">
             <button
@@ -59,7 +59,7 @@ export default function SkipSessionReasonPanel({
                 setOtherSelected(false);
                 setOtherNote('');
               }}
-              className="flex-1 py-2.5 rounded-xl text-[12px] font-medium text-white/60 border border-white/15"
+              className="flex-1 py-2.5 rounded-xl text-caption font-medium text-label-secondary border border-white/15"
             >
               Back
             </button>
@@ -67,7 +67,7 @@ export default function SkipSessionReasonPanel({
               type="button"
               disabled={busy}
               onClick={handleOtherSubmit}
-              className="flex-1 py-2.5 rounded-xl text-[12px] font-medium text-white bg-white/15 border border-white/25"
+              className="flex-1 py-2.5 rounded-xl text-caption font-medium text-white bg-white/15 border border-white/25"
             >
               {busy ? 'Saving…' : 'Skip session'}
             </button>
@@ -81,7 +81,7 @@ export default function SkipSessionReasonPanel({
               type="button"
               disabled={busy}
               onClick={() => handleChip(code)}
-              className="py-2.5 px-2 rounded-xl text-left text-[12px] font-medium text-white/85 bg-white/[0.06] border border-white/12 hover:bg-white/[0.10] disabled:opacity-45"
+              className="py-2.5 px-2 rounded-xl text-left text-caption font-medium text-label bg-white/[0.06] border border-white/12 hover:bg-white/[0.10] disabled:opacity-45"
             >
               {label}
             </button>
@@ -94,7 +94,7 @@ export default function SkipSessionReasonPanel({
           type="button"
           disabled={busy}
           onClick={onSkipWithoutReason}
-          className="w-full py-2.5 text-[12px] text-white/45 hover:text-white/60"
+          className="w-full py-2.5 text-caption text-label-secondary hover:text-label-secondary"
         >
           Skip without sharing why
         </button>
@@ -102,12 +102,12 @@ export default function SkipSessionReasonPanel({
           type="button"
           disabled={busy}
           onClick={onBack}
-          className="w-full py-2 text-[12px] text-white/35 hover:text-white/50"
+          className="w-full py-2 text-caption text-label-secondary hover:text-label-secondary"
         >
           Cancel
         </button>
       </div>
-      <p className="text-[11px] text-white/30 truncate" title={sessionTitle}>
+      <p className="text-caption text-label-secondary truncate" title={sessionTitle}>
         {sessionTitle}
       </p>
     </div>

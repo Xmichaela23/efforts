@@ -151,15 +151,15 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
    */
   const duration = formatSessionDuration(w);
 
-  const titleSize = size === 'card' ? 'text-base' : 'text-base';
-  const descSize = size === 'card' ? 'text-[13px]' : 'text-sm';
+  const titleSize = size === 'card' ? 'text-body' : 'text-body';
+  const descSize = size === 'card' ? 'text-footnote' : 'text-subhead';
 
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       {/* ⛔ ROW 1 — TITLE + DURATION. Never below the description. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div
-          className={`${titleSize} font-medium tracking-normal min-w-0 truncate`}
+          className={`${titleSize} font-medium tracking-normal min-w-0 break-words`}
           style={{
             color,
             textShadow: '0 1px 1px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.35)',
@@ -169,7 +169,7 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {duration ? (
-            <span className="text-xs font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.70)' }}>
+            <span className="text-caption font-normal tabular-nums" style={{ color: 'var(--label-secondary)' }}>
               {duration}
             </span>
           ) : null}
@@ -180,7 +180,7 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
 
       {/* ⛔ ROW 2 — THE DESCRIPTION, ONCE. */}
       {description ? (
-        <div className={`${descSize} font-light leading-snug`} style={{ color: 'rgba(255,255,255,0.60)' }}>
+        <div className={`${descSize} font-normal leading-snug`} style={{ color: 'var(--label-secondary)' }}>
           {description}
         </div>
       ) : null}

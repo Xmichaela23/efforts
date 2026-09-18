@@ -2922,8 +2922,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 );
               })()}
 
-              {/* Bottom row: Mark as Complete and Close - evenly spaced with yellow outlines */}
-              <div className="flex gap-2 w-full">
+              {/* Bottom row: Mark as Complete and Close - evenly spaced with yellow outlines.
+                  They wrap to two rows on a zoomed screen rather than pushing Close off it (WCAG 2.2 SC 1.4.4). */}
+              <div className="flex flex-wrap gap-2 w-full">
                 {selectedPlannedWorkout && (() => {
                   const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
                   const isRun = ['run', 'running', 'walk'].includes(workoutType);
