@@ -4987,12 +4987,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <>
             <div className="p-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex-1 relative">
+                <div className="flex-1 min-w-0 relative">
                   <div className="flex items-center border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                     <div className="pl-3 text-label-secondary">
                       <Search className="h-4 w-4" />
                     </div>
-                    <Input
+                    {/* 2026-09-18 — a long name WRAPS to a second line; it is never shortened and never
+                        given a second name ("Weighted Reverse Hyper" was cut off in a one-line input).
+                        A one-row textarea that grows to fit; Enter finishes instead of adding a line. */}
+                    <textarea
+                      rows={1}
+                      ref={(el) => {
+                        if (!el) return;
+                        el.style.height = 'auto';
+                        el.style.height = `${el.scrollHeight}px`;
+                      }}
                       placeholder="Add exercise..."
                       /**
                        * ⛔ THE ATHLETE READS THE EXECUTION NAME AND THE APP KEEPS THE CANONICAL ONE.
@@ -5004,21 +5013,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       value={exercise.execution_name || exercise.name}
                       // D-133: exercise name is a search-to-pick field, NOT a contact/credential.
                       // Suppress iOS autofill/save bubble (was offering to "save" the lift name).
-                      type="search"
                       enterKeyHint="done"
                       autoComplete="off"
                       autoCorrect="off"
                       autoCapitalize="off"
                       spellCheck={false}
                       name="exercise-search"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+                      }}
                       onChange={(e) => {
                         // ⛔ THEIR WORDS WIN. Dropping the display name here is what keeps the swap
                         // contract honest: from this keystroke on, `name` is the only name.
+                        const typed = e.target.value.replace(/\s*\n\s*/g, ' ');
                         setExercises((prev) => prev.map((ex) => ex.id === exercise.id ? { ...ex, execution_name: undefined, how_to: undefined } : ex));
-                        updateExerciseName(exercise.id, e.target.value);
-                        setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
+                        updateExerciseName(exercise.id, typed);
+                        setActiveDropdown(typed.length > 0 ? exercise.id : null);
                       }}
-                      className="h-10 text-body font-medium !border-0 bg-transparent text-label placeholder:text-label-secondary focus-visible:ring-0 focus-visible:!border-0"
+                      className="block w-full min-w-0 min-h-10 px-3 py-2 resize-none overflow-hidden leading-snug break-words text-body font-medium border-0 bg-transparent text-label placeholder:text-label-secondary focus:outline-none"
                       onFocus={() => {
                         if (exercise.name.length > 0) {
                           setActiveDropdown(exercise.id);
@@ -5028,7 +5040,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         maybePersistTypedSwap(exercise.id, exercise.name);
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
-                      style={{ fontSize: 'var(--type-body)'}}
+                      style={{ fontSize: 'var(--type-body)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em' }}
                     />
                     {/* The how-to for a home version of a machine movement (2026-09-08). Only rows the
                         server stamped get it; it goes with the display name when the athlete types. */}
@@ -5045,7 +5057,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     )}
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-11 left-0 right-0 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-32 overflow-y-auto">
+                    <div className="absolute top-full mt-0.5 left-0 right-0 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
