@@ -10,19 +10,22 @@ export type { SessionWeatherForDisplay };
 /**
  * ⛔ THE PHONE KEEPS EACH READING WHILE THE APP IS OPEN (2026-09-17, Michael). Swiping the Today card between days
  * asked the server again for a day already on screen a moment ago, and the block sat empty for the round trip.
- * A reading for today, a future day or the last 5 days is kept 15 minutes — the server's own shared-cache time for
- * those days, since they still change. An older day's reading does not change and is kept until the app closes.
+ * Keep times (Michael approved 2026-09-17), the same as `get-weather`'s shared cache: today 15 minutes; a future day
+ * 1 hour; the last 5 days once a day; an older day until the app closes. A day is fetched only when it is shown.
  * Nothing is written to storage.
  */
 const READING_CACHE = new Map<string, { weather: SessionWeatherForDisplay; heatNote: string | null; at: number }>();
-// OURS — 15 minutes, matching get-weather's shared cache for days that still change; 5 days = its archive lag (FIELD)
-const CHANGING_KEEP_MS = 15 * 60 * 1000;
-const ARCHIVE_LAG_DAYS = 5;
-function readingStillChanges(timestamp: string, current: boolean | undefined): boolean {
-  if (current) return true;
+const MIN_MS = 60 * 1000;
+const ARCHIVE_LAG_DAYS = 5; // FIELD — Open-Meteo's archive delay
+/** How long a kept reading is good for; Infinity = never fetched again while the app is open. */
+function readingKeepMs(timestamp: string, current: boolean | undefined): number {
+  if (current) return 15 * MIN_MS;
   const day = String(timestamp).slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  if (day === today) return 15 * MIN_MS;
+  if (day > today) return 60 * MIN_MS;
   const cutoff = new Date(Date.now() - ARCHIVE_LAG_DAYS * 86400000).toISOString().slice(0, 10);
-  return !(day < cutoff);
+  return day < cutoff ? Infinity : 24 * 60 * MIN_MS;
 }
 
 interface UseWeatherProps {
@@ -63,7 +66,7 @@ export function useWeather({
     let cancelled = false;
     const cacheKey = JSON.stringify([Number(lat), Number(lng), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]);
     const kept = READING_CACHE.get(cacheKey);
-    if (kept && (!readingStillChanges(timestamp, current) || Date.now() - kept.at < CHANGING_KEEP_MS)) {
+    if (kept && Date.now() - kept.at < readingKeepMs(timestamp, current)) {
       setWeather(kept.weather);
       setHeatNote(kept.heatNote);
       setLoading(false);

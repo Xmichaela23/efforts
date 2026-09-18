@@ -15,6 +15,15 @@ function heatNoteFor(weather: unknown, wantsCurrentConditions: boolean): string 
   return load != null && load > 0 ? HEAT_NOTE : null;
 }
 
+/** How long a reading is kept in the shared cache — see the write below. The phone keeps the same times. */
+function weatherKeepMs(daysAgo: number, current: boolean): number {
+  const MIN = 60 * 1000;
+  if (current || daysAgo === 0) return 15 * MIN;
+  if (daysAgo < 0) return 60 * MIN;
+  if (daysAgo <= 5) return 24 * 60 * MIN;
+  return 100 * 365 * 24 * 60 * MIN; // never fetched again
+}
+
 /**
  * Bump when weather merge/cache semantics change so persisted workout rows refetch.
  * ⛔ 4 → 5 (2026-09-09, work order §3b.1): the request now asks Open-Meteo for `weather_code` and
@@ -394,17 +403,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Write shared cache with 30-minute TTL (if table exists)
+    // Write the shared cache (if the table exists); the keep time is `weatherKeepMs`.
     try {
       const key = (globalThis as any).__wx_cache_key as string | undefined;
       if (key) {
         /**
-         * ⛔ A PAST DAY OUTSIDE THE ARCHIVE LAG IS KEPT FOR A YEAR (2026-09-17). Its reading does not change once the
-         * archive holds it, so fetching it again every 15 minutes spent Open-Meteo calls for the same answer.
-         * OURS — the year. ⚠️ Open-Meteo replaces preliminary reanalysis with the final one about two months later
-         * (small revisions); a year-old copy may differ from a fresh fetch by that much. Everything else keeps 15 min.
+         * ⛔ HOW LONG A READING IS KEPT (2026-09-17, Michael approved): today 15 minutes (Open-Meteo's current data is
+         * 15-minutely, FIELD); a future day 1 hour (its fastest models update hourly, FIELD); the last 5 days once a
+         * day (OURS — the archive lag is 5 days, FIELD, and the forecast endpoint's past hours settle within it);
+         * an older day is never fetched again (OURS — the archive holds it; Open-Meteo swaps preliminary reanalysis
+         * for the final about two months later, so a kept copy may differ slightly from a fresh fetch).
          */
-        const keepMs = daysAgo > ARCHIVE_LAG_DAYS ? 365 * 86400 * 1000 : 15 * 60 * 1000;
+        const keepMs = weatherKeepMs(daysAgo, wantsCurrentConditions);
         const expires = new Date(Date.now() + keepMs).toISOString();
         await supabase.from('weather_cache').upsert({ key, lat: latNum, lng: lngNum, day, weather: weatherData, expires_at: expires });
       }
