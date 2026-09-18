@@ -26,12 +26,11 @@ An easy endurance ride recorded with no power meter scores on heart rate (6be65b
 prints "0 W" and marks it in range against "under 126 W". It should print no watts and no in-range mark. Only riders
 without a power meter see it.
 
-## [x] CLOSED 2026-09-17 (clean-up batch item 2, 204224d9) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
+## [x] CLOSED 2026-09-17 (204224d9, then f6aed0c3) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
 
-> The logger's set line reads "target 2-4 per arm · 3 to 4 in reserve" on every catalogue `isUnilateral` movement
-> that is upper body (rows, archer push-up, external rotation). The flag also marks one-leg and one-side core
-> movements (Bulgarian split squat, lunges, side plank, suitcase carry); "per arm" stays off those, which print
-> as before — their word ("per leg" / "per side") is copy and waits for Michael. Everything below is history.
+> Every movement the catalogue marks one-sided (`isUnilateral` — arms, legs and core alike) reads
+> "target 2-4 per side · 3 to 4 in reserve" in the logger (Michael approved "per side" 2026-09-17; it replaced the
+> first build's "per arm"). Everything below is history.
 
 Kroc Row (catalogue `isUnilateral: true`, `src/lib/exercise-config.ts` 'kroc row') prints "target 2-4 · 3 to 4 in
 reserve" with no word that the reps are per arm. Standard logging practice: log the one dumbbell's weight and count
@@ -116,9 +115,15 @@ loads one week (`handlePlanClick`), and each week is added only when the athlete
 a twelve-week plan exported after viewing week 1 prints week 1. Found while tracing the export's lift names; not fixed
 in that change. A file that is meant to match the phone row for row needs every week read from `planned_workouts`.
 
-## QUEUED (2026-09-17, throwaway round for D-479) — THE WEEK LIST PRINTS "Lateral Raise", THE WORKOUT SCREEN "Dumbbell Lateral Raise"
+## [x] FIXED 2026-09-17 (c89668dc) — THE WEEK LIST PRINTS "Lateral Raise", THE WORKOUT SCREEN "Dumbbell Lateral Raise"
 
-> **Traced 2026-09-17 (clean-up batch item 3), not fixed — a choice.** Throwaway home-gym build: the plan screen's week
+> **FIXED 2026-09-17 (c89668dc, option b).** The composer names the lateral raise for the kit ("Dumbbell Lateral Raise"
+> with dumbbells, "Band Lateral Raise" with bands only, "Lateral Raise" on a cable-only kit); materialize-plan no
+> longer renames a standing-plan row the kit reaches, so the stored row, the step and every screen carry one name.
+> Throwaway home + commercial gym: 300 of 300 rows, step name = row name. A block built before the deploy keeps
+> "Lateral Raise" on every screen until it is restated. Everything below is history.
+>
+> **Traced 2026-09-17 (clean-up batch item 3) — a choice.** Throwaway home-gym build: the plan screen's week
 > list already prints "Dumbbell Lateral Raise" (it reads the server's lines, built from the session's steps). The
 > stored row still says "Lateral Raise" with no shown name: the composer does not rename it, and materialize-plan's
 > older equipment swap (`substituteExerciseForEquipment`, `materialize-plan/index.ts:2559-2562`) renames only the
