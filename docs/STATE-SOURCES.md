@@ -698,3 +698,132 @@ One table per file group of the load-bearing scope (DESIGN-one-truth-guard §2.1
 | A metric test anchor rounds to 2.5 kg (imperial 5 lb) | `_shared/strength/test-session.ts` `TEST_ROUND_TO_KG` | FIELD — IPF Technical Rules Book 2023: "the weight of the barbell must always be a multiple of 2.5 kg" | 2026-09-16 |
 | Gear distance: the Details picker prints whole metres under 1 mile, else 1 dp mi (metric 1 dp km); the Gear screen prints whole mi / km | `_shared/display-format.ts` `distanceMetresUnderMile`, `distanceWhole` (read by `gear-list`) | FIELD — 1 mi = 1609.344 m (definition). **OURS** — the 1-mile cut and the decimals, today's display rule carried from the phone | 2026-09-16 |
 | Week bar distance: whole mi / km, hidden under 0.05 of the unit | `get-week/week-totals.ts` `WEEK_BAR_MIN_DISTANCE_UNITS`, `display-format.ts` `distanceWhole` | FIELD — 1 mi = 1609.344 m (definition). **OURS** — the whole number and the 0.05 cut, the Week tab's display rule carried from the phone | 2026-09-16 |
+
+## Exercise how-tos (2026-09-18)
+
+Every movement a plan can print carries a how-to, shown behind the (i) beside the row name. Words approved by Michael
+2026-09-18 (c3f5076d), word for word; the steps follow the source page, read 2026-09-18. One row per source; the
+table is `strength-grid/grid.ts EXECUTION_HOW_TO`, each entry with its source beside it. The words that predate it
+(home rear delt, pullover, concentration curl, dumbbell leg curl, chest-supported row, back extension, reverse hypers,
+calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension on a back extension bench").
+
+| Source | Movements it sets the steps for | Where |
+|---|---|---|
+| FIELD — ACE, "Farmer's Carry" (https://www.acefitness.org/resources/everyone/exercise-library/359/farmer-s-carry/) | Farmers Carry | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Glute Bridge" (https://www.acefitness.org/resources/everyone/exercise-library/49/glute-bridge/) | Glute Bridge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Lateral Lunge" (https://www.acefitness.org/resources/everyone/exercise-library/364/lateral-lunge/) | Lateral Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Prone (Lying) Hamstring Curl" (https://www.acefitness.org/resources/everyone/exercise-library/131/prone-lying-hamstrings-curl/) | Band Leg Curl | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Prone Scapular (Shoulder) Stabilization Exercises" (https://www.acefitness.org/resources/everyone/exercise-library/249/prone-scapular-shoulder-stabilization-series-i-y-t-w-o-formation/) | YTW Raises | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Quadruped Bent-knee Hip Extensions" (https://www.acefitness.org/resources/everyone/exercise-library/270/quadruped-bent-knee-hip-extensions/) | Hip Extension | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Single Leg Push-off" (https://www.acefitness.org/resources/everyone/exercise-library/230/single-leg-push-off/) | Explosive Step Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Standing Leg Extension" (https://www.acefitness.org/resources/everyone/exercise-library/133/standing-leg-extension/) | Banded Leg Extension | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Walking Abduction" (https://www.acefitness.org/resources/everyone/exercise-library/290/walking-abduction/) | Band Lateral Walk | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Adam Gardner / PowerliftingTechnique.com, "Sandbag Workouts" (5. Sandbag Shouldering, throw version) (https://powerliftingtechnique.com/sandbag-workout-routine/) | Sandbag Throw | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Adam Hodges, PhD (USAT coach) / TrainingPeaks, "8 Running Drills to Improve Your Running Form" (https://www.trainingpeaks.com/blog/drills-for-proper-running-form/) | B-Skip | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Adam Hodges, PhD / TrainingPeaks, "8 Running Drills to Improve Your Running Form" (Straight Leg Run) (https://www.trainingpeaks.com/blog/drills-for-proper-running-form/) | Stiff-Legged Run | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Alex Polish, ACE-CPT / BarBend, "10 Upper Body Kettlebell Exercises" (Kettlebell Bent-Over Row) (https://barbend.com/upper-body-kettlebell-exercises/) | Kettlebell Rows | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Alex Polish, ACE-CPT / BarBend, "11 Lat Pulldown Variations" (Resistance Band Lat Pulldown) (https://barbend.com/lat-pulldown-variations/) | Band Pull Down | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Amber Sayer, MS, CPT / Marathon Handbook, "10 Agility Ladder Drills" (https://marathonhandbook.com/agility-ladder-drills/) | Hopscotch | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Anthony O'Reilly, CPT / BarBend, "The 15 Best Smith Machine Exercises and How to do Them" (https://barbend.com/best-smith-machine-exercises/) | Smith Machine Hip Thrust | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Asphalt Green (fitness organization, no named author), "The Beginner's Guide to the Hip Thrust Machine" (https://www.asphaltgreen.org/blog/the-beginners-guide-to-the-hip-thrust-machine/) | Machine Hip Thrust | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Christopher Covello, checked by Erin Chancer, CPT / Garage Gym Reviews, "Bent-Over Dumbbell Rows" (https://www.garagegymreviews.com/dumbbell-rows) | Bent Over Row (dumbbells) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Dave Tate / elitefts, "A Beginner's Guide to the Zercher Squat" (https://elitefts.com/blogs/training/a-beginners-guide-to-the-zercher-squat) | Zercher Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Dave Tate / elitefts, "How to Perform the JM Press: A Step-by-Step Guide from the Inventor" (JM Blakley's method) (https://elitefts.com/blogs/training/how-to-perform-the-jm-press-a-step-by-step-guide-from-the-inventor) | JM Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Eric Bugera, CSCS / BarBend, "How to Do the Drag Curl to Build Your Arms" (https://barbend.com/drag-curl/) | Drag Curl | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Eric Bugera, CSCS / BarBend, "How to Do the Nordic Curl" (https://barbend.com/nordic-curl/) | Glute Ham Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Alternate Bound" (https://exrx.net/Plyometrics/AlternateBoundDoubleArm) | Bounding | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Archer Push-up" (https://exrx.net/WeightExercises/PectoralSternal/BWArcherPushup) | Archer Push Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Bench Press" (https://exrx.net/WeightExercises/PectoralSternal/BBBenchPress) | Bench Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Bent-over Row" (https://exrx.net/WeightExercises/BackGeneral/BBBentOverRow) | Barbell Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Close Grip Bench Press" (https://exrx.net/WeightExercises/Triceps/BBCloseGripBenchPress) | Close Grip Bench Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Deadlift" (https://exrx.net/WeightExercises/ErectorSpinae/BBDeadlift) | Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Front Squat" (https://exrx.net/WeightExercises/GluteusMaximus/BBFrontSquat) | Front Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Good-morning" (https://exrx.net/WeightExercises/Hamstrings/BBGoodMorning) | Good Morning | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Hip Thrust" (https://exrx.net/WeightExercises/GluteusMaximus/BBHipThrust) | Hip Thrust | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Incline Bench Press" (https://exrx.net/WeightExercises/PectoralClavicular/BBInclineBenchPress) | Incline Bench Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Lying Triceps Extension" (https://exrx.net/WeightExercises/Triceps/BBLyingTriExt) | Skull Crusher | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Military Press" (https://exrx.net/WeightExercises/DeltoidAnterior/BBMilitaryPress) | Overhead Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Preacher Curl" (https://exrx.net/WeightExercises/Brachialis/BBPreacherCurl) | Preacher Curl (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Prone Incline Curl" (https://exrx.net/WeightExercises/Brachialis/BBProneInclineCurl) | Spider Curl | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Squat" (https://exrx.net/WeightExercises/Quadriceps/BBSquat) | Back Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Standing Leg Calf Raise" (https://exrx.net/WeightExercises/Gastrocnemius/BBStandingCalfRaise) | Freestanding Barbell Calf Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Barbell Stiff Leg Deadlift" (https://exrx.net/WeightExercises/ErectorSpinae/BBStiffLegDeadlift) | Stiff-Legged Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Curl"; ACE, "Standing Bicep Curl" (band) (https://exrx.net/WeightExercises/Biceps/CBCurl) | Cable Curls | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Isolateral Lateral Raise" (https://exrx.net/WeightExercises/DeltoidLateral/CBLateralRaise) | Lateral Raise (cable) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Isolateral Reverse Fly" (https://exrx.net/WeightExercises/DeltoidPosterior/CBStandingReverseFly) | Rear Delt Fly (cable) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Isolateral Standing Fly" (https://exrx.net/WeightExercises/PectoralSternal/CBStandingFly) | Chest Fly (cable) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Pulldown" (https://exrx.net/WeightExercises/LatissimusDorsi/CBFrontPulldown) | Lat Pulldown (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Pushdown" (https://exrx.net/WeightExercises/Triceps/CBPushdown) | Tricep Pushdown (cable) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Cable Standing Shoulder External Rotation" (https://exrx.net/WeightExercises/Infraspinatus/CBStandingExternalRotation) | External Rotation (cable) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Chest Dip" (https://exrx.net/WeightExercises/PectoralSternal/BWChestDip) | Dips | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Decline Push-up" (https://exrx.net/WeightExercises/PectoralClavicular/BWDeclinePushup) | Decline Push Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Arnold Press" (https://exrx.net/WeightExercises/DeltoidAnterior/DBArnoldPress) | Arnold Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Bench Press" (https://exrx.net/WeightExercises/PectoralSternal/DBBenchPress) | Dumbbell Bench Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Bent-over Row" (https://exrx.net/WeightExercises/BackGeneral/DBBentOverRow) | Dumbbell Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Fly" (https://exrx.net/WeightExercises/PectoralSternal/DBFly) | Chest Fly (dumbbells) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Incline Bench Press" (https://exrx.net/WeightExercises/PectoralClavicular/DBInclineBenchPress) | Dumbbell Incline Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Lateral Raise" (https://exrx.net/WeightExercises/DeltoidLateral/DBLateralRaise) | Dumbbell Lateral Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Low Swing" (https://exrx.net/WeightExercises/Power/DBLowSwing) | KB DB Swing | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Lying Shoulder External Rotation" (https://exrx.net/WeightExercises/Infraspinatus/DBLyingExternalRotation) | External Rotation (dumbbell) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Pullover" (https://exrx.net/WeightExercises/PectoralSternal/DBPullover) | DB Pullover | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Rear Lunge" (https://exrx.net/WeightExercises/GluteusMaximus/DBRearLunge) | Reverse Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Shoulder Press" (https://exrx.net/WeightExercises/DeltoidAnterior/DBShoulderPress) | Seated DB Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Split Squat" (https://exrx.net/WeightExercises/GluteusMaximus/DBSplitSquat) | Split Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Step-up" (https://exrx.net/WeightExercises/GluteusMaximus/DBStepUp) | Step Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Dumbbell Triceps Extension" (https://exrx.net/WeightExercises/Triceps/DBTriExt) | Behind the Neck DB Triceps Extension | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Inverted Row" (https://exrx.net/WeightExercises/BackGeneral/BWSupineRow) | Inverted Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Kettlebell Goblet Squat" (https://exrx.net/WeightExercises/Kettlebell/KBGobletSquat) | Goblet Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Kettlebell Press" (https://exrx.net/WeightExercises/Kettlebell/KBPress) | Kettlebell Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Kettlebell Swing" (https://exrx.net/WeightExercises/Kettlebell/KBSwing) | Kettlebell Swing, KB DB Swing | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever 45° Leg Press" (https://exrx.net/WeightExercises/GluteusMaximus/LV45LegPress) | Leg Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Back Extension" (https://exrx.net/WeightExercises/ErectorSpinae/LVBackExtension) | Machine Back Extension | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Chest Press" (https://exrx.net/WeightExercises/PectoralSternal/LVChestPress) | Machine Chest Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Deadlift" (https://exrx.net/WeightExercises/ErectorSpinae/LVDeadlift) | Ground-Based Deadlift Machine | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Isolateral Pec Deck Fly" (https://exrx.net/WeightExercises/PectoralSternal/LVPecDeckFly) | Pec Deck | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Isolateral Seated Reverse Fly" (https://exrx.net/WeightExercises/DeltoidPosterior/LVRearLateralRaise) | Rear Delt Machine (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Leg Extension" (https://exrx.net/WeightExercises/Quadriceps/LVLegExtension) | Leg Extension (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Lying Leg Curl" (https://exrx.net/WeightExercises/Hamstrings/LVLyingLegCurl) | Leg Curl (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Pullover" (https://exrx.net/WeightExercises/LatissimusDorsi/LVPullover) | Pullover Machine (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Reverse Hyper-extension" (https://exrx.net/WeightExercises/GluteusMaximus/LVReverseHyperextension) | Reverse Hyperextension (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Seated Row" (https://exrx.net/WeightExercises/BackGeneral/LVSeatedRow) | Chest-Supported Row (station) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Squat" (https://exrx.net/WeightExercises/GluteusMaximus/LVSquat) | Lever Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Lever Triceps Dip" (https://exrx.net/WeightExercises/Triceps/LVTriDip) | Dip Machine | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Pull-up" (https://exrx.net/WeightExercises/LatissimusDorsi/BWPullup) | Pull Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Push-up" (https://exrx.net/WeightExercises/PectoralSternal/BWPushup) | Push Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Romanian Deadlift" (https://exrx.net/WeightExercises/OlympicLifts/RomanianDeadlift) | Romanian Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Single Leg Lateral Hop" (https://exrx.net/Plyometrics/SingleLegLateralHopBarrier) | Single-Leg Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Single Leg Split Squat" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSplitSquat) | Bulgarian Split Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Single Leg Squat (pistol)" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSquat) | Single Leg Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Single Leg Stiff-leg Deadlift" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegStiffLegDeadlift) | Single Leg RDL | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Sled Hack Squat" (https://exrx.net/WeightExercises/GluteusMaximus/SLHackSquat) | Hack Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Sled Pull" (https://exrx.net/WeightExercises/Power/WTPullSprint) | Sled Pull | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Sled Push" (https://exrx.net/WeightExercises/Power/WTPushSprint) | Sled Push | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Smith Bench Press" (https://exrx.net/WeightExercises/PectoralSternal/SMBenchPress) | Smith Machine Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Split Jump" (https://exrx.net/Plyometrics/SplitJump) | Lunge Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Squat" (https://exrx.net/WeightExercises/GluteusMaximus/BWSquat) | Bodyweight Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Suspended Inverted Row" (https://exrx.net/WeightExercises/BackGeneral/STInvertedRow) | Inverted Ring Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Trap Bar Squat" (https://exrx.net/WeightExercises/Quadriceps/TBSquat) | Trap Bar Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Vertical Jumps" (https://exrx.net/Plyometrics/VerticalJumps) | Rebound Jumps | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ExRx, "Walking Lunge" (https://exrx.net/Stretches/Miscellaneous/WalkingLunge) | Walking Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Jake Boly, CSCS / BarBend, "How the Larsen Press Can Be a Secret Weapon For Bench Press Gains" (https://barbend.com/larsen-press/) | Larsen Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Jesse Zucker, CPT / BarBend, "The 12 Best Cardiovascular Exercises" (Skater) (https://barbend.com/best-cardiovascular-exercises/) | Skater Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — John Meadows / T Nation, "Tip: Master the Meadows Row" (https://archive.t-nation.com/training/tip-master-the-meadows-row/) | Meadows Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Massachusetts General Hospital Sports Physical Therapy, "Shoulder Rotator Cuff and Scapular Strengthening Program" (External Rotation) (https://web.archive.org/web/2026/https://www.massgeneral.org/assets/MGH/pdf/orthopaedics/sports-medicine/physical-therapy/mass-general-shoulder-twelve-strengthening-program.pdf) | External Rotation (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Massachusetts General Hospital Sports Physical Therapy, "Shoulder Rotator Cuff and Scapular Strengthening Program" (Standing forward flexion, full can) (https://web.archive.org/web/2026/https://www.massgeneral.org/assets/MGH/pdf/orthopaedics/sports-medicine/physical-therapy/mass-general-shoulder-twelve-strengthening-program.pdf) | Scaption Bodyweight Shoulder Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Matt Kroczaleski / T Nation, "Kroc Rows – 101" (https://t-nation.com/t/kroc-rows-101/284491) | Kroc Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Matt Toupalik, ACE CPT / Cactus Athletics, "Ickey Shuffle Ladder Progression #1" (https://cactusathletics.com/ickey-shuffle-ladder-progression-1/) | Ickey Shuffle | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Mike Dewar / BarBend, "The 15 Best Tricep Exercises" (Triceps Pushdown) (https://barbend.com/best-triceps-exercises/) | Band Tricep Pushdown | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Mike Dewar, CSCS / BarBend, "How to Do the Tate Press for Thicker Arms and Bigger Pressing Numbers" (https://barbend.com/tate-press/) | Tate Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — NASM Exercise Library, "Dumbbell Romanian Deadlift" (https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift) | Romanian Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — NASM Exercise Library, "Pike Push-Up" (https://www.nasm.org/resource-center/exercise-library/pike-push-up) | Pike Push Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Norman Cheung / BarBend, "How to Do the Diamond Push-Up" (https://barbend.com/diamond-push-up/) | Diamond Push Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — NSCA Kinetic Select, "High Knee Drills" (https://www.nsca.com/education/articles/kinetic-select/high-knee-drills/) | A-Skip | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — NSCA PTQ 9.4, "Resistance Training Progressions for the Older Adult: Pulls and Rows" (https://www.nsca.com/contentassets/1cf6f81b246549cfa07473dbd8516ff1/ptq-9.4.3-resistance-training-progressions-for-the-older-adult-pulls-and-rows.pdf) | Gorilla Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Onnit Academy, checked by Sean Hyson, CSCS / Onnit, "The Expert's Guide To The Landmine Row Exercise" (https://www.onnit.com/blogs/the-edge/the-expert-s-guide-to-the-landmine-row-exercise) | T-Bar Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Ryan Horton, CSCS / Horton Barbell, "Low Pogo Hops (How To, Benefits, Common Mistakes)" (https://hortonbarbell.com/low-pogo-hops-how-to-benefits-common-mistakes/) | Pogo Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Shane McLean, CPT / Garage Gym Reviews, "An At-Home Upper-Body Resistance Band Workout" (Band Pull-Apart) (https://www.garagegymreviews.com/upper-body-resistance-band-workout) | Rear Delt Fly (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Shane McLean, CPT / Garage Gym Reviews, "An At-Home Upper-Body Resistance Band Workout" (Lateral Raise) (https://www.garagegymreviews.com/upper-body-resistance-band-workout) | Band Lateral Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Shane McLean, CPT / Garage Gym Reviews, "How To Do The Floor Press Exercise" (https://www.garagegymreviews.com/floor-press-exercise) | DB Floor Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Stephen Sheehan, CPT / Garage Gym Reviews, "10 Best Cable Fly Alternatives" (Resistance Band Fly) (https://www.garagegymreviews.com/cable-fly-alternatives) | Chest Fly (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Stephen Sheehan, CPT / Garage Gym Reviews, "18 Trainer-Approved Weight Plate Exercises" (Weight Plate Front Raise) (https://www.garagegymreviews.com/weight-plate-exercises) | Plate Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Tomah Memorial Hospital Physical Therapy (E. Bender, MSPT, CSCS; W. Gnewikow, DPT) / MSD Manual, "Standing Resisted Shoulder External Rotation" (https://www.msdmanuals.com/professional/multimedia/video/standing-resisted-shoulder-external-rotation) | External Rotation (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |

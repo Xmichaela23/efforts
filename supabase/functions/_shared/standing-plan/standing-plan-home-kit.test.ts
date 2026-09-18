@@ -143,11 +143,13 @@ Deno.test('⛔ THE THIRD HOME ROUTE (workorder addendum, 2026-09-10): the preach
     assert((r as { swap_options?: { name: string; display: string }[] }).swap_options?.some((o) => o.display === 'Concentration Curl'),
       'the row\'s own swap list does not carry the concentration curl');
   }
-  // With the station, the row is his and carries no how-to.
+  // With the station, the row is his and carries the station's how-to (2026-09-18: every movement has one) —
+  // the arms on the preacher pad, not the knee.
   const gymRows = [1, 2, 3, 4].flatMap((wk) => rowsIn(week(['Commercial gym'], wk))).filter((r) => r.name.toLowerCase() === 'preacher curl');
   for (const r of gymRows) {
     assertEquals(r.execution_name, undefined);
-    assertEquals((r as { how_to?: string }).how_to, undefined);
+    const howTo = String((r as { how_to?: string }).how_to ?? '');
+    assert(/preacher bench/i.test(howTo) && !/knee/i.test(howTo), `station how-to missing or wrong: "${howTo}"`);
   }
 });
 

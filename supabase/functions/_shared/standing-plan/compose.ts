@@ -2042,6 +2042,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
         load_prescribed: false,
         slot_intent: TEST_LIFT_INTENT,
         notes: 'Last set as many reps as possible. It sets your numbers.',
+        ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       });
       continue;
     }
@@ -2056,6 +2057,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
       // reps and the block's numbers come off it. *"Test set —"* was a label for a row that already
       // says Test in its session name, and *"clean"* is the form rule, which lives on the set itself.
       notes: 'Last set as many reps as possible. It sets your numbers.',
+      ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       set_plan: steps.map((s) => ({
         weight: s.weight,
         reps: s.reps === 'max' ? 1 : s.reps,
@@ -2132,8 +2134,10 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     notes.push({ kind: 'source', text: PLYO_DOSE.stopRule, cite: PLYO_DOSE.stopRuleIsHis });
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
-  return PLYO_FAMILIES_PER_DAY.map((family) => ({
-    name: drillForWeek(family, args.week, args.equipment),
+  return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) })).map(({ family, name }) => ({
+    name,
+    // Every movement carries its how-to (2026-09-18, `EXECUTION_HOW_TO`), the drills included.
+    ...(executionHowTo(name, args.equipment ?? null) ? { how_to: executionHowTo(name, args.equipment ?? null)! } : {}),
     // ⛔ ONE ROW, ONE DRILL, and the efforts sit in `reps` because a plyometric row shows reps and
     // nothing else (D-3452) — there is no load to record and no plate calculator to draw.
     sets: 1,
@@ -2416,16 +2420,14 @@ function rowExecutionName(
   return exec === movement ? null : exec;
 }
 /**
- * THE HOW-TO FOR THIS ROW, or `null`. Same carve-out and same gate as `rowExecutionName` above: a
- * competition lift is never annotated, and the text only travels when the free-weight route is the
- * one the athlete's kit resolved to (2026-09-08).
+ * THE HOW-TO FOR THIS ROW, or `null`. Every row carries one since 2026-09-18, the competition lifts included — the
+ * how-to is part of the movement, not a note on a substitute (`EXECUTION_HOW_TO`). `slot` is kept for the call sites.
  */
 function rowHowTo(
   movement: string,
-  slot: StrengthSlot,
+  _slot: StrengthSlot,
   equipment: string[] | null | undefined,
 ): string | null {
-  if (slot.role === 'competition') return null;
   return executionHowTo(movement, equipment ?? null);
 }
 /**

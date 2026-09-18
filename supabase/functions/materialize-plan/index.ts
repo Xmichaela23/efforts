@@ -51,7 +51,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
-import { executionHowTo, executionName } from '../_shared/strength-grid/grid.ts';
+import { executionHowTo, executionName, homeRouteOnKit } from '../_shared/strength-grid/grid.ts';
 import { canPerform } from '../../../src/lib/strength-gear.ts';
 import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
 import { liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
@@ -2556,7 +2556,7 @@ export function expandTokensForRow(
           
           // Apply equipment substitution with percentage for intelligent band guidance
           // ⛔ THE ATHLETE'S KIT ALREADY REACHES THIS MOVEMENT, SO NOTHING IS SWAPPED (2026-09-10). Where the grid
-          // has a home route for the row on this kit (`executionHowTo` — a lying dumbbell leg curl on a flat bench),
+          // has a home route for the row on this kit (`homeRouteOnKit` — a lying dumbbell leg curl on a flat bench),
           // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
           // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
           // printed a movement the row never named, and the bodyweight label came with it.
@@ -2565,7 +2565,7 @@ export function expandTokensForRow(
           // Raise"); a rename here gave the step one name and the stored row another, so the Today card and the setup
           // sample week said "Lateral Raise" while the logger said "Dumbbell Lateral Raise". A row the kit no longer
           // reaches (the equipment changed after the build) still falls to the swap below.
-          const substituted = (executionHowTo(originalName, userEquipment) != null
+          const substituted = (homeRouteOnKit(originalName, userEquipment)
             || (isStandingPlanRow && canPerform(originalName, userEquipment)))
             ? { name: originalName }
             : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
@@ -3006,7 +3006,7 @@ export function expandTokensForRow(
           
           // Apply equipment substitution with percentage for intelligent band guidance
           // ⛔ THE ATHLETE'S KIT ALREADY REACHES THIS MOVEMENT, SO NOTHING IS SWAPPED (2026-09-10). Where the grid
-          // has a home route for the row on this kit (`executionHowTo` — a lying dumbbell leg curl on a flat bench),
+          // has a home route for the row on this kit (`homeRouteOnKit` — a lying dumbbell leg curl on a flat bench),
           // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
           // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
           // printed a movement the row never named, and the bodyweight label came with it.
@@ -3015,7 +3015,7 @@ export function expandTokensForRow(
           // Raise"); a rename here gave the step one name and the stored row another, so the Today card and the setup
           // sample week said "Lateral Raise" while the logger said "Dumbbell Lateral Raise". A row the kit no longer
           // reaches (the equipment changed after the build) still falls to the swap below.
-          const substituted = (executionHowTo(originalName, userEquipment) != null
+          const substituted = (homeRouteOnKit(originalName, userEquipment)
             || (isStandingPlanRow && canPerform(originalName, userEquipment)))
             ? { name: originalName }
             : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);

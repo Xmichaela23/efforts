@@ -17,36 +17,36 @@ WEEK 01  column=standard  ⟵ TEST WEEK
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Test: Upper   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Bench Press                    -x6, 5, max  @ By feel       | note: Last set as many reps as possible. It sets your numbers.
-      ME     Overhead Press                 -x6, 5, max  @ By feel       | note: Last set as many reps as possible. It sets your numbers.
+      ME     Bench Press                    -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
+      ME     Overhead Press                 -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Test: Lower   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Back Squat                     -x6, 5, max  @ By feel       | note: Last set as many reps as possible. It sets your numbers.
-      ME     Deadlift                       -x6, 5, max  @ By feel       | note: Last set as many reps as possible. It sets your numbers.
+      ME     Back Squat                     -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
+      ME     Deadlift                       -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Pogo Hops                      1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 53 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -62,43 +62,43 @@ WEEK 02  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      A-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 55 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -112,43 +112,43 @@ WEEK 03  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Lunge Hops                     1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      B-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Lunge Hops                     1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 40 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -162,43 +162,43 @@ WEEK 04  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Single-Leg Hops                1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Bounding                       1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 52 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -212,43 +212,43 @@ WEEK 05  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Skater Hops                    1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Skater Hops                    1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -262,43 +262,43 @@ WEEK 06  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      A-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Pogo Hops                      1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 38 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -312,43 +312,43 @@ WEEK 07  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      B-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -362,43 +362,43 @@ WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Lunge Hops                     1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Bounding                       1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Lunge Hops                     1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 59 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -412,43 +412,43 @@ WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Single-Leg Hops                1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 51 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -462,43 +462,43 @@ WEEK 10  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Skater Hops                    1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      A-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Skater Hops                    1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 48 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -512,43 +512,43 @@ WEEK 11  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      B-Skip                         1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Pogo Hops                      1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 35 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -562,43 +562,43 @@ WEEK 12  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
-      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
+      ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Bounding                       1x4          @ Bodyweight    | how-to · note: running gait and speed. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to · note: general speed and explosiveness. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
+      -      Hopscotch                      1x4          @ Bodyweight    | how-to · note: general foot and leg control. Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy, stop.
   [Wednesday] run      Near-threshold Run — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift · how-to
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
+      ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
-      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
