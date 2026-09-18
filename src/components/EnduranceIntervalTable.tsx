@@ -223,8 +223,8 @@ export default function EnduranceIntervalTable({
   if (displayMode === 'awaiting_recompute' && hasPlanned) {
     return (
       <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
-        <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
-        <p className="text-xs text-red-300/90 mt-1">
+        <p className="text-subhead text-red-200">Session interval contract missing for this planned workout.</p>
+        <p className="text-caption text-red-300 mt-1">
           {displayReason === 'no_measured_execution_and_no_overall'
             ? 'Measured execution data is not ready yet. Recompute analysis to refresh.'
             : 'Recompute analysis to generate canonical interval rows.'}
@@ -254,7 +254,7 @@ export default function EnduranceIntervalTable({
   // ── Interval table ───────────────────────────────────────────────────────
   return (
     <>
-      <table className="w-full text-[13px] table-fixed">
+      <table className="w-full text-footnote table-fixed">
         <colgroup>
           <col className="w-[36%]" />
           <col className="w-[22%]" />
@@ -271,7 +271,7 @@ export default function EnduranceIntervalTable({
                   <button
                     type="button"
                     onClick={() => setShowAllIntervals((v) => !v)}
-                    className="text-[11px] px-1.5 py-0.5 rounded-xl bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15"
+                    className="text-caption px-1.5 py-0.5 rounded-xl bg-white/10 border border-white/15 text-label hover:bg-white/15"
                   >
                     {showAllIntervals ? 'Hide strides' : 'Show strides'}
                   </button>
@@ -354,7 +354,7 @@ export default function EnduranceIntervalTable({
               }
               return iv.planned_pace_display;
             })();
-            const pctClass = (cmp?.status && RACE_STATUS_CLASS[cmp.status]) || 'text-white/50';
+            const pctClass = (cmp?.status && RACE_STATUS_CLASS[cmp.status]) || 'text-label-secondary';
 
             const showRangeSubtitle = (() => {
               // D-040 Fix C: single-segment steady → no subtitle (the pace
@@ -370,10 +370,10 @@ export default function EnduranceIntervalTable({
 
             // ⛔ The pacing word and its label are the server's (audit H-D12, `pacing.variability`).
             const cvIndicator = pct != null && variability ? (
-              variability.level === 'high' ? <span className="text-[9px] text-red-500" title={variability.label}>⚠️</span>
-              : variability.level === 'moderate' ? <span className="text-[9px] text-orange-500" title={variability.label}>⚠️</span>
-              : variability.level === 'good' ? <span className="text-[9px] text-yellow-500" title={variability.label}>✓</span>
-              : <span className="text-[9px] text-green-500" title={variability.label}>✓</span>
+              variability.level === 'high' ? <span className="text-caption text-red-500" title={variability.label}>⚠️</span>
+              : variability.level === 'moderate' ? <span className="text-caption text-orange-500" title={variability.label}>⚠️</span>
+              : variability.level === 'good' ? <span className="text-caption text-yellow-500" title={variability.label}>✓</span>
+              : <span className="text-caption text-green-500" title={variability.label}>✓</span>
             ) : null;
 
             return (
@@ -381,36 +381,36 @@ export default function EnduranceIntervalTable({
                 <td className="px-2 py-1.5">
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                      <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
+                      <span className="text-footnote font-medium break-words min-w-0 pr-2">{String(iv.planned_label ?? '')}</span>
                       {/* 2026-09-03 (Michael: "go follow industry standards"): no per-row percentage on a planned
                           session. TrainingPeaks and Garmin show planned beside actual and colour the actual
                           (in range / faster / slower); one score for the session lives in the header. The
                           goal-race view keeps its own comparison. */}
                       {pct != null && isGoalRace && hasPlanned && (
                         <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
+                          <span className={`text-caption font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
                           {cvIndicator}
                         </div>
                       )}
                     </div>
                     {showRangeSubtitle && subtitlePace && (
-                      <div className="text-[10px] text-gray-400 mt-0.5">
+                      <div className="text-caption text-label-secondary mt-0.5">
                         {String(subtitlePace)}
                       </div>
                     )}
                   </div>
                 </td>
-                <td className={`px-2 py-1.5 font-medium ${bandClass}`}>{iv.not_done ? <span className="text-white/40">{iv.not_matched ? 'not matched' : 'not done'}</span> : execCell}</td>
+                <td className={`px-2 py-1.5 font-medium ${bandClass}`}>{iv.not_done ? <span className="text-label-secondary">{iv.not_matched ? 'not matched' : 'not done'}</span> : execCell}</td>
                 <td className="px-2 py-1.5">{iv.not_done ? '—' : distStr}</td>
                 <td className="px-2 py-1.5">
                   <div className="font-medium">{iv.not_done ? '—' : durStr}</div>
                 </td>
-                <td className="px-1 py-1.5 text-[13px]">
+                <td className="px-1 py-1.5 text-footnote">
                   <div className="text-right">
                     {hrVal != null ? (
                       <>
                         <div className="font-medium">{hrVal}</div>
-                        <div className="text-[10px] text-gray-400">bpm</div>
+                        <div className="text-caption text-label-secondary">bpm</div>
                       </>
                     ) : '—'}
                   </div>
@@ -444,7 +444,7 @@ function CompletedTotalsSegmentTable({
   const durStr = ct.duration_s ? fmtTime(ct.duration_s) : '—';
   const hrStr = ct.avg_hr ? String(Math.round(ct.avg_hr)) : '—';
   return (
-    <table className="w-full text-[13px] table-fixed">
+    <table className="w-full text-footnote table-fixed">
       <colgroup>
         <col className="w-[36%]" />
         <col className="w-[22%]" />
@@ -467,7 +467,7 @@ function CompletedTotalsSegmentTable({
           <td className="px-2 py-1.5 font-medium">{isRide ? '—' : paceStr}</td>
           <td className="px-2 py-1.5">{distStr}</td>
           <td className="px-2 py-1.5 font-medium">{durStr}</td>
-          <td className="px-1 py-1.5 text-right">{hrStr !== '—' ? <><div className="font-medium">{hrStr}</div><div className="text-[10px] text-gray-400">bpm</div></> : '—'}</td>
+          <td className="px-1 py-1.5 text-right">{hrStr !== '—' ? <><div className="font-medium">{hrStr}</div><div className="text-caption text-label-secondary">bpm</div></> : '—'}</td>
         </tr>
       </tbody>
     </table>
@@ -570,7 +570,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
       improving: { w: 'improving', c: 'text-emerald-400', a: '↑' },
       holding: { w: 'holding', c: 'text-amber-300', a: '→' },
       sliding: { w: 'sliding', c: 'text-red-400', a: '↓' },
-      needs_data: { w: 'building — need more sessions', c: 'text-white/40', a: '' },
+      needs_data: { w: 'building — need more sessions', c: 'text-label-secondary', a: '' },
     };
     const v = VERD[dt.verdict] || VERD.needs_data;
     const pct = dt.pct_change;
@@ -581,10 +581,10 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
     // number and the arrow always agree. Three copies of that became one.
     const pctDisplay = (dt as { signed_pct?: string | null }).signed_pct ?? null;
     return (
-      <div className="flex items-baseline justify-center gap-1.5 text-[12px] mb-3">
+      <div className="flex items-baseline justify-center gap-1.5 text-caption mb-3">
         <span style={labelStyle}>{dt.discipline} trend</span>
         <span className={`inline-flex items-baseline gap-0.5 ${v.c}`}>{v.a && <span>{v.a}</span>}<span>{v.w}</span></span>
-        {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-white/35">{pctDisplay}</span>}
+        {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-label-secondary">{pctDisplay}</span>}
       </div>
     );
   })();
@@ -596,8 +596,8 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
     return (
       <div className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-        <span className="text-[12px] text-gray-100" style={tnum}>{pct}%</span>
-        <span className="text-[11px]" style={labelStyle}>{label}</span>
+        <span className="text-caption text-label" style={tnum}>{pct}%</span>
+        <span className="text-caption" style={labelStyle}>{label}</span>
       </div>
     );
   };
@@ -605,33 +605,33 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   return (
     <div className="galaxy-card rounded-xl border border-white/10 p-4" style={{ ['--card-accent-a' as any]: '0.16' }}>
       {weekLabel && (
-        <div className="text-center text-[11px] uppercase tracking-wide mb-2" style={labelStyle}>{weekLabel}</div>
+        <div className="text-center text-caption uppercase tracking-wide mb-2" style={labelStyle}>{weekLabel}</div>
       )}
       {trendNode}
       {(executedDistM > 0 || executedDurS > 0) && (
         <div className="flex items-center justify-center gap-10 text-center mb-4">
           <div className="flex flex-col items-center">
-            <div className="text-2xl font-light text-gray-100" style={tnum}>{doneDistText ?? '—'}</div>
-            <div className="text-[11px] mt-0.5" style={labelStyle}>Distance</div>
+            <div className="text-title1 font-normal text-label" style={tnum}>{doneDistText ?? '—'}</div>
+            <div className="text-caption mt-0.5" style={labelStyle}>Distance</div>
           </div>
           <div className="flex flex-col items-center">
-            <div className="text-2xl font-light text-gray-100" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
-            <div className="text-[11px] mt-0.5" style={labelStyle}>Duration</div>
+            <div className="text-title1 font-normal text-label" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
+            <div className="text-caption mt-0.5" style={labelStyle}>Duration</div>
           </div>
         </div>
       )}
 
       {/* D-194: work:rest readout — "Work 24:00 · Rest 11:00", single-sourced from the server contract. */}
       {(ct as any).swim_work_rest && (
-        <div className="text-center text-[12px] text-white/55 mb-4" style={tnum}>{(ct as any).swim_work_rest}</div>
+        <div className="text-center text-caption text-label-secondary mb-4" style={tnum}>{(ct as any).swim_work_rest}</div>
       )}
 
       {metrics.length > 0 && (
         <div className={`grid gap-3 text-center ${metrics.length >= 4 ? 'grid-cols-4' : metrics.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {metrics.map(([v, l]) => (
             <div key={l} className="flex flex-col items-center">
-              <div className="text-sm font-light text-gray-100 whitespace-nowrap" style={tnum}>{v}</div>
-              <div className="text-[11px] mt-0.5" style={labelStyle}>{l}</div>
+              <div className="text-subhead font-normal text-label whitespace-nowrap" style={tnum}>{v}</div>
+              <div className="text-caption mt-0.5" style={labelStyle}>{l}</div>
             </div>
           ))}
         </div>
@@ -641,9 +641,9 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
           the pace consequence ("with fins — reads faster than unaided"). Falls back to the legacy
           client-derived fins line for any session_detail built before this field existed. */}
       {(ct as any).swim_pace_equipment_note ? (
-        <div className="mt-2 text-center text-[11px] text-white/40">{(ct as any).swim_pace_equipment_note}</div>
+        <div className="mt-2 text-center text-caption text-label-secondary">{(ct as any).swim_pace_equipment_note}</div>
       ) : finsUsed ? (
-        <div className="mt-2 text-center text-[11px] text-white/40">· some sets with fins</div>
+        <div className="mt-2 text-center text-caption text-label-secondary">· some sets with fins</div>
       ) : null}
 
       {(distPct != null || timePct != null) && (
@@ -658,16 +658,16 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
       )}
 
       <div className="mt-4 pt-3 border-t border-white/[0.08]">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-4 text-subhead">
           <div>
-            <div className="text-[11px] mb-1" style={labelStyle}>Planned</div>
-            <div className="font-light text-gray-200" style={tnum}>{planDistText ?? '—'}</div>
-            <div className="text-gray-400" style={tnum}>{plannedDurS > 0 ? fmtTimeLocal(plannedDurS) : '—'}</div>
+            <div className="text-caption mb-1" style={labelStyle}>Planned</div>
+            <div className="font-normal text-label" style={tnum}>{planDistText ?? '—'}</div>
+            <div className="text-label-secondary" style={tnum}>{plannedDurS > 0 ? fmtTimeLocal(plannedDurS) : '—'}</div>
           </div>
           <div>
-            <div className="text-[11px] mb-1" style={labelStyle}>Executed</div>
-            <div className="font-light text-gray-200" style={tnum}>{doneDistText ?? '—'}</div>
-            <div className="text-gray-400" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
+            <div className="text-caption mb-1" style={labelStyle}>Executed</div>
+            <div className="font-normal text-label" style={tnum}>{doneDistText ?? '—'}</div>
+            <div className="text-label-secondary" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
           </div>
         </div>
       </div>
@@ -691,10 +691,10 @@ function fmtPaceSec(s: number | null | undefined): string {
 
 /** The server's goal-race status word → its colour (audit H-D12). */
 const RACE_STATUS_CLASS: Record<string, string> = {
-  on: 'text-emerald-400/80',
-  near: 'text-amber-400/80',
-  off: 'text-amber-500/80',
+  on: 'text-emerald-400',
+  near: 'text-amber-400',
+  off: 'text-amber-500',
   ahead: 'text-emerald-400',
-  even: 'text-white/50',
-  behind: 'text-amber-400/90',
+  even: 'text-label-secondary',
+  behind: 'text-amber-400',
 };

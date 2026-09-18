@@ -137,24 +137,24 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
       {counts && counts.exercises_planned > 0 && (
         <div>
           <div className="flex items-baseline gap-2">
-            <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
-            <span className="text-lg font-semibold text-white">
+            <span className="readout-label text-caption font-medium uppercase tracking-wide">Completed</span>
+            <span className="text-body font-semibold text-white">
               {counts.exercises_completed} of {counts.exercises_planned}
             </span>
-            <span className="text-xs text-gray-400">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
+            <span className="text-caption text-label-secondary">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
           </div>
           {/* Q-181 — THE SWAP RECEIPT, deterministic and server-written. An IN-SLOT swap renders nothing. */}
           {execSubstitutionNotes.map((note, i) => (
-            <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
+            <p key={i} className="text-subhead text-label mt-1.5 leading-snug">{note}</p>
           ))}
         </div>
       )}
       {/* "Failed" on screen (plumbing §3): the tap's own error outranks the stored line while fresh. */}
       {(recomputeError || analysisFailure) && (
         <div className="flex items-center justify-between gap-3 mb-2">
-          <p className="text-xs text-rose-300/90 m-0">{recomputeError || analysisFailure}</p>
+          <p className="text-caption text-rose-300 m-0">{recomputeError || analysisFailure}</p>
           {onRecompute && (
-            <GalaxyButton variant="secondary" size="sm" onClick={onRecompute} disabled={recomputing} className="shrink-0 text-xs" title="Run the analysis again">
+            <GalaxyButton variant="secondary" size="sm" onClick={onRecompute} disabled={recomputing} className="shrink-0 text-caption" title="Run the analysis again">
               {recomputing ? 'Trying…' : 'Try again'}
             </GalaxyButton>
           )}
@@ -167,28 +167,28 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
           the contract for anything that still reads it. */}
       {Array.isArray(allOut) && allOut.length > 0 && (
         <div className="galaxy-card mt-3 mb-1 rounded-xl border border-strength/25 p-3" style={{ ['--card-accent-a' as any]: '0.20' }}>
-          <div className="readout-label text-[11px] uppercase tracking-wider mb-2">All-out set</div>
+          <div className="readout-label text-caption uppercase tracking-wider mb-2">All-out set</div>
           {allOut.map((a: any, i: number) => (
             <div key={i} className={i > 0 ? 'mt-3 pt-3 border-t border-white/10' : ''}>
-              <div className="text-sm text-white/90">
-                <span className="text-white/60">{a.name}</span>{' '}
+              <div className="text-subhead text-label">
+                <span className="text-label-secondary">{a.name}</span>{' '}
                 <span className="tabular-nums font-semibold">{a.weight} lb × {a.reps}</span>
               </div>
               {/* ⛔ STRONG/HEVY-CLEAN (2026-08-11) — a rep record is a "Rep PR" badge and nothing else. */}
               {a.is_rep_record && (
-                <div className="text-[13px] mt-0.5">
+                <div className="text-footnote mt-0.5">
                   {/* Strength orange, not green — green means bike (Michael 2026-08-15). */}
                   <span className="text-strength font-medium">Rep PR</span>
                 </div>
               )}
-              <div className="text-[12px] text-white/50 mt-1 tabular-nums">
+              <div className="text-caption text-label-secondary mt-1 tabular-nums">
                 Estimated max {a.estimated_1rm} lb
               </div>
             </div>
           ))}
           {/* The 95% week is the one that moves the bar, whatever else is on screen. */}
           {block?.is_measurement_week === true && (
-            <p className="text-[12px] text-white/55 mt-2 leading-snug">
+            <p className="text-caption text-label-secondary mt-2 leading-snug">
               This is the set that sets your next cycle's weight.
             </p>
           )}
@@ -215,16 +215,16 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
         <>
         <div className="grid grid-cols-4 gap-2 px-3 py-3 border-t border-white/[0.055] text-center">
           <div>
-            <div className="text-lg font-semibold text-white">{totals.sets_completed}</div>
-            <div className="text-[11px] text-white/50">Total Sets</div>
+            <div className="text-body font-semibold text-white">{totals.sets_completed}</div>
+            <div className="text-caption text-label-secondary">Total Sets</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">{totals.reps_completed}</div>
-            <div className="text-[11px] text-white/50">Total Reps</div>
+            <div className="text-body font-semibold text-white">{totals.reps_completed}</div>
+            <div className="text-caption text-label-secondary">Total Reps</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">{totals.volume_display ?? '—'}</div>
-            <div className="text-[11px] text-white/50">{totals.volume_label ?? 'Volume'}</div>
+            <div className="text-body font-semibold text-white">{totals.volume_display ?? '—'}</div>
+            <div className="text-caption text-label-secondary">{totals.volume_label ?? 'Volume'}</div>
           </div>
           {/* DURATION — the fourth tile, and the only editable one. It reads "—" on sessions logged
               before the clock existed, and the edit is how those get a number at all. */}
@@ -242,7 +242,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
                   if (e.key === 'Enter') { e.preventDefault(); (e.currentTarget as HTMLInputElement).blur(); }
                   if (e.key === 'Escape') { setEditingDuration(false); setDurationError(null); }
                 }}
-                className="w-full bg-white/[0.10] border border-white/25 rounded-md px-1 py-0.5 text-lg font-semibold text-white text-center tabular-nums outline-none focus:border-white/50"
+                className="w-full bg-white/[0.10] border border-white/25 rounded-md px-1 py-0.5 text-body font-semibold text-white text-center tabular-nums outline-none focus:border-white/50"
                 aria-label="Session duration in minutes"
               />
             ) : (
@@ -253,28 +253,28 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
                   setDurationError(null);
                   setEditingDuration(true);
                 }}
-                className="relative w-full text-lg font-semibold text-white hover:text-white/80"
+                className="relative w-full text-body font-semibold text-white hover:text-label"
                 aria-label={durationMin > 0 ? `Session duration ${durationMin} minutes, edit` : 'Add session duration'}
               >
                 {formatSessionMinutes(durationMin)}
-                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-white/25 pointer-events-none" />
+                <Pencil className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-label-secondary pointer-events-none" />
               </button>
             )}
-            <div className="text-[11px] text-white/50">{editingDuration ? 'Minutes' : 'Duration'}</div>
+            <div className="text-caption text-label-secondary">{editingDuration ? 'Minutes' : 'Duration'}</div>
           </div>
         </div>
         {durationError && (
-          <div className="text-[11px] text-amber-300/90 text-right px-3 pb-2">{durationError}</div>
+          <div className="text-caption text-amber-300 text-right px-3 pb-2">{durationError}</div>
         )}
         </>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
-        <div className="px-3 py-3 border-t border-white/[0.055] text-[13px] text-white/85">
-          <div className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase mb-1">Add‑ons</div>
+        <div className="px-3 py-3 border-t border-white/[0.055] text-footnote text-label">
+          <div className="readout-label text-caption font-semibold tracking-[0.12em] uppercase mb-1">Add‑ons</div>
           {completed.addons.map((a:any, idx:number)=> (
             <div key={idx} className="flex items-center justify-between py-0.5">
               <span>{a.token?.split('.')[0]?.replace(/_/g,' ') || a.name || 'Addon'}</span>
-              <span className="text-white/55">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
+              <span className="text-label-secondary">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
             </div>
           ))}
         </div>

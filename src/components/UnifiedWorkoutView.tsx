@@ -893,7 +893,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         {/* Row 1: Title + Attach/Unattach. gap-4 so the title never touches the button — with the
             location in the title it can run to two lines and there was nothing holding them apart. */}
         <div className="flex items-center justify-between gap-4">
-          <h2 className="font-light tracking-normal text-base text-white min-w-0">
+          <h2 className="font-normal tracking-normal text-body text-white min-w-0">
             {(() => {
               // ⛔ `ME: Upper` → `Heavy: Upper` at the last moment. Display only; the engine string
               // is untouched, and `plainIntent` is total so every other title passes through.
@@ -908,7 +908,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <button
                 onClick={()=>setAssocOpen(true)}
                 title={unmatchedPrompt(sameDayPlannedRows as never)}
-                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-label font-normal tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-subhead"
                 style={{
                   borderColor: `rgba(${sportRgb}, 0.32)`,
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.10)`,
@@ -951,7 +951,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     console.warn('[UnifiedWorkoutView] unattach handler failed:', e);
                   }
                 }}
-                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+                className="px-4 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-lg border border-white/25 text-label font-normal tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-subhead"
                 style={{
                   borderColor: `rgba(${sportRgb}, 0.30)`,
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.08)`,
@@ -969,7 +969,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           * value prevents. Nothing when there is nothing true to say.
           */}
         {boomLine ? (
-          <div className="text-[14px] mt-1.5" style={{ lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>
+          <div className="text-subhead mt-1.5" style={{ lineHeight: 1.35, color: 'var(--label)' }}>
             {boomLine}
           </div>
         ) : null}
@@ -986,7 +986,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           const line = (sessionDetailV1 as { block?: { line?: string | null } | null } | null)?.block?.line ?? null;
           return line ? (
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span className="text-gray-400 text-sm">{line}</span>
+              <span className="text-label-secondary text-subhead">{line}</span>
             </div>
           ) : null;
         })()}
@@ -1016,18 +1016,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     540" becomes "Garmin Edge 540 via Strava", in Garmin's blue; a non-Garmin device
                     keeps its "via [device]" line. */}
                 {deviceName && deviceIsGarmin ? (
-                  <span className="text-[#007CC3] font-light text-xs">Garmin {deviceName} via Strava</span>
+                  <span className="text-[#409DD2] font-normal text-caption">Garmin {deviceName} via Strava</span>
                 ) : deviceName ? (
-                  <span className="text-gray-400 text-xs">via {deviceName}</span>
+                  <span className="text-label-secondary text-caption">via {deviceName}</span>
                 ) : null}
                 {stravaUrl && (
                   <>
-                    <span className="text-gray-300">•</span>
+                    <span className="text-footnote text-label-secondary">•</span>
                     <a 
                       href={stravaUrl} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-xs text-[#FC5200] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="text-caption text-[#FC5200] font-normal underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
                     >
                       View on Strava
                     </a>
@@ -1043,7 +1043,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const garminUrl = garminConnectId ? `https://connect.garmin.com/app/activity/${garminConnectId}` : null;
             return (
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                <span className="text-gray-400 text-sm">via</span>
+                <span className="text-label-secondary text-subhead">via</span>
                 {/**
                   * ⛔ THE ATTRIBUTION IS "Garmin [device model]" AND NOTHING ELSE (2026-09-03).
                   *
@@ -1061,20 +1061,20 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   * ⛔ WHAT THIS REPLACED: a hand-drawn blue triangle polygon in Garmin's #007CC3 standing
                   * in for their mark — an invented, stylized mark, which the guidelines do not permit.
                   */}
-                {/* text-sm, not text-xs (2026-09-03, Michael: "the garmin is real small"). Garmin's own
+                {/* text-subhead, not text-caption (2026-09-03, Michael: "the garmin is real small"). Garmin's own
                     rule is "appropriately sized text"; at 12px against a 14px date line it read as fine
                     print, which is the opposite of the visual association their guidelines ask for. */}
-                <span className="text-[#007CC3] font-light text-sm">
+                <span className="text-[#409DD2] font-normal text-subhead">
                   {deviceName ? `Garmin ${deviceName}` : 'Garmin'}
                 </span>
                 {garminUrl && (
                   <>
-                    <span className="text-gray-300">•</span>
+                    <span className="text-footnote text-label-secondary">•</span>
                     <a
                       href={garminUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-[#007CC3] font-light underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="text-caption text-[#409DD2] font-normal underline underline-offset-2 cursor-pointer hover:opacity-80 transition-opacity"
                     >
                       View
                     </a>
@@ -1105,7 +1105,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             Share (2026-09-07): the session as text through the phone's share sheet, with the site at
             the bottom. Any completed session, runs and rides included. No picture. */}
         <div className="flex items-baseline justify-between gap-3">
-            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline min-w-0">
+            <p className="text-subhead text-label font-normal tracking-normal leading-snug [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline min-w-0">
               {(() => {
                 try {
                   // For completed workouts, use the date field for date and timestamp for time
@@ -1153,10 +1153,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               })()}
             </p>
             {isCompleted && (
-              <span className="flex items-baseline gap-3 shrink-0 text-xs font-light">
+              <span className="flex items-baseline gap-3 shrink-0 text-caption font-normal">
                 <button
                   type="button"
-                  className="text-white/60 hover:text-white/90 transition-colors"
+                  className="text-label-secondary hover:text-label transition-colors"
                   onClick={async () => {
                   try {
                     const w = workout as Record<string, unknown> | null;
@@ -1230,7 +1230,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             )}
           </div>
         {shareError && (
-          <p className="text-xs text-red-400 text-right mt-1">{shareError}</p>
+          <p className="text-caption text-red-400 text-right mt-1">{shareError}</p>
         )}
         {assocOpen && (
           <AssociatePlannedDialog
@@ -1270,21 +1270,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         >
           {/* Planned tab: show for planned workouts OR completed+linked */}
           {(!isCompleted || isLinked) && (
-            <TabsTrigger value="planned" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+            <TabsTrigger value="planned" style={{ fontFamily: 'inherit', letterSpacing: '0.02em' }} className="flex items-center gap-2 py-1 text-subhead font-normal tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-label-secondary hover:text-label transition-colors">
               <Calendar className="h-4 w-4" />
               Planned
             </TabsTrigger>
           )}
           {/* Performance tab: show for all completed (planned = execution scores, unplanned = analysis) */}
           {isCompleted && (
-            <TabsTrigger value="summary" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+            <TabsTrigger value="summary" style={{ fontFamily: 'inherit', letterSpacing: '0.02em' }} className="flex items-center gap-2 py-1 text-subhead font-normal tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-label-secondary hover:text-label transition-colors">
               <ListCollapse className="h-4 w-4" />
               Performance
             </TabsTrigger>
           )}
           {/* Details tab: completed endurance only — strength family folds Details into Performance */}
           {isCompleted && !isStrengthFamily && (
-            <TabsTrigger value="completed" className="flex items-center gap-2 py-1 font-light tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-gray-400 hover:text-gray-300 transition-colors">
+            <TabsTrigger value="completed" style={{ fontFamily: 'inherit', letterSpacing: '0.02em' }} className="flex items-center gap-2 py-1 text-subhead font-normal tracking-wide data-[state=active]:bg-transparent data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white/30 data-[state=inactive]:text-label-secondary hover:text-label transition-colors">
               <List className="h-4 w-4" />
               Details
             </TabsTrigger>
@@ -1325,7 +1325,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             tabIndex={0}
                             aria-label="Swap sport for this session"
                             title="Swap sport"
-                            className="p-1 -m-1 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
+                            className="p-1 -m-1 rounded-lg text-label-secondary hover:text-label hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowSwapPanel((v) => !v); }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowSwapPanel((v) => !v); }
@@ -1379,7 +1379,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     <div className="mt-4">
                       <button
                         onClick={handleClick}
-                        className={`w-full px-4 py-3 rounded-xl ${isMobility ? 'bg-purple-500/20 border-purple-500/40 hover:bg-purple-500/30' : isStrength ? 'bg-orange-500/20 border-orange-500/40 hover:bg-orange-500/30' : 'bg-white/[0.08] border-white/30 hover:bg-white/[0.12]'} backdrop-blur-md border text-white text-sm font-light tracking-wide transition-all`}
+                        className={`w-full px-4 py-3 rounded-xl ${isMobility ? 'bg-purple-500/20 border-purple-500/40 hover:bg-purple-500/30' : isStrength ? 'bg-orange-500/20 border-orange-500/40 hover:bg-orange-500/30' : 'bg-white/[0.08] border-white/30 hover:bg-white/[0.12]'} backdrop-blur-md border text-white text-subhead font-normal tracking-wide transition-all`}
                       >Go to workout</button>
                     </div>
                   );
@@ -1422,7 +1422,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   <div className="mt-4 pt-3 border-t border-white/10">
                   {showSwapPanel && swapOptions.length > 0 && (
                     <div className="mb-3 flex flex-col gap-2">
-                      <div className="text-[13px] text-white/70">Same day, same time. Pick the sport you want instead.</div>
+                      <div className="text-footnote text-label-secondary">Same day, same time. Pick the sport you want instead.</div>
                       {swapOptions.map((opt) => (
                         <button
                           key={opt.id}
@@ -1431,10 +1431,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           onClick={() => applySwap(opt)}
                           className="w-full px-3 py-2.5 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
-                          <div className="text-sm font-medium">{opt.label}</div>
+                          <div className="text-subhead font-medium">{opt.label}</div>
                           {/* ⛔ WARN, NEVER GATE — the button above still applies the swap. */}
                           {opt.warnings.map((warn) => (
-                            <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
+                            <div key={warn} className="text-caption text-amber-200 mt-1">{warn}</div>
                           ))}
                         </button>
                       ))}
@@ -1444,7 +1444,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-white/60 hover:text-white/80 hover:bg-white/10"
+                      className="text-label-secondary hover:text-label hover:bg-white/10"
                       onClick={async () => {
                         const currentDate = (unifiedWorkout as any)?.date || (workout as any)?.date || '';
                         const workoutId = (unifiedWorkout as any)?.id || (workout as any)?.id;
@@ -1524,7 +1524,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-white/60 hover:text-white/80 hover:bg-white/10 gap-1.5"
+                        className="text-label-secondary hover:text-label hover:bg-white/10 gap-1.5"
                         onClick={() => setShowSwapPanel((v) => !v)}
                       >
                         <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -1671,15 +1671,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         </div>
                       ) : (
                         <div>
-                          <h3 className="font-light mb-4 text-white/90">Workout Completed</h3>
-                          <p className="text-white/60">Workout type not yet supported in completed view.</p>
+                          <h3 className="font-normal mb-4 text-label">Workout Completed</h3>
+                          <p className="text-label-secondary">Workout type not yet supported in completed view.</p>
                         </div>
                       )}
                   </div>
                 ) : (
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                    <h3 className="font-light text-amber-400 mb-2">Not Yet Completed</h3>
-                    <p className="text-sm text-amber-300/80">
+                    <h3 className="font-normal text-amber-400 mb-2">Not Yet Completed</h3>
+                    <p className="text-subhead text-amber-300">
                       This workout hasn't been completed yet. Complete it to see detailed analytics.
                     </p>
                   </div>
@@ -1703,7 +1703,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 console.warn('[UnifiedWorkoutView] delete workout confirmation/handler failed:', e);
               }
             }}
-            className="px-4 py-2 rounded-xl bg-transparent border border-red-400/40 text-red-300/85 font-light text-sm hover:bg-red-500/10"
+            className="px-4 py-2 rounded-xl bg-transparent border border-red-400/40 text-red-300 font-normal text-subhead hover:bg-red-500/10"
           >
             Delete workout
           </button>

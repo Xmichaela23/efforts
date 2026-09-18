@@ -139,8 +139,8 @@ interface SessionNarrativeProps {
 export function Reading({ label, text }: { label: string; text: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-x-2.5">
-      <span className="shrink-0 w-[92px] text-[11px] text-white/45 lowercase tracking-wide leading-snug">{label}</span>
-      <span className="min-w-0 flex-1 text-[13px] text-white/85 leading-snug">{text}</span>
+      <span className="shrink-0 w-[92px] text-caption text-label-secondary lowercase tracking-wide leading-snug">{label}</span>
+      <span className="min-w-0 flex-1 text-footnote text-label leading-snug">{text}</span>
     </div>
   );
 }
@@ -161,7 +161,7 @@ export function NextUp({ session }: { session: NextSession }) {
       label="Next"
       text={(
         <>
-          {dayName && <span className="text-white/55">{dayName} </span>}
+          {dayName && <span className="text-label-secondary">{dayName} </span>}
           {/* Name only (2026-09-15, Michael). The prescription stays in the contract for race readiness. */}
           {session.name}
         </>
@@ -181,31 +181,31 @@ function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['ses
   return (
     <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-3 space-y-3">
       <div>
-        <span className="text-[10px] font-semibold text-amber-200/90 uppercase tracking-wide">Race readiness</span>
-        <p className="text-sm font-semibold text-gray-100 mt-1 leading-snug">{rr.headline}</p>
+        <span className="text-caption font-semibold text-amber-200 uppercase tracking-wide">Race readiness</span>
+        <p className="text-subhead font-semibold text-label mt-1 leading-snug">{rr.headline}</p>
       </div>
       {!!String(rr.verdict || '').trim() && (
-        <p className="text-sm text-gray-300 leading-relaxed">{rr.verdict}</p>
+        <p className="text-subhead text-label leading-relaxed">{rr.verdict}</p>
       )}
       {!!String(rr.tactical_instruction || '').trim() && (
         <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
-          <span className="readout-label text-[10px] font-medium uppercase tracking-wide">Race day</span>
-          <p className="text-sm text-gray-100 mt-0.5 leading-snug">{rr.tactical_instruction}</p>
+          <span className="readout-label text-caption font-medium uppercase tracking-wide">Race day</span>
+          <p className="text-subhead text-label mt-0.5 leading-snug">{rr.tactical_instruction}</p>
         </div>
       )}
       {rr.flag != null && String(rr.flag).trim() !== '' && (
         <div className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-2">
-          <span className="text-[10px] font-medium text-amber-200/90 uppercase tracking-wide">Flag</span>
-          <p className="text-sm text-amber-100/95 mt-0.5 leading-snug">{rr.flag}</p>
+          <span className="text-caption font-medium text-amber-200 uppercase tracking-wide">Flag</span>
+          <p className="text-subhead text-amber-100 mt-0.5 leading-snug">{rr.flag}</p>
         </div>
       )}
       {!!String(rr.projection || '').trim() && (
-        <p className="text-xs text-gray-400 leading-relaxed border-t border-white/10 pt-2">{rr.projection}</p>
+        <p className="text-caption text-label-secondary leading-relaxed border-t border-white/10 pt-2">{rr.projection}</p>
       )}
       {!!String(rr.taper_guidance || '').trim() && (
         <div className="rounded-md border border-sky-500/25 bg-sky-500/[0.07] px-2.5 py-2">
-          <span className="text-[10px] font-medium text-sky-200/90 uppercase tracking-wide">Taper</span>
-          <p className="text-sm text-gray-200 mt-0.5 leading-relaxed">{String(rr.taper_guidance).trim()}</p>
+          <span className="text-caption font-medium text-sky-200 uppercase tracking-wide">Taper</span>
+          <p className="text-subhead text-label mt-0.5 leading-relaxed">{String(rr.taper_guidance).trim()}</p>
         </div>
       )}
     </div>
@@ -229,13 +229,13 @@ export default function SessionNarrative({
   const failureText = recomputeError || analysisFailure || null;
   const failureBlock = failureText ? (
     <div className="flex items-center justify-between gap-3 mb-1">
-      <p className="text-sm text-red-300/90 m-0">{failureText}</p>
+      <p className="text-subhead text-red-300 m-0">{failureText}</p>
       <GalaxyButton
         variant="secondary"
         size="sm"
         onClick={onRecompute}
         disabled={recomputing || recomputeDisabled}
-        className="shrink-0 text-xs"
+        className="shrink-0 text-caption"
         title="Run the analysis again"
       >
         {recomputing ? 'Trying…' : 'Try again'}
@@ -307,14 +307,14 @@ export default function SessionNarrative({
             size="sm"
             onClick={onRecompute}
             disabled={recomputing || recomputeDisabled}
-            className="text-xs"
+            className="text-caption"
             title="Generate analysis for this workout"
           >
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
           </GalaxyButton>
         </div>
         {failureBlock}
-        <p className="text-sm text-gray-500 italic">
+        <p className="text-subhead text-label-secondary italic">
           {hasSessionDetail
             ? 'No insights available for this workout yet. Recompute analysis to refresh.'
             : 'No session insight contract found for this workout yet. Click "Recompute analysis" to generate it.'}
@@ -376,14 +376,14 @@ export default function SessionNarrative({
         // The section's header, in State's voice (BODY / THIS WEEK): 11 px, uppercase, tracked, the
         // sport's colour. It used to be a 14 px grey stat line with no relation to the screen next door.
         return parts.length > 0
-          ? <div className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">{parts.join(' · ')}</div>
+          ? <div className="readout-label text-caption font-semibold tracking-[0.12em] uppercase">{parts.join(' · ')}</div>
           : null;
       })()}
       {/* ⛔ THE SESSION CAME IN OFF ITS PRESCRIPTION (2026-09-17, WORKORDER Stage D1). One server-written line
           under the header; the rep rows below are unchanged. server-word: `execution.off_prescription.line`,
           composed by `_shared/session-detail/off-prescription.ts` — printed, never decided here. */}
       {typeof sd?.execution?.off_prescription?.line === 'string' && sd.execution.off_prescription.line && (
-        <p className="text-sm text-gray-200 leading-relaxed">{sd.execution.off_prescription.line}</p>
+        <p className="text-subhead text-label leading-relaxed">{sd.execution.off_prescription.line}</p>
       )}
       {hasRaceDebrief && (
         <div className="space-y-1.5">
@@ -398,19 +398,19 @@ export default function SessionNarrative({
       )}
       {sd?.forward_context && (sd.forward_context.headline || sd.forward_context.body) && (
         <div>
-          <span className="readout-label text-xs font-medium uppercase tracking-wide">
+          <span className="readout-label text-caption font-medium uppercase tracking-wide">
             {sd.forward_context.eyebrow || 'What this means for future races'}
           </span>
-          <p className="text-sm font-semibold text-gray-100 leading-snug mt-1">
+          <p className="text-subhead font-semibold text-label leading-snug mt-1">
             {sd.forward_context.headline}
           </p>
           {sd.forward_context.body && (
-            <p className="text-sm text-gray-300 leading-relaxed mt-1">
+            <p className="text-subhead text-label leading-relaxed mt-1">
               {sd.forward_context.body}
             </p>
           )}
           {sd.forward_context.projection_line && (
-            <p className="text-sm text-teal-300/90 leading-relaxed mt-2">
+            <p className="text-subhead text-teal-300 leading-relaxed mt-2">
               {sd.forward_context.projection_line}
             </p>
           )}

@@ -32,7 +32,7 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
     improving: { w: 'improving', c: 'text-emerald-400', a: '↑' },
     holding: { w: 'holding', c: 'text-amber-300', a: '→' },
     sliding: { w: 'sliding', c: 'text-red-400', a: '↓' },
-    needs_data: { w: 'building — need more sessions', c: 'text-white/40', a: '' },
+    needs_data: { w: 'building — need more sessions', c: 'text-label-secondary', a: '' },
   };
   const v = VERD[dt.verdict] || VERD.needs_data;
   const pct = dt.pct_change;
@@ -47,10 +47,10 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
   // number and the arrow always agree. Three copies of that became one.
   const pctDisplay = (dt as { signed_pct?: string | null }).signed_pct ?? null;
   return (
-    <div className="flex items-baseline gap-1.5 py-1 text-[12px]">
-      <span className="text-white/45">{dt.discipline} trend</span>
+    <div className="flex items-baseline gap-1.5 py-1 text-caption">
+      <span className="text-label-secondary">{dt.discipline} trend</span>
       <span className={`inline-flex items-baseline gap-0.5 ${v.c}`}>{v.a && <span>{v.a}</span>}<span>{v.w}</span></span>
-      {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-white/35">{pctDisplay}</span>}
+      {dt.verdict !== 'needs_data' && pctDisplay && <span className="text-label-secondary">{pctDisplay}</span>}
     </div>
   );
 }
@@ -89,7 +89,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       typeMaybe === 'swim' || typeMaybe === 'swimming'
     );
     if (!allowCompletedOnly) {
-      return (<div className="text-sm text-gray-600">No planned session to compare.</div>);
+      return (<div className="text-subhead text-label-secondary">No planned session to compare.</div>);
     }
   }
 
@@ -175,7 +175,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       return (
         <div className="w-full space-y-2 p-3">
           {sessionDetailLoading && !sd && (
-            <div className="text-xs text-white/50 px-0.5" aria-live="polite">Loading test result…</div>
+            <div className="text-caption text-label-secondary px-0.5" aria-live="polite">Loading test result…</div>
           )}
           <StrengthTestResult
             result={(sd as any).test_result}
@@ -199,7 +199,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(normalizeDiscipline(type) || String(type || '')) }}
       >
         {sessionDetailLoading && !sd && (
-          <div className="text-xs text-white/50 px-3 pt-3" aria-live="polite">
+          <div className="text-caption text-label-secondary px-3 pt-3" aria-live="polite">
             Loading performance analysis…
           </div>
         )}
@@ -275,7 +275,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
     <div className="w-full">
       {sessionDetailLoading && !hasSessionDetail && (
         <div className="flex justify-center py-8" aria-busy="true" aria-label="Loading performance data">
-          <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+          <Loader2 className="h-6 w-6 animate-spin text-label-secondary" />
         </div>
       )}
 
@@ -289,27 +289,27 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           s != null && Number.isFinite(s) && s > 0 ? formatDuration(s) : '—';
         return (
           <div className="w-full pt-2 pb-3">
-            <div className="mb-1 text-center text-xs text-gray-400 uppercase tracking-widest">
+            <div className="mb-1 text-center text-caption text-label-secondary uppercase tracking-widest">
               Goal race · {race.event_name}
             </div>
             <div className="flex items-start justify-center gap-8 text-center">
               {goalS != null && (
                 <div className="flex flex-col items-center">
-                  <div className="text-sm font-semibold text-gray-100">{fmt(goalS)}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">Goal</div>
+                  <div className="text-subhead font-semibold text-label">{fmt(goalS)}</div>
+                  <div className="text-caption text-label-secondary mt-0.5">Goal</div>
                 </div>
               )}
               {projS != null && (
                 <div className="flex flex-col items-center">
-                  <div className="text-sm font-semibold text-gray-100">
+                  <div className="text-subhead font-semibold text-label">
                     {race.fitness_projection_display ?? fmt(projS)}
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">Projected</div>
+                  <div className="text-caption text-label-secondary mt-0.5">Projected</div>
                 </div>
               )}
               <div className="flex flex-col items-center">
-                <div className="text-sm font-semibold text-gray-100">{fmt(actualS)}</div>
-                <div className="text-[11px] text-gray-400 mt-0.5">Actual</div>
+                <div className="text-subhead font-semibold text-label">{fmt(actualS)}</div>
+                <div className="text-caption text-label-secondary mt-0.5">Actual</div>
               </div>
             </div>
           </div>
@@ -402,12 +402,12 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="py-2">
           <div className="grid grid-cols-2 gap-4">
-            <div className="text-gray-800">Add‑ons</div>
-            <div className="text-gray-900 space-y-1">
+            <div className="text-label-secondary">Add‑ons</div>
+            <div className="text-label space-y-1">
               {completed.addons.map((a:any, idx:number)=> (
                 <div key={idx} className="flex items-center justify-between">
                   <span>{a.token?.split('.')[0]?.replace(/_/g,' ') || a.name || 'Addon'}</span>
-                  <span className="text-gray-600">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
+                  <span className="text-label-secondary">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
                 </div>
               ))}
             </div>

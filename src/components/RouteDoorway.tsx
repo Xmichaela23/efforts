@@ -69,8 +69,8 @@ const dateLabel = (x: number) => new Date(x * 864e5).toLocaleDateString('en-US',
 // State pill: NEUTRAL for the abstain / flat states (the restraint is the honesty); toned only when the
 // server reports a confident direction. Never invents a claim the flags don't carry.
 const PILL: Record<string, { label: string; tone: string }> = {
-  still_learning: { label: 'Still learning', tone: 'text-gray-300 bg-gray-500/15' },
-  still_building: { label: 'Building', tone: 'text-gray-300 bg-gray-500/15' },
+  still_learning: { label: 'Still learning', tone: 'text-label bg-gray-500/15' },
+  still_building: { label: 'Building', tone: 'text-label bg-gray-500/15' },
   holding: { label: 'Holding', tone: 'text-sky-300 bg-sky-500/15' },
   improving: { label: 'Getting faster', tone: 'text-emerald-300 bg-emerald-500/15' },
   declining: { label: 'Slower at effort', tone: 'text-amber-300 bg-amber-500/15' },
@@ -146,19 +146,19 @@ function SegmentChart({ pts, metric, showSlope, fitLine }: {
           );
         })}
       </svg>
-      <p className="text-[13px] mt-2 px-0.5 flex items-center gap-2 tabular-nums">
+      <p className="text-footnote mt-2 px-0.5 flex items-center gap-2 tabular-nums">
         {tp ? (
           <>
             <span className={`inline-block w-2.5 h-2.5 rounded-full ${isBestOf(tp) ? 'bg-amber-300' : 'bg-gray-200'}`} />
-            <span className="text-gray-300">
-              <b className="text-gray-100 font-semibold">{paceLabel(valOf(tp))}/mi</b> · {dateLabel(dayNum(tp.date))}
+            <span className="text-label">
+              <b className="text-label font-semibold">{paceLabel(valOf(tp))}/mi</b> · {dateLabel(dayNum(tp.date))}
               {tp.hr > 0 ? ` · HR ${tp.hr}` : ''}{isBestOf(tp) ? ' · your best' : ''}
             </span>
           </>
         ) : (
           <>
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-300" />
-            <span className="text-gray-400">your best · tap a dot for its detail</span>
+            <span className="text-label-secondary">your best · tap a dot for its detail</span>
           </>
         )}
       </p>
@@ -185,7 +185,7 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
         type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className="w-full -mx-2 px-2 py-2 rounded-lg flex items-center justify-between gap-2 text-left hover:bg-gray-800/40 transition-colors"
       >
-        <span className="text-xs text-gray-300">
+        <span className="text-caption text-label">
           Same stretch · ran {allTime}×
           <span className="text-emerald-400 ml-2 font-medium">{open ? 'Hide' : 'View trend'}</span>
         </span>
@@ -201,15 +201,15 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
         <div className="mt-3 space-y-3">
           {/* CARD carries the claim — the server-authored verdict copy is the headline. */}
           <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-4">
-            <span className={`inline-block text-[11px] font-semibold px-2.5 py-1 rounded-full ${pill.tone}`}>{pill.label}</span>
-            <p className="text-[17px] font-semibold text-gray-100 mt-2.5 leading-snug">{verdict.copy}</p>
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-3 text-[12.5px] text-gray-400 tabular-nums">
-              <span><b className="text-gray-200 font-semibold">{v.n}</b> of {allTime} runs</span>
-              <span className="text-gray-600">·</span>
-              {monthsLabel && <span><b className="text-gray-200 font-semibold">{monthsLabel}</b></span>}
+            <span className={`inline-block text-caption font-semibold px-2.5 py-1 rounded-full ${pill.tone}`}>{pill.label}</span>
+            <p className="text-body font-semibold text-label mt-2.5 leading-snug">{verdict.copy}</p>
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-3 text-caption text-label-secondary tabular-nums">
+              <span><b className="text-label font-semibold">{v.n}</b> of {allTime} runs</span>
+              <span className="text-label-secondary">·</span>
+              {monthsLabel && <span><b className="text-label font-semibold">{monthsLabel}</b></span>}
               {flags.show_pct && v.pct != null && (
                 <>
-                  <span className="text-gray-600">·</span>
+                  <span className="text-label-secondary">·</span>
                   <span className={v.pct < 0 ? 'text-amber-300' : 'text-emerald-300'}>
                     {flags.show_arrow ? (v.pct < 0 ? '↓ ' : '↑ ') : ''}{v.pct > 0 ? '+' : ''}{v.pct}%
                   </span>
@@ -221,12 +221,12 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
           {/* Chart — demoted, quiet, flag-driven. No slope unless the server says so. */}
           <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-3">
             <div className="flex items-center justify-between mb-1 gap-2">
-              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-500">Your efforts here</span>
+              <span className="text-caption font-semibold uppercase tracking-wide text-label-secondary">Your efforts here</span>
               <div className="inline-flex bg-gray-900/60 rounded-lg p-0.5 gap-0.5">
                 {(['same', 'pace'] as const).map((m) => (
                   <button
                     key={m} type="button" onClick={() => setMetric(m)} aria-pressed={metric === m}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${metric === m ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-200'}`}
+                    className={`text-caption font-medium px-3 py-1.5 rounded-md transition-colors ${metric === m ? 'bg-gray-700 text-label' : 'text-label-secondary hover:text-label'}`}
                   >
                     {m === 'same' ? 'Same-effort' : 'Pace'}
                   </button>
@@ -242,7 +242,7 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
           </div>
 
           {/* Honesty line — kept verbatim. */}
-          <p className="text-[12px] text-gray-500 leading-relaxed px-1">
+          <p className="text-caption text-label-secondary leading-relaxed px-1">
             Not a verdict — a read on whether you’re getting faster on this exact stretch, with hills and
             effort taken out. It stays quiet until the trend is real.
           </p>
