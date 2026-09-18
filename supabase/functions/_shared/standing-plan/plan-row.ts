@@ -41,7 +41,7 @@ export type ArcPhase = { name: string; start_week: number; end_week: number; wee
  * effort-aware surface. That file's own comment says why: *"an unrecognised name resolves to the
  * default silently, and that silence is Q-192's whole failure mode."*
  */
-export const STANDING_PLAN_PROTOCOL_ID = 'standing_plan';
+export { STANDING_PLAN_PROTOCOL_ID } from './protocol-id.ts';
 
 /**
  * ⛔ NO SCHEDULED DELOAD, AND THAT IS SOURCED RATHER THAN OMITTED (p120, corpus §"why

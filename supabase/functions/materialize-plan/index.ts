@@ -331,6 +331,7 @@ type StrengthIntentMat = 'support' | 'performance' | null;
 type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
+import { PLAN_WRITER_VERSION } from '../_shared/plan-refresh.ts';
 
 /**
  * Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower).
@@ -4462,9 +4463,17 @@ Deno.serve(async (req) => {
     const isDoneRow = (r: any) => !!r?.completed_workout_id
       || ['completed', 'skipped'].includes(String(r?.workout_status ?? '').toLowerCase());
     if (skipDone) console.log(`[materialize-plan] skip_done: ${rows.filter(isDoneRow).length} done row(s) left as they are`);
+    // ⛔ `from_date` (2026-09-18): the plan refresh rewrites sessions dated today or later; a row dated before it
+    // keeps its expansion and step ids, done or not. Opt-in, like `skip_done`.
+    const fromDate: string | null = typeof payload?.from_date === 'string' ? String(payload.from_date).slice(0, 10) : null;
+    // ⛔ `stamp_writer_version` (2026-09-18, `_shared/plan-refresh.ts`): the caller has just written these rows' content
+    // with this code (activate-plan, the plan refresh), so the expansion carries `computed.writer_version`. Every
+    // other caller leaves it off, and the row reads as older until the next refresh.
+    const stamp = payload?.stamp_writer_version === true ? { writer_version: PLAN_WRITER_VERSION } : {};
     let count = 0;
     for (const row of rows) {
       if (skipDone && isDoneRow(row)) continue;
+      if (fromDate && String(row?.date ?? '').slice(0, 10) < fromDate) continue;
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
@@ -4483,7 +4492,7 @@ Deno.serve(async (req) => {
             const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
             const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
             const update: any = {
-              computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds, anchors: (baselines as any)._anchors ?? null },
+              computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds, anchors: (baselines as any)._anchors ?? null, ...stamp },
               total_duration_seconds: finalTotalSeconds,
               duration: Math.max(1, finalDuration),
             };
@@ -4541,6 +4550,7 @@ Deno.serve(async (req) => {
               steps: v3,
               total_duration_seconds: finalTotalSeconds,
               anchors: (baselines as any)._anchors ?? null,
+              ...stamp,
               ...(Array.isArray(swim_equipment_suggested) && swim_equipment_suggested.length > 0
                 ? { swim_equipment_suggested }
                 : {}),
@@ -4681,7 +4691,7 @@ Deno.serve(async (req) => {
           // ⛔ A mobility row with no timed steps still carries its logger rows (audit H-T12). `steps: []`
           // marks it expanded, so get-week stops asking for it; the planned-length ladder skips an empty list.
           await supabase.from('planned_workouts')
-            .update({ computed: { normalization_version: 'v3', steps: [], mobility_sets: mobilitySets } })
+            .update({ computed: { normalization_version: 'v3', steps: [], mobility_sets: mobilitySets, ...stamp } })
             .eq('id', String(row.id));
           count += 1;
         }

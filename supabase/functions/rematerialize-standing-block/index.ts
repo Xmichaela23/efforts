@@ -18,10 +18,20 @@
 // That is the law the deleted auto-progression earned: *"the athlete opened the logger to a number
 // they never agreed to."*
 //
-// ⚠️ IT ONLY EVER REWRITES WEEKS THAT HAVE NOT STARTED. History is not editable, and the live week
-// keeps the prescription it is being judged against.
+// ⛔ IT REWRITES EVERY SESSION NOT DONE, FROM TODAY ON (Michael, 2026-09-18) — the rest of the live week
+// included. It used to leave the live week alone ("the live week keeps the prescription it is being judged
+// against"), and a rule change then reached nothing until next week while today's session still carried the
+// old lines. Completed and skipped sessions, and anything dated before today, stay exactly as they are. Rows
+// are updated in place (same row, same id, same links), never deleted and re-created. It keeps the athlete's
+// place in the block and the weights from their test week: it is the same block, re-read, not a new plan.
+//
+// ⛔ AND THE SERVER RUNS IT BY ITSELF (2026-09-18). Every row it writes is stamped with `PLAN_WRITER_VERSION`
+// (`_shared/plan-refresh.ts`); get-week queues `{ refresh: true }` on the job queue when a plan has an
+// upcoming session stamped older, and the endurance re-price after an accepted number queues the same job.
+// `run-jobs` calls it with the service key and the job's `user_id`.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireUser } from '../_shared/require-user.ts';
+import { resolveUser } from '../_shared/require-user.ts';
+import { isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
@@ -55,12 +65,16 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     // ⛔ THE VERIFIED JWT, never a body-supplied id — the B1 auth boundary. Throws 401 on a forged
-    // token, the anon key, or the service key; this is a CLIENT-FACING function by design, because
-    // applying is the athlete's tap.
-    const { userId } = await requireUser(req);
-
+    // token or the anon key. The service key is the job queue (`run-jobs`, the automatic refresh): it names
+    // the athlete in the body, and only server code holds that key.
+    const who = await resolveUser(req);
     const p = await req.json().catch(() => ({}));
-    const willWrite = p?.apply === true;
+    const userId = who.isService ? (typeof p?.user_id === 'string' ? p.user_id : null) : who.userId;
+    if (!userId) return json({ success: false, reason: 'user_id_required' }, 400);
+    // ⛔ THE AUTOMATIC REFRESH (2026-09-18): the same apply, plus the expansion always runs (a number the rows are
+    // priced off may have changed with no token moving) and the job record the screens poll is kept.
+    const isRefresh = p?.refresh === true;
+    const willWrite = p?.apply === true || isRefresh;
     const asOf = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : null;
 
     const supabase = createClient(
@@ -154,7 +168,8 @@ Deno.serve(async (req: Request) => {
       // ⛔ COMPLETION TRAVELS WITH THE ROW NOW — the cut is per session, not per week, so
       // `restateFromTest` has to be able to tell a done session from a future one.
       // ⛔ AND THE ENDURANCE COLUMNS, because the runs and rides are restated too (2026-09-05).
-      .select('id, week_number, date, type, name, description, duration, steps_preset, strength_exercises, workout_status, completed_workout_id, tags')
+      // ⛔ AND THE WRITER VERSION stamped in each row's `computed` (2026-09-18, `_shared/plan-refresh.ts`).
+      .select(`id, week_number, date, type, name, description, duration, steps_preset, strength_exercises, workout_status, completed_workout_id, tags, ${STAMP_SELECT}`)
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
@@ -243,9 +258,13 @@ Deno.serve(async (req: Request) => {
         k, { ...(v as Record<string, unknown>), movement: (sp.test_lift_names as Record<string, string>)?.[k] ?? k },
       ]),
     );
-    if (found.length === 0) {
-      // ⛔ ABSTAIN, LOUDLY. No completed test set means no working number, and the block keeps the
-      // "by feel" contract it was written with rather than being prescribed off a guess.
+    // ⛔ ABSTAIN ON THE DRY RUN, LOUDLY. No completed test set means no working number, and the block keeps the
+    // "by feel" contract it was written with rather than being prescribed off a guess.
+    // ⛔ BUT AN APPLY STILL REWRITES (2026-09-18): the sessions take today's shape with the weights they have — by
+    // feel on a lift awaiting its test, the file's number on a lift that has one. The rebuild used to answer
+    // "rebuilt" here and write nothing, and the automatic refresh has to reach a block before its test too.
+    // The stored working numbers and `test_read` are not written from an empty read (below).
+    if (found.length === 0 && !willWrite) {
       return json({
         success: true, applied: false, current_week: currentWeek,
         reason: 'no_completed_test_sets',
@@ -455,6 +474,8 @@ Deno.serve(async (req: Request) => {
        */
       afterWeek: TEST_WEEK_INDEX,
       testDayCutoff: testCutoff,
+      // ⛔ TODAY ON (2026-09-18): the rest of the live week too; before today stays as it is.
+      fromDate: today,
     });
 
     /**
@@ -462,7 +483,7 @@ Deno.serve(async (req: Request) => {
      * restated; a library correction or a deload column never reached an existing calendar. Same
      * laws: unstarted sessions only, the diff comes back on the dry run, applying is the tap.
      */
-    const endurance = restateEndurance({ composed, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX });
+    const endurance = restateEndurance({ composed, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX, fromDate: today });
 
     if (!willWrite) {
       return json({
@@ -480,13 +501,31 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ⛔ THE JOB RECORD THE SCREENS POLL (`endurance-checkpoint` `reprice_status`), kept by the refresh only.
+    const refreshable = (plannedRows ?? []).filter((r: Record<string, unknown>) => isRefreshable(r, today));
+    const writeJob = async (patch: Record<string, unknown>) => {
+      if (!isRefresh) return;
+      try {
+        const { data: cur } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
+        const cfg = (cur?.config && typeof cur.config === 'object') ? cur.config as Record<string, unknown> : {};
+        const prior = (cfg.reprice_job && typeof cfg.reprice_job === 'object') ? cfg.reprice_job as Record<string, unknown> : {};
+        await supabase.from('plans').update({ config: { ...cfg, reprice_job: { ...prior, ...patch } } }).eq('id', plan.id).eq('user_id', userId);
+      } catch (e) { console.warn('[standing-restate] job record not written:', (e as Error)?.message ?? String(e)); }
+    };
+    await writeJob({ started_at: new Date().toISOString(), total: refreshable.length, done: 0, finished_at: null });
+
     // ⚠️ ROW BY ROW, so a failure part-way leaves the rest of the block intact rather than
     // half-rewritten under a transaction we do not have.
     let written = 0;
     for (const u of restated.rows) {
       const { error } = await supabase
         .from('planned_workouts')
-        .update({ strength_exercises: u.strength_exercises })
+        // ⛔ AND THE SESSION'S WORDS when the composer's differ (2026-09-18) — `RestatedRow.name` / `.description`.
+        .update({
+          strength_exercises: u.strength_exercises,
+          ...(u.name != null ? { name: u.name } : {}),
+          ...(u.description != null ? { description: u.description, rendered_description: u.description } : {}),
+        })
         .eq('id', u.id)
         .eq('user_id', userId);
       if (!error) written += 1;
@@ -514,16 +553,19 @@ Deno.serve(async (req: Request) => {
     // ⛔ THE WORKING NUMBERS ARE STORED UNDER THE BLOCK'S OWN KEY, never `config.training_max`
     // (pivot §3). That key is the previous program's 85%-of-a-true-1RM with three live readers, and a number
     // written there would be spent as if it were that other quantity.
+    // ⚠️ RE-READ FIRST, so the job record written above survives this write.
+    const { data: cfgNow } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
+    const baseConfig = (cfgNow?.config && typeof cfgNow.config === 'object') ? cfgNow.config as Record<string, unknown> : config;
     const { error: cfgErr } = await supabase
       .from('plans')
       .update({
         config: {
-          ...config,
+          ...baseConfig,
           standing_plan: {
             ...sp,
             taper_weeks: taperWeeks,
-            working_numbers: reading.working,
-            test_read: true,
+            // ⛔ AN EMPTY READ WRITES NO NUMBERS (2026-09-18): an apply before the test keeps what the block had.
+            ...(found.length > 0 ? { working_numbers: reading.working, test_read: true } : {}),
             // ⛔ WHAT THE PATTERNS HAVE EARNED, STORED BESIDE THE NUMBERS (A2). The next restate reads
             // it back for provenance; the composition itself is re-derived from history every time,
             // so a stale value can never prescribe anything.
@@ -616,13 +658,18 @@ Deno.serve(async (req: Request) => {
     // ⚠️ LOUD BUT NOT FATAL: get-week re-materializes a MISSING computed on its own, but a STALE one
     // is never re-checked — which is exactly why this call cannot be skipped silently.
     let computedRefreshed = false;
-    if (written > 0 || enduranceWritten > 0) {
+    // ⛔ THE EXPANSION ALSO RUNS WHEN A ROW IS STAMPED OLDER, OR ON THE REFRESH (2026-09-18): a row whose tokens did not
+    // move may still expand differently under newer code or a newly accepted number, and it is only stamped once
+    // it has been expanded here.
+    const staleCount = (plannedRows ?? []).filter((r: Record<string, unknown>) => isStaleRow(r, today)).length;
+    if (written > 0 || enduranceWritten > 0 || staleCount > 0 || isRefresh) {
       try {
         // ⛔ `skip_done`: a session already done keeps its steps and their ids, byte for byte — a logged run's
         // intervals point at those ids. The rebuild never rewrites a done row's prescription, and now not its
-        // expansion either.
+        // expansion either. `from_date` (2026-09-18): nor a session dated before today.
+        // ⛔ `stamp_writer_version`: every row it expands was just written by this code — see `_shared/plan-refresh.ts`.
         const { error: matErr } = await supabase.functions.invoke('materialize-plan', {
-          body: { training_plan_id: plan.id, skip_done: true },
+          body: { training_plan_id: plan.id, skip_done: true, from_date: today, stamp_writer_version: true },
         });
         computedRefreshed = !matErr;
         if (matErr) console.warn(`[standing-restate] computed refresh failed: ${matErr.message}`);
@@ -630,6 +677,24 @@ Deno.serve(async (req: Request) => {
         console.warn(`[standing-restate] computed refresh failed: ${(e as Error)?.message ?? String(e)}`);
       }
     }
+
+    /**
+     * ⛔ THE STAMP (2026-09-18) rides the expansion above (`stamp_writer_version`): every session not done, today on,
+     * now reads as written by this code, whether or not its words moved. Counted back here for the job record.
+     */
+    let stamped = 0;
+    let staleAfter = 0;
+    if (computedRefreshed) {
+      try {
+        const { data: back } = await supabase.from('planned_workouts')
+          .select(`id, date, workout_status, completed_workout_id, ${STAMP_SELECT}`)
+          .eq('training_plan_id', plan.id).eq('user_id', userId).gte('date', today);
+        const open = (back ?? []).filter((r: Record<string, unknown>) => isRefreshable(r, today));
+        stamped = open.filter((r: Record<string, unknown>) => Number(r.writer_version) === PLAN_WRITER_VERSION).length;
+        staleAfter = open.filter((r: Record<string, unknown>) => isStaleRow(r, today)).length;
+      } catch (e) { console.warn('[standing-restate] stamps not read back:', (e as Error)?.message ?? String(e)); }
+    }
+    await writeJob({ done: computedRefreshed ? stamped : 0, finished_at: new Date().toISOString(), writer_version: PLAN_WRITER_VERSION });
 
     /**
      * ⛔ THE LENGTHS REPORTED ARE THE LENGTHS STORED (2026-09-10). A run or ride's minutes are what
@@ -658,7 +723,7 @@ Deno.serve(async (req: Request) => {
       + `endurance_rows=${enduranceWritten}/${endurance.rows.length} endurance_changes=${endurance.changes.length} `
       + `unmatched=${restated.unmatched.length} `
       + `me_sets=${JSON.stringify(ladder.sets)} me_bar=${JSON.stringify(ladder.bar)} `
-      + `me_unread=${ladder.unread}`,
+      + `me_unread=${ladder.unread} refresh=${isRefresh} stale=${staleCount}→${staleAfter} stamped=${stamped} v=${PLAN_WRITER_VERSION}`,
     );
 
     return json({ taper_weeks: taperWeeks, weeks,
@@ -672,7 +737,9 @@ Deno.serve(async (req: Request) => {
       me_bar: { by_pattern: ladder.bar, state: ladder.barState, last_reps: ladder.lastReps },
       config_written: !cfgErr,
       computed_refreshed: computedRefreshed,
-    });
+      rows_stamped: stamped, rows_stale_after: staleAfter, writer_version: PLAN_WRITER_VERSION,
+    // ⚠️ A REFRESH WHOSE EXPANSION FAILED ANSWERS 502, so the job queue tries it again (the rewrite is idempotent).
+    }, isRefresh && !computedRefreshed ? 502 : 200);
   } catch (e) {
     const status = (e as { status?: number })?.status === 401 ? 401 : 500;
     return json({ success: false, reason: status === 401 ? 'unauthorized' : 'error', details: (e as Error)?.message ?? String(e) }, status);

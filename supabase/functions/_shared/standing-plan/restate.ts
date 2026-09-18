@@ -13,8 +13,9 @@
 //   1. **It proposes; it does not silently write.** A dry run returns the diff; applying is a tap.
 //      That law is not caution — the auto-progression that used to move strength load on every
 //      ingest was DELETED because *"the athlete opened the logger to a number they never agreed to."*
-//   2. **Only weeks that have not started.** History is not editable, and a session already logged
-//      against a prescription keeps the prescription it was judged against.
+//   2. **Only sessions not done, dated today or later** (2026-09-18, was "only weeks that have not
+//      started"). History is not editable: a session already logged or skipped keeps the prescription it
+//      was judged against, and a session dated before today stays as it is, done or not.
 //
 // ⛔ AND THE TWO NEVER MEET. That one walks a the previous program training max through cycle verdicts. This one
 // re-runs THIS composer with the working numbers filled in and takes the difference. No function
@@ -37,6 +38,9 @@ export type PlannedRowish = {
    */
   workout_status?: string | null;
   completed_workout_id?: string | null;
+  name?: string | null;
+  description?: string | null;
+  tags?: unknown;
 };
 
 export type RestatedRow = {
@@ -44,6 +48,12 @@ export type RestatedRow = {
   week: number;
   day: string;
   strength_exercises: StrengthExercise[];
+  /**
+   * ⛔ THE SESSION'S OWN WORDS, WHEN THE COMPOSER'S DIFFER (2026-09-18). Only on a day the composer gives ONE lifting
+   * session, and never on a test row the athlete scheduled. Absent = the words stand.
+   */
+  name?: string;
+  description?: string;
 };
 
 export type RestatedChange = {
@@ -146,7 +156,7 @@ function topWorkWeight(ex: StrengthExercise | null | undefined): number | null {
 }
 
 /**
- * ⛔ THE DIFF, ON WEEKS THAT HAVE NOT STARTED.
+ * ⛔ THE DIFF, ON SESSIONS NOT DONE, DATED TODAY OR LATER (`fromDate`, 2026-09-18).
  *
  * @param composed         the block re-composed WITH the working numbers — the same pure composer
  *                         that wrote the block, so the shape is identical and only the loads move.
@@ -194,6 +204,11 @@ export function restateFromTest(args: {
    * has not been taught the new rule cannot silently start rewriting a test day.
    */
   testDayCutoff?: string | null;
+  /**
+   * ⛔ TODAY, ISO (2026-09-18). A row dated before it is left exactly as it is, done or not; today's and every
+   * later session not yet done is restated, the rest of the live week included. Absent = no date gate.
+   */
+  fromDate?: string | null;
 }): Restatement {
   /**
    * ⛔⛔ IT ACCUMULATES; IT USED TO OVERWRITE, AND THAT BECAME A SILENT NO-OP ON 2026-08-24.
@@ -208,11 +223,13 @@ export function restateFromTest(args: {
    * sessions' rows sharing one bucket cannot cross-match.
    */
   const bySlot = new Map<string, StrengthExercise[]>();
+  const sessionsBySlot = new Map<string, Array<{ name?: string; description?: string }>>();
   for (const wk of args.composed) {
     for (const s of wk.sessions) {
       if (s.type !== 'strength') continue;
       const key = `${wk.week}|${s.day}`;
       bySlot.set(key, [...(bySlot.get(key) ?? []), ...(s.strength_exercises ?? [])]);
+      sessionsBySlot.set(key, [...(sessionsBySlot.get(key) ?? []), s as { name?: string; description?: string }]);
     }
   }
 
@@ -221,6 +238,7 @@ export function restateFromTest(args: {
   const matched = new Set<string>();
 
   const cutoff = typeof args.testDayCutoff === 'string' ? args.testDayCutoff.slice(0, 10) : null;
+  const fromDate = typeof args.fromDate === 'string' ? args.fromDate.slice(0, 10) : null;
   for (const row of args.planned ?? []) {
     const week = Number(row?.week_number);
     if (!Number.isFinite(week)) continue;
@@ -242,6 +260,8 @@ export function restateFromTest(args: {
     const wanted = bySlot.get(`${week}|${day}`);
     if (!wanted) continue;
     matched.add(`${week}|${day}`);
+    // ⛔ BEFORE TODAY STAYS AS IT IS (2026-09-18) — matched above so it is not reported as missing.
+    if (fromDate && (!date || date < fromDate)) continue;
 
     const existing = Array.isArray(row?.strength_exercises)
       ? row.strength_exercises as StrengthExercise[]
@@ -443,7 +463,22 @@ export function restateFromTest(args: {
           : {}),
       };
     });
-    if (touched) rows.push({ id: String(row.id), week, day, strength_exercises: next });
+    /**
+     * ⛔ THE SESSION'S WORDS TRAVEL TOO (2026-09-18). The runs and rides already took the composer's name and
+     * description; a lifting day kept the ones it was built with, so a change to them reached no calendar. Only
+     * when the day holds one composed lifting session (two would leave "which one" unanswered) and never on a test
+     * row the athlete put on the calendar, which the composer did not write.
+     */
+    const words: { name?: string; description?: string } = {};
+    const one = sessionsBySlot.get(`${week}|${day}`) ?? [];
+    const rowTags = (Array.isArray(row?.tags) ? row.tags : []).map((t: unknown) => String(t));
+    if (one.length === 1 && !rowTags.some((t) => TEST_ROW_TAGS.has(t))) {
+      // ⚠️ Only a row read WITH its words is compared; a caller that did not select them rewrites none.
+      if ('name' in row && typeof one[0].name === 'string' && one[0].name && one[0].name !== String(row.name ?? '')) words.name = one[0].name;
+      if ('description' in row && typeof one[0].description === 'string' && one[0].description !== String(row.description ?? '')) words.description = one[0].description;
+    }
+    const wordsMove = Object.keys(words).length > 0;
+    if (touched || wordsMove) rows.push({ id: String(row.id), week, day, strength_exercises: next, ...words });
   }
 
   // ⛔ WHAT THE COMPOSER HAD AN ANSWER FOR AND COULD NOT PLACE. Silence here would read as
@@ -467,8 +502,8 @@ export function restateFromTest(args: {
 // page's third step) never reached a calendar that already existed, and the deload column's "the
 // endurance sessions drop a level" was copy the write never honoured. The rebuild now restates both.
 //
-// ⛔ THE SAME TWO LAWS. Only sessions the athlete has not done; the diff is returned before it is
-// applied. Matched on week + weekday + type, in date order when a day carries two of one sport.
+// ⛔ THE SAME TWO LAWS. Only sessions the athlete has not done, dated today or later; the diff is
+// returned before it is applied. Matched on week + weekday + type, in date order when a day carries two of one sport.
 //
 // ⚠️ A SCHEDULED TEST IS NOT THE COMPOSER'S ROW. Retests the athlete put on the calendar (run test,
 // FTP test) are inserted rows the composer does not know about; they are skipped by tag, never
@@ -522,7 +557,10 @@ export function restateEndurance(args: {
   composed: ComposedWeek[];
   planned: EndurancePlannedRowish[] | null | undefined;
   afterWeek: number;
+  /** ⛔ TODAY, ISO (2026-09-18) — a row dated before it is left as it is. Absent = no date gate. */
+  fromDate?: string | null;
 }): EnduranceRestatement {
+  const fromDate = typeof args.fromDate === 'string' ? args.fromDate.slice(0, 10) : null;
   const bySlot = new Map<string, Array<ComposedWeek['sessions'][number]>>();
   for (const wk of args.composed) {
     for (const s of wk.sessions) {
@@ -560,6 +598,8 @@ export function restateEndurance(args: {
     wanted.forEach((fresh, i) => {
       const row = have[i];
       if (isDone(row)) return;
+      // ⛔ Before today stays as it is (2026-09-18); still matched, so the day is not reported missing.
+      if (fromDate && String(row.date ?? '').slice(0, 10) < fromDate) return;
       const nextTokens = tokensOf(fresh.steps_preset);
       const curTokens = tokensOf(row.steps_preset);
       const toMin = Math.round(Number(fresh.duration) || 0);

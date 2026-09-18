@@ -30,7 +30,9 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 /** Only these functions can be reached through the queue; a row with any other kind fails at once. */
 // `post-import-athlete-pipeline` joined 2026-09-17 (WORKORDER Stage D): the athlete's numbers are re-read
 // AFTER the session's own best efforts exist, which means behind that workout's `recompute-workout` job.
-const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync', 'post-import-athlete-pipeline']);
+// `rematerialize-standing-block` joined 2026-09-18: the plan refresh (`_shared/plan-refresh.ts`), queued when a plan
+// has an upcoming session written by older code or a number it is priced off was accepted.
+const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync', 'post-import-athlete-pipeline', 'rematerialize-standing-block']);
 /** OURS — stop claiming after 40 s; a tick then ends well inside the edge wall-clock cap. */
 const CLAIM_BUDGET_MS = 40_000;
 /** OURS — one job may take at most 90 s; recompute-workout's whole chain runs in well under that. */
@@ -160,6 +162,18 @@ Deno.serve(async (req: Request) => {
         await supabase.from('jobs').update({ status: 'queued', attempts: Math.max(0, job.attempts - 1), started_at: null }).eq('id', job.id);
         counts.released++;
         continue;
+      }
+      // ⛔ ONE PLAN REFRESH AT A TIME (2026-09-18): a refresh rewrites a whole plan's upcoming rows and the database
+      // is small. Jobs in one tick already run one after another (this batch's other claims are excluded); this
+      // covers two ticks overlapping. Given back untouched when another refresh started within the job timeout.
+      if (job.kind === 'rematerialize-standing-block') {
+        const since = new Date(Date.now() - JOB_TIMEOUT_MS).toISOString();
+        const { data: busy } = await supabase.from('jobs').select('id').eq('kind', job.kind).eq('status', 'running').not('id', 'in', `(${batch.map((b) => b.id).join(',')})`).gte('started_at', since).limit(1);
+        if (busy?.length) {
+          await supabase.from('jobs').update({ status: 'queued', attempts: Math.max(0, job.attempts - 1), started_at: null, next_run_at: new Date(Date.now() + 60_000).toISOString() }).eq('id', job.id);
+          counts.released++;
+          continue;
+        }
       }
       const t0 = Date.now();
       const outcome = await runTarget(job);

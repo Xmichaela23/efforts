@@ -92,7 +92,7 @@ no-deploy.**
 |---|---|
 | `swimPlanTokens.ts` | `calendar-sync` |
 
-### `supabase/functions/_shared/` — 142 files · anything in it → 87 functions
+### `supabase/functions/_shared/` — 143 files · anything in it → 87 functions
 
 `activate-plan` · `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `analyze-swim-workout` · `athletic-record` · `auto-attach-planned` · `backfill-facts` · `backfill-routes` · `bright-service` · `calculate-workload` · `calendar-sync` · `check-feedback-needed` · `coach` · `complete-race` · `compute-core-verdict` · `compute-facts` · `compute-session-boom` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `course-detail` · `course-strategy` · `course-upload` · `create-goal-and-materialize-plan` · `delete-account` · `delete-goal` · `delete-plan` · `detach-planned` · `detect-cores` · `disconnect-connection` · `end-plan` · `endurance-checkpoint` · `export-data` · `fetch-strava-route` · `garmin-webhook-activities` · `garmin-webhook-user` · `gear-list` · `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-weather` · `get-week` · `import-fit-file` · `import-garmin-history` · `import-strava-history` · `ingest-activity` · `ingest-phone-workout` · `intervals-activity-probe` · `intervals-connect-key` · `intervals-oauth` · `learn-fitness-profile` · `mark-planned-complete` · `match-cores` · `materialize-plan` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `process-workouts-batch` · `readiness` · `recompute-athlete-memory` · `recompute-workout` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `rematerialize-strength-block` · `resolve-exercise-weight` · `resume-plan` · `run-jobs` · `save-baseline-test` · `save-baselines` · `save-imported-workout` · `send-workout-to-garmin` · `share-strength-to-strava` · `strava-token-exchange` · `strava-webhook` · `strength-test-session` · `swap-list` · `swap-session` · `sweep-user-history` · `sweep-week` · `swift-task` · `validate-reschedule` · `weekly-workload` · `workout-detail`
 
@@ -183,6 +183,7 @@ no-deploy.**
 | `plan-line.ts` | `coach` · `get-week` · `workout-detail` |
 | `plan-overview.ts` | `plan-overview` |
 | `plan-phase.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `workout-detail` |
+| `plan-refresh.ts` | `endurance-checkpoint` · `get-week` · `materialize-plan` · `rematerialize-standing-block` |
 | `plan-week.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `analyze-swim-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `rematerialize-strength-block` · `strava-webhook` · `swap-list` · `swap-session` · `workout-detail` |
 | `planned-duration-label.ts` | `get-week` · `workout-detail` |
 | `planned-duration.ts` | `analyze-cycling-workout` · `auto-attach-planned` · `get-week` · `mark-planned-complete` · `plan-overview` · `swap-session` · `workout-detail` |
@@ -544,9 +545,9 @@ no-deploy.**
 | `swap.ts` | `swap-session` |
 | `workout-choice.ts` | `swap-session` |
 
-### `supabase/functions/_shared/standing-plan/` — 29 files · anything in it → 14 functions
+### `supabase/functions/_shared/standing-plan/` — 30 files · anything in it → 15 functions
 
-`analyze-strength-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `get-week` · `rematerialize-standing-block` · `save-baseline-test` · `strength-test-session` · `swap-list` · `swap-session`
+`analyze-strength-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `get-week` · `materialize-plan` · `rematerialize-standing-block` · `save-baseline-test` · `strength-test-session` · `swap-list` · `swap-session`
 
 | touch this file | redeploy these |
 |---|---|
@@ -566,6 +567,7 @@ no-deploy.**
 | `plan-row.ts` | `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `plyo.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `progression.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
+| `protocol-id.ts` | `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `rematerialize-standing-block` |
 | `restate.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `session-vocabulary.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` · `swap-session` |
 | `setup-copy.ts` | `generate-strength-plan` · `get-arc-context` |

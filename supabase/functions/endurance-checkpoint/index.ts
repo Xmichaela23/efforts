@@ -12,8 +12,15 @@
 // athlete's tap; `decision: 'keep'` records the answer and moves nothing. Same law as
 // `rematerialize-standing-block`: it proposes; it does not silently write.
 //
-// ⚠️ IT ONLY EVER RE-PRICES ROWS NOT COMPLETED OR SKIPPED, whatever their date. History is not editable.
+// ⚠️ IT ONLY EVER RE-PRICES ROWS NOT COMPLETED OR SKIPPED, DATED TODAY OR LATER (2026-09-18). History is not
+// editable.
+//
+// ⛔ THE RE-PRICE IS THE PLAN REFRESH (2026-09-18). An accepted number no longer runs its own loop through the
+// per-row materializer; it queues the same refresh the server runs when a plan's sessions were written by older
+// code (`_shared/plan-refresh.ts` → `rematerialize-standing-block` on the job queue), so the plan is rewritten
+// once, not twice. The per-row loop, its 29-call budget and its hand-off to a fresh request are deleted with it.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isRefreshable, queuePlanRefresh } from '../_shared/plan-refresh.ts';
 import { requireUser } from '../_shared/require-user.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import { STANDING_PLAN_PROTOCOL_ID } from '../_shared/standing-plan/index.ts';
@@ -33,68 +40,6 @@ const corsHeaders = {
 };
 function json(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
-
-/**
- * ONE ROW THROUGH THE PER-ROW MATERIALIZER, AND WHY IT FAILED WHEN IT DID (2026-09-16, Stage 7 session 3). Both
- * loops below counted a row only when the call returned no error, and threw the error and the row id away — a
- * re-price finished "30 of 33" with nothing on record about the three. The status, the row, its date and type and
- * the reply are logged now, so the misses can be named.
- */
-async function repriceOneRow(supabase: any, r: any, tag: string, misses?: Array<Record<string, unknown>>): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
-    if (!error) return true;
-    const ctx = (error as { context?: Response }).context;
-    let body = '';
-    try { body = ctx && typeof ctx.text === 'function' ? (await ctx.text()).slice(0, 300) : ''; } catch { /* no body */ }
-    console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: status=${ctx?.status ?? 'none'} ${error.name ?? ''} ${error.message ?? ''} body=${body} data=${JSON.stringify(data ?? null).slice(0, 200)}`);
-    misses?.push({ id: r.id, date: r.date, type: r.type, status: ctx?.status ?? null, error: `${error.name ?? ''} ${error.message ?? ''}`.trim(), body });
-    return false;
-  } catch (e) {
-    console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: threw ${(e as Error)?.message ?? String(e)}`);
-    misses?.push({ id: r.id, date: r.date, type: r.type, status: null, error: `threw ${(e as Error)?.message ?? String(e)}` });
-    return false;
-  }
-}
-
-/**
- * ⛔ THIRTY CALLS A REQUEST (2026-09-16, Stage 7 session 3). One request to this function can send about 30 calls to
- * other edge functions; every call after that fails before it leaves ("FunctionsFetchError: Failed to send a request to
- * the Edge Function"). Measured on throwaway blocks of 32 re-priceable rows: rows 1–30 re-priced and rows 31–32 failed
- * — in date order, in reverse order, one at a time or four at a time, and again on a second try inside the same request;
- * each failed row re-priced when sent on its own. That was the "30 of 33". Not on Supabase's published limits page
- * (read 2026-09-16), so the number is what was measured, not a documented one.
- * So a request re-prices at most `budget` rows and hands the rest to a fresh request of this function
- * (`reprice_continue`), which is itself one call. Four rows at a time keeps each request short.
- * OURS — `REPRICE_CALLS_PER_REQUEST` 29 (the measured 30 less the hand-off call) and the batch of 4.
- */
-const REPRICE_CALLS_PER_REQUEST = 29;
-const REPRICE_BATCH = 4;
-async function repriceRows(
-  supabase: any, rows: any[], tag: string, misses: Array<Record<string, unknown>>, budget: number,
-  onBatch?: (done: number) => Promise<void>,
-): Promise<{ repriced: number; rest: any[] }> {
-  const now = rows.slice(0, Math.max(0, budget));
-  let repriced = 0;
-  for (let i = 0; i < now.length; i += REPRICE_BATCH) {
-    const oks = await Promise.all(now.slice(i, i + REPRICE_BATCH).map((r) => repriceOneRow(supabase, r, tag, misses)));
-    repriced += oks.filter(Boolean).length;
-    if (onBatch) await onBatch(repriced);
-  }
-  return { repriced, rest: rows.slice(now.length) };
-}
-
-/** One call: the rows not yet reached go to a fresh request of this function, as the same athlete. */
-async function handOffReprice(supabase: any, req: Request, planId: string, rest: any[], job: Record<string, unknown>): Promise<boolean> {
-  try {
-    const { error } = await supabase.functions.invoke('endurance-checkpoint', {
-      body: { reprice: true, plan_id: planId, reprice_continue: { ids: rest.map((r) => String(r.id)), job } },
-      headers: { Authorization: req.headers.get('Authorization') ?? '' },
-    });
-    if (error) console.warn(`[reprice] hand-off failed: ${error.name ?? ''} ${error.message ?? ''}`);
-    return !error;
-  } catch (e) { console.warn('[reprice] hand-off threw:', (e as Error)?.message ?? String(e)); return false; }
 }
 
 const HARD_FAMILIES = new Set(['run_mlss', 'run_near_threshold', 'ride_sweet_spot', 'ride_anaerobic']);
@@ -133,57 +78,25 @@ Deno.serve(async (req: Request) => {
     // with no checkpoint gate and nothing recorded. The Baselines screen calls this after a save that
     // changed a pace, FTP or threshold HR. Strength rows are untouched: a block's weights come from
     // its week-1 test, not from Baselines.
-    // ⛔ THE RE-PRICE IS A BACKGROUND JOB (2026-09-05, Michael: "let's make it right"). The rows are re-priced
-    // one call each; on a full block that is 30 calls and up to a minute. The client used to hold the request
-    // open and tell the athlete to keep the screen open. Now the server records the job on the plan
-    // (`config.reprice_job`), replies at once, and keeps working after the reply (EdgeRuntime.waitUntil —
-    // the same mechanism strava-webhook uses). The screen polls `reprice_status` for the count. If the
-    // runtime has no waitUntil, it falls back to running in the request as before.
+    // ⛔ THE RE-PRICE IS A BACKGROUND JOB (2026-09-05, Michael: "let's make it right"), and since 2026-09-18 it is
+    // the plan refresh on the job queue (`queuePlanRefresh`). The server records the job on the plan
+    // (`config.reprice_job`) and replies at once; the screen polls `reprice_status` for the count.
     if (p?.reprice_status === true) {
       return json({ success: true, job: (config as Record<string, unknown>)?.reprice_job ?? null });
     }
     if (p?.reprice === true) {
       const { data: rows } = await supabase
         .from('planned_workouts')
-        .select('id, week_number, date, type, tags, computed, workout_status, completed_workout_id')
+        .select('id, date, workout_status, completed_workout_id')
         .eq('training_plan_id', plan.id)
-        .eq('user_id', userId)
-        .order('date');
-      // A continuation carries the rows the previous request did not reach, and the job it belongs to.
-      const cont = p?.reprice_continue && Array.isArray(p.reprice_continue.ids) ? p.reprice_continue : null;
-      const contIds = cont ? new Set((cont.ids as unknown[]).map(String)) : null;
-      const pending = (rows ?? []).filter((r: any) => isRepriceable(r) && (!contIds || contIds.has(String(r.id))));
-      const job = cont?.job
-        ? { started_at: String(cont.job.started_at), total: Number(cont.job.total) || pending.length, done: Number(cont.job.done) || 0, finished_at: null as string | null, misses: Array.isArray(cont.job.misses) ? cont.job.misses : [] }
-        : { started_at: new Date().toISOString(), total: pending.length, done: 0, finished_at: null as string | null, misses: [] as Array<Record<string, unknown>> };
-      const writeJob = async (j: typeof job) => {
-        const { data: cur } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
-        await supabase.from('plans').update({ config: { ...((cur?.config as Record<string, unknown>) ?? config), reprice_job: j } }).eq('id', plan.id).eq('user_id', userId);
-      };
-      await writeJob(job);
-      const run = async () => {
-        const misses: Array<Record<string, unknown>> = [...job.misses];
-        const { repriced, rest } = await repriceRows(supabase, pending, 'reprice', misses, REPRICE_CALLS_PER_REQUEST, (done) => writeJob({ ...job, done: job.done + done }));
-        const done = job.done + repriced;
-        if (rest.length > 0) {
-          const next = { ...job, done, misses };
-          const handed = await handOffReprice(supabase, req, plan.id, rest, next);
-          if (handed) { await writeJob(next); console.log(`[reprice] plan=${plan.id} ${done}/${job.total}, ${rest.length} handed on`); return done; }
-          for (const r of rest) misses.push({ id: r.id, date: r.date, type: r.type, status: null, error: 'hand-off failed' });
-        }
-        // The rows that did not re-price, with the reply, on the job record (nothing else keeps them).
-        const { misses: _m, ...base } = job;
-        await writeJob({ ...base, done, finished_at: new Date().toISOString(), ...(misses.length ? { misses } : {}) } as typeof job);
-        console.log(`[reprice] plan=${plan.id} repriced=${done}/${job.total}`);
-        return done;
-      };
-      const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
-      if (typeof waitUntil === 'function' && pending.length > 0) {
-        waitUntil(run());
-        return json({ success: true, queued: true, rows_pending: pending.length });
+        .eq('user_id', userId);
+      const pending = (rows ?? []).filter((r: any) => isRefreshable(r, today)).length;
+      const q = await queuePlanRefresh(supabase, { userId, planId: String(plan.id), why: 'reprice', rowsPending: pending });
+      if (!q.queued && q.reason !== 'already_queued') {
+        console.warn(`[reprice] plan=${plan.id} not queued: ${q.reason}`);
+        return json({ success: false, reason: 'refresh_not_queued', details: q.reason }, 500);
       }
-      const repriced = await run();
-      return json({ success: true, repriced: true, rows_repriced: repriced, rows_pending: pending.length });
+      return json({ success: true, queued: true, rows_pending: pending });
     }
 
     const due = checkpointDue(currentWeek, weeks, answered);
@@ -225,7 +138,8 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userId)
       .order('date');
     const all = rows ?? [];
-    const pending = all.filter((r: any) => isRepriceable(r));
+    // ⛔ TODAY ON (2026-09-18) — the rows the refresh re-prices.
+    const pending = all.filter((r: any) => isRepriceable(r) && String(r?.date ?? '').slice(0, 10) >= today);
     // The stamp every unstarted row carries (identical across a materialization); the newest wins.
     const stamped = pending.map((r: any) => r?.computed?.anchors as Anchors | null).filter(Boolean);
     const onPlan: Anchors | null = stamped.length ? stamped[stamped.length - 1] : null;
@@ -342,24 +256,27 @@ Deno.serve(async (req: Request) => {
         const thrProposal = pendingRunThresholdProposal({ learned_fitness: lf2, performance_numbers: pn2 } as any);
         if (thrProposal) await acceptVia('run_threshold', thrProposal.measuredSecPerKm);
       } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }
-      // Up to three calls are spent above (the learner on the dry run, two accepts), so fewer rows fit in this request;
-      // the rest go to a background re-price job (`reprice_continue`) and are counted as re-priced when handed on.
-      const misses: Array<Record<string, unknown>> = [];
-      const { repriced: inRequest, rest } = await repriceRows(supabase, pending, 'checkpoint', misses, REPRICE_CALLS_PER_REQUEST - 3);
-      repriced = inRequest;
-      if (rest.length > 0) {
-        const job = { started_at: new Date().toISOString(), total: pending.length, done: inRequest, finished_at: null, misses };
-        if (await handOffReprice(supabase, req, plan.id, rest, job)) repriced += rest.length;
-      }
+      // ⛔ THE PLAN REFRESH, QUEUED (2026-09-18) — the same job as every other re-price. The endurance rows it will
+      // re-price are counted as re-priced once it is queued, as the handed-on rows were before.
+      const all2 = (rows ?? []) as any[];
+      const q = await queuePlanRefresh(supabase, {
+        userId, planId: String(plan.id), why: 'reprice',
+        rowsPending: all2.filter((r) => isRefreshable(r, today)).length,
+      });
+      if (q.queued || q.reason === 'already_queued') repriced = pending.length;
+      else console.warn(`[checkpoint] plan=${plan.id} refresh not queued: ${q.reason}`);
     }
     const record = {
       week: due.week, answered_at: new Date().toISOString(), decision,
       live, on_plan: onPlan, rows_repriced: repriced,
       ...(ftpAccepted != null ? { ftp_accepted_w: ftpAccepted } : {}),
     };
+    // ⚠️ RE-READ FIRST, so the refresh's job record written above survives this write.
+    const { data: cfgNow } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
+    const baseConfig = (cfgNow?.config && typeof cfgNow.config === 'object') ? cfgNow.config : config;
     const { error: cfgErr } = await supabase
       .from('plans')
-      .update({ config: { ...config, standing_plan: { ...sp, endurance_checkpoints: [...(Array.isArray(sp.endurance_checkpoints) ? sp.endurance_checkpoints : []), record] } } })
+      .update({ config: { ...baseConfig, standing_plan: { ...sp, endurance_checkpoints: [...(Array.isArray(sp.endurance_checkpoints) ? sp.endurance_checkpoints : []), record] } } })
       .eq('id', plan.id)
       .eq('user_id', userId);
     if (cfgErr) console.warn(`[checkpoint] answer not recorded: ${cfgErr.message}`);

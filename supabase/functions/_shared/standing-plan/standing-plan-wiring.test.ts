@@ -605,7 +605,9 @@ Deno.test('the restater refuses a block that is not a Standing Plan block', asyn
   const ARCHIVED_NAME = new RegExp(['wend', 'ler'].join(''), 'i');
   assert(!/training_max/.test(code) && !ARCHIVED_NAME.test(code),
     'the restater reaches into the training max');
-  assert(/requireUser/.test(code), 'the restater does not verify who is asking');
+  // ⛔ `resolveUser` since 2026-09-18: the athlete's verified token, or the service key from the job queue (the plan
+  // refresh), which names the athlete in the body. Anything else is still a 401.
+  assert(/resolveUser/.test(code) && /isService/.test(code), 'the restater does not verify who is asking');
 });
 
 Deno.test("⛔⛔ THE TEST WEEK'S COMPETITION LIFTS ARE STAMPED ME — the empty-Monday regression", () => {

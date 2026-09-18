@@ -649,7 +649,10 @@ Deno.serve(async (req) => {
       const resp = await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key },
-        body: JSON.stringify({ plan_id: planId })
+        // ⛔ `stamp_writer_version` (2026-09-18, `_shared/plan-refresh.ts`): these rows were just written by this code,
+        // so each expansion carries the code version. A plan with an upcoming session stamped older is refreshed by
+        // the server on its next calendar read.
+        body: JSON.stringify({ plan_id: planId, stamp_writer_version: true })
       })
       console.log(`[activate-plan] materialize-plan response status: ${resp.status}`);
       const respText = await resp.text();

@@ -49,6 +49,7 @@ import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
+import { isStandingPlanConfig, queueRefreshIfStale } from '../_shared/plan-refresh.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -180,6 +181,18 @@ Deno.serve(async (req)=>{
           where: 'plans',
           count: plans.length
         });
+        /**
+         * ⛔ THE AUTOMATIC PLAN REFRESH (2026-09-18, `_shared/plan-refresh.ts`). A Standing Plan block with an
+         * upcoming session written by older code is queued for one rebuild on the job queue; nothing here waits
+         * for it and nothing on screen changes until it has run.
+         */
+        {
+          const todayIso = new Date().toISOString().slice(0, 10);
+          for (const plan of plans) {
+            if (!isStandingPlanConfig(plan?.config)) continue;
+            await queueRefreshIfStale(supabase, userId, String(plan.id), todayIso);
+          }
+        }
         // Preload existing planned rows in range for quick membership checks
         /**
          * ⛔ `tags` IS SELECTED NOW, AND IT IS THE WHOLE FIX. The membership key was
