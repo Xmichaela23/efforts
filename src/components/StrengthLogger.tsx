@@ -111,6 +111,7 @@ function plyoAlternatives(name: string, equipment: string[]): AlternativeOption[
 // ⛔ `ME: Upper` → `Heavy: Upper`, at the last moment before an athlete reads it. The engine string
 // is untouched. See `plain-intent.ts` — the mapping has one owner, not one copy per surface.
 import { plainIntent } from '@/lib/plain-intent';
+import { platePlanForSets, type PlatePlanStep } from '@/lib/plate-plan';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
 import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -526,80 +527,22 @@ const PLATES_BY_UNIT: Record<'lb' | 'kg', Array<{ weight: number; count: number;
   ],
 };
 
-const PlateMath: React.FC<{
-  weight: number;
-  barType: string;
-  /** The exercise's unit — the weight, the bar and the plates are all in it. */
-  unit: 'lb' | 'kg';
-}> = ({ weight, barType, unit }) => {
-  const plates = PLATES_BY_UNIT[unit];
-  const currentBar = BAR_TYPES[barType] && BAR_TYPES[barType].unit === unit
-    ? BAR_TYPES[barType]
-    : BAR_TYPES[barKeysForUnit(unit)[0]];
-  const barWeight = currentBar.load;
+/** The bar a set is on: its own if it is one of this unit's bars, else the unit's first. */
+const plateBarFor = (barType: string, unit: 'lb' | 'kg') => (BAR_TYPES[barType] && BAR_TYPES[barType].unit === unit
+  ? BAR_TYPES[barType]
+  : BAR_TYPES[barKeysForUnit(unit)[0]]);
 
-  const calculatePlates = () => {
-    if (!weight || weight <= barWeight) {
-      return { plates: [], possible: false };
-    }
-
-    /* guard: device — plates for the weight in the athlete's box on the bar they picked */
-    const weightToLoad = weight - barWeight;
-    const weightPerSide = weightToLoad / 2;
-
-    if (weightPerSide <= 0) {
-      return { plates: [], possible: true };
-    }
-
-    const result: Array<{weight: number, count: number, color: string}> = [];
-    let remaining = weightPerSide;
-
-    for (const plate of plates) {
-      /* guard: device — plates for the weight in the athlete's box on the bar they picked */
-      const maxUsable = Math.floor(remaining / plate.weight);
-      const actualUse = Math.min(maxUsable, plate.count);
-      
-      if (actualUse > 0) {
-        result.push({
-          weight: plate.weight,
-          count: actualUse,
-          color: plate.color
-        });
-        /* guard: device — plates for the weight in the athlete's box on the bar they picked */
-        remaining = Math.round((remaining - (actualUse * plate.weight)) * 100) / 100;
-      }
-    }
-
-    return { plates: result, possible: remaining <= 0.1 };
-  };
-
-  const plateCalc = calculatePlates();
-
-  return (
-    <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-xs shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-      <div className="text-white/70 mb-1">{barWeight}{unit} bar +</div>
-      {plateCalc.plates.length > 0 ? (
-        <div className="space-y-1">
-          {plateCalc.plates.map((plate, index) => (
-            <div key={index} className="flex items-center gap-2 text-white/80">
-              <span className="text-white/72">{plate.count}x</span>
-              <span>{plate.weight}{unit} per side</span>
-            </div>
-          ))}
-        </div>
-        
-      ) : (
-        <span className="text-white/72">Empty bar only</span>
-      )}
-      
-      {!plateCalc.possible && weight > barWeight && (
-        <div className="mt-1 text-red-400">
-          Can't make exactly {weight}{unit} with standard plates
-        </div>
-      )}
-    </div>
-  );
-};
+/**
+ * ⛔ THE PLATES FOR THIS SET, PER SIDE, AND NOTHING ELSE (2026-09-18) — e.g. "45 25 10", in the order they sit
+ * on the bar, inside first. `step` is this set's entry in `platePlanForSets` over the exercise's sets in order:
+ * the plates carry over from the set before, and each load is the fewest plate changes from it
+ * (src/lib/plate-plan.ts). An empty bar prints nothing.
+ */
+const PlateMath: React.FC<{ step: PlatePlanStep | null }> = ({ step }) => (
+  <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-xs text-white/80 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+    {(step?.plates ?? []).join(' ')}
+  </div>
+);
 
 /**
  * ⛔ WHAT KIND OF SET IS THIS? The standing plan already answered, on the row (2026-08-27).
@@ -6322,7 +6265,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   <span className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Plates</span>
                                   
                                 </div>
-                                <PlateMath weight={set.weight} barType={exBarKeyFor(set.barType)} unit={exUnit ?? 'lb'} />
+                                <PlateMath
+                                  step={platePlanForSets(
+                                    exercise.sets.map((x) => ({
+                                      weight: x.weight,
+                                      barLoad: plateBarFor(exBarKeyFor(x.barType), exUnit ?? 'lb').load,
+                                      bar: exBarKeyFor(x.barType),
+                                    })),
+                                    PLATES_BY_UNIT[exUnit ?? 'lb'],
+                                  )[setIndex]}
+                                />
                               </div>
                             )}
 
