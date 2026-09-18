@@ -803,6 +803,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             ...row,
             workout_analysis: row?.workout_analysis ?? it?.workout_analysis ?? null,
             name: row?.name ?? it?.name ?? null,
+            intent_title: row?.intent_title ?? it?.intent_title ?? null,
           };
         }
         return it?.planned_workout ?? null;

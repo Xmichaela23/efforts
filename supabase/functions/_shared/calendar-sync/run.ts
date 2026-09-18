@@ -16,6 +16,7 @@ import { ensureValidGarminAccessToken, sendToGarmin, scheduleWorkoutOnDate, dele
 import { decryptToken } from '../token-crypto.ts';
 // The title every Efforts screen shows ("Ride — Long Ride"); the saved name is often just "Ride".
 import { deriveWorkoutTitle } from '../../../../src/lib/derive-workout-title.ts';
+import { intentTitle } from '../intent-title.ts';
 import { recordProviderResult } from '../connection-health.ts';
 import { fetchAthleteTimezone } from '../athlete-timezone.ts';
 import { localDateInTz } from '../local-date.ts';
@@ -92,7 +93,8 @@ export async function runCalendarSync(supabase: any, userId: string, now = new D
     if (!provider) continue;
     try {
       let payload: any;
-      const title = deriveWorkoutTitle(row);
+      // The day's title in the book's terms rides on the row, as get-week sends it (2026-09-18).
+      const title = deriveWorkoutTitle({ ...row, intent_title: intentTitle(row?.name) || null });
       if (provider === 'intervals_icu') {
         if (String(row.type).toLowerCase() !== 'ride') throw new Error(`Intervals.icu sending covers rides only so far; this is a ${row.type}`);
         payload = serializeRide({ ...row, name: title });

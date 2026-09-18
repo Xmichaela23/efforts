@@ -15,6 +15,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getRescheduleEngine } from '../_shared/coaching/index.ts';
 import { buildTimeline, findDayIndex } from './timeline-builder.ts';
+import { intentTitle } from '../_shared/intent-title.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -629,7 +630,8 @@ Deno.serve(async (req) => {
       .filter((w: any) => w.type === workout.type && w.id !== workout_id)
       .map((w: any) => ({
         id: w.id,
-        name: w.name || `${w.type} workout`,
+        // The day's title in the book's terms (`_shared/intent-title.ts`, 2026-09-18) — the popup prints it.
+        name: intentTitle(w.name) || `${w.type} workout`,
         type: w.type
       }));
 

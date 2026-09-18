@@ -132,7 +132,7 @@ Deno.test('the four intents print the book’s word and its cue', () => {
     { slot_intent: 'SKILL', name: 'back squat' },
     { slot_intent: 'HYP', name: 'dumbbell curl' },
   ]), bar);
-  assertEquals(rows[0].kind, 'Maximal effort');
+  assertEquals(rows[0].kind, 'Maximum effort');
   assertEquals(rows[0].cue, '1 to 5 reps, stop short of failure.');
   assertEquals(rows[1].kind, 'Skill');
   assert(rows[1].cue?.startsWith('Form and consistency over speed.'));

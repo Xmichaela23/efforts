@@ -30,7 +30,6 @@ import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { isPlyoSession } from '@/lib/utils';
 import { WEEK_DAYS as ORDER, isEnduranceSession, type WeekSession } from '@/lib/week-budget';
-import { plainIntent } from '@/lib/plain-intent';
 import type { WeekOneSummary } from '@/lib/builder-readout';
 
 export type WeekGridSession = WeekSession;
@@ -62,10 +61,8 @@ export default function WeekGrid({
   // ⛔ THE PRESS-DAYS CHECK, THE DAY COUNTS AND THE BALANCE SENTENCE LEFT THIS FILE (2026-09-10, audit
   // H-P05). They are worked out on the server and arrive as `summary`.
 
-  // ⛔ MOVED TO `@/lib/plain-intent` (2026-08-28). It lived here as two lines and was used HERE
-  // ONLY, so the logger header, the calendar and the plan download screen all still printed
-  // `DE: Upper` at the athlete. Pasting the two lines into three more files is the private-list
-  // disease this codebase keeps paying for; the mapping now has one owner and four readers.
+  // ⛔ A LIFTING DAY'S TITLE COMES FROM THE SERVER (2026-09-18): the composer stamps `intent_title` on each
+  // session ("Maximum Effort: Upper"). The phone-side "Heavy" / "Speed" swap is gone.
 
   /**
    * ⛔ ONE CAPITALISATION FOR EVERY MOVEMENT (punch item 5, 2026-08-25). The accessory line read
@@ -141,7 +138,9 @@ export default function WeekGrid({
            * carries its own duration, which is the number the athlete is actually deciding on.
            */
           const label = (s: WeekGridSession) => {
-            const name = titleCase(plainIntent(s.type === 'strength' ? s.name.replace('Strength — ', '') : s.name));
+            // A lifting day's title is the server's (`intent_title`, 2026-09-18): "Maximum Effort: Upper".
+            const shown = s.type === 'strength' ? (s.intent_title || s.name) : s.name;
+            const name = titleCase(s.type === 'strength' ? shown.replace('Strength — ', '') : shown);
             const mins = Number(s.duration) || 0;
             return mins > 0 ? `${name} ${fmtMins(mins)}` : name;
           };

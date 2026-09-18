@@ -46,6 +46,7 @@ import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 import { emptyDayLine } from '../_shared/empty-day-line.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
+import { intentTitle } from '../_shared/intent-title.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -998,6 +999,7 @@ Deno.serve(async (req)=>{
         analysis_updated_at: w?.analysis_updated_at ?? null,
         analysis_readout: analysisReadout({ ...w, workout_status: w?.workout_status || status }),
         name: w?.name ?? null,
+        intent_title: String(type) === 'strength' ? intentTitle(w?.name ?? null) || null : null,
         timestamp: w?.timestamp ?? null,
         // Workload data from database (single source of truth)
         workload_actual: w.workload_actual ?? null,
@@ -1687,6 +1689,8 @@ Deno.serve(async (req)=>{
          * the workout view and the plan list. The name is display text and a rename silently kills the pill.
          */
         is_deload: /deload/i.test(String(p.name ?? item.name ?? '')),
+        // A lifting day's title, in the book's terms (`_shared/intent-title.ts`, 2026-09-18): `ME: Upper` → "Maximum Effort: Upper".
+        intent_title: String(p.type ?? item.type ?? '').toLowerCase() === 'strength' ? intentTitle(p.name ?? item.name ?? null) || null : null,
         // The day's listing order (H-T16); the same number sits on the item and on completed_workout.
         day_order: item.day_order ?? null,
         export_hints: p.export_hints ?? null,
@@ -1736,6 +1740,7 @@ Deno.serve(async (req)=>{
         done_headline: item.done_headline ?? null,
         is_executed: item.is_executed === true,
         day_order: item.day_order ?? null,
+        intent_title: item.intent_title ?? null,
       };
     };
     /**

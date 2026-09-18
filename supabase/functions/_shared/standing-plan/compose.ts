@@ -15,6 +15,7 @@
 // a slot. Convert, never add.
 // ============================================================================
 
+import { intentTitle } from '../intent-title.ts';
 import {
   buildEnduranceSession,
   resolveEnduranceAnchors,
@@ -278,6 +279,8 @@ export type PlanSession = {
   day: string;
   type: string;
   name: string;
+  /** The day's title in the book's terms, for every screen (`intentTitle(name)`, stamped by `composeWeek`). */
+  intent_title?: string;
   description: string;
   duration: number;
   strength_exercises?: StrengthExercise[];
@@ -4201,7 +4204,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
   return {
     frame: args.frame, week: args.week, column: args.column, isTestWeek: testWeek,
-    sessions, ledger, meRows, notes, conflicts, volume,
+    // ⛔ EVERY LIFTING DAY CARRIES ITS TITLE IN THE BOOK'S TERMS (2026-09-18) — `intent_title`, "Maximum Effort:
+    // Upper" for `ME: Upper` (`_shared/intent-title.ts`). The name stays the engine string; screens print the title.
+    sessions: sessions.map((s) => (String(s.type).toLowerCase() === 'strength' ? { ...s, intent_title: intentTitle(s.name) } : s)),
+    ledger, meRows, notes, conflicts, volume,
     // ⛔ p146's BUCKETS 1-3, counted off the sessions as the library built them. See
     // `endurance-ledger.ts` — nothing surfaces it, and it asks the athlete nothing.
     enduranceLedger: enduranceLedgerFor(builtEndurance),

@@ -452,7 +452,8 @@ export default function WorkoutCalendar({
         workoutId: workout.id,
         oldDate,
         newDate: targetDate,
-        workoutName: workout.name || `${workout.type} workout`,
+        // A lifting day's title in the book's terms, from get-week (2026-09-18).
+        workoutName: workout.intent_title || workout.name || `${workout.type} workout`,
       });
       setShowValidationPopup(true);
     } catch (err) {

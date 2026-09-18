@@ -9,6 +9,7 @@
 
 // Import from source modules (NOT ./index.ts) — index.ts re-exports this file, so importing the
 // barrel here would create a load-order cycle.
+import { spelledIntentTitle } from '../intent-title.ts';
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type PullupProgress, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
 import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentGroupPaceHr, decouplingToSeries, computeRunDecouplingState, runSessionGroup, type RunSessionGroup, type RunFitness } from './run.ts';
@@ -817,7 +818,8 @@ export interface ViadaWeekPerformed {
   /** Muscles the week left under the floor of one accessory slot. */
   belowFloor: string[];
   /** Per lifting session: work sets, and what that costs the next day (his 6-8 / 14+ figure). */
-  perSession: Array<{ label: string; countedSets: number; totalIfAllCounted: number; verdict: string }>;
+  /** `display` is the day's title spelled out in the book's terms (`spelledIntentTitle`, 2026-09-18); the card prints it. */
+  perSession: Array<{ label: string; display: string; countedSets: number; totalIfAllCounted: number; verdict: string }>;
   /** p084's other dose — heavy reps and velocity reps per movement pattern. */
   perPattern: Array<{
     pattern: string; heavyReps: number; velocityReps: number;
@@ -1782,6 +1784,7 @@ function buildViadaWeekPerformed(
     belowFloor: ledger.belowFloor,
     perSession: ledger.perSession.map((sess) => ({
       label: sess.label,
+      display: spelledIntentTitle(sess.label),
       countedSets: sess.countedSets,
       totalIfAllCounted: sess.totalIfAllCounted,
       verdict: sess.verdict,

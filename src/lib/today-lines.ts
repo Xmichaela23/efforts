@@ -169,9 +169,9 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
 
 // ── 2. THE LIFT SESSION ─────────────────────────────────────────────────────────────────────────
 
-/** The book's own word for the slot, spelled out (p218's intent table). */
+/** The book's own word for the slot, spelled out (p219: "ME, or maximum effort"; "DE, or dynamic effort"). */
 export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
-  ME: 'Maximal effort',
+  ME: 'Maximum effort',
   DE: 'Dynamic effort',
   SKILL: 'Skill',
   HYP: 'Hypertrophy',

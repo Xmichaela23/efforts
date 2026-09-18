@@ -189,7 +189,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                 {r.status === 'not_logged' && r.status_label && (
                   <span className="text-caption text-label-secondary uppercase tracking-wide">{r.status_label}</span>
                 )}
-                {/* ⛔ THE BOOK'S WORD FOR THE SLOT — Maximal effort / Dynamic effort / Hypertrophy / Skill
+                {/* ⛔ THE BOOK'S WORD FOR THE SLOT — Maximum effort / Dynamic effort / Hypertrophy / Skill
                     (Michael, 2026-09-12), the same words Today's cards print. Composed by
                     `session-detail/strength-slots.ts` at read time; the phone prints it. */}
                 {r.intent_word && (

@@ -28,7 +28,6 @@ import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 // the label ("30–40 min" for a lift priced off its rows, "63:00" otherwise, nothing on the plyo day).
 import { plannedDurationFields } from '@shared/planned-duration-label';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
-import { plainIntent } from '@/lib/plain-intent';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -97,6 +96,23 @@ function summarizeSteps(steps?: string[]): string[] {
 // step tokens, out of prose, from distance × pace, and from interval reps priced at the description's
 // pace. A plan session's length is the server's stored total or the builder's authored minutes.
 
+/**
+ * A lifting day's title in the book's terms, as the composer stamped it on the plan's own sessions
+ * (`sessions_by_week[..].intent_title`, 2026-09-18), keyed by the session's name. The phone reads it; it words nothing.
+ * A plan built before the stamp has none, and its days print their own names.
+ */
+function intentTitlesOf(plan: any): Map<string, string> {
+  const out = new Map<string, string>();
+  const sbw = plan?.sessions_by_week;
+  if (!sbw || typeof sbw !== 'object') return out;
+  for (const list of Object.values(sbw)) {
+    if (!Array.isArray(list)) continue;
+    for (const s of list as any[]) {
+      if (typeof s?.name === 'string' && typeof s?.intent_title === 'string' && s.intent_title) out.set(s.name, s.intent_title);
+    }
+  }
+  return out;
+}
 function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
 
 interface Plan {
@@ -320,6 +336,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             }
             return v;
           };
+          const titleByName = intentTitlesOf(pd);
           for (const w of mat) {
             const wk = w.week_number || 1;
             const dayName = numToDay[w.day_number as number] || w.day || '';
@@ -353,6 +370,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const workout = {
               id: w.id,
               name: w.name || 'Session',
+              intent_title: titleByName.get(String(w.name ?? '')) ?? null,
               type: (String((w as any).type).toLowerCase() === 'bike' ? 'ride' : (w as any).type) as any,
               description: renderedDesc,
               duration,
@@ -882,6 +900,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         if (Array.isArray(rows)) {
           // Removed auto-rebake to avoid surprise writes in UI
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
+          const titleByName = intentTitlesOf(selectedPlanDetail);
           const normalized = rows.map((w: any) => {
             const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
             const computed = (w as any).computed || {};
@@ -894,7 +913,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const steps_preset = parseMaybeJson((w as any).steps_preset) || null;
             const export_hints = parseMaybeJson((w as any).export_hints) || null;
             const intervals = parseMaybeJson((w as any).intervals) || [];
-            return { ...w, day: dayName, duration, planned_duration_seconds: plannedSecs, planned_duration_label: plannedDurationFields(w).planned_duration_label, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
+            return { ...w, intent_title: titleByName.get(String(w.name ?? '')) ?? null, day: dayName, duration, planned_duration_seconds: plannedSecs, planned_duration_label: plannedDurationFields(w).planned_duration_label, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
           });
           weekCacheRef.current.set(key, normalized);
           let weeks: any[];
@@ -1242,6 +1261,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     const weeks: any[] = (plan.weeks || []).slice().sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0));
     const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const titleByName = intentTitlesOf(plan);
     for (const wk of weeks) {
       const rawTitle = wk.title != null ? String(wk.title).trim() : '';
       const titleRedundant = rawTitle === `Week ${wk.weekNumber}`;
@@ -1306,10 +1326,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             meta.push(w.intensity);
           }
           if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
-          // ⛔ THE DOWNLOAD IS A SURFACE TOO. It prints the session name verbatim, so the Standing
-          // Plan's `DE: Upper` reached the athlete in the file even after the screens were mapped.
-          // Display only — the engine string is unchanged. See `plain-intent.ts`.
-          lines.push(`- ${plainIntent(w.name)}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
+          // ⛔ THE DOWNLOAD IS A SURFACE TOO. A lifting day prints its title in the book's terms — the one the
+          // composer stamped on the plan's session (`intent_title`, 2026-09-18), matched here by name.
+          lines.push(`- ${w.intent_title || titleByName.get(String(w.name ?? '')) || w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);
 
           const discExport = String(w.type || w.discipline || '').toLowerCase();

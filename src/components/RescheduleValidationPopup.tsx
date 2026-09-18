@@ -1,7 +1,6 @@
 import React from 'react';
 import { X, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { plainIntent } from '@/lib/plain-intent';
 
 interface ValidationReason {
   code: string;
@@ -170,9 +169,10 @@ export default function RescheduleValidationPopup({
             </h3>
             {/* ⛔ THE CALENDAR'S DRAG CONFIRMATION PRINTS THE RAW NAME, so the Standing Plan's
                 `DE: Upper` reached the athlete here even though the calendar CHIPS abbreviate it away
-                (`derivePlannedCellLabel` folds it to "STG"). Display only — see `plain-intent.ts`. */}
+                (`derivePlannedCellLabel` folds it to "STG"). Since 2026-09-18 the callers pass the server's
+                `intent_title` ("Maximum Effort: Upper") and `validate-reschedule` titles the conflicts. */}
             <p className="text-sm text-white/70 font-light">
-              {plainIntent(workoutName)}
+              {workoutName}
             </p>
             {oldDate !== newDate && (
               <p className="text-xs text-white/50 mt-1">
@@ -224,7 +224,7 @@ export default function RescheduleValidationPopup({
             <div className="space-y-1">
               {conflicts.sameTypeWorkouts.map((conflict, idx) => (
                 <p key={idx} className="text-xs text-white/70 font-light">
-                  • {plainIntent(conflict.name) || `${conflict.type} workout`}
+                  • {conflict.name || `${conflict.type} workout`}
                 </p>
               ))}
             </div>

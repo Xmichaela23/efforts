@@ -79,18 +79,15 @@ import {
 import { weekChangeLead, weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
 // ⛔ The coverage-line gate lives in a pure module so a fixture pins it — see state-coverage.ts.
 import { coverageVisible } from '@/lib/state-coverage';
-// ⛔ `DE: Upper` → `Speed day, upper body`, at the last moment before the athlete reads it (Michael,
-// off the live card: "LLM jiberish what is DE?" … "spell it out"). One formatter over the ONE owner
-// of the Heavy/Speed vocabulary — the logger, the calendar, the week grid and the plan download all
-// read the same two words; this card spells the phrase out in full. The engine string on the payload
-// is untouched. `Test:` keeps its word; SKILL/HYP are slot intents, never day labels.
-import { spelledIntentLabel } from '@/lib/plain-intent';
+// ⛔ EACH DAY IS SPELLED OUT BY THE SERVER (2026-09-18): `perSession[].display`, "Dynamic Effort day, upper body"
+// (`_shared/intent-title.ts`). Michael, off the live card: "spell it out"; and the book's own terms.
 
 export type ViadaWeekPerformed = {
   since: string;
   perMuscle: Array<{ muscle: string; sets: number; effectiveReps: number; verdict: string }>;
   belowFloor: string[];
-  perSession: Array<{ label: string; countedSets: number; totalIfAllCounted: number; verdict: string }>;
+  /** `display` is the day spelled out in the book's terms, from the server (2026-09-18). */
+  perSession: Array<{ label: string; display?: string; countedSets: number; totalIfAllCounted: number; verdict: string }>;
   perPattern: Array<{
     pattern: string; heavyReps: number; velocityReps: number;
     heavy: 'below' | 'in_band' | 'above'; velocity: 'below' | 'in_band' | 'above';
@@ -206,7 +203,7 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
           <div className="mt-1 space-y-1">
             {week.perSession.map((s, i) => (
               <div key={`${s.label}-${i}`} className="flex items-baseline justify-between gap-3">
-                <span className="text-footnote text-label">{spelledIntentLabel(s.label)}</span>
+                <span className="text-footnote text-label">{s.display ?? s.label}</span>
                 <span className="text-caption text-label-secondary tabular-nums">
                   <span className="text-label">{s.countedSets}</span> work sets
                   {isSessionVerdict(s.verdict) && SESSION_VERDICT_WORD[s.verdict] && <> · {SESSION_VERDICT_WORD[s.verdict]}</>}

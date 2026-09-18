@@ -108,9 +108,6 @@ function plyoAlternatives(name: string, equipment: string[]): AlternativeOption[
     .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
     .map((d) => ({ name: d, same_pattern: true, equipment: 'bodyweight' } as AlternativeOption));
 }
-// ⛔ `ME: Upper` → `Heavy: Upper`, at the last moment before an athlete reads it. The engine string
-// is untouched. See `plain-intent.ts` — the mapping has one owner, not one copy per surface.
-import { plainIntent } from '@/lib/plain-intent';
 import { platePlanForSets, type PlatePlanStep } from '@/lib/plate-plan';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
 import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
@@ -587,7 +584,7 @@ const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: 
  * ⚠️ THE SPELLED-OUT NAMES STAY — p219's own abbreviations, and Michael asked for the words.
  */
 const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; text: string }> = {
-  ME: { name: 'Maximal effort', text: '1 to 5 reps, stop short of failure.' },
+  ME: { name: 'Maximum effort', text: '1 to 5 reps, stop short of failure.' },
   DE: { name: 'Dynamic effort', text: 'As fast as possible on every rep. Bar slows, set is over.' },
   SKILL: { name: 'Skill', text: 'Form and consistency over speed. Weight heavy enough to be a challenge. Every rep either improves the movement or degrades it. Performed poorly, stop.' },
   HYP: { name: 'Hypertrophy', text: '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.' },
@@ -4575,7 +4572,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {(() => {
                 const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                 if (mode === 'mobility') return 'Log Mobility';
-                return scheduledWorkout ? `Log: ${plainIntent(scheduledWorkout.name)}` : 'Log Strength';
+                // The title is the server's (`intent_title`, 2026-09-18): "Maximum Effort: Upper". A row from somewhere
+                // that does not send it prints its own name.
+                return scheduledWorkout ? `Log: ${(scheduledWorkout as any).intent_title ?? scheduledWorkout.name ?? ''}` : 'Log Strength';
               })()}
             </h1>
             {/* D-124: surface deload context so a lighter-than-last-time prescription
@@ -4699,12 +4698,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       .map((w:any)=> (
                         <button key={w.id} onClick={()=>{ 
                           prefillFromPlanned(w); 
-                          setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${plainIntent(w.name)||'Strength'}`); 
+                          setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.intent_title || w.name || 'Strength'}`); 
                           setSourcePlannedId(w.id); 
                           setSourcePlannedDate(w.date); 
                           setShowPlannedMenu(false); 
                         }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.15] text-subhead flex items-center justify-between text-white" type="button">
-                          <span className="font-normal">{weekdayShortFromYmd(w.date)} — {plainIntent(w.name)||'Strength'}</span>
+                          <span className="font-normal">{weekdayShortFromYmd(w.date)} — {w.intent_title || w.name || 'Strength'}</span>
                           <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/40 text-label bg-white/[0.12]">{String(w.workout_status||'planned')}</span>
                         </button>
                       ))}

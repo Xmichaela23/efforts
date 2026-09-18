@@ -36,7 +36,6 @@ import { useSwapSheet, postSwap, type SwapSheetOption } from '@/hooks/useSwapShe
 import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { plainIntent } from '@/lib/plain-intent';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
 const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
@@ -895,11 +894,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex items-center justify-between gap-4">
           <h2 className="font-normal tracking-normal text-body text-white min-w-0">
             {(() => {
-              // ⛔ `ME: Upper` → `Heavy: Upper` at the last moment. Display only; the engine string
-              // is untouched, and `plainIntent` is total so every other title passes through.
+              // ⛔ A LIFTING DAY'S TITLE IS THE SERVER'S (2026-09-18): `intent_title`, "Maximum Effort: Upper".
+              const sent = String((hydratedPlanned as any)?.intent_title || (workout as any)?.intent_title || '').trim();
+              if (sent) return sent;
               const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
-              if (st) return plainIntent(st);
-              return plainIntent(generateWorkoutTitle());
+              if (st) return st;
+              return generateWorkoutTitle();
             })()}
           </h2>
           {/* Attach/Unattach button - moved here */}
@@ -1485,7 +1485,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             workoutId: workoutId,
                             oldDate: currentDate,
                             newDate: currentDate, // Will be updated when user selects an option
-                            workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+                            workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
                           });
                           setShowReschedulePopup(true);
                         } catch (err) {
@@ -1751,7 +1751,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 workoutId: workoutId,
                 oldDate: currentDate,
                 newDate: newDate,
-                workoutName: (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+                workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
               });
               setShowReschedulePopup(true);
             } catch (err) {

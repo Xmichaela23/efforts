@@ -42,7 +42,7 @@ type RirVerdict = 'too_easy' | 'on_target' | 'too_hard';
 // `KIND_WORD` (src/lib/today-lines.ts); this sent "heavy" / "speed" for the same slots, so the
 // Performance tab named a lift's focus in a second vocabulary. One vocabulary now; the client's
 // `kindWordFromSlot` still understands the old words from a row analysed before this deployed.
-const SLOT_INTENT_WORD: Record<string, string> = { ME: 'Maximal effort', DE: 'Dynamic effort', SKILL: 'Skill', HYP: 'Hypertrophy' };
+const SLOT_INTENT_WORD: Record<string, string> = { ME: 'Maximum effort', DE: 'Dynamic effort', SKILL: 'Skill', HYP: 'Hypertrophy' };
 
 const RIR_LINE: Record<RirVerdict, string> = {
   too_hard: 'Going too hard — reduce weight or add reps in reserve',

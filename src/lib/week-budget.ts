@@ -12,6 +12,8 @@
 export type WeekSession = {
   day: string;
   name: string;
+  /** A lifting day's title in the book's terms, stamped by the composer ("Maximum Effort: Upper"). */
+  intent_title?: string;
   /** `strength` | `run` | `ride` | `swim` — the composer's own tag. */
   type?: string;
   duration?: number;

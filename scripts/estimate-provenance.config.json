@@ -103,7 +103,14 @@
         "src/components/TrainingBaselines.tsx",
         "src/components/TodayWeather.tsx",
         "src/components/MobileSummary.tsx",
-        "src/components/WorkoutCalendar.tsx"
+        "src/components/WorkoutCalendar.tsx",
+        "src/lib/today-lines.ts",
+        "src/components/WeekGrid.tsx",
+        "src/components/AllPlansInterface.tsx",
+        "src/components/RescheduleValidationPopup.tsx",
+        "src/components/UnifiedWorkoutView.tsx",
+        "src/components/context/ViadaWeekCard.tsx",
+        "src/lib/derive-workout-title.ts"
       ]
     },
     "parked": [
@@ -417,6 +424,17 @@
           "Analysis did not finish",
           "Analysis failed at ",
           "STALLED_AFTER_MS"
+        ]
+      },
+      {
+        "field": "intent_title on get-week, workout-detail, composed sessions, validate-reschedule; perSession[].display",
+        "words": [
+          "plainIntent(",
+          "spelledIntentLabel(",
+          "INTENT_WORD",
+          "Heavy: ",
+          "Speed day",
+          "Maximal effort"
         ]
       }
     ]

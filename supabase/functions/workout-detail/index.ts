@@ -59,6 +59,7 @@ import { buildForwardContext } from '../_shared/session-detail/forward-context.t
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
 import { clock, displayFormat, durationClock } from '../_shared/display-format.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
+import { intentTitle } from '../_shared/intent-title.ts';
 import {
   buildArcPerformanceBridge,
   ARC_PERFORMANCE_BRIDGE_VERSION,
@@ -1616,6 +1617,8 @@ function normalizeBasic(w: any) {
     is_executed: isExecutedWorkout(w),
     planned_id: w?.planned_id || null,
     name: w?.name || null,
+    // A lifting day's title, in the book's terms (`_shared/intent-title.ts`, 2026-09-18).
+    intent_title: String(w?.type ?? '').toLowerCase() === 'strength' ? intentTitle(w?.name) || null : null,
     // Basic metrics (pass-through; units as stored)
     distance: w?.distance ?? w?.distance_km ?? null,
     distance_meters: w?.distance_meters ?? (typeof w?.distance === 'number' ? w.distance * 1000 : null),
