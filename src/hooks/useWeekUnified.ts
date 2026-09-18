@@ -1,3 +1,4 @@
+import type { SpacingLine } from '@shared/standing-plan/spacing-line.ts';
 /**
  * useWeekUnified - DUMB CLIENT hook
  * 
@@ -49,6 +50,8 @@ export function useWeekUnified(fromISO: string, toISO: string) {
         training_plan_context: unknown | null;
         /** The line for a day with nothing on it, per date — `_shared/empty-day-line.ts` (2026-09-17). */
         empty_day_lines: Record<string, string> | null;
+        /** Today's two scheduling sentences, per date — `_shared/standing-plan/spacing-line.ts` (2026-09-18). */
+        spacing_lines: Record<string, SpacingLine | null> | null;
       }>;
     },
     placeholderData: keepPreviousData,
@@ -74,12 +77,13 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   const weeklyStats = (query.data as any)?.weekly_stats || { planned: 0, completed: 0 };
   const trainingPlanContext = (query.data as any)?.training_plan_context || null;
   const emptyDayLines: Record<string, string> = (query.data as any)?.empty_day_lines || {};
+  const spacingLines: Record<string, SpacingLine | null> = (query.data as any)?.spacing_lines || {};
   // Show loading while fetching when there is no real data yet, or when showing previous week's placeholder (wrong dates for the requested range).
   const loading =
     enabled &&
     query.isFetching &&
     (query.isPlaceholderData || query.data === undefined);
-  return { items, weeklyStats, trainingPlanContext, emptyDayLines, loading, error: (query.error as any)?.message || null };
+  return { items, weeklyStats, trainingPlanContext, emptyDayLines, spacingLines, loading, error: (query.error as any)?.message || null };
 }
 
 

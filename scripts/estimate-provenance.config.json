@@ -438,6 +438,16 @@
         ]
       },
       {
+        "field": "get-week spacing_lines",
+        "words": [
+          "spacingLineFor(",
+          "Keep them six to eight hours apart",
+          "costs the lift its skill and speed sets",
+          "If they have to be closer",
+          "closerLabel"
+        ]
+      },
+      {
         "field": "swap-list lists",
         "words": [
           "getInSlotAlternatives(",

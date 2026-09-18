@@ -12,11 +12,11 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { VENUE_LABEL } from '@shared/session-swap/copy.ts';
 import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
+import type { SpacingLine } from '@shared/standing-plan/spacing-line.ts';
 import {
   liftLinesFor,
   liftCardLinesFor,
   enduranceLinesFor,
-  spacingLineFor,
   isStrengthRow,
   isEnduranceRow,
   isFromPlan,
@@ -118,17 +118,16 @@ export function deckCardsFor(session: TodayRow, useImperial: boolean): DeckCard[
 // ── the day's spacing line ──────────────────────────────────────────────────────────────────────
 
 /**
- * The day's spacing, above the sessions. ⛔ IT CARRIES NO SPORT COLOUR (§2b): it belongs to the day,
+ * The day's spacing, above the sessions. The words are `get-week`'s (`spacing_lines`, 2026-09-18). ⛔ IT CARRIES NO SPORT COLOUR (§2b): it belongs to the day,
  * not to either session. Renders nothing unless the day is a lift and a ride or run.
  *
  * ⚠️ IT MOVED HERE FROM `TodaySessionLines`, which was deleted (2026-09-09). That component drew the
  * per-session lines BEFORE the deck existed and became unreachable when every planned session
  * started rendering as a deck or a card; the spacing line was the one piece of it still on screen.
  */
-export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows }) => {
+export const TodaySpacingLine: React.FC<{ spacing: SpacingLine | null }> = ({ spacing }) => {
   // ⛔ CLOSED BY DEFAULT (§2.1, 2026-09-10).
   const [open, setOpen] = React.useState(false);
-  const spacing = spacingLineFor(rows);
   if (!spacing) return null;
   return (
     <div
@@ -136,29 +135,28 @@ export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows
       /* 12 px to the first card (Michael, 2026-09-09). */
       style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 12px' }}
     >
-      <div>{spacing.lead}</div>
-      {/* ⛔ THE TAP THE LOAD CARD'S CHEVRON HAD: the words left, the chevron at the far right, turning
-          over when open. ⚠️ No chevron where there is nothing under it (a swim day). */}
-      {spacing.closer ? (
-        <>
+      {/* ⛔ THE CLOSER OPENS FROM A CHEVRON ON THE LEAD LINE (2026-09-18). Its heading (the words over the closer)
+          came off: no page prints it. Closed by default (§2.1); no chevron where there is nothing under it (a swim day). */}
+      <div className="flex items-start justify-between gap-2">
+        <span>{spacing.lead}</span>
+        {spacing.closer ? (
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="mt-0.5 flex w-full items-center justify-between bg-transparent border-none p-0 text-left cursor-pointer text-footnote font-normal leading-snug"
-            style={{ color: 'var(--label-secondary)' }}
+            aria-label={spacing.closer}
+            className="shrink-0 bg-transparent border-none p-0 cursor-pointer"
           >
-            <span>{spacing.closerLabel}</span>
             <ChevronDown
-              className="h-4 w-4 shrink-0 text-label-secondary"
+              className="h-4 w-4 text-label-secondary"
               aria-hidden="true"
               style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
             />
           </button>
-          {open ? (
-            <div style={{ marginTop: 2, color: 'var(--label-secondary)' }}>{spacing.closer}</div>
-          ) : null}
-        </>
+        ) : null}
+      </div>
+      {spacing.closer && open ? (
+        <div style={{ marginTop: 2, color: 'var(--label-secondary)' }}>{spacing.closer}</div>
       ) : null}
     </div>
   );

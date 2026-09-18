@@ -9,13 +9,11 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
-  spacingLineFor,
   liftLinesFor,
   liftCardLinesFor,
   enduranceLinesFor,
   bandOf,
   familyOf,
-  isFromPlan,
 } from './today-lines.ts';
 
 const PLAN = 'plan-1';
@@ -31,98 +29,6 @@ const run = (family: string, band: string) => ({
   tags: ['standing_plan', `family:${family}`, 'level:1', 'sport:run', `band:${band}`],
 });
 const bar = (n: string) => n === 'barbell bench press';
-
-// ── the spacing line ────────────────────────────────────────────────────────────────────────────
-
-Deno.test('one session gets no spacing line', () => {
-  assertEquals(spacingLineFor([lift([{ slot_intent: 'ME', name: 'barbell bench press' }])]), null);
-});
-
-const LEAD = 'Two sessions today. Keep them six to eight hours apart.';
-const CLOSER_LABEL = 'If they have to be closer';
-
-Deno.test('two sessions, a lift and a ride: two lines, and the preferred order with its cost (p144, p145, p77)', () => {
-  const day = [lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_endurance', 'vt1_or_easier')];
-  assertEquals(spacingLineFor(day), {
-    lead: LEAD,
-    closerLabel: CLOSER_LABEL,
-    closer: 'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
-  });
-});
-
-Deno.test('⛔ A SESSION THAT IS NOT VT1 DROPS "keep it easy" — p144 rule 5 (2026-09-11)', () => {
-  /**
-   * ⛔ SUPERSEDES "the band no longer picks a branch" (2026-09-10) FOR THE FIRST SENTENCE. Michael,
-   * from the phone: Monday told him to keep the run easy over a run the plan had just prescribed
-   * hard. Rule 5 covers VT1-intensity endurance by name; above, near and below threshold have no
-   * page behind the clause. The ORDER sentence is unaffected on every band — that is rule 6 and p77,
-   * about the lift's own freshness.
-   */
-  assertEquals(
-    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_anaerobic', 'above')])?.closer,
-    'Lift first. Riding first costs the lift its skill and speed sets.',
-  );
-  assertEquals(
-    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), run('run_near_threshold', 'near')])?.closer,
-    'Lift first. Running first costs the lift its skill and speed sets.',
-  );
-});
-
-Deno.test('a speed row alone keeps the second sentence', () => {
-  const day = [lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), ride('ride_anaerobic', 'above')];
-  assertEquals(
-    spacingLineFor(day)?.closer,
-    'Lift first. Riding first costs the lift its skill and speed sets.',
-  );
-});
-
-Deno.test('a run in place of the ride uses the same lines with "run"', () => {
-  assertEquals(
-    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), run('run_lsd', 'vt1_or_easier')])?.closer,
-    'Lift first and keep the run easy. Running first costs the lift its skill and speed sets.',
-  );
-});
-
-Deno.test('a row with no band still gets both lines', () => {
-  const bandless = { id: 'r', type: 'ride', training_plan_id: PLAN, tags: ['sport:ride'] };
-  const out = spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), bandless]);
-  assertEquals(out?.lead, LEAD);
-  assertEquals(out?.closerLabel, CLOSER_LABEL);
-});
-
-Deno.test('⛔ A LIFT WITH NO SKILL AND NO SPEED SETS: THE SECOND SENTENCE DROPS', () => {
-  const day = [lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_endurance', 'vt1_or_easier')];
-  assertEquals(spacingLineFor(day)?.closer, 'Lift first and keep the ride easy.');
-});
-
-Deno.test('⛔ BOTH HALVES GONE: THE CHEVRON DOES NOT DRAW (2026-09-11)', () => {
-  /**
-   * ⛔ THE UPPER-BODY DAY BESIDE A HARD RUN — the day Michael was looking at. Going second costs the
-   * bench nothing (p131: fresh in the systems the session uses; the run takes the legs), and a run
-   * the plan prescribed hard is not the one to keep easy. Both halves are unearned, so only the
-   * spacing line prints and the chevron is not drawn.
-   */
-  const upper = lift(
-    [{ slot_intent: 'ME', name: 'barbell bench press' }],
-    ['standing_plan', 'frame:all_rounder', 'column:standard'],
-  );
-  assertEquals(spacingLineFor([upper, run('run_mlss', 'above')]), { lead: LEAD });
-  // And a hypertrophy-only lift beside a hard ride: the same two absences, on a row with no frame tag.
-  assertEquals(
-    spacingLineFor([lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_anaerobic', 'above')]),
-    { lead: LEAD },
-  );
-});
-
-Deno.test('⛔ TWO SESSIONS THAT ARE NOT A LIFT AND A RIDE GET NO LINE', () => {
-  assertEquals(spacingLineFor([ride('ride_endurance', 'vt1_or_easier'), run('run_lsd', 'vt1_or_easier')]), null);
-});
-
-Deno.test('⛔ A GARMIN RIDE IS NOT THE SECOND SESSION — it is not from the plan', () => {
-  const garmin = { id: 'g', type: 'ride', workout_status: 'completed' };
-  assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), garmin]), null);
-  assertEquals(isFromPlan(garmin), false);
-});
 
 // ── the lift session ────────────────────────────────────────────────────────────────────────────
 
@@ -306,36 +212,4 @@ Deno.test('the ride with work reads its sprint interval off the row: 9, 8, 9', (
 
 Deno.test('⛔ A RIDE WITH WORK AND NO SPRINT TOKEN GETS NO LINE — never a fixed number', () => {
   assertEquals(enduranceLinesFor(withWork(1, null)), []);
-});
-
-// ⛔ AN UPPER-BODY DAY (frame tag, no lower: tag) DROPS THE LEG-COST SENTENCE; A LOWER DAY KEEPS IT.
-const FRAME_DAY = ['standing_plan', 'frame:all_rounder', 'column:standard'];
-
-Deno.test('⛔ UPPER-BODY DAY: "Lift first and keep the ride easy." only, the chevron line stays', () => {
-  const upper = lift([{ slot_intent: 'SKILL', name: 'pull-up' }, { slot_intent: 'DE', name: 'medicine ball throw' }], FRAME_DAY);
-  const out = spacingLineFor([upper, ride('ride_endurance', 'vt1_or_easier')]);
-  assertEquals(out, {
-    lead: 'Two sessions today. Keep them six to eight hours apart.',
-    closerLabel: 'If they have to be closer',
-    closer: 'Lift first and keep the ride easy.',
-  });
-  assertEquals(spacingLineFor([upper, run('run_vt1', 'vt1_or_easier')])?.closer, 'Lift first and keep the run easy.');
-});
-
-Deno.test('⛔ UPPER OR LOWER IS NEVER READ OFF THE NAME', () => {
-  const namedUpper = { ...lift([{ slot_intent: 'SKILL', name: 'back squat' }], [...FRAME_DAY, 'lower:me']), name: 'Upper body: Push' };
-  assertEquals(
-    spacingLineFor([namedUpper, ride('ride_endurance', 'vt1_or_easier')])?.closer,
-    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
-  );
-});
-
-Deno.test('lower-body days are unchanged: lower:me and lower:de keep the second sentence', () => {
-  for (const role of ['me', 'de']) {
-    const lower = lift([{ slot_intent: 'DE', name: 'box jump' }], [...FRAME_DAY, `lower:${role}`]);
-    assertEquals(
-      spacingLineFor([lower, ride('ride_endurance', 'vt1_or_easier')])?.closer,
-      'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
-    );
-  }
 });

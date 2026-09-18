@@ -389,7 +389,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   // Unified lookup - use week range for training plan context, but filter items to active date
-  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext, emptyDayLines } = useWeekUnified(fromISO, toISO);
+  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext, emptyDayLines, spacingLines } = useWeekUnified(fromISO, toISO);
   // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
   // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
   // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
@@ -2100,8 +2100,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // day's own lines beneath it — work order 2026-09-09 §2.
           <div>
             {/* ⛔ THE SPACING LINE, ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). It shows
-                only on a day that is a lift and a ride or run; every other day gets nothing. */}
-            <TodaySpacingLine rows={displayWorkouts as never} />
+                only on a day that is a lift and a ride or run; every other day gets nothing. The words are
+                get-week's `spacing_lines` (2026-09-18), composed from the day's sessions. */}
+            <TodaySpacingLine spacing={spacingLines?.[activeDate] ?? null} />
             {/* ⛔ 14 px BETWEEN SESSIONS (Michael, 2026-09-09). Each deck and card already
                 carries its own 14 px bottom margin, so the list adds none — two gaps stacked is
                 what pushed LOAD under the fold on a two-session day. */}

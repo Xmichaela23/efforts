@@ -47,6 +47,7 @@ import { dayOrderFor } from '../_shared/day-order.ts';
 import { emptyDayLine } from '../_shared/empty-day-line.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
+import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1818,6 +1819,27 @@ Deno.serve(async (req)=>{
       (responseData as any).empty_day_lines = lines;
     } catch (e) {
       debugNotes.push({ where: 'empty_day_lines', error: String(e) });
+    }
+    /**
+     * ⛔ TODAY'S SCHEDULING SENTENCES ARE THE SERVER'S (2026-09-18, the Stage C follow-up) —
+     * `_shared/standing-plan/spacing-line.ts`, one per date, from that day's sessions: the planned row, or the
+     * completed row where the session is done, as Today lays the day out. Null where the day gets nothing.
+     */
+    try {
+      const byDate = new Map<string, any[]>();
+      for (const it of itemsWithPlannedWorkout as any[]) {
+        const done = String(it?.status || '').toLowerCase() === 'completed';
+        const row = done ? (it?.completed_workout ?? it) : (it?.planned_workout ?? null);
+        if (!row) continue;
+        const d = String(it?.date ?? '').slice(0, 10);
+        if (!byDate.has(d)) byDate.set(d, []);
+        byDate.get(d)!.push(row);
+      }
+      const spacing: Record<string, ReturnType<typeof spacingLineFor>> = {};
+      for (let d = fromISO; d <= toISO; d = addDays(d, 1)) spacing[d] = spacingLineFor(byDate.get(d) ?? []);
+      (responseData as any).spacing_lines = spacing;
+    } catch (e) {
+      debugNotes.push({ where: 'spacing_lines', error: String(e) });
     }
     if (trainingPlanContext) responseData.training_plan_context = trainingPlanContext;
     if (warningsOut.length) responseData.warnings = warningsOut;

@@ -89,83 +89,8 @@ const intentOf = (ex: TodayStrengthRow | null | undefined): 'ME' | 'DE' | 'SKILL
 };
 
 // ── 1. THE SPACING LINE ─────────────────────────────────────────────────────────────────────────
-
-/**
- * ⛔ ONLY WHEN THE DAY HAS TWO SESSIONS, and only when one of them is the lift and the other is a
- * ride or a run. p143's rule 6 is about how long to leave *before the resistance session*, so a day
- * with no lift on it has nothing to space.
- *
- * ⛔ REVISED 2026-09-10 (work order §2.1): TWO LINES ALWAYS, THE REST UNDER A CHEVRON. The earlier
- * version picked ONE branch off the endurance row's `band:` tag and printed only that one. The screen
- * now shows the book's preferred order with the cost of the other, whatever the ride is:
- *
- *   · **p144, rule 5** — work that benefits from pre-fatigue goes last, almost always VT1-intensity
- *     endurance, so the LIFT goes first and the ride or run is the one kept easy.
- *   · **p143, rule 6 / p77** — skill movements are best in the first session, being freshest, so
- *     riding first costs the lift its skill and speed sets.
- *
- * ⛔ THE DAY'S OWN ROWS STILL DECIDE THE WORDS: the endurance row's sport picks "ride" or "run", and
- * the lift's rows decide whether the second sentence is there at all — a lift with no skill slot and
- * no speed slot has nothing to lose by going second, so it is not told it would.
- *
- * ⚠️ A SWIM DAY GETS THE FIRST LINE ONLY. No swim wording was approved, and a chevron that opens onto
- * nothing is not drawn.
- */
-export type SpacingLine = { lead: string; closerLabel?: string; closer?: string };
-
-export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
-  const planned = rows.filter(isFromPlan);
-  if (planned.length !== 2) return null;
-
-  const lift = planned.find(isStrengthRow);
-  const endurance = planned.find((r) => !isStrengthRow(r) && isEnduranceRow(r));
-  if (!lift || !endurance) return null;
-
-  // p143, rule 6.
-  const lead = 'Two sessions today. Keep them six to eight hours apart.';
-
-  const sport = sportOf(endurance);
-  if (sport !== 'run' && sport !== 'ride') return { lead };
-
-  const closerLabel = 'If they have to be closer';
-  /**
-   * ⛔ "KEEP IT EASY" IS p144 RULE 5, AND THAT RULE IS ABOUT VT1 (Michael, 2026-09-11, off the screen:
-   * Monday read *"keep the run easy"* over a run the same screen had just prescribed hard at 48
-   * minutes). Rule 5 is the work-that-benefits-from-pre-fatigue rule and he names VT1-intensity
-   * endurance as that work — *"you could cut your VT1 run volume by a third or so after a hard leg
-   * workout"*. Above, near or below threshold, there is no page behind the clause, so it comes off
-   * rather than being softened.
-   * ⚠️ AN UNKNOWN BAND COUNTS AS NOT EASY: the claim needs the page, not the absence of a tag.
-   * ⛔ THIS REVERSES 2026-09-10's "the band no longer picks a branch" FOR THE FIRST SENTENCE ONLY.
-   * The ORDER still reads the same on every band, because p143 rule 6 and p77 are about the lift's
-   * own freshness and say nothing about what the other session is.
-   */
-  const easy = bandOf(endurance) === 'vt1_or_easier';
-  // p144 rule 5 (the easy clause), p143 rule 6 (the order).
-  const first = easy ? `Lift first and keep the ${sport} easy.` : 'Lift first.';
-  // p143, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
-  const intents = rowsOf(lift).map(intentOf);
-  /**
-   * ⛔ AN UPPER-BODY DAY DROPS THE SECOND SENTENCE (Michael, 2026-09-10, §2.1). Riding or running first
-   * costs the lift its legs, not its bench (p131: fresh in the systems the session uses; p251; p274
-   * pairs the upper pull day with an easy ride).
-   * ⚠️ READ OFF THE FRAME'S TAGS, NEVER THE NAME. The composer stamps `frame:` on every frame lifting
-   * day and `lower:me` / `lower:de` only on the frame's lower days; a frame day with no `lower:` tag
-   * is the frame's upper day (`compose.ts` gives it `region: 'upper'` by the same rule). Test-week and
-   * plyometric rows carry no `frame:` tag and keep the rule above.
-   */
-  const upperDay = tagValue(lift, 'frame') != null && tagValue(lift, 'lower') == null;
-  const costs = !upperDay && (intents.includes('SKILL') || intents.includes('DE'));
-  const cost = `${sport === 'run' ? 'Running' : 'Riding'} first costs the lift its skill and speed sets.`;
-  /**
-   * ⛔ NOTHING TO LOSE AND NOTHING TO KEEP EASY, SO NOTHING IS SAID (2026-09-11). A lift with no skill
-   * and no speed sets, beside a session that is not VT1, has lost both halves of the line: going
-   * second costs it nothing, and the other session is not the one to keep easy. The chevron does not
-   * draw — the same silence a swim day already gets, and the standing rule in this file.
-   */
-  if (!easy && !costs) return { lead };
-  return { lead, closerLabel, closer: costs ? `${first} ${cost}` : first };
-}
+// ⛔ MOVED TO THE SERVER 2026-09-18 (the Stage C follow-up): `_shared/standing-plan/spacing-line.ts`. `get-week`
+// sends `spacing_lines`, one per date; Today prints it.
 
 // ── 2. THE LIFT SESSION ─────────────────────────────────────────────────────────────────────────
 
