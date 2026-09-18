@@ -5,7 +5,7 @@ import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
 import { movingSecondsUnderCeiling, timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
-import { executionFromEasyHr, executionFromWorkReps } from '../_shared/execution-score.ts';
+import { executionFromEasyHr, executionFromSections } from '../_shared/execution-score.ts';
 import { SAMPLE_BREAK_S, STOPPED_BELOW_MPS } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
@@ -926,8 +926,6 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       avg_power_watts: Math.round(actualPower),
       power_basis: interval.executed?.judged_power_basis ?? null,
       power_band: isRecovery ? null : powerRangeBand(actualPower, plannedPowerLower, plannedPowerUpper),
-      // Seconds inside the planned range, counted per second by compute-workout-summary — Execution's numerator.
-      in_range_s: isRecovery ? null : (interval.executed?.in_range_s ?? null),
       normalized_power_w: Math.round(normalizedPower),
       power_adherence_percent: isRecovery ? null : Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
@@ -1543,24 +1541,48 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     const intensityAdherence = easyRead?.pct ?? null;
 
     /**
-     * ⛔ EXECUTION = TIME IN THE TARGET RANGE, GARMIN'S METHOD (2026-09-17, Michael approved) — `_shared/execution-score.ts`.
-     *   · Work intervals with a power range: seconds inside each interval's own range (counted per second by
-     *     compute-workout-summary; a floor-only step, p237, counts at or above its floor) ÷ those intervals' seconds.
-     *     FALLBACK (OURS): an interval with no per-second count is judged on its judged power — all of it or none.
-     *   · An easy ride with no watts (a heart-rate target): moving seconds at or under the easy ceiling ÷ the ride's
-     *     moving seconds.
+     * ⛔ EXECUTION = COROS'S EFFORT ACCURACY: DONE, AND DONE IN RANGE (2026-09-17, Michael) — `_shared/execution-score.ts`.
+     *   · Every planned step with a power range is a section (COROS: open sections get no score). Completion: seconds
+     *     done ÷ planned, capped, weighted by planned time; a step never reached counts 0. Intensity: seconds inside
+     *     the step's own range (counted per second by compute-workout-summary; a floor-only step, p237, counts at or
+     *     above its floor) ÷ seconds done. Execution = the two averaged.
+     *     FALLBACK (OURS): a step with no per-second count is judged on its judged power — all of it or none.
+     *   · An easy ride with no watts (a heart-rate target): moving ÷ planned time, and moving seconds at or under the
+     *     easy ceiling ÷ moving seconds.
      *   · No target at all: no score.
      * DELETED: the 70/30 power + duration blend and the 50/50 easy + duration blend. Power adherence (work counted
      * twice) stays as its own number — the written read and the chips still print it — and no longer feeds this.
      */
-    const workReps = (Array.isArray(intervalBreakdown) ? intervalBreakdown : [])
-      .filter((iv: any) => iv?.interval_type === 'work' && iv?.power_band != null)
-      .map((iv: any) => ({ seconds: iv.actual_duration_s, in_range_s: iv.in_range_s ?? null, average_in_range: iv.power_band === 'in' }));
-    const repResult = executionFromWorkReps(workReps);
+    const planStepById = new Map<string, any>((Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : []).map((st: any) => [String(st?.id), st]));
+    const rideSections = (Array.isArray(intervals) ? intervals : [])
+      .map((iv: any) => {
+        const pr = iv?.power_range || iv?.planned?.power_range;
+        const lo = Number(pr?.lower ?? pr?.min);
+        if (!(lo > 0) || planStepById.get(String(iv?.planned_step_id))?.watch_target === 'none') return null;
+        const hiRaw = pr?.upper ?? pr?.max;
+        const notDone = (iv as any)?.not_done === true || !iv?.executed;
+        const secs = notDone ? 0 : (Number(iv.executed?.duration_s) || 0);
+        const plannedS = Number(iv?.planned?.duration_s ?? iv?.duration_s) || 0;
+        const watts = iv?.executed?.judged_power_w ?? iv?.executed?.avg_power_w ?? null;
+        const band = notDone ? null : powerRangeBand(watts, lo, hiRaw == null ? null : Number(hiRaw));
+        const role = String(iv?.role || iv?.kind || '').toLowerCase();
+        return {
+          planned_s: plannedS || null,
+          completion: plannedS > 0 ? secs / plannedS : null,
+          seconds: secs,
+          in_range_s: notDone ? 0 : (iv.executed?.in_range_s ?? null),
+          average_in_range: notDone ? false : (band == null ? null : band === 'in'),
+          is_rep: !notDone && !/warm|cool|recover|rest/.test(role),
+        };
+      })
+      .filter((x: any) => x != null);
+    const repResult = executionFromSections(rideSections);
     let executionAdherence: number | null = null;
     let executionBasis: 'work_time_in_range' | 'easy_hr' | null = null;
+    let executionCompletion: number | null = null, executionIntensity: number | null = null;
     if (repResult.pct != null) {
       executionAdherence = repResult.pct;
+      executionCompletion = repResult.completion_pct; executionIntensity = repResult.intensity_pct;
       executionBasis = 'work_time_in_range';
     } else if (!hasGradedPower && easyCeiling.ceiling != null) {
       const rideHasSpeed = sensorData.some((x: any) => Number(x?.speed) > 0);
@@ -1579,10 +1601,11 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         }),
         easyCeiling.ceiling,
       );
-      executionAdherence = executionFromEasyHr(under, completedMovingSeconds(workout));
+      const easy = executionFromEasyHr(under, completedMovingSeconds(workout), Number(durationAdherence?.planned_duration_s) || null);
+      executionAdherence = easy.pct; executionCompletion = easy.completion_pct; executionIntensity = easy.intensity_pct;
       if (executionAdherence != null) executionBasis = 'easy_hr';
     }
-    console.log(`🎯 [EXECUTION] ${executionAdherence ?? '—'}% (${executionBasis ?? 'no target'}; intervals in range ${repResult.reps_in_range}/${repResult.reps_judged}; fallback ${repResult.fallback_reps})`);
+    console.log(`🎯 [EXECUTION] ${executionAdherence ?? '—'}% = (done ${executionCompletion ?? '—'}% + in range ${executionIntensity ?? '—'}%) / 2 (${executionBasis ?? 'no target'}; intervals in range ${repResult.reps_in_range}/${repResult.reps_judged}; fallback ${repResult.fallback_reps})`);
     
     // D-035: Unlinked-ride null-override. Without a plan, "adherence" is
     // meaningless — there's nothing to be measured against. power_variability
@@ -1598,6 +1621,8 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       // local performance type was narrower than what runtime constructs/reads).
       execution_score: executionAdherence,
       execution_basis: executionBasis,
+      execution_completion_pct: executionCompletion,
+      execution_intensity_pct: executionIntensity,
       execution_reps_in_range: executionBasis === 'work_time_in_range' ? repResult.reps_in_range : null,
       execution_reps_judged: executionBasis === 'work_time_in_range' ? repResult.reps_judged : null,
       execution_fallback_reps: executionBasis === 'work_time_in_range' ? repResult.fallback_reps : null,

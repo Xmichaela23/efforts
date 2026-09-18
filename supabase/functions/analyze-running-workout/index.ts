@@ -7,7 +7,7 @@ import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
 import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
 import { getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
-import { executionFromEasyHr, executionFromWorkReps } from '../_shared/execution-score.ts';
+import { executionFromEasyHr, executionFromSections } from '../_shared/execution-score.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
@@ -1890,24 +1890,26 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // and preserved by the JSONB || merge operator in merge_computed RPC.
     
     /**
-     * ⛔ EXECUTION = TIME IN THE TARGET RANGE, GARMIN'S METHOD (2026-09-17, Michael approved) — `_shared/execution-score.ts`
-     * carries the manual's words and URL. Set ONCE, here, after everything else; nothing below rewrites it.
-     *   · Easy run (a heart-rate target): moving seconds at or under the easy ceiling ÷ the session's moving seconds.
-     *   · Any other run with work reps that carry a pace range: seconds inside each rep's own range (counted per
-     *     second by compute-workout-summary, `executed.in_range_s`) ÷ those reps' moving seconds. The range is the
-     *     plan's as printed — read off the plan step, never the widened copy the granular read uses. Warm-up, jogs
-     *     and cool-down are left out (OURS for the first two; Garmin for the cool-down).
-     *   · FALLBACK (OURS): a rep with no per-second count is judged on its average — all of it or none of it.
+     * ⛔ EXECUTION = COROS'S EFFORT ACCURACY: DONE, AND DONE IN RANGE (2026-09-17, Michael) — `_shared/execution-score.ts`
+     * carries COROS's words and URL. Set ONCE, here, after everything else; nothing below rewrites it.
+     *   · The sections scored are the plan's steps that carry a target: a pace range, and not sent to the watch as
+     *     time only (`watch_target: 'none'` — the warm-up, the cool-down, an easy jog). COROS: open sections get no score.
+     *   · Completion: done ÷ planned per section (distance when the step prescribes distance, else time), capped at
+     *     100%, weighted by planned time; a section never reached counts 0. Intensity: seconds inside each section's
+     *     own range (counted per second by compute-workout-summary, `executed.in_range_s`) ÷ seconds done. The range
+     *     is the plan's as printed. Execution = the two averaged.
+     *   · Easy run (a heart-rate target): completion = moving ÷ planned time; intensity = moving seconds under the
+     *     easy ceiling ÷ moving seconds.
+     *   · FALLBACK (OURS): a section with no per-second count is judged on its average — all of it or none of it.
      *   · Laps that could not be placed against the plan (`laps-unmatched`, `no-laps-whole-run`), or no target at all:
-     *     no score. The Duration tile still says how long.
-     * DELETED with this: the 50/50 pace + duration blend (four places), the 15/60/10/15 segment blend, the easy
-     * governor's 50/50 and the duration-only score on unmatched laps.
+     *     no score.
      */
     {
       const alignmentMode = String((workout as any)?.computed?.alignment_mode || '');
       let execPct: number | null = null;
       let execBasis: 'work_time_in_range' | 'easy_hr' | null = null;
       let repsInRange = 0, repsJudged = 0, fallbackReps = 0;
+      let completionPct: number | null = null, intensityPct: number | null = null;
       if (_hasLinkedPlan && isEasyPrescribedRun(classifiedTypeKey) && runEasyBand.ceiling != null) {
         // Each analyzer sample is one second (`duration_s`, the extractor's own); stopped seconds carry no pace.
         const under = movingSecondsUnderCeiling(
@@ -1918,25 +1920,42 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           })),
           runEasyBand.ceiling,
         );
-        execPct = executionFromEasyHr(under, completedMovingSeconds(workout));
+        const r = executionFromEasyHr(under, completedMovingSeconds(workout), Number(enhancedAnalysis.duration_adherence?.planned_duration_s) || null);
+        execPct = r.pct; completionPct = r.completion_pct; intensityPct = r.intensity_pct;
         if (execPct != null) execBasis = 'easy_hr';
       } else if (_hasLinkedPlan && !['laps-unmatched', 'no-laps-whole-run'].includes(alignmentMode)) {
-        const reps = computedIntervals
-          .filter((iv: any) => String(iv?.role ?? iv?.kind ?? '').toLowerCase() === 'work' && iv?.not_done !== true && iv?.executed)
+        const sections = computedIntervals
           .map((iv: any) => {
-            const range = (iv?.planned_step_id != null ? planStepsById.get(String(iv.planned_step_id))?.pace_range : null) ?? iv?.pace_range ?? null;
-            const secs = Number(iv.executed?.moving_s ?? iv.executed?.duration_s) || null;
-            // The summary step's segment pace on moving seconds — the pace the rep row prints and bands.
-            const avg = Number(iv.executed?.avg_pace_s_per_mi) || null;
-            const band = paceRangeBand(avg, range?.lower, range?.upper);
-            return { seconds: secs, in_range_s: iv.executed?.in_range_s ?? null, average_in_range: band == null ? null : band === 'in' };
-          });
-        const r = executionFromWorkReps(reps);
-        execPct = r.pct;
+            const role = String(iv?.role ?? iv?.kind ?? '').toLowerCase();
+            const st = iv?.planned_step_id != null ? planStepsById.get(String(iv.planned_step_id)) : null;
+            const range = st?.pace_range ?? null;
+            if (!st || !range || st?.watch_target === 'none' || role === 'lap' || role === 'overall') return null;
+            const notDone = iv?.not_done === true || !iv?.executed;
+            const secs = notDone ? 0 : (Number(iv.executed?.moving_s ?? iv.executed?.duration_s) || 0);
+            const plannedM = st?.distanceDerived === true ? 0 : Number(st?.distanceMeters) || 0;
+            const plannedS = Number(st?.seconds ?? st?.duration_s) || 0;
+            const doneM = notDone ? 0 : Number(iv.executed?.distance_m) || 0;
+            const completion = plannedM > 0 && !(plannedS > 0) ? doneM / plannedM : (plannedS > 0 ? secs / plannedS : null);
+            // Distance steps weigh by the time the range's middle pace gives them.
+            const weight = plannedS > 0 ? plannedS : (plannedM > 0 ? (plannedM / 1609.34) * ((Number(range.lower) + Number(range.upper)) / 2) : null);
+            // The summary step's segment pace on moving seconds — the pace the row prints and bands.
+            const band = notDone ? null : paceRangeBand(Number(iv.executed?.avg_pace_s_per_mi) || null, range.lower, range.upper);
+            return {
+              planned_s: weight, completion, seconds: secs,
+              in_range_s: notDone ? 0 : (iv.executed?.in_range_s ?? null),
+              average_in_range: notDone ? false : (band == null ? null : band === 'in'),
+              is_rep: role === 'work' && !notDone,
+            };
+          })
+          .filter((x: any) => x != null);
+        const r = executionFromSections(sections);
+        execPct = r.pct; completionPct = r.completion_pct; intensityPct = r.intensity_pct;
         repsInRange = r.reps_in_range; repsJudged = r.reps_judged; fallbackReps = r.fallback_reps;
         if (execPct != null) execBasis = 'work_time_in_range';
       }
-      console.log(`🎯 [EXECUTION] ${execPct ?? '—'}% (${execBasis ?? 'no target'}; reps in range ${repsInRange}/${repsJudged}; fallback ${fallbackReps})`);
+      performance.execution_completion_pct = completionPct;
+      performance.execution_intensity_pct = intensityPct;
+      console.log(`🎯 [EXECUTION] ${execPct ?? '—'}% = (done ${completionPct ?? '—'}% + in range ${intensityPct ?? '—'}%) / 2 (${execBasis ?? 'no target'}; reps in range ${repsInRange}/${repsJudged}; fallback ${fallbackReps})`);
       performance.execution_adherence = execPct;
       performance.execution_basis = execBasis;
       performance.execution_reps_in_range = execBasis === 'work_time_in_range' ? repsInRange : null;

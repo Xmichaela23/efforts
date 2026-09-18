@@ -1,38 +1,41 @@
 import { assertEquals } from 'jsr:@std/assert';
-import { executionFromEasyHr, executionFromWorkReps } from './execution-score.ts';
+import { executionFromEasyHr, executionFromSections } from './execution-score.ts';
 import { secondsInPaceRangeBetween } from './run-pace.ts';
 import { shareInPowerRange } from './ride-power.ts';
 
-Deno.test('Garmin\'s example: 50 of 60 minutes in range is 83%', () => {
-  const r = executionFromWorkReps([{ seconds: 3600, in_range_s: 3000, average_in_range: true }]);
-  assertEquals(r.pct, 83);
+const rep = (o: Partial<Parameters<typeof executionFromSections>[0][number]>) =>
+  ({ planned_s: 240, completion: 1, seconds: 240, in_range_s: 240, average_in_range: true, is_rep: true, ...o });
+
+Deno.test('COROS\'s example: all the distance, 80% in the zone, reads 90%', () => {
+  const r = executionFromSections([rep({ planned_s: 960, seconds: 960, in_range_s: 768 })]);
+  assertEquals([r.pct, r.completion_pct, r.intensity_pct], [90, 100, 80]);
 });
 
-Deno.test('every rep in range reads 100, every rep far out reads 0', () => {
-  const clean = Array.from({ length: 6 }, () => ({ seconds: 240, in_range_s: 240, average_in_range: true }));
-  assertEquals(executionFromWorkReps(clean), { pct: 100, reps_in_range: 6, reps_judged: 6, fallback_reps: 0 });
-  const fast = Array.from({ length: 6 }, () => ({ seconds: 240, in_range_s: 0, average_in_range: false }));
-  assertEquals(executionFromWorkReps(fast), { pct: 0, reps_in_range: 0, reps_judged: 6, fallback_reps: 0 });
+Deno.test('clean reads 100; every rep done but far too fast reads 50, not 0', () => {
+  assertEquals(executionFromSections(Array.from({ length: 6 }, () => rep({}))).pct, 100);
+  const fast = executionFromSections(Array.from({ length: 6 }, () => rep({ seconds: 210, completion: 1, in_range_s: 0, average_in_range: false })));
+  assertEquals([fast.pct, fast.reps_in_range, fast.reps_judged], [50, 0, 6]);
 });
 
-Deno.test('a rep with no per-second count falls back to its average: all or nothing', () => {
-  const r = executionFromWorkReps([
-    { seconds: 240, in_range_s: null, average_in_range: true },
-    { seconds: 240, in_range_s: null, average_in_range: false },
-  ]);
-  assertEquals(r, { pct: 50, reps_in_range: 1, reps_judged: 2, fallback_reps: 2 });
+Deno.test('two of six reps skipped, the other four in range: 67% done, 100% in range, about 83%', () => {
+  const skipped = { completion: 0, seconds: 0, in_range_s: 0, average_in_range: false, is_rep: false };
+  const r = executionFromSections([rep({}), rep({}), rep({}), rep({}), rep(skipped), rep(skipped)]);
+  assertEquals([r.pct, r.completion_pct, r.intensity_pct, r.reps_judged], [83, 67, 100, 4]);
 });
 
-Deno.test('no judged rep, no score', () => {
-  assertEquals(executionFromWorkReps([{ seconds: 240, in_range_s: null, average_in_range: null }]).pct, null);
-  assertEquals(executionFromWorkReps([]).pct, null);
+Deno.test('a section with no per-second count falls back to its average: all or nothing', () => {
+  const r = executionFromSections([rep({ in_range_s: null }), rep({ in_range_s: null, average_in_range: false })]);
+  assertEquals([r.pct, r.intensity_pct, r.fallback_reps], [75, 50, 2]);
 });
 
-Deno.test('easy: seconds under the ceiling over moving seconds, never above 100', () => {
-  assertEquals(executionFromEasyHr(1800, 2400), 75);
-  assertEquals(executionFromEasyHr(2500, 2400), 100);
-  assertEquals(executionFromEasyHr(null, 2400), null);
-  assertEquals(executionFromEasyHr(100, null), null);
+Deno.test('no targeted section, no score', () => {
+  assertEquals(executionFromSections([]).pct, null);
+});
+
+Deno.test('easy: moving over planned, and time under the ceiling over moving, averaged', () => {
+  assertEquals(executionFromEasyHr(1800, 2400, 2400).pct, 88); // (100 + 75) / 2
+  assertEquals(executionFromEasyHr(2400, 1800, 2400).pct, 88); // (75 + 100) / 2
+  assertEquals(executionFromEasyHr(null, 2400, 2400).pct, null);
 });
 
 Deno.test('pace seconds in range: moving seconds only, the range with no allowance', () => {
