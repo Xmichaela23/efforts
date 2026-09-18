@@ -188,8 +188,8 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
     <div className="bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-xl p-4 shadow-lg">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white/90">Core Timer</h3>
-        <span className="text-sm text-white/60">{Math.floor(duration / 60)} min - your choice</span>
+        <h3 className="text-body font-semibold text-label">Core Timer</h3>
+        <span className="text-subhead text-label-secondary">{Math.floor(duration / 60)} min - your choice</span>
       </div>
       
       {/* Timer Display */}
@@ -231,12 +231,12 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 onBlur={handleDurationSubmit}
                 onKeyDown={(e) => e.key === 'Enter' && handleDurationSubmit()}
                 autoFocus
-                className="w-16 text-center text-xl font-mono font-bold bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg px-1 text-white/90 placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                className="w-16 text-center text-title3 font-mono font-semibold bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg px-1 text-label placeholder:text-label-secondary focus:outline-none focus:border-white/40"
                 placeholder="5:00"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               />
             ) : (
-              <span className={`text-2xl font-mono font-bold ${timeRemaining <= 30 ? 'text-red-400' : 'text-white/90'}`}>
+              <span className={`text-title1 font-mono font-semibold ${timeRemaining <= 30 ? 'text-red-400' : 'text-label'}`}>
                 {formatTime(timeRemaining)}
               </span>
             )}
@@ -247,9 +247,9 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
         <div className="flex flex-col gap-2">
           <button
             onClick={handleStartPause}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-light tracking-wide transition-all duration-300 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-full font-normal tracking-wide transition-all duration-300 ${
               isRunning 
-                ? 'bg-white/[0.12] border border-white/35 text-white/90 hover:bg-white/[0.15] hover:border-white/45' 
+                ? 'bg-white/[0.12] border border-white/35 text-label hover:bg-white/[0.15] hover:border-white/45' 
                 : 'bg-amber-500/80 text-white hover:bg-amber-500 border border-amber-400/50'
             }`}
             style={{ fontFamily: 'Inter, sans-serif' }}
@@ -259,7 +259,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
           </button>
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 rounded-full font-light tracking-wide bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
+            className="flex items-center gap-2 px-4 py-2 rounded-full font-normal tracking-wide bg-white/[0.08] backdrop-blur-lg border border-white/25 text-label hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
             style={{ fontFamily: 'Inter, sans-serif' }}
           >
             <RotateCcw size={18} />
@@ -270,7 +270,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
       
       {/* Exercise List */}
       <div className="space-y-2">
-        <div className="text-sm font-medium text-white/80 mb-2">Log your exercises:</div>
+        <div className="text-subhead font-medium text-label mb-2">Log your exercises:</div>
         
         {exercises.map((ex, index) => (
           <div key={ex.id} className="relative">
@@ -296,10 +296,10 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                   onFocus={() => setFocusedExerciseId(ex.id)}
                   onBlur={handleBlur}
                   placeholder="Exercise name..."
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-0 ${
+                  className={`w-full px-3 py-2 border rounded-lg text-subhead focus:outline-none focus:ring-0 ${
                     ex.completed 
-                      ? 'bg-white/[0.03] line-through text-white/40 border-white/10' 
-                      : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-white/80 placeholder:text-white/30 focus:border-white/30 focus:bg-white/[0.08]'
+                      ? 'bg-white/[0.03] line-through text-label-secondary border-white/10' 
+                      : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-label placeholder:text-label-secondary focus:border-white/30 focus:bg-white/[0.08]'
                   }`}
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 />
@@ -311,7 +311,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                       <button
                         key={i}
                         onClick={() => selectSuggestion(ex.id, suggestion)}
-                        className="w-full px-3 py-2 text-left text-sm text-white/90 hover:bg-white/[0.15] first:rounded-t-lg last:rounded-b-lg transition-colors"
+                        className="w-full px-3 py-2 text-left text-subhead text-label hover:bg-white/[0.15] first:rounded-t-lg last:rounded-b-lg transition-colors"
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {suggestion}
@@ -327,10 +327,10 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 value={ex.amount}
                 onChange={(e) => updateExercise(ex.id, 'amount', e.target.value)}
                 placeholder="Amount"
-                className={`w-20 px-2 py-2 border rounded-lg text-sm text-center focus:outline-none focus:ring-0 ${
+                className={`w-20 px-2 py-2 border rounded-lg text-subhead text-center focus:outline-none focus:ring-0 ${
                   ex.completed 
-                    ? 'bg-white/[0.03] line-through text-white/40 border-white/10' 
-                    : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-white/80 placeholder:text-white/30 focus:border-white/30 focus:bg-white/[0.08]'
+                    ? 'bg-white/[0.03] line-through text-label-secondary border-white/10' 
+                    : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-label placeholder:text-label-secondary focus:border-white/30 focus:bg-white/[0.08]'
                 }`}
                 style={{ fontFamily: 'Inter, sans-serif' }}
               />
@@ -339,7 +339,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
               {exercises.length > 1 && (
                 <button
                   onClick={() => removeExercise(ex.id)}
-                  className="p-2 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/60 hover:text-red-400 hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
+                  className="p-2 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-label-secondary hover:text-red-400 hover:border-red-400 transition-all duration-300 h-8 w-8 flex items-center justify-center flex-shrink-0"
                   aria-label="Remove exercise"
                 >
                   <X size={16} />
@@ -352,7 +352,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
         {/* Add exercise button */}
         <button
           onClick={addExercise}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-white/70 hover:text-white/90 hover:bg-white/[0.05] rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-subhead text-label-secondary hover:text-label hover:bg-white/[0.05] rounded-lg transition-colors"
           style={{ fontFamily: 'Inter, sans-serif' }}
         >
           <Plus size={16} />
@@ -362,7 +362,7 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
       
       {/* Elapsed time note */}
       {totalElapsed > 0 && (
-        <div className="mt-4 text-center text-sm text-white/60">
+        <div className="mt-4 text-center text-subhead text-label-secondary">
           Total time: {formatTime(totalElapsed)}
         </div>
       )}

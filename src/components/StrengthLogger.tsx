@@ -539,7 +539,7 @@ const plateBarFor = (barType: string, unit: 'lb' | 'kg') => (BAR_TYPES[barType] 
  * (src/lib/plate-plan.ts). An empty bar prints nothing.
  */
 const PlateMath: React.FC<{ step: PlatePlanStep | null }> = ({ step }) => (
-  <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-xs text-white/80 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+  <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-caption text-label shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
     {(step?.plates ?? []).join(' ')}
   </div>
 );
@@ -4397,7 +4397,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // STRUCTURE intensity. Was `orange-500/400` — a different hue that never matched the chips
         // sitting inside these same cards. See the palette block at the top of this file.
         border: 'border-strength/35',
-        text: 'text-strength/90',
+        text: 'text-strength',
         hoverText: 'hover:text-strength',
         rgb: STRENGTH_RGB,
         // Save button — the commit action, so it wears BANKED weight, not structure.
@@ -4455,7 +4455,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       >
         <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 pb-4 mb-4 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
           <div className="flex items-center w-full px-4">
-            <h1 className="text-xl font-medium text-white/90">Loading...</h1>
+            <h1 className="text-title3 font-medium text-label">Loading...</h1>
           </div>
         </div>
       </div>
@@ -4534,8 +4534,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               restCue ? 'max-w-[19rem] px-3.5 py-2 rounded-2xl' : 'flex items-center gap-2 px-3 py-1.5 rounded-full'
             }`}>
               <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-strength/80">Rest</span>
-              <span className="text-lg font-semibold tabular-nums leading-none">{display}</span>
+              <span className="text-caption uppercase tracking-wide text-strength">Rest</span>
+              <span className="text-body font-semibold tabular-nums leading-none">{display}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -4545,7 +4545,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   cancelRestNotification(activeKey);
                   clearPersistedTimer(activeKey); // Q-TIMER: skipped → drop its wall-clock deadline
                 }}
-                className="pointer-events-auto ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-white/80 hover:text-white flex items-center justify-center text-xs font-medium"
+                className="pointer-events-auto ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-label hover:text-white flex items-center justify-center text-caption font-medium"
                 aria-label="Skip rest"
               >
                 Skip
@@ -4553,7 +4553,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </div>
               {restCue && (
                 <div className="pt-1.5">
-                  <p className="text-[12px] leading-snug text-[#FFE6D5]/85">{restCue}</p>
+                  <p className="text-caption leading-snug text-[#FFE6D5]/85">{restCue}</p>
                   {/* Whose minutes these are is recorded in strength/rest-seconds.ts and docs/STATE-SOURCES.md,
                       not on the screen (Michael, 2026-09-07: "LLM slop"). */}
                 </div>
@@ -4571,7 +4571,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               workout, so it belongs with the name, not competing with the date/Pick
               planned controls for horizontal space). Title gets the full row width. */}
           <div className="flex items-start gap-2">
-            <h1 className="text-xl font-medium text-white/90 min-w-0 leading-tight">
+            <h1 className="text-title3 font-medium text-label min-w-0 leading-tight">
               {(() => {
                 const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
                 if (mode === 'mobility') return 'Log Mobility';
@@ -4587,7 +4587,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 server-word: the server decides, this prints. */}
             {(scheduledWorkout as any)?.is_deload === true && (
               <span
-                className="shrink-0 mt-1 text-[11px] font-semibold uppercase tracking-wide text-strength/90"
+                className="shrink-0 mt-1 text-caption font-semibold uppercase tracking-wide text-strength"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."
               >
                 Deload
@@ -4608,11 +4608,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {!isMobilitySession && (workoutStartMs != null ? (
               <div className="shrink-0 ml-auto flex items-center gap-2">
                 <div className="flex flex-col items-end leading-none" aria-label="Session elapsed time">
-                  <span className="text-[11px] uppercase tracking-wide text-white/70">Elapsed</span>
+                  <span className="text-caption uppercase tracking-wide text-label-secondary">Elapsed</span>
                   <span
                     role="timer"
                     aria-live="off"
-                    className="mt-0.5 text-base font-medium tabular-nums text-white/80"
+                    className="mt-0.5 text-body font-medium tabular-nums text-label"
                   >
                     {formatElapsed(sessionElapsedSeconds)}
                   </span>
@@ -4624,7 +4624,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   variant="secondary"
                   size="sm"
                   onClick={stopSession}
-                  className="px-2.5 py-1 text-[12px] text-white/72"
+                  className="px-2.5 py-1 text-caption text-label-secondary"
                   aria-label="Stop the session timer"
                 >
                   Stop
@@ -4639,7 +4639,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 className="shrink-0 ml-auto mt-0.5 px-4 py-1.5"
                 aria-label="Start the session timer"
               >
-                <span aria-hidden="true" className="text-[13px] leading-none">▸</span>
+                <span aria-hidden="true" className="text-footnote leading-none">▸</span>
                 Start session
               </GalaxyButton>
             ))}
@@ -4656,17 +4656,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               autoCapitalize="off"
               spellCheck={false}
               name="performed-date"
+              style={{ fontFamily: 'inherit', letterSpacing: '0.02em' }}
               value={performedDate || ''}
               onChange={(e) => setPerformedDate(e.target.value)}
-              className="h-8 px-2 py-1 text-xs text-white/90 bg-white/[0.08] border-2 border-white/20 rounded-xl hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
-              style={{ fontFamily: 'Inter, sans-serif' }}
+              className="h-8 px-2 py-1 text-caption text-label bg-white/[0.08] border-2 border-white/20 rounded-xl hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
             />
             <div className="relative">
-              <GalaxyButton variant="secondary" size="sm" onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</GalaxyButton>
+              <GalaxyButton variant="secondary" size="sm" onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-subhead px-3 py-1.5 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">Pick planned</GalaxyButton>
               {showPlannedMenu && (
                 <div className="absolute right-0 mt-1.5 w-72 bg-[#1a1a2e] backdrop-blur-xl border-2 border-white/30 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_4px_16px_rgba(0,0,0,0.5)] z-[100] p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-xs font-semibold text-white/72">Strength (Next 14 days)</div>
+                    <div className="text-caption font-semibold text-label-secondary">Strength (Next 14 days)</div>
                     <button 
                       onClick={() => {
                         clearSessionProgress();
@@ -4680,7 +4680,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         setLockManualPrefill(false);
                         setShowPlannedMenu(false);
                       }}
-                      className={`text-xs ${themeColors.text} hover:opacity-80`}
+                      className={`text-caption ${themeColors.text} hover:opacity-80`}
                     >
                       Start Fresh
                     </button>
@@ -4703,9 +4703,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           setSourcePlannedId(w.id); 
                           setSourcePlannedDate(w.date); 
                           setShowPlannedMenu(false); 
-                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.15] text-sm flex items-center justify-between text-white" type="button">
-                          <span className="font-light">{weekdayShortFromYmd(w.date)} — {plainIntent(w.name)||'Strength'}</span>
-                          <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/40 text-white/80 bg-white/[0.12]">{String(w.workout_status||'planned')}</span>
+                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-white/[0.15] text-subhead flex items-center justify-between text-white" type="button">
+                          <span className="font-normal">{weekdayShortFromYmd(w.date)} — {plainIntent(w.name)||'Strength'}</span>
+                          <span className="text-2xs px-1.5 py-0.5 rounded border-2 border-white/40 text-label bg-white/[0.12]">{String(w.workout_status||'planned')}</span>
                         </button>
                       ))}
                   </div>
@@ -4717,41 +4717,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {/* Temporarily hidden */}
               {false && (
                 <>
-                  <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Warm‑up • Core</button>
+                  <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-subhead px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-label hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">Warm‑up • Core</button>
                   {showAddonsMenu && (
               <div className="absolute right-0 mt-1.5 w-72 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 p-2">
                 <div className="space-y-1">
                   <div>
-                    <div className="text-xs text-white/72 px-1 mb-1">Warm‑Up</div>
+                    <div className="text-caption text-label-secondary px-1 mb-1">Warm‑Up</div>
                     {!showWarmupChooser ? (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
+                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-label hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 text-subhead shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">5 min</button>
                       </div>
                     ) : (
                       <div className="p-2 border-2 border-white/30 rounded-xl bg-white/[0.08]">
-                        <div className="text-xs text-white/72 mb-1">Category</div>
+                        <div className="text-caption text-label-secondary mb-1">Category</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['push','squat','hinge','pull','general','power'].map(cat => (
-                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupCategory===cat? 'bg-white/[0.12] border-white/40 text-white' : 'border-white/25 bg-white/[0.08] text-white/80 hover:bg-white/[0.10] hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{cat}</button>
+                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded-full border text-caption transition-all duration-300 ${selectedWarmupCategory===cat? 'bg-white/[0.12] border-white/40 text-white' : 'border-white/25 bg-white/[0.08] text-label hover:bg-white/[0.10] hover:border-white/35'}`}>{cat}</button>
                           ))}
                         </div>
-                        <div className="text-xs text-white/72 mb-1">Variant</div>
+                        <div className="text-caption text-label-secondary mb-1">Variant</div>
                         <div className="flex flex-wrap gap-1.5 mb-2">
                           {['A','B','C','D','E','F'].map(v => (
-                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded-full border text-xs transition-all duration-300 ${selectedWarmupVariant===v? 'bg-white/[0.12] border-white/40 text-white' : 'border-white/25 bg-white/[0.08] text-white/80 hover:bg-white/[0.10] hover:border-white/35'}`} style={{ fontFamily: 'Inter, sans-serif' }}>{v}</button>
+                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded-full border text-caption transition-all duration-300 ${selectedWarmupVariant===v? 'bg-white/[0.12] border-white/40 text-white' : 'border-white/25 bg-white/[0.08] text-label hover:bg-white/[0.10] hover:border-white/35'}`}>{v}</button>
                           ))}
                         </div>
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={()=>setShowWarmupChooser(false)} className="text-xs text-white/70 hover:text-white/90">Cancel</button>
-                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded-full bg-white/[0.12] border-2 border-white/35 text-white hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300" style={{ fontFamily: 'Inter, sans-serif' }}>Attach</button>
+                          <button onClick={()=>setShowWarmupChooser(false)} className="text-caption text-label-secondary hover:text-label">Cancel</button>
+                          <button onClick={attachChosenWarmup} className="text-caption px-2 py-1 rounded-full bg-white/[0.12] border-2 border-white/35 text-white hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300">Attach</button>
                         </div>
                       </div>
                     )}
                   </div>
                   <div>
-                    <div className="text-xs text-white/72 px-1 mb-1">Core</div>
+                    <div className="text-caption text-label-secondary px-1 mb-1">Core</div>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 text-sm shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>5 min</button>
+                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-label hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 text-subhead shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">5 min</button>
                     </div>
                   </div>
                   {/* Mobility category removed per request */}
@@ -4764,7 +4764,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
         </div>
         {sourcePlannedName && (
-          <div className="mt-1 text-sm text-white/72 px-4">Source: {sourcePlannedName}</div>
+          <div className="mt-1 text-subhead text-label-secondary px-4">Source: {sourcePlannedName}</div>
         )}
       </div>
 
@@ -4775,9 +4775,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {attachedAddons.map((a,idx)=> (
               <div key={idx} className="rounded-xl bg-white/[0.05] backdrop-blur-md border-2 border-white/20 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                 <div className="flex items-center justify-between p-2">
-                  <div className="text-sm text-white/90">{a.name}</div>
+                  <div className="text-subhead text-label">{a.name}</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-white/72">{formatSeconds(a.seconds)}</span>
+                    <span className="text-caption text-label-secondary">{formatSeconds(a.seconds)}</span>
                     {!a.completed ? (
                       <button onClick={()=>{
                         const updatedAddons = attachedAddons.map((x,i)=> i===idx?{...x, running: !x.running }:x);
@@ -4785,11 +4785,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         if (isInitialized && exercises.length > 0) {
                           saveSessionProgress(exercises, updatedAddons, notesText, notesRpe);
                         }
-                      }} className="px-2 py-1 text-xs rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      }} className="px-2 py-1 text-caption rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-label hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                         {a.running? 'Pause' : 'Start'}
                       </button>
                     ) : (
-                      <span className={`${themeColors.text} text-xs`}>✓ Done</span>
+                      <span className={`${themeColors.text} text-caption`}>✓ Done</span>
                     )}
                     {/* Remove addon */}
                     <button
@@ -4802,7 +4802,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           saveSessionProgress(exercises, updated, notesText, notesRpe);
                         }
                       }}
-                      className="text-white/72 hover:text-red-400 h-7 w-7 flex items-center justify-center transition-colors"
+                      className="text-label-secondary hover:text-red-400 h-7 w-7 flex items-center justify-center transition-colors"
                       aria-label="Remove addon"
                     >
                       <X className="h-4 w-4" />
@@ -4811,12 +4811,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 </div>
                 {a.sequence && a.sequence.length>0 && (
                   <div className="px-2 pb-1.5">
-                    <div className="text-xs text-white/72 mb-0.5">Sequence</div>
+                    <div className="text-caption text-label-secondary mb-0.5">Sequence</div>
                     <div className="divide-y divide-white/15 border-2 border-white/20 rounded-xl bg-white/[0.08] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
                       {a.sequence.map((step, sIdx)=> (
                         <div key={sIdx} className="flex items-center justify-between px-2 py-1.5">
-                          <div className="text-sm text-white/90">{step.move}</div>
-                          <div className="text-xs text-white/72">{Math.round(step.time_sec/60)}m{String(step.time_sec%60).padStart(2,'0')}s</div>
+                          <div className="text-subhead text-label">{step.move}</div>
+                          <div className="text-caption text-label-secondary">{Math.round(step.time_sec/60)}m{String(step.time_sec%60).padStart(2,'0')}s</div>
                         </div>
                       ))}
                     </div>
@@ -4844,7 +4844,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               block: one line saying how a superset is done — one set of each, then rest, then again — the
               way Strong and Hevy bracket a pair. Swap still works on either half. */}
           {exercise.superset_group && exercises[exerciseIndex + 1]?.superset_group === exercise.superset_group && exercises[exerciseIndex - 1]?.superset_group !== exercise.superset_group && (
-            <div className="mx-1 mt-3 mb-1 px-1.5 text-[11px] uppercase tracking-wider text-white/55">
+            <div className="mx-1 mt-3 mb-1 px-1.5 text-caption uppercase tracking-wider text-label-secondary">
               Superset · {String((exercise.execution_name || exercise.name || '')).trim()} with {String((exercises[exerciseIndex + 1]?.execution_name || exercises[exerciseIndex + 1]?.name || '')).trim()} · one set of each, rest, then again
             </div>
           )}
@@ -4889,7 +4889,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                standing-plan session this block now renders nothing rather than an unsourced line. */
             Array.isArray(scheduledWorkout?.tags)
             && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan') && (
-            <p className="mx-3 mb-1.5 mt-2 text-[12px] font-medium text-white/72 leading-snug">
+            <p className="mx-3 mb-1.5 mt-2 text-caption font-medium text-label-secondary leading-snug">
               {STANDING_ACCESSORY_SET_CUE}
             </p>
             )
@@ -4946,8 +4946,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex justify-end mt-2">
                     <button 
                       onClick={() => deleteExercise(exercise.id)} 
-                      className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/70 hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 text-sm flex items-center gap-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-label-secondary hover:text-red-400 hover:bg-white/[0.12] hover:border-red-400/60 transition-all duration-300 text-subhead flex items-center gap-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                     >
                       <X className="h-4 w-4" /> Remove
                     </button>
@@ -4960,7 +4959,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
                   <div className="flex items-center border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-                    <div className="pl-3 text-white/72">
+                    <div className="pl-3 text-label-secondary">
                       <Search className="h-4 w-4" />
                     </div>
                     <Input
@@ -4989,7 +4988,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         updateExerciseName(exercise.id, e.target.value);
                         setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
                       }}
-                      className="h-10 text-base font-medium !border-0 bg-transparent text-white/90 placeholder:text-white/70 focus-visible:ring-0 focus-visible:!border-0"
+                      className="h-10 text-body font-medium !border-0 bg-transparent text-label placeholder:text-label-secondary focus-visible:ring-0 focus-visible:!border-0"
                       onFocus={() => {
                         if (exercise.name.length > 0) {
                           setActiveDropdown(exercise.id);
@@ -4999,7 +4998,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         maybePersistTypedSwap(exercise.id, exercise.name);
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
-                      style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+                      style={{ fontSize: 'var(--type-body)'}}
                     />
                     {/* The how-to for a home version of a machine movement (2026-09-08). Only rows the
                         server stamped get it; it goes with the display name when the athlete types. */}
@@ -5009,7 +5008,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         aria-label="How to do this exercise"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setHowToFor(exercise.id)}
-                        className="pr-3 pl-1 text-white/80 hover:text-white"
+                        className="pr-3 pl-1 text-label hover:text-white"
                       >
                         <Info className="h-5 w-5" />
                       </button>
@@ -5026,7 +5025,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             maybePersistTypedSwap(exercise.id, suggestion);
                             setActiveDropdown(null);
                           }}
-                          className="w-full text-left px-3 py-2 hover:bg-white/[0.08] text-sm min-h-[36px] flex items-center text-white/90"
+                          className="w-full text-left px-3 py-2 hover:bg-white/[0.08] text-subhead min-h-[36px] flex items-center text-label"
                         >
                           {suggestion}
                         </button>
@@ -5041,7 +5040,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {(exercise.planned_name || plyoFamilyFor(exercise.name)) && (
                   <button
                     onClick={() => setSwapFor(swapFor === exercise.id ? null : exercise.id)}
-                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[12px] font-medium transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-white/70 hover:text-white/90'}`}
+                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-caption font-medium transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-label-secondary hover:text-label'}`}
                     aria-label="Swap this exercise"
                   >
                     <Repeat className="h-4 w-4" />
@@ -5063,7 +5062,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   && String(exercise.name ?? '').trim().length > 1 && (
                   <button
                     onClick={() => setAddToPlanFor(addToPlanFor === exercise.id ? null : exercise.id)}
-                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[12px] font-medium transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-white/70 hover:text-white/90'}`}
+                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-caption font-medium transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-label-secondary hover:text-label'}`}
                     aria-label="Add this exercise to the plan"
                   >
                     <Plus className="h-4 w-4" />
@@ -5072,7 +5071,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 )}
                 <button
                   onClick={() => toggleExerciseExpanded(exercise.id)}
-                  className="p-2 text-white/72 hover:text-white/90 transition-colors"
+                  className="p-2 text-label-secondary hover:text-label transition-colors"
                 >
                   {expandedExercises[exercise.id] ? 
                     <ChevronUp className="h-4 w-4" /> : 
@@ -5147,12 +5146,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 return (
                   <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-[12px] uppercase tracking-wide text-white/72">
+                      <span className="text-caption uppercase tracking-wide text-label-secondary">
                         Swap {exercise.planned_name || exercise.name}
                       </span>
                       <button
                         onClick={() => { setSwapRestOfPlan(false); setSwapFor(null); }}
-                        className="text-white/70 hover:text-white/70"
+                        className="text-label-secondary hover:text-label-secondary"
                         aria-label="Close swap"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -5166,12 +5165,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(false)}
-                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                          className={`px-2.5 py-1 rounded-xl text-caption border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-label-secondary hover:text-label'}`}
                         >Just today</button>
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(true)}
-                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                          className={`px-2.5 py-1 rounded-xl text-caption border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-label-secondary hover:text-label'}`}
                         >Rest of plan</button>
                       </div>
                     )}
@@ -5270,7 +5269,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           variant="secondary"
                           size="sm"
                           onClick={() => applySwap(a.name)}
-                          className="px-2.5 py-1.5 text-[12px]"
+                          className="px-2.5 py-1.5 text-caption"
                         >{a.display ?? a.name}</GalaxyButton>
                       );
                       const direct = alts.filter((a) => a.tier === 'direct');
@@ -5279,13 +5278,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         <>
                           {direct.length > 0 && (
                             <>
-                              <p className="text-[11px] uppercase tracking-wide text-white/70 mb-1.5">Direct swaps</p>
+                              <p className="text-caption uppercase tracking-wide text-label-secondary mb-1.5">Direct swaps</p>
                               <div className="flex flex-wrap gap-1.5 mb-3">{direct.map(chip)}</div>
                             </>
                           )}
                           {lighter.length > 0 && (
                             <>
-                              <p className="text-[11px] uppercase tracking-wide text-white/62 mb-1.5">Alternatives</p>
+                              <p className="text-caption uppercase tracking-wide text-label-secondary mb-1.5">Alternatives</p>
                               <div className="flex flex-wrap gap-1.5">{lighter.map(chip)}</div>
                             </>
                           )}
@@ -5294,12 +5293,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     })() : (
                       /* We do not know this exercise's movement pattern — so we do not guess at a
                          substitute. Say so, and let them search. (Law 2.) */
-                      <p className="text-[12px] text-white/70 leading-snug">
+                      <p className="text-caption text-label-secondary leading-snug">
                         No matched alternatives for this movement — type a name above to search.
                       </p>
                     )}
 
-                    <p className="text-[12px] text-white/55 mt-2.5 leading-snug">
+                    <p className="text-caption text-label-secondary mt-2.5 leading-snug">
                       Swapping is not a miss. Or type any exercise in the name field above.
                     </p>
                   </div>
@@ -5309,17 +5308,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {/* Adapt-a-plan #2 — add-to-plan confirm for a hand-added lift. */}
               {addToPlanFor === exercise.id && (
                 <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
-                  <p className="text-[12px] text-white/70 leading-snug mb-2.5">
+                  <p className="text-caption text-label-secondary leading-snug mb-2.5">
                     Add {exercise.name} to the rest of your plan? It’ll show up on your matching training days with a starting weight from your baseline.
                   </p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { void persistPlanAdd(exercise); setAddToPlanFor(null); }}
-                      className="px-3 py-1.5 rounded-xl text-[12px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
+                      className="px-3 py-1.5 rounded-xl text-caption border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
                     >Add to plan</button>
                     <button
                       onClick={() => setAddToPlanFor(null)}
-                      className="px-3 py-1.5 rounded-xl text-[12px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-white/85 transition-colors"
+                      className="px-3 py-1.5 rounded-xl text-caption border border-white/15 bg-white/[0.04] text-label-secondary hover:text-label transition-colors"
                     >Cancel</button>
                   </div>
                 </div>
@@ -5427,7 +5426,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   };
                   // Readable, not the .38 the first pass used — these are labels the athlete reads
                   // mid-set with a bar in their hands.
-                  const labelCls = 'text-[10px] font-semibold uppercase tracking-[0.08em] text-white/[0.88] leading-none';
+                  const labelCls = 'text-caption font-semibold uppercase tracking-[0.08em] text-label leading-none';
                   /**
                    * ⛔⛔ THE TITLE CUE IS DELETED (2026-09-09, WORKORDER-kill-ours §A.2).
                    *
@@ -5610,7 +5609,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {/* The word is the kind of set; tap it and one line explains it (2026-09-08). */}
                       {intentLine && (
                         <button type="button" data-first-run="set-word" onClick={() => bookWord && setSetTypeFor(bookWord)}
-                          className="block w-full text-left px-1.5 pt-0.5 pb-1 text-[12px] font-medium text-white/70 leading-snug">
+                          className="block w-full text-left px-1.5 pt-0.5 pb-1 text-caption font-medium text-label-secondary leading-snug">
                           {intentLine}
                         </button>
                       )}
@@ -5618,11 +5617,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         bookWord === 'ME'
                           ? (
                             <button type="button" data-first-run="set-word" onClick={() => setSetTypeFor('ME')}
-                              className="block w-full text-left px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
+                              className="block w-full text-left px-1.5 pt-0.5 pb-2 text-caption font-medium text-label-secondary leading-snug">
                               {cardCue}
                             </button>
                           ) : (
-                            <div className="px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
+                            <div className="px-1.5 pt-0.5 pb-2 text-caption font-medium text-label-secondary leading-snug">
                               {cardCue}
                             </div>
                           )
@@ -5631,7 +5630,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           rule above it. Renders independently of the cues: an old-plan band row
                           with no standing cue still earns it. */}
                       {advanceNudge && (
-                        <div className="px-1.5 pb-2 text-[12px] text-white/70 leading-snug">
+                        <div className="px-1.5 pb-2 text-caption text-label-secondary leading-snug">
                           {advanceNudge}
                         </div>
                       )}
@@ -5644,12 +5643,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               same hue, one step brighter. It used to go emerald on completion,
                               which is bike green on a strength screen. */}
                           <span
-                            className="text-[15px] font-bold tabular-nums leading-none whitespace-nowrap"
+                            className="text-subhead font-semibold tabular-nums leading-none whitespace-nowrap"
                             style={{ color: exRepsLeft <= 0 ? STRENGTH.banked : 'rgba(255,255,255,0.85)' }}
                           >
                             {exRepsLeft <= 0
                               ? `${exRepTotal} reps done`
-                              : (<><span>{exRepsLeft}</span><span className="text-[12px] font-semibold text-white/70 ml-1">reps left</span></>)}
+                              : (<><span>{exRepsLeft}</span><span className="text-caption font-semibold text-label-secondary ml-1">reps left</span></>)}
                           </span>
                           <span className="w-28 h-1.5 rounded-full bg-white/[0.08] overflow-hidden" aria-hidden="true">
                             <span
@@ -5671,9 +5670,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         return (
                           <div className="px-1.5 pb-1.5">
                             {firstPlyoIdx === exerciseIndex && (
-                              <p className="text-[12px] text-white/72 leading-snug mb-1.5">{PLYO_SESSION_NOTE}</p>
+                              <p className="text-caption text-label-secondary leading-snug mb-1.5">{PLYO_SESSION_NOTE}</p>
                             )}
-                            <p className="text-[12px] text-white/60 leading-snug">
+                            <p className="text-caption text-label-secondary leading-snug">
                               {fam ? `For ${fam.benefit}. ` : ''}{PLYO_STOP_RULE} Efforts are a record, not a target.
                             </p>
                           </div>
@@ -5724,11 +5723,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // not move — and the grid switches to `alignItems: end` so every cell, the set
                         // index and the Previous column all share the one baseline.
                         const numCls = `w-full h-11 flex items-end justify-center bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
-                        const numStyle: React.CSSProperties = { fontSize: '17px', fontFamily: 'Inter, sans-serif' };
+                        const numStyle: React.CSSProperties = { fontSize: 'var(--type-body)'};
                         // D-097 / D-406: a value that came from the previous session or from the
                         // composer's suggestion is a STARTING POINT, greyed so it can never be
                         // mistaken for something the athlete logged.
-                        const ghostCls = 'text-white/50';
+                        const ghostCls = 'text-label-secondary';
 
                         // D-122 anchor, compacted into its own column. Reuses `formatLastSet`
                         // rather than re-deriving the string, so the D-324 rule (no RIR on a
@@ -5790,10 +5789,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     hint: exUnit === 'kg' ? 'Kilograms of help from the band or machine. Leave blank if none.' : 'Pounds of help from the band or machine. Leave blank if none.',
                                   })}
                                   className={`${numCls} flex-1 min-w-0`}
-                                  style={{ ...numStyle, fontSize: '15px' }}
+                                  style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                                   aria-label={exUnit === 'kg' ? 'Assist in kilograms' : 'Assist in pounds'}
                                 >
-                                  {assistNum == null ? <span className="text-white/40">−</span> : `-${assistNum}`}
+                                  {assistNum == null ? <span className="text-label-secondary">−</span> : `-${assistNum}`}
                                 </button>
                                 <button
                                   type="button"
@@ -5802,10 +5801,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     initialValue: added == null ? '' : String(added), allowDecimal: true,
                                   })}
                                   className={`${numCls} flex-1 min-w-0`}
-                                  style={{ ...numStyle, fontSize: '15px' }}
+                                  style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                                   aria-label="Added weight"
                                 >
-                                  {added == null ? <span className="text-white/40">+</span> : `+${added}`}
+                                  {added == null ? <span className="text-label-secondary">+</span> : `+${added}`}
                                 </button>
                               </div>
                             );
@@ -5828,7 +5827,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 style={numStyle}
                                 aria-label={exUnit === 'kg' ? 'Band kilograms' : 'Band pounds'}
                               >
-                                {bandNum == null ? <span className="text-white/40">—</span> : String(bandNum)}
+                                {bandNum == null ? <span className="text-label-secondary">—</span> : String(bandNum)}
                               </button>
                             );
                           }
@@ -5936,7 +5935,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     identical, and the session was logged wrong because of it. The
                                     placeholder sits where the eyes already are. */}
                                 {shown === '' && set.amrap && !done
-                                  ? <span className="text-strength/60 text-[12px] tracking-wide">AMRAP</span>
+                                  ? <span className="text-strength text-caption tracking-wide">AMRAP</span>
                                   : (shown === '' || shown === '—')
                                     ? (repTargetGhost && !done ? <span className={ghostCls}>{repTargetGhost}</span> : (shown === '' ? '\u00a0' : shown))
                                     : shown}
@@ -5962,12 +5961,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 allowDecimal: false,
                               })}
                               className={numCls}
-                              style={{ ...numStyle, fontSize: '15px' }}
+                              style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                               aria-label="RIR"
                             >
                               {hasValue
                                 ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                : <span className={targetRir != null ? 'text-strength/85 font-medium' : 'text-white/30'}>{formatRirTarget(targetRir)}</span>}
+                                : <span className={targetRir != null ? 'text-strength font-medium' : 'text-label-secondary'}>{formatRirTarget(targetRir)}</span>}
                             </button>
                           );
                         };
@@ -6032,12 +6031,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
                                 {/* Warm-up vs working set is an INTENSITY difference, so it is drawn
                                     as one. Warm-up was sky blue — a swim colour doing a strength
-                                    job; the ramp now literally reads as a dimmer light that comes
-                                    up when the work starts. */}
-                                <span className={`text-[11px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-strength/80' : 'text-strength/100'}`}>
+                                    job. It was then the strength colour at 80%, a dimmer light that
+                                    comes up when the work starts — and at 12 px that measured 4.2:1,
+                                    under WCAG 2.2's 4.5:1 (2026-09-18). The step is now weight:
+                                    warm-up medium, working set semibold, both full colour. */}
+                                <span className={`text-caption uppercase tracking-wide text-strength ${isWarmup ? 'font-medium' : 'font-semibold'}`}>
                                   {isWarmup ? 'Warmup' : 'Working set — add when ready'}
                                 </span>
-                                {set.setHint && <span className="text-[11px] text-white/72 italic">{set.setHint}</span>}
+                                {set.setHint && <span className="text-caption text-label-secondary italic">{set.setHint}</span>}
                               </div>
                             )}
 
@@ -6048,9 +6049,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <div className="flex items-center gap-2 mb-1.5 pl-[30px]">
                                 {/* Warm-up vs working set is an INTENSITY difference, so it is drawn
                                     as one. Warm-up was sky blue — a swim colour doing a strength
-                                    job; the ramp now literally reads as a dimmer light that comes
-                                    up when the work starts. */}
-                                <span className={`text-[11px] font-semibold uppercase tracking-wide ${isWarmup ? 'text-strength/80' : 'text-strength/100'}`}>
+                                    job. It was then the strength colour at 80%, a dimmer light that
+                                    comes up when the work starts — and at 12 px that measured 4.2:1,
+                                    under WCAG 2.2's 4.5:1 (2026-09-18). The step is now weight:
+                                    warm-up medium, working set semibold, both full colour. */}
+                                <span className={`text-caption uppercase tracking-wide text-strength ${isWarmup ? 'font-medium' : 'font-semibold'}`}>
                                   {isWarmup ? 'Warm-up' : 'Working sets'}
                                 </span>
                               </div>
@@ -6062,7 +6065,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // No horizontal padding here — the set container already adds px-1.5, so
                               // this lands flush with the bar-speed cue above the exercise (which has
                               // its own px-1.5 and no container). Same vertical line as "SET".
-                              <div className="pt-0.5 pb-2 text-[12px] font-medium text-strength/90 leading-snug">
+                              <div className="pt-0.5 pb-2 text-caption font-medium text-strength leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
                               </div>
                             )}
@@ -6070,7 +6073,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             <div style={gridStyle}>
                               {/* `pb-1.5` matches the number cells' own bottom padding, so the index,
                                   the Previous anchor and every typed number sit on one line. */}
-                              <span className={`text-[13px] tabular-nums leading-none pb-1.5 ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
+                              <span className={`text-footnote tabular-nums leading-none pb-1.5 ${done ? rowAccent.num : 'text-label-secondary'}`}>
                                 {exIsPlyo ? '' : setIndex + 1}
                               </span>
 
@@ -6078,8 +6081,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 <button
                                   type="button"
                                   onClick={fillFromPrior}
-                                  className="h-11 flex items-end pb-1.5 min-w-0 text-[12px] text-left text-white/[0.9] tabular-nums leading-none hover:text-white transition-colors"
-                                  style={{ fontFamily: 'Inter, sans-serif' }}
+                                  className="h-11 flex items-end pb-1.5 min-w-0 text-caption text-left text-label tabular-nums leading-none hover:text-white transition-colors"
                                   aria-label={`Use previous: ${priorTxt}`}
                                 >
                                   {/* The ellipsis stays as the backstop — the reserve tail was what
@@ -6087,7 +6089,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   <span className="min-w-0 whitespace-nowrap overflow-hidden text-ellipsis">{priorTxt}</span>
                                 </button>
                               ) : (
-                                <span className="text-[12px] text-white/40 leading-none pb-1.5">{showPrevious ? '—' : ''}</span>
+                                <span className="text-caption text-label-secondary leading-none pb-1.5">{showPrevious ? '—' : ''}</span>
                               )}
 
                               {renderWeightCell()}
@@ -6108,7 +6110,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               <button
                                 type="button"
                                 onClick={() => deleteSet(exercise.id, setIndex)}
-                                className="h-7 w-4 flex items-center justify-center text-white/40 hover:text-red-400 transition-colors"
+                                className="h-7 w-4 flex items-center justify-center text-label-secondary hover:text-red-400 transition-colors"
                                 aria-label={`Delete set ${setIndex + 1}`}
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -6126,7 +6128,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {((targetHint && !set.amrap && exercise.rir_tracked !== false) || (!isDurationBased && !exIsBodyweight && exBarLoaded) || isDurationBased) && (
                               <div style={gridStyle} className="pt-1.5 pb-0.5">
                                 {targetHint && !set.amrap && exercise.rir_tracked !== false && (
-                                  <span style={{ gridColumn: '1 / 4' }} className="text-[12px] font-medium text-white/70 leading-snug">
+                                  <span style={{ gridColumn: '1 / 4' }} className="text-caption font-medium text-label-secondary leading-snug">
                                     {targetHint}
                                   </span>
                                 )}
@@ -6135,7 +6137,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     <button
                                       type="button"
                                       onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                      className="text-[12px] font-medium leading-none px-2 py-1 rounded-md border transition-colors"
+                                      className="text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors"
                                       style={platesOpen
                                         ? { color: STRENGTH_CHIP.textOpen, borderColor: STRENGTH_CHIP.borderOpen, background: STRENGTH_CHIP.bgOpen }
                                         : { color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
@@ -6157,12 +6159,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     >
                                       <SelectTrigger
                                         aria-label="Bar type"
-                                        className="h-auto text-[12px] font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
+                                        className="h-auto text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
                                         style={{ color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
                                       >
                                         {`${BAR_TYPES[exBarKeyFor(set.barType)].load} ${BAR_TYPES[exBarKeyFor(set.barType)].unit} bar`}
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
+                                      <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-label">
                                         {exBarKeys.map((k) => (
                                           <SelectItem key={k} value={k} className="hover:bg-white/[0.15]">{BAR_TYPES[k].name}</SelectItem>
                                         ))}
@@ -6186,8 +6188,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                           // the JS tick when the screen locks mid-carry.
                                           persistTimer(durationTimerKey, seconds);
                                         }}
-                                        className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                        className="text-caption font-medium px-2 py-0.5 rounded-full border border-white/20 text-label-secondary hover:text-white hover:bg-white/[0.08] transition-colors"
                                       >
                                         Start
                                       </button>
@@ -6202,8 +6203,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                           clearPersistedTimer(durationTimerKey);
                                           void cancelRestNotification(durationTimerKey);
                                         }}
-                                        className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors"
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                        className="text-caption font-medium px-2 py-0.5 rounded-full border border-white/20 text-label-secondary hover:text-white hover:bg-white/[0.08] transition-colors"
                                       >
                                         Pause
                                       </button>
@@ -6232,7 +6232,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   value={editingTimerValue}
                                   onChange={(e) => setEditingTimerValue(e.target.value)}
                                   placeholder=":60 or 1:00"
-                                  className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
+                                  className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-body rounded-md"
                                 />
                                 <div className="flex items-center justify-between mt-3 gap-3">
                                   <button
@@ -6244,13 +6244,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                         setEditingTimerKey(null);
                                       }
                                     }}
-                                    className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                    className="text-subhead px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                                   >
                                     Save
                                   </button>
                                   <button
                                     onClick={() => setEditingTimerKey(null)}
-                                    className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                    className="text-subhead px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                                   >
                                     Close
                                   </button>
@@ -6262,7 +6262,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             {platesOpen && (
                               <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-white/10 bg-white/[0.03] p-2">
                                 <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Plates</span>
+                                  <span className="text-caption font-semibold uppercase tracking-wide text-label-secondary">Plates</span>
                                   
                                 </div>
                                 <PlateMath
@@ -6290,10 +6290,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // "success" — emerald here was bike green (#50C878).
                               return (
                                 <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-strength/[0.08] border border-strength/25 rounded-lg">
-                                  <div className="text-[13px] text-strength/90">
+                                  <div className="text-footnote text-strength">
                                     {/* The server's numbers in the athlete's unit, with its unit (Stage 4 session 4). */}
                                     Saved: {srv.estimated1RM_in_unit ?? srv.estimated1RM}{srv.unit ? ` ${srv.unit}` : ''}
-                                    <span className="text-white/72"> — from {srv.weight > 0 ? `${srv.weight_in_unit ?? srv.weight}${srv.unit ? ` ${srv.unit}` : ''} × ` : ''}{srv.reps} reps</span>
+                                    <span className="text-label-secondary"> — from {srv.weight > 0 ? `${srv.weight_in_unit ?? srv.weight}${srv.unit ? ` ${srv.unit}` : ''} × ` : ''}{srv.reps} reps</span>
                                   </div>
                                 </div>
                               );
@@ -6311,12 +6311,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               return (
                                 <div className="mt-2 ml-[30px] mr-1 rounded-lg border border-strength/40 bg-strength/[0.08] px-2 py-1.5" role="group" aria-label="Adjust reps in reserve">
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[11px] font-semibold uppercase tracking-wide text-strength/90">RIR — tap to change</span>
+                                    <span className="text-caption font-semibold uppercase tracking-wide text-strength">RIR — tap to change</span>
                                     <button
                                       type="button"
                                       onClick={() => setRirConfirm(null)}
-                                      className="text-[11px] text-white/72 hover:text-white/75 px-1"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                      className="text-caption text-label-secondary hover:text-label-secondary px-1"
                                       aria-label="Keep the suggested RIR"
                                     >
                                       keep
@@ -6331,12 +6330,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                           key={r}
                                           type="button"
                                           onClick={() => confirmRirAndComplete(exercise.id, setIndex, r)}
-                                          className={`h-9 w-9 rounded-full border-2 text-sm tabular-nums leading-none transition-colors ${
+                                          className={`h-9 w-9 rounded-full border-2 text-subhead tabular-nums leading-none transition-colors ${
                                             isSuggested
                                               ? 'bg-strength/30 border-strength text-[#FFE6D5] font-semibold ring-2 ring-strength/50'
-                                              : 'bg-white/[0.04] border-white/15 text-white/70 hover:bg-strength/15 hover:border-strength/40'
+                                              : 'bg-white/[0.04] border-white/15 text-label-secondary hover:bg-strength/15 hover:border-strength/40'
                                           }`}
-                                          style={{ fontFamily: 'Inter, sans-serif' }}
                                           aria-label={`RIR ${isCap ? '5 or more' : r}${isSuggested ? ' (suggested — tap to confirm)' : ''}`}
                                         >
                                           {isCap ? '5+' : r}
@@ -6393,9 +6391,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     e.stopPropagation();
                     addSet(exercise.id);
                   }}
-                  className="h-8 text-xs px-3 py-1.5 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
+                  className="h-8 text-caption px-3 py-1.5 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_2px_8px_rgba(0,0,0,0.15)]"
                   type="button"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Set
@@ -6436,8 +6433,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           }}
                           placeholder="How did it feel? Any modifications?"
                           rows={3}
-                          className="text-sm border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-white/90 placeholder:text-white/70 focus-visible:ring-0 focus-visible:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
+                          className="text-subhead border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl text-label placeholder:text-label-secondary focus-visible:ring-0 focus-visible:border-white/30 focus:bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
                         />
                       </div>
                     );
@@ -6453,8 +6449,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <button
                       type="button"
                       onClick={() => deleteExercise(exercise.id)}
-                      className="px-2.5 py-1 rounded-xl text-[12px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-red-400 hover:border-red-400/50 transition-colors flex items-center gap-1"
-                      style={{ fontFamily: 'Inter, sans-serif' }}
+                      className="px-2.5 py-1 rounded-xl text-caption border border-white/15 bg-white/[0.04] text-label-secondary hover:text-red-400 hover:border-red-400/50 transition-colors flex items-center gap-1"
                     >
                       <X className="h-3 w-3" /> Remove exercise
                     </button>
@@ -6472,7 +6467,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {/* Add new exercise input */}
         <div className="relative mx-3 mb-2">
           <div className="relative flex items-center border-2 border-white/25 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset] px-3 py-2">
-            <div className="pl-2 text-white/72">
+            <div className="pl-2 text-label-secondary">
               <Search className="h-4 w-4" />
             </div>
             <Input
@@ -6488,14 +6483,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               name="exercise-search"
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-8 text-sm !border-0 bg-transparent text-white/90 placeholder:text-white/70 focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
-              style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
+              className="h-8 text-subhead !border-0 bg-transparent text-label placeholder:text-label-secondary focus-visible:ring-0 focus-visible:!border-0 pr-9 flex-1"
+              style={{ fontSize: 'var(--type-body)'}}
             />
             {currentExercise && (
               <button
                 type="button"
                 onClick={handleAddClick}
-                className="absolute right-3 h-6 w-6 flex items-center justify-center text-white/70 hover:text-white rounded-full hover:bg-white/[0.10] transition-colors"
+                className="absolute right-3 h-6 w-6 flex items-center justify-center text-label-secondary hover:text-white rounded-full hover:bg-white/[0.10] transition-colors"
                 aria-label="Add exercise"
               >
                 <Plus className="h-4 w-4" />
@@ -6510,7 +6505,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   key={index}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSuggestionClick(exercise)}
-                  className="w-full text-left px-3 py-2 hover:bg-white/[0.10] text-white/90 text-sm min-h-[40px] transition-colors"
+                  className="w-full text-left px-3 py-2 hover:bg-white/[0.10] text-label text-subhead min-h-[40px] transition-colors"
                 >
                   {exercise}
                 </button>
@@ -6532,35 +6527,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowUntickedWarn(false)} />
             <div className="relative w-full sm:w-[460px] bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-              <h3 className="text-lg font-semibold mb-2 text-white/90">
+              <h3 className="text-body font-semibold mb-2 text-label">
                 {pending.length} {pending.length === 1 ? 'set has' : 'sets have'} numbers but {pending.length === 1 ? 'is' : 'are'} not marked done
               </h3>
-              <p className="text-sm text-white/70 leading-snug">
+              <p className="text-subhead text-label-secondary leading-snug">
                 Sets that aren't marked done are saved, but they don't count toward your volume or workload.
               </p>
-              <ul className="mt-3 space-y-1 text-sm text-white/72">
+              <ul className="mt-3 space-y-1 text-subhead text-label-secondary">
                 {shown.map((p) => (
                   <li key={`${p.exerciseId}-${p.setIndex}`} className="tabular-nums">
                     {p.exerciseName} · set {p.setIndex + 1}
                   </li>
                 ))}
                 {pending.length > shown.length && (
-                  <li className="text-white/70">and {pending.length - shown.length} more</li>
+                  <li className="text-label-secondary">and {pending.length - shown.length} more</li>
                 )}
               </ul>
               <div className="mt-5 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => { setShowUntickedWarn(false); setShowSessionRPE(true); }}
-                  className="text-sm text-white/72 hover:text-white/80 px-2 py-1.5"
+                  className="text-subhead text-label-secondary hover:text-label px-2 py-1.5"
                 >
                   Save without them
                 </button>
                 <button
                   type="button"
                   onClick={() => { markUntickedComplete(); setShowUntickedWarn(false); setShowSessionRPE(true); }}
-                  className={`text-sm text-white ${themeColors.hoverText} rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300`}
-                  style={{ fontFamily: 'Inter, sans-serif' }}
+                  className={`text-subhead text-white ${themeColors.hoverText} rounded-full px-3 py-1.5 bg-white/[0.12] border-2 border-white/35 hover:bg-white/[0.15] hover:border-white/45 transition-all duration-300`}
                 >
                   Mark {pending.length === 1 ? 'it' : 'them'} done
                 </button>
@@ -6575,16 +6569,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : ()=>setShowNotesModal(false)} />
           <div className="relative w-full sm:w-[520px] bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-            <h3 className="text-lg font-semibold mb-3 text-white/90">How did it feel?</h3>
+            <h3 className="text-body font-semibold mb-3 text-label">How did it feel?</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-white/70">Notes</label>
+                <label className="text-subhead text-label-secondary">Notes</label>
                 <textarea autoComplete="off" value={notesText} onChange={(e)=>{
                   setNotesText(e.target.value);
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
                   }
-                }} rows={4} className="mt-1 w-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg p-2 text-sm text-white/90 placeholder:text-white/70 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="" style={{ fontFamily: 'Inter, sans-serif' }} />
+                }} rows={4} className="mt-1 w-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg p-2 text-subhead text-label placeholder:text-label-secondary focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="" />
               </div>
               <div>
                 {/* The one effort scale (src/components/ui/effort-scale.tsx), same row as the finish sheet. */}
@@ -6600,7 +6594,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="mt-4 sticky bottom-0 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 pt-3 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
               <div className="flex items-center gap-4">
                 {isSaving || isSaved ? (
-                  <div className="flex items-center gap-2 text-sm text-white/70 flex-1 justify-center">
+                  <div className="flex items-center gap-2 text-subhead text-label-secondary flex-1 justify-center">
                     {isSaving && (
                       <>
                         <Loader2 className={`h-4 w-4 animate-spin ${themeColors.text}`} />
@@ -6613,15 +6607,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
                           <span>Saved!</span>
                         </div>
-                        <span className="text-xs text-white/62">View Adherence to adjust weights for next time</span>
+                        <span className="text-caption text-label-secondary">View Adherence to adjust weights for next time</span>
                       </div>
                     )}
                   </div>
                 ) : (
                   <>
-                    <button onClick={()=>setShowNotesModal(false)} className="text-sm text-white/70 hover:text-white/90">Cancel</button>
-                    <button onClick={()=>{ finalizeSave(); }} className="text-sm text-white/70 hover:text-white/90">Skip</button>
-                    <GalaxyButton variant="primary" size="sm" onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-sm ${themeColors.hoverText} px-3 py-1.5`} style={{ fontFamily: 'Inter, sans-serif' }}>Save</GalaxyButton>
+                    <button onClick={()=>setShowNotesModal(false)} className="text-subhead text-label-secondary hover:text-label">Cancel</button>
+                    <button onClick={()=>{ finalizeSave(); }} className="text-subhead text-label-secondary hover:text-label">Skip</button>
+                    <GalaxyButton variant="primary" size="sm" onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-subhead ${themeColors.hoverText} px-3 py-1.5`}>Save</GalaxyButton>
                   </>
                 )}
               </div>
@@ -6658,7 +6652,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         return (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
-            <p className="text-[12px] uppercase tracking-wider text-white/72 mb-3">
+            <p className="text-caption uppercase tracking-wider text-label-secondary mb-3">
               {CALIBRATION_APPLIED_HEADING}
             </p>
             <div className="space-y-3 mb-4">
@@ -6667,10 +6661,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 const ev = events.find((e: any) => e?.lift === c.lift && !e?.undone_at);
                 const undone = undoneLifts.includes(String(c.ref ?? c.lift));
                 return (
-                  <div key={i} className="text-sm text-white/85">
+                  <div key={i} className="text-subhead text-label">
                     <div>
-                      <span className="text-white/72">{c.lift}</span>{' '}
-                      <span className={`tabular-nums ${undone ? 'line-through text-white/62' : ''}`}>
+                      <span className="text-label-secondary">{c.lift}</span>{' '}
+                      <span className={`tabular-nums ${undone ? 'line-through text-label-secondary' : ''}`}>
                         {c.from_top_set} → {c.to_top_set} lb
                       </span>
                     </div>
@@ -6678,7 +6672,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         direction and nothing else; the reset in particular needs p33 beside it or a
                         single bad session reads as having cost 10%. */}
                     {ev && !undone && (
-                      <p className="mt-1 text-[12px] leading-snug text-white/62">
+                      <p className="mt-1 text-caption leading-snug text-label-secondary">
                         {calibrationLine(ev.reason === 'reset' ? 'reset' : 'bump', {
                           lift: c.lift,
                           from: Number(ev.from_training_max),
@@ -6687,7 +6681,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </p>
                     )}
                     {undone && (
-                      <p className="mt-1 text-[12px] leading-snug text-white/70">
+                      <p className="mt-1 text-caption leading-snug text-label-secondary">
                         Put back to {Number(ev?.from_training_max) || c.from_top_set} lb.
                       </p>
                     )}
@@ -6709,7 +6703,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           } catch { /* the line simply stays as applied; nothing is lost */ }
                           setApplyingRework(false);
                         }}
-                        className={`mt-1 text-[12px] underline underline-offset-2 disabled:opacity-50 ${up ? 'text-white/70' : 'text-white/70'}`}
+                        className={`mt-1 text-caption underline underline-offset-2 disabled:opacity-50 ${up ? 'text-label-secondary' : 'text-label-secondary'}`}
                       >
                         {CALIBRATION_UNDO_LABEL}
                       </button>
@@ -6718,7 +6712,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 );
               })}
             </div>
-            <p className="text-[12px] text-white/72 mb-4 leading-snug">{CALIBRATION_SCOPE_NOTE}</p>
+            <p className="text-caption text-label-secondary mb-4 leading-snug">{CALIBRATION_SCOPE_NOTE}</p>
             {/* ⛔ ONE BUTTON, AND IT IS NOT "APPLY". The change is already written by the time this
                 renders — a second confirmation would be the app asking permission for something it
                 has done. Dismissing is the only action left, and Undo is per lift above. */}
@@ -6726,7 +6720,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               type="button"
               disabled={applyingRework}
               onClick={closeSheet}
-              className="w-full py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium disabled:opacity-50"
+              className="w-full py-2.5 rounded-xl bg-white/90 text-black text-subhead font-medium disabled:opacity-50"
             >
               {applyingRework ? 'Working…' : 'Done'}
             </button>
@@ -6755,12 +6749,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         return (
           <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 backdrop-blur-sm">
             <div className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-[#141414] p-5 pb-8">
-              <p className="text-[12px] uppercase tracking-wider text-white/72 mb-3">
+              <p className="text-caption uppercase tracking-wider text-label-secondary mb-3">
                 {STANDING_TEST_APPLIED_HEADING}
               </p>
               <div className="space-y-2 mb-4">
                 {Object.values(wn).map((v, i) => (
-                  <p key={i} className="text-sm text-white/85 tabular-nums">
+                  <p key={i} className="text-subhead text-label tabular-nums">
                     {standingWorkingNumberLine({
                       // ⚠️ `movement` is the tested display name the server reads off the block's own
                       // `test_lift_names` (added 2026-08-24 — `v.lift` is the raw key, and the sheet
@@ -6773,12 +6767,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </p>
                 ))}
               </div>
-              <p className="text-[12px] text-white/70 mb-1 leading-snug">{standingFilledLine(weeks)}</p>
-              <p className="text-[12px] text-white/72 mb-4 leading-snug">{STANDING_TEST_SCOPE_NOTE}</p>
+              <p className="text-caption text-label-secondary mb-1 leading-snug">{standingFilledLine(weeks)}</p>
+              <p className="text-caption text-label-secondary mb-4 leading-snug">{STANDING_TEST_SCOPE_NOTE}</p>
               <button
                 type="button"
                 onClick={closeSheet}
-                className="w-full py-2.5 rounded-xl bg-white/90 text-black text-sm font-medium"
+                className="w-full py-2.5 rounded-xl bg-white/90 text-black text-subhead font-medium"
               >
                 {STANDING_TEST_DONE_LABEL}
               </button>
@@ -6796,8 +6790,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             className="relative w-full sm:w-[520px] bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-t-2xl sm:rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
           >
-            <h3 className="text-lg font-semibold mb-1 text-white/90">Lower than your stored max</h3>
-            <p className="text-sm text-white/72 mb-4">
+            <h3 className="text-body font-semibold mb-1 text-label">Lower than your stored max</h3>
+            <p className="text-subhead text-label-secondary mb-4">
               {downWriteReview.downs.length > 1 ? 'These tests came' : 'This test came'} in below what's on file.
               If it was a true near-max effort, tap Update. If you stopped early, Keep the higher number.
               Your call — {downWriteReview.downs.length > 1 ? 'it saves once every lift is decided' : 'your tap saves it'}.
@@ -6808,23 +6802,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 return (
                   <div key={d.key} className="bg-white/[0.06] border-2 border-white/15 rounded-xl p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-white/90">{d.lift}</span>
-                      <span className="text-xs text-white/62 tabular-nums">stored {d.prior_in_unit ?? d.prior} · tested {d.next_in_unit ?? d.next}</span>
+                      <span className="text-subhead font-medium text-label">{d.lift}</span>
+                      <span className="text-caption text-label-secondary tabular-nums">stored {d.prior_in_unit ?? d.prior} · tested {d.next_in_unit ?? d.next}</span>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => chooseDown(d.key, 'keep')}
                         disabled={savingBaseline}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
-                        style={{ fontFamily: 'Inter, sans-serif' }}
+                        className={`flex-1 h-9 rounded-lg text-subhead border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-label-secondary hover:border-white/30'}`}
                       >
                         Keep {d.prior_in_unit ?? d.prior}
                       </button>
                       <button
                         onClick={() => chooseDown(d.key, 'update')}
                         disabled={savingBaseline}
-                        className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-strength/25 border-strength/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
-                        style={{ fontFamily: 'Inter, sans-serif' }}
+                        className={`flex-1 h-9 rounded-lg text-subhead border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-strength/25 border-strength/60 text-white' : 'bg-white/[0.06] border-white/20 text-label-secondary hover:border-white/30'}`}
                       >
                         Update to {d.next_in_unit ?? d.next}
                       </button>
@@ -6837,11 +6829,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <button
                 onClick={() => { setDownWriteReview(null); setDownDecisions({}); }}
                 disabled={savingBaseline}
-                className="text-sm text-white/70 hover:text-white/90 disabled:opacity-50"
+                className="text-subhead text-label-secondary hover:text-label disabled:opacity-50"
               >
                 Cancel
               </button>
-              {savingBaseline && <span className="text-sm text-white/72">Saving…</span>}
+              {savingBaseline && <span className="text-subhead text-label-secondary">Saving…</span>}
             </div>
           </div>
         </div>
@@ -6853,8 +6845,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <SheetHeader>
             <SheetTitle className="text-center">{setTypeFor ? `${setTypeFor} · ${SET_TYPE_INFO[setTypeFor].name}` : ''}</SheetTitle>
           </SheetHeader>
-          <div className="py-4 text-[17px] leading-relaxed text-white/90">{setTypeFor ? SET_TYPE_INFO[setTypeFor].text : ''}</div>
-          <button onClick={() => setSetTypeFor(null)} className="w-full py-3 text-white/70 hover:text-white">Close</button>
+          <div className="py-4 text-body leading-relaxed text-label">{setTypeFor ? SET_TYPE_INFO[setTypeFor].text : ''}</div>
+          <button onClick={() => setSetTypeFor(null)} className="w-full py-3 text-label-secondary hover:text-white">Close</button>
         </SheetContent>
       </Sheet>
       {(() => {
@@ -6865,8 +6857,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <SheetHeader>
                 <SheetTitle className="text-center">{ex ? (ex.execution_name || ex.name) : ''}</SheetTitle>
               </SheetHeader>
-              <div className="py-4 text-[17px] leading-relaxed text-white/90">{ex?.how_to}</div>
-              <button onClick={() => setHowToFor(null)} className="w-full py-3 text-white/70 hover:text-white">Close</button>
+              <div className="py-4 text-body leading-relaxed text-label">{ex?.how_to}</div>
+              <button onClick={() => setHowToFor(null)} className="w-full py-3 text-label-secondary hover:text-white">Close</button>
             </SheetContent>
           </Sheet>
         );
@@ -6883,7 +6875,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   key={rir}
                   onClick={() => setSelectedRIR(rir)}
                   className={`
-                    h-14 text-lg font-medium rounded-lg
+                    h-14 text-body font-medium rounded-lg
                     ${selectedRIR === rir 
                       ? 'bg-gray-900 text-white' 
                       : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
@@ -6949,18 +6941,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {isSaving ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <Loader2 className={`h-12 w-12 ${themeColors.text} animate-spin mb-4`} />
-                <p className="text-lg font-medium text-white/90">Saving workout...</p>
-                <p className="text-sm text-white/72 mt-2">(you don't need to stay here)</p>
+                <p className="text-body font-medium text-label">Saving workout...</p>
+                <p className="text-subhead text-label-secondary mt-2">(you don't need to stay here)</p>
               </div>
             ) : isSaved ? (
               <div className="flex flex-col items-center justify-center py-8">
                 <CheckCircle className={`h-12 w-12 ${themeColors.text} mb-4`} />
-                <p className="text-lg font-medium text-white/90">Saved!</p>
-                <p className="text-sm text-white/62 mt-2">View Details to adjust weights for next time</p>
+                <p className="text-body font-medium text-label">Saved!</p>
+                <p className="text-subhead text-label-secondary mt-2">View Details to adjust weights for next time</p>
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-bold mb-2 text-center text-white/90">
+                <h2 className="text-title1 font-semibold mb-2 text-center text-label">
                   Workout Complete!
                 </h2>
                 
@@ -6975,7 +6967,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     size="lg"
                     onClick={handleSessionRPESkip}
                     className="flex-1 py-4"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Skip
                   </GalaxyButton>
@@ -6984,7 +6975,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     size="lg"
                     onClick={() => handleSessionRPESubmit(sessionRPE)}
                     className="flex-1 py-4"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
                   >
                     Submit & Finish
                   </GalaxyButton>
@@ -7004,8 +6994,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       >
         <button
           onClick={saveWorkout}
-          className={`w-full h-14 text-base font-medium text-white transition-all duration-200 rounded-xl backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
-          style={{ fontFamily: 'Inter, sans-serif' }}
+          className={`w-full h-14 text-body font-medium text-white transition-all duration-200 rounded-xl backdrop-blur-lg border-2 ${themeColors.saveBg} ${themeColors.saveBorder} ${themeColors.saveHoverBg} ${themeColors.saveHoverBorder} ${themeColors.saveShadow}`}
         >
           Save Workout
         </button>
@@ -7013,16 +7002,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             deliberate throw-away (a mistaken open, a test dry-run), not a save-guard. */}
         <div className="mt-3 flex justify-center" aria-live="polite">
           {confirmDiscard ? (
-            <div className="flex items-center gap-3 text-xs" style={{ fontFamily: 'Inter, sans-serif' }}>
-              <span className="text-white/70">Discard this session?</span>
-              <button onClick={discardSession} className="text-red-400/80 hover:text-red-300">Discard</button>
-              <button onClick={() => setConfirmDiscard(false)} className="text-white/62 hover:text-white/75">Keep</button>
+            <div className="flex items-center gap-3 text-caption">
+              <span className="text-label-secondary">Discard this session?</span>
+              <button onClick={discardSession} className="text-red-400 hover:text-red-300">Discard</button>
+              <button onClick={() => setConfirmDiscard(false)} className="text-label-secondary hover:text-label-secondary">Keep</button>
             </div>
           ) : (
             <button
               onClick={() => setConfirmDiscard(true)}
-              className="text-xs text-white/30 hover:text-white/70 transition-colors"
-              style={{ fontFamily: 'Inter, sans-serif' }}
+              className="text-caption text-label-secondary hover:text-label-secondary transition-colors"
             >
               Discard
             </button>
