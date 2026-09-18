@@ -216,7 +216,9 @@ send a second copy and the button's copy is never removed when the row changes o
 not reproduced. Fix: the button records its send the same way the sync does (one record of what was sent). One
 function. After the one-truth workorder.
 
-## OPEN (2026-09-16 evening) — NEAR-THRESHOLD RUN: "RPE 8–10" ON SUB-THRESHOLD STEPS
+## [x] CLOSED 2026-09-18 (46e82a09, deployed) — NEAR-THRESHOLD RUN: "RPE 8–10" ON SUB-THRESHOLD STEPS
+
+> The effort number is off every run and ride step; the talk-test line (p235) and "All-out" (p229–231) print where the page says so. Everything below is history.
 
 > 2026-09-17: the "0.41 mi" half is DROPPED (Michael) — it was a row built before the 17:48 rebuild; the Planned tab
 > prints 4:00 for timed steps. Open: the RPE line only. Proposed "4:00 @ 10:26–10:52/mi" with no RPE (no effort number
