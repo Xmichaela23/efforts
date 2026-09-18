@@ -225,6 +225,7 @@ export interface SorenessEntry {
   workoutId: string;   // the workout whose post-completion popup wrote this soreness
   startTime: string;   // that workout's START timestamp (ISO) — used for the before-session provenance guard
   soreness: number;    // on the 1–7 Hooper scale (post-migration)
+  date?: string;       // the workout's calendar day (YYYY-MM-DD); `resolveCurrentSoreness` windows by it when present
 }
 
 /**
@@ -295,7 +296,6 @@ export function resolveCurrentSoreness(
   // OURS — `resolveCurrentSoreness` 7-day recent window, 5-entry baseline, z ≥ 1 and +1 point, last 6 sessions counted: no source
   const recentDays = opts?.recentDays ?? 7;
   const minBaseline = opts?.minBaseline ?? 5;
-  const now = opts?.asOf ? new Date(opts.asOf).getTime() : null;
   const rows = entries
     .filter((e) => e.soreness >= SORENESS_SCALE_MIN && e.soreness <= SORENESS_SCALE_MAX)  // 1–7 only
     .map((e) => ({ e, t: new Date(e.startTime).getTime() }))
@@ -304,14 +304,21 @@ export function resolveCurrentSoreness(
   const logged = rows.length;
   if (logged === 0) return { level: null, recent: null, mean: null, z: null, baselineOk: false, logged: 0, recentCount: 0, elevatedCount: 0, countWindow: 0, diag: 'no soreness logged' };
 
-  const newest = now ?? rows[0].t;
-  const recentRows = rows.filter((x) => (newest - x.t) <= recentDays * 86400000).map((x) => x.e.soreness);
+  // ⛔ THE WINDOW IS CALENDAR DAYS, THE SAME DAYS AS THE EFFORT PASS (2026-09-18). `recentDays` 7 means the
+  // as-of day and the 6 before it — the effort read's `date >= asOf − 6`. It was measured in hours from the
+  // as-of instant, and a date-only as-of is midnight: a session at noon 7 days back sat 6.5 days away and
+  // came in, so soreness read 8 days under a "last 7 days" label.
+  const dayOf = (x: { e: SorenessEntry; t: number }) => (x.e.date ? String(x.e.date).slice(0, 10) : new Date(x.t).toISOString().slice(0, 10));
+  const newestDay = opts?.asOf ? String(opts.asOf).slice(0, 10) : dayOf(rows[0]);
+  const fromDay = new Date(Date.parse(`${newestDay}T12:00:00Z`) - (recentDays - 1) * 86400000).toISOString().slice(0, 10);
+  const inRecent = (x: { e: SorenessEntry; t: number }) => dayOf(x) >= fromDay;
+  const recentRows = rows.filter(inRecent).map((x) => x.e.soreness);
   const recent = recentRows.length ? recentRows.reduce((a, b) => a + b, 0) / recentRows.length : null;
 
   // ⚠️ THE BASELINE EXCLUDES THE RECENT WINDOW. Leaving the last week inside its own comparison drags
   // the mean toward the value being tested and quietly shrinks every deviation — a sore week would
   // partly normalise itself.
-  const baseRows = rows.filter((x) => (newest - x.t) > recentDays * 86400000).map((x) => x.e.soreness);
+  const baseRows = rows.filter((x) => !inRecent(x)).map((x) => x.e.soreness);
   const baselineOk = baseRows.length >= minBaseline;
   if (recent == null) return { level: null, recent: null, mean: null, z: null, baselineOk, logged, recentCount: 0, elevatedCount: 0, countWindow: 0, diag: `nothing logged in ${recentDays}d` };
   if (!baselineOk) return { level: null, recent, mean: null, z: null, baselineOk: false, logged, recentCount: recentRows.length, elevatedCount: 0, countWindow: 0, diag: `baseline thin (${baseRows.length}/${minBaseline})` };

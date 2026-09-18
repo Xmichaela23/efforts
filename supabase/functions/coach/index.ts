@@ -1698,7 +1698,7 @@ Deno.serve(async (req) => {
     // BODY row (D-354): post-session soreness, collected in the SAME 28d pass as the RPE norms so the
     // two halves of the row can never describe different windows. Read as ENTRIES, not an average —
     // `resolveCurrentSoreness` needs timestamps to separate the recent window from the baseline.
-    const sorenessEntries: Array<{ workoutId: string; startTime: string; soreness: number }> = [];
+    const sorenessEntries: Array<{ workoutId: string; startTime: string; soreness: number; date: string }> = [];
     const normRir: number[] = [];
     for (const w of Array.isArray(normWorkouts) ? normWorkouts : []) {
       if (String((w as any)?.workout_status || '').toLowerCase() !== 'completed') continue;
@@ -1729,6 +1729,7 @@ Deno.serve(async (req) => {
             workoutId: String((w as any)?.id ?? ''),
             startTime: String((w as any)?.timestamp || ((w as any)?.date + 'T12:00:00Z')),
             soreness: s,
+            date: String((w as any)?.date || '').slice(0, 10),
           });
         }
       }

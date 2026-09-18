@@ -67,3 +67,11 @@ Deno.test('a thin baseline reports no persistence count at all', () => {
   assertEquals(r.baselineOk, false);
   assertEquals(r.elevatedCount, 0);
 });
+
+Deno.test('THE WINDOW IS THE EFFORT WINDOW: runs 1, 3, 5 and 7 days back, 7 days counts three', () => {
+  // asOf is a bare date (midnight), entries are dated days at noon — the shape coach hands it
+  const asOf = '2026-07-30';
+  const at = (n: number, s: number) => ({ workoutId: `d${n}`, startTime: `2026-07-${String(30 - n).padStart(2, '0')}T12:00:00Z`, soreness: s, date: `2026-07-${String(30 - n).padStart(2, '0')}` });
+  const r = resolveCurrentSoreness([at(1, 3), at(3, 3), at(5, 3), at(7, 3)], { asOf, recentDays: 7 });
+  assertEquals(r.recentCount, 3); // day 7 back is the 8th day; it belongs to the baseline
+});
