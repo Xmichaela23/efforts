@@ -755,7 +755,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'sandbag throw': ALWAYS,
   // A KETTLEBELL SWING NEEDS A KETTLEBELL. It was untagged, so `gearRoutesFor` returned ALWAYS and
   // warned - and it is one of his secondary hinge movements, so it was being offered to everyone.
-  'kb swing': [['kettlebell'], ['dumbbells']],
+  // Same route as `kettlebell swing` and `kb swings` (2026-09-18): with no kettlebell the p220 hinge row
+  // moves to its next secondary. A dumbbell swing is its own movement (`dumbbell swing`, `db swings`).
+  'kb swing': [['kettlebell']],
 
   // ── fixed stations: the commercial-gym chip is the declaration ──────────────────────────────────
   'smith machine press': [['machine']],

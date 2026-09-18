@@ -170,7 +170,10 @@ blank and the card keeps its height; State's BODY sits under the bike/run/streng
 than usual", no "above your normal" and no sentences. Throwaway check 2026-09-17, one round, 7 of 7.
 ⚠️ Until the build lands, the live web app still draws BODY in the top card, now without the words.
 
-## QUEUED (2026-09-17, seen in the BODY throwaway) — SORENESS READS 8 DAYS UNDER A "last 7 days" LABEL
+## [x] CLOSED 2026-09-18 (needs coach deployed) — SORENESS READS 8 DAYS UNDER A "last 7 days" LABEL
+
+> The soreness window counts calendar days, the as-of day and the 6 before it, the same days as effort. Runs 1, 3, 5
+> and 7 days back: soreness counts 3, effort counts 3 (`current-soreness.test.ts`). Everything below is history.
 
 Runs on days 1, 3, 5 and 7 before today: effort counted 3 sessions, soreness counted 4 entries (it took day 7).
 The soreness window is one day wider than the effort window it shares a label with (`resolveCurrentSoreness`,
@@ -191,7 +194,11 @@ Both fail before and after the 2026-09-16/17 sessions; neither was touched. (1) 
 returns `readout`. (2) `src/lib/strength-gear-catalogue.test.ts` "A PLURAL AND ITS SINGULAR AGREE". Read each
 before changing it: decide whether the test or the code is stale.
 
-## QUEUED (2026-09-17, Stage A, check left red) — KB SWING IS OFFERED TO AN ATHLETE WITH DUMBBELLS AND NO KETTLEBELL
+## [x] CLOSED 2026-09-18 (needs a phone build and the strength functions deployed) — KB SWING IS OFFERED TO AN ATHLETE WITH DUMBBELLS AND NO KETTLEBELL
+
+> "KB swing" needs a kettlebell, like the other two spellings; a dumbbell swing stays its own movement. Dumbbells and
+> no kettlebell: all three spellings refused, dumbbell swing allowed. "A PLURAL AND ITS SINGULAR AGREE" is green.
+> Everything below is history.
 
 `src/lib/strength-gear.ts:758` lets "KB swing" be done with dumbbells; the three other spellings (`kb swings` :664,
 `kettlebell swing` :663) need a kettlebell, and the comment directly above :758 says "A KETTLEBELL SWING NEEDS A
