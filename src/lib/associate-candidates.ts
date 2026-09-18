@@ -19,7 +19,7 @@
 // is TrainingPeaks' behaviour and it is also the only version that keeps the week-mix honest.
 
 // ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
-import { normalizeSessionType } from './discipline';
+import { normalizeSessionType } from './discipline.ts';
 
 export type CandidateRow = {
   id: string;
