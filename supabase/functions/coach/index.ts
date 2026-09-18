@@ -956,8 +956,8 @@ Deno.serve(async (req) => {
     const workoutQueryTo = addDaysISO(asOfDate, 2);
     const { data: weekWorkoutsRows, error: wwErr } = await supabase
       .from('workouts')
-      // distance / avg_heart_rate / elapsed_time / avg_speed: the moving-time fallbacks `completedMovingSeconds` reads (State's "This week" line)
-      .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises,metrics,moving_time,distance,avg_heart_rate,elapsed_time,avg_speed')
+      // distance / avg_heart_rate / elapsed_time / avg_speed / duration (a logged lift's time): the moving-time fallbacks `completedMovingSeconds` reads (State's "This week" line)
+      .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises,metrics,moving_time,distance,avg_heart_rate,elapsed_time,avg_speed,duration')
       .eq('user_id', userId)
       .gte('date', workoutQueryFrom)
       .lte('date', workoutQueryTo);

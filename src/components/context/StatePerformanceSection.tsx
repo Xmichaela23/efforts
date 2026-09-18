@@ -1006,7 +1006,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, appliedFtpWord = null, runThreshold = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; appliedFtpWord?: string | null; /** the coach payload's run threshold, printed as sent (v215) */ runThreshold?: { pace: string | null; word: string | null; hr: number | null; easyTarget: string | null } | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, appliedFtpWord = null, runThreshold = null, heading = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; appliedFtpWord?: string | null; /** the coach payload's run threshold, printed as sent (v215) */ runThreshold?: { pace: string | null; word: string | null; hr: number | null; easyTarget: string | null } | null; /** the section's own header text; drawn on one line with Reorder (2026-09-18) */ heading?: string | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -1210,7 +1210,16 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // and `loading` here means "the server has not produced a trends display" — which for a new athlete
   // is indefinite. The sheet asks the server its own question (`endurance-checkpoint`) and gates itself
   // on the answer, so it renders regardless; the sport plates still wait for their contract.
-  if (loading || cards.length === 0) return <div className="py-3"><EnduranceCheckpointSheet enabled={hasActivePlan === true} /></div>;
+  // ⛔ THE HEADER AND REORDER SHARE ONE LINE (2026-09-18). The heading sat in StateTab with its own margins, then
+  // this section's top padding, then Reorder on a line of its own — about three lines before any data. One row
+  // now: the heading left, Reorder right (the Adjust tab's construction), and no gap under it.
+  const headerRow = (withReorder: boolean) => (heading || withReorder) ? (
+    <div className="px-1 mt-3 mb-1 flex items-baseline justify-between gap-3">
+      {heading ? <span className="text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">{heading}</span> : <span />}
+      {withReorder && <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-[11px] tracking-wider uppercase text-white/45 py-1 -my-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>}
+    </div>
+  ) : null;
+  if (loading || cards.length === 0) return <div className="pb-3">{headerRow(false)}<EnduranceCheckpointSheet enabled={hasActivePlan === true} /></div>;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
   // falls through to the standard card (adherence).
@@ -1331,13 +1340,11 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   };
 
   return (
-    <div className="py-3">
+    <div className="pb-3">
+      {headerRow(true)}
       {/* ⛔ THE SIX-WEEK CHECKPOINT (D-462 follow-up) sits above the sport plates: it is plan-level
           (threshold pace, FTP, threshold HR), not one sport's. Renders only when the server says it is due. */}
       <EnduranceCheckpointSheet enabled={hasActivePlan === true} />
-      <div className="px-3 flex justify-end">
-        <button type="button" onClick={() => setReordering((v) => !v)} className="text-[11px] tracking-wider uppercase text-white/45 py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
-      </div>
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
       {/* ⛔ THE "Fitness / trends over recent weeks" HEADING IS REMOVED (2026-09-01, cosmetic) — it
@@ -1424,29 +1431,29 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                   {Icon && <Icon size={15} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
                   <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase text-white/70">{card.discipline}</span>
                 </span>
-                {/* ⛔ ONE GRID FOR THE WHOLE SPORT, NOT A GRID PER ROW — the columns only line up if
-                    every row's cells are children of the SAME grid. Names left, numbers right: two
-                    straight edges (rule 2). The old markup right-aligned the whole line, so the
-                    numbers lined up and the names zigzagged. */}
                 {/* ⛔ TWO COLUMNS, NOT THREE (Michael 2026-09-03, on the phone: "loa…" and "heart rate at
                     easy …"). A third column for the note starved the name column — a long note
                     ("143 bpm · incl. warm-ups") pushed the name to nothing and `truncate` cut it. The
                     note now sits UNDER its value, right-aligned and dim, so the name keeps the whole
                     left column and never truncates. Two straight edges still hold (rule 2). */}
-                <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-[6px]">
+                {/* ⛔ ONE LINE PER ROW THAT WRAPS, NOT A TWO-COLUMN GRID (2026-09-18). The grid gave the name `1fr` beside
+                    an `auto` value, so a wide value ("9:35/mi · 168 bpm") squeezed the name column to nothing and
+                    "threshold" ran under the pace ("thresho9:35/mi") at 320–430 px. Now the name never shrinks and the
+                    value sits right-aligned beside it, or drops to its own right-aligned line when both do not fit.
+                    Names still share one left edge and values one right edge. */}
+                <span className="flex-1 min-w-0 flex flex-col gap-y-[6px]">
                   {rows.map((r, i) => (
-                    <React.Fragment key={`${r.name}-${i}`}>
-                      <span className="text-[14px] text-white/85 leading-tight min-w-0">{r.name}</span>
-                      <span className="text-[15px] text-white/90 leading-tight tabular-nums text-right">
-                        {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
-                        {r.value}
+                    <span key={`${r.name}-${i}`} className="flex flex-col">
+                      <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="text-[14px] text-white/85 leading-tight shrink-0">{r.name}</span>
+                        <span className="ml-auto text-[15px] text-white/90 leading-tight tabular-nums text-right">
+                          {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
+                          {r.value}
+                        </span>
                       </span>
-                      {/* ⛔ THE NOTE GETS ITS OWN ROW ACROSS BOTH COLUMNS (2026-09-06). It sat under the value
-                          inside the value cell, so a wide note ("12-week trend · from 1.637") squeezed the name
-                          column until the name wrapped, and the name's second line ran into the note. On its own
-                          row nothing shares its width. */}
-                      {r.note && <span className="col-span-2 -mt-[4px] text-right text-[12.5px] text-white/65 leading-tight tabular-nums">{r.note}</span>}
-                    </React.Fragment>
+                      {/* the note on its own right-aligned line, full width, so nothing shares its width (2026-09-06) */}
+                      {r.note && <span className="mt-[2px] text-right text-[12.5px] text-white/65 leading-tight tabular-nums">{r.note}</span>}
+                    </span>
                   ))}
                 </span>
                 {/* ⛔ A CHEVRON THAT OPENS A ROW IS AN AFFORDANCE, NOT DECORATION (rule 5) — it was

@@ -27,6 +27,7 @@
  *   5. distance ÷ average speed (km/h), else distance × average pace (s/km), never longer than elapsed.
  *   6. the last sensor sample's timer.
  *   7. minute columns × 60 (timer, moving, elapsed) — including the rounded `computed` figure's source.
+ *      7b. a STRENGTH row with none of the above → `duration`, the logger's session time (2026-09-18).
  *   8. elapsed seconds — never for a swim, where elapsed includes the rest on the wall.
  * ⚠️ MINUTE COLUMNS FOLLOW THE STORAGE CONVENTION `swim-scalars.ts` documents: under 1000 is minutes,
  * 1000 and over is already seconds. The phone multiplied everything by 60; the only rows that differ are
@@ -150,6 +151,15 @@ export function completedMovingSeconds(row: any): number | null {
     // 7 — minute columns.
     for (const v of [metrics?.total_timer_time, row?.moving_time, metrics?.moving_time, row?.elapsed_time, metrics?.elapsed_time]) {
       const secs = minutesOrSeconds(v);
+      if (secs != null) return secs;
+    }
+
+    // 7b — a lift logged in the app: the logger's session time. The strength logger writes only `duration`
+    // (minutes, its own timer from start to save — `StrengthLogger.tsx` `elapsedMinutesForSave`), no moving or
+    // elapsed column, so without this rung the session had no time at all and State's "This week" line left
+    // strength out (2026-09-18). Strength only: an endurance row's `duration` is not its moving time.
+    if (sport === 'strength') {
+      const secs = minutesOrSeconds(row?.duration);
       if (secs != null) return secs;
     }
 

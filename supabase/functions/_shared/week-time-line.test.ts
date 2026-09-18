@@ -21,3 +21,7 @@ Deno.test('middle half: 25th–75th, nothing below five values, zeros are not re
   assertEquals(middleHalf([10, 20, 30, 40]), null);
   assertEquals(middleHalf([0, 0, 10, 20, 30, 40]), null);
 });
+
+Deno.test('a lift logged in the app counts with the logger\'s session time (duration, minutes)', () => {
+  assertEquals(weekTimeLine([{ type: 'strength', workout_status: 'completed', duration: 52 }, row('run', 2700)]), 'strength 52m · run 45m');
+});
