@@ -233,7 +233,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 autoFocus
                 className="w-16 text-center text-title3 font-mono font-semibold bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-lg px-1 text-label placeholder:text-label-secondary focus:outline-none focus:border-white/40"
                 placeholder="5:00"
-                style={{ fontFamily: 'Inter, sans-serif' }}
               />
             ) : (
               <span className={`text-title1 font-mono font-semibold ${timeRemaining <= 30 ? 'text-red-400' : 'text-label'}`}>
@@ -252,7 +251,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                 ? 'bg-white/[0.12] border border-white/35 text-label hover:bg-white/[0.15] hover:border-white/45' 
                 : 'bg-amber-500/80 text-white hover:bg-amber-500 border border-amber-400/50'
             }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
           >
             {isRunning ? <Pause size={18} /> : <Play size={18} />}
             {isRunning ? 'Pause' : 'Start'}
@@ -260,7 +258,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
           <button
             onClick={handleReset}
             className="flex items-center gap-2 px-4 py-2 rounded-full font-normal tracking-wide bg-white/[0.08] backdrop-blur-lg border border-white/25 text-label hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300"
-            style={{ fontFamily: 'Inter, sans-serif' }}
           >
             <RotateCcw size={18} />
             Reset
@@ -301,7 +298,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                       ? 'bg-white/[0.03] line-through text-label-secondary border-white/10' 
                       : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-label placeholder:text-label-secondary focus:border-white/30 focus:bg-white/[0.08]'
                   }`}
-                  style={{ fontFamily: 'Inter, sans-serif' }}
                 />
                 
                 {/* Autocomplete dropdown */}
@@ -312,7 +308,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                         key={i}
                         onClick={() => selectSuggestion(ex.id, suggestion)}
                         className="w-full px-3 py-2 text-left text-subhead text-label hover:bg-white/[0.15] first:rounded-t-lg last:rounded-b-lg transition-colors"
-                        style={{ fontFamily: 'Inter, sans-serif' }}
                       >
                         {suggestion}
                       </button>
@@ -332,7 +327,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
                     ? 'bg-white/[0.03] line-through text-label-secondary border-white/10' 
                     : 'bg-white/[0.05] backdrop-blur-lg border-white/15 text-label placeholder:text-label-secondary focus:border-white/30 focus:bg-white/[0.08]'
                 }`}
-                style={{ fontFamily: 'Inter, sans-serif' }}
               />
               
               {/* Remove button */}
@@ -353,7 +347,6 @@ const CoreTimer: React.FC<CoreTimerProps> = ({
         <button
           onClick={addExercise}
           className="flex items-center gap-2 w-full px-3 py-2 text-subhead text-label-secondary hover:text-label hover:bg-white/[0.05] rounded-lg transition-colors"
-          style={{ fontFamily: 'Inter, sans-serif' }}
         >
           <Plus size={16} />
           Add exercise

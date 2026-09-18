@@ -104,7 +104,6 @@ export function StrengthTestResult({
               onClick={onRecompute}
               disabled={recomputing}
               className="shrink-0 h-8 px-3 text-caption rounded-xl bg-white/[0.06] border border-white/20 text-label-secondary hover:bg-white/[0.1] transition-all disabled:opacity-50"
-              style={{ fontFamily: 'Inter, sans-serif' }}
               title="Run the analysis again"
             >
               {recomputing ? 'Trying…' : 'Try again'}

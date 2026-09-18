@@ -205,7 +205,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   };
 
   return (
-    <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="space-y-6">
       {/* Summary line - volume/workload only (title shown in parent) */}
       <div className="space-y-2">
         {sessionDetailStale && (
