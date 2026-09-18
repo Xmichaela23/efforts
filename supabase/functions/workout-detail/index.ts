@@ -1064,7 +1064,7 @@ async function runSessionDetailPipelineAndPersist(
       const vals = ((loadRows ?? []) as any[])
         .map((r) => Number(r?.workload_actual))
         .filter((v) => Number.isFinite(v) && v > 0);
-      // The athlete's own middle half — one rule with State's fatigue "usual" (`_shared/middle-half.ts`). Below
+      // The athlete's own middle half (`_shared/middle-half.ts`). Below
       // its minimum the chip shows the number and no range, and says nothing about where it sits.
       const band = middleHalf(vals);
       loadContext = {

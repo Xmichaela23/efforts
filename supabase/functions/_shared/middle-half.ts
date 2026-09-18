@@ -1,7 +1,8 @@
 /**
  * ⛔ THE ATHLETE'S "USUAL" — THEIR OWN MIDDLE HALF (moved here 2026-09-18 from `workout-detail`, where the
- * Performance screen's Workload chip first used it, 2026-08-02). One rule, two readers: the session's workload
- * against the same sport's last 90 days, and State's fatigue against the last 12 weeks of daily fatigue.
+ * Performance screen's Workload chip first used it, 2026-08-02). Its one reader: the session's workload against the
+ * same sport's last 90 days. (State's fatigue read it for a day, 2026-09-18, and was taken off: form carries
+ * fatigue's context, TrainingPeaks' way.)
  *
  * FIELD — the 25th–75th percentile is a standard descriptive summary (the interquartile range), not a tuned
  * threshold; the "where it sits among yours" framing is Strava's Relative Effort range and Garmin's Training Load

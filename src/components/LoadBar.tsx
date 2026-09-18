@@ -23,8 +23,7 @@ export interface LoadBarData {
      */
     display?: {
       fitness: { value: string | null; change: string | null; window: string | null };
-      /** `usual` — the athlete's own middle half of 12 weeks of daily fatigue ("44–60"), the coach's (v216). */
-      fatigue: { value: string | null; change: string | null; window: string | null; usual?: string | null };
+      fatigue: { value: string | null; change: string | null; window: string | null };
       form: { value: string | null; change: string | null; window: string | null };
     } | null;
   } | null;
@@ -215,9 +214,8 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
         {rd && rd.fitness.value != null ? (
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap [&>span]:-ml-3">
             <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{rd.fitness.value}</span><Delta v={rd.fitness.change} /><Window w={rd.fitness.window} /></span>
-            {/* ⛔ FATIGUE CARRIES ITS USUAL (2026-09-18, approved): "fatigue 56 · usual 44–60" — the athlete's own
-                middle half, the Performance screen's Workload rule. Without a usual the window prints as before. */}
-            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} />{rd.fatigue.usual ? <span className="ml-1">· usual <span className="text-white/75 tabular-nums">{rd.fatigue.usual}</span></span> : <Window w={rd.fatigue.window} />}</span>
+            {/* ⛔ NO "usual" ON FATIGUE (2026-09-18, reverted the same day): form carries fatigue's context, TrainingPeaks' way. */}
+            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} /><Window w={rd.fatigue.window} /></span>
             <span>
               <Dot />form <span className="readout-num text-[13px] text-white/85">{rd.form.value}</span>
               {zone && <><span className="ml-1">·</span><span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span></>}
