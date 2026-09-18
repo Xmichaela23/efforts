@@ -1,6 +1,6 @@
 /**
  * The prescription on a run step (Michael, 2026-09-02, rulings 1 and 2): easy steps carry a
- * heart-rate range and say so; hard steps carry an effort target beside their pace.
+ * heart-rate range and say so; hard steps carry their pace and no effort number (2026-09-17).
  *
  * Run: deno test --allow-read --allow-env --allow-net --no-check supabase/functions/materialize-plan/run-prescription.test.ts
  * Athlete-agnostic: synthetic numbers, never tuned to the primary user.
@@ -27,15 +27,15 @@ Deno.test('an easy run is prescribed by heart rate: every step carries the zone 
 });
 
 /**
- * ⛔ THE BANDS ARE FOSTER'S CR-10 NOW, NOT THE OURS 5–6 / 8–10 (2026-09-17, WORKORDER Stage B2). Threshold work
- * reads 6–7 on that scale, not 5–6. This check pinned the hand-set band and went red when the rule changed.
+ * ⛔ NO EFFORT NUMBER ON A RUN STEP (Michael, 2026-09-17). The pages prescribe a percentage of threshold and nothing
+ * else; the OURS 5–6 / 8–10 and then Foster's CR-10 both came off.
  */
-Deno.test('threshold work carries effort 6–7 on the work steps; its recoveries carry their pace, never the easy heart-rate range', () => {
+Deno.test('threshold work carries its pace and no effort number on the work steps; its recoveries carry their pace, never the easy heart-rate range', () => {
   const steps = expand('cruise_4x1mi_threshold');
   const w = work(steps);
   assertEquals(w.length, 4);
   for (const s of w) {
-    assertEquals(s.target_rpe, { lo: 6, hi: 7 });
+    assertEquals(s.target_rpe, undefined);
     assertEquals(s.pace_sec_per_mi, 450);
     assertEquals(s.hr_range, undefined);
   }
@@ -65,13 +65,12 @@ Deno.test('an easy run\'s strides keep heart rate on their recoveries', () => {
   for (const s of expand('strides_6x20s').filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
 });
 
-/** 5K pace is above threshold by definition (p229 ">vVO2"), so it reads 8–9 — the top of the old band, 10, is all-out only. */
-Deno.test('work above threshold carries effort 8–9 on the work steps', () => {
+Deno.test('work above threshold carries its pace and no effort number', () => {
   const steps = expand('interval_6x800m_5kpace_R90s');
   const w = work(steps);
   assertEquals(w.length, 6);
   for (const s of w) {
-    assertEquals(s.target_rpe, { lo: 8, hi: 9 });
+    assertEquals(s.target_rpe, undefined);
     assertEquals(s.pace_sec_per_mi, 425);
     assertEquals(s.prescription, undefined);
   }
@@ -105,7 +104,7 @@ Deno.test('strides carry neither a zone nor an effort target', () => {
 });
 
 // ═══ THE WHITELIST TRAP — the fields must survive the v3 normalization the calendar row is written in ═══
-Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.steps (found dropped 2026-09-02)', () => {
+Deno.test('v3 round-trip: prescription and hr_range reach computed.steps (found dropped 2026-09-02)', () => {
   const row = { type: 'run', date: '2026-09-05' };
   const easy = expand('run_easy_30min').map((st) => toV3Step(st, row));
   for (const s of easy) {
@@ -115,7 +114,7 @@ Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.s
   const hard = expand('cruise_4x1mi_threshold').map((st) => toV3Step(st, row));
   const w = hard.filter((s) => s.kind === 'work');
   assertEquals(w.length, 4);
-  for (const s of w) assertEquals(s.target_rpe, { lo: 6, hi: 7 });
+  for (const s of w) assertEquals(s.target_rpe, undefined);
   for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, undefined); // a hard run's rest carries its pace (2026-09-16)
 });
 
@@ -133,15 +132,8 @@ Deno.test('D-478: an easy step priced at the easy pace shows the Friel range, no
 });
 
 
-/**
- * ⛔ THE BAND FOLLOWS THE STEP'S OWN PERCENT OF THRESHOLD (2026-09-17, WORKORDER Stage B2). The old rule read the
- * token: anything starting `interval_` got 8–10, so Michael's 2026-09-16 session — six reps at 90% of threshold,
- * BELOW it — printed "RPE 8–10" on sub-threshold work.
- */
-Deno.test('CR-10: a 90%-of-threshold rep reads 6–7, a 120% rung reads 8–9', () => {
-  const step = (pace: number) => ({ kind: 'work', pace_sec_per_mi: pace });
-  const nearThreshold = stampRunPrescription('interval_6x240s_90pct_r60s', [step(Math.round(450 / 0.9))], baselines);
-  assertEquals(nearThreshold[0].target_rpe, { lo: 6, hi: 7 });
-  const aboveThreshold = stampRunPrescription('round_5x_ladder_120pct', [step(Math.round(450 / 1.2))], baselines);
-  assertEquals(aboveThreshold[0].target_rpe, { lo: 8, hi: 9 });
+Deno.test('no hard run token stamps an effort number (2026-09-17)', () => {
+  for (const tok of ['interval_6x240s_90pct_r60s', 'round_3x_40s130-r20s50-40s130-r20s50_R120s', 'run_sprint_8x10s_r90s', 'run_vo2_5x3min_z5']) {
+    for (const s of expand(tok)) assertEquals(s.target_rpe, undefined, tok);
+  }
 });

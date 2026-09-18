@@ -9,8 +9,8 @@
  *
  * The words (approved by Michael, 2026-09-16, off p231-232's forty-twenty at level 2):
  *   10:00 warm-up · ref 8:33–9:41/mi
- *   5 sets of 4 × 40 s @ 5:39–5:53/mi · RPE 8–10, 20 s @ 14:06–15:54/mi between · 2:00 @ 8:33–9:41/mi between sets
- *   ("RPE 8–10" added 2026-09-16, Michael: effort prints in the book's term)
+ *   5 sets of 4 × 40 s @ 5:39–5:53/mi, 20 s @ 14:06–15:54/mi between · 2:00 @ 8:33–9:41/mi between sets
+ *   (the "RPE 8–10" added 2026-09-16 came off 2026-09-17 — no run or ride page prints an effort number)
  *   8:00 cool-down · ref 8:33–9:41/mi
  *
  * ⚠️ GROUPING READS THE STEPS, NOT THE TOKEN. The smallest run of steps that repeats back to back is the
@@ -31,7 +31,6 @@ export type PlannedStep = {
   powerRange?: Range | null;
   prescription?: string;
   hr_range?: Range | null;
-  target_rpe?: { lo?: number; hi?: number } | null;
 };
 
 export type StepLineOptions = {
@@ -41,7 +40,23 @@ export type StepLineOptions = {
   sport?: string | null;
   /** A race-day row prints its one pace, not a range. */
   raceDay?: boolean;
+  /** The row's `family:<id>` tag — picks the book's effort line, if its page prints one. */
+  family?: string | null;
 };
+
+/**
+ * ⛔ THE BOOK'S OWN EFFORT WORDS, ON THE TWO SESSIONS WHOSE PAGES PRINT THEM (Michael, 2026-09-17).
+ *
+ * No run or ride step prints an effort number: the pages prescribe a percentage of threshold and nothing else.
+ * Two pages do give an effort in words, and those words go under the steps as one line. Both strings are approved
+ * word for word — do not reword, re-case or re-punctuate them.
+ */
+// Viada p235 (VT1 and LSD): "Practise the talk test at least twice per run — once after 5 minutes and once after 20."
+export const TALK_TEST_LINE = 'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.';
+// Viada p229–231 (Sprint / Power): "All-out" = "best possible speed for the day".
+export const ALL_OUT_LINE = 'All-out: the best speed you have today.';
+const TALK_TEST_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_vt1', 'run_lsd']);
+const ALL_OUT_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_sprint_power']);
 
 const kindOf = (s: PlannedStep) => String(s?.kind || '').toLowerCase();
 const isWarmup = (s: PlannedStep) => kindOf(s) === 'warmup';
@@ -111,24 +126,15 @@ function lengthText(s: PlannedStep, opts: StepLineOptions): string {
   return String(s?.label || '').trim() || 'interval';
 }
 
-const rpeText = (s: PlannedStep) =>
-  s?.target_rpe && typeof s.target_rpe.lo === 'number' && typeof s.target_rpe.hi === 'number'
-    ? (s.target_rpe.lo === s.target_rpe.hi ? `RPE ${s.target_rpe.lo}` : `RPE ${s.target_rpe.lo}–${s.target_rpe.hi}`) : undefined;
-
-/**
- * " @ 5:39–5:53/mi · RPE 8–10", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy".
- * ⛔ THE EFFORT IS "RPE", THE BOOK'S TERM (Michael, 2026-09-16), after the pace or watts it gauges.
- */
-function targetText(s: PlannedStep, opts: StepLineOptions, effort = true): string {
-  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s), rpe = effort ? rpeText(s) : undefined;
-  const withRpe = (t: string) => (rpe ? `${t} · ${rpe}` : t);
+/** " @ 5:39–5:53/mi", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy". */
+function targetText(s: PlannedStep, opts: StepLineOptions): string {
+  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s);
   if (hr) return ` @ ${hr}${pace ? ` · ref ${pace}` : ''}`;
-  if (pace) return withRpe(` @ ${pace}`);
+  if (pace) return ` @ ${pace}`;
   // ⛔ A RIDE'S RECOVERY PRINTS ITS WATTS WHEN IT CARRIES THEM (2026-09-16, Stage 7 session 3 — "a recovery step inside a
   // hard run or ride prints the page's pace or power"). It printed " easy" ahead of the watts; " easy" is left for a
   // recovery that carries no target at all (the last line below).
-  if (pow) return withRpe(` @ ${pow}`);
-  if (rpe) return ` @ ${rpe}`;
+  if (pow) return ` @ ${pow}`;
   return isRecovery(s) ? ' easy' : '';
 }
 
@@ -217,25 +223,22 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
  *
  * FIELD — the chunking is Nielsen Norman Group's scanning guidance: readers scan rather than read, and a line runs
  * 50–75 characters. The one-line form was about 140 and wrapped.
- *
- * ⚠️ The effort band is left OFF these lines — Michael's approved strings carry the pace only. Everywhere else a
- * hard work step still prints its `RPE n–n`.
  */
 function setBlockAt(seg: PlannedStep[], from: number, opts: StepLineOptions): { covered: number; work: PlannedStep[]; rec: PlannedStep[] } | null {
   if (isRecovery(seg[from])) return null;
   const work: PlannedStep[] = [];
   const rec: PlannedStep[] = [];
-  const wSig = targetText(seg[from], opts, false);
+  const wSig = targetText(seg[from], opts);
   let rSig: string | null = null;
   let i = from;
   while (i < seg.length) {
     const w = seg[i];
-    if (isRecovery(w) || targetText(w, opts, false) !== wSig) break;
+    if (isRecovery(w) || targetText(w, opts) !== wSig) break;
     work.push(w);
     i++;
     const r = seg[i];
     if (!r || !isRecovery(r)) break;
-    const sig = targetText(r, opts, false);
+    const sig = targetText(r, opts);
     if (rSig == null) rSig = sig;
     else if (sig !== rSig) break;
     rec.push(r);
@@ -268,8 +271,8 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
         if (block) {
           setNo++;
           out.push(`Set ${setNo}`);
-          out.push(`${block.work.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.work[0], opts, false)}`);
-          out.push(`jog after each: ${block.rec.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.rec[0], opts, false)}`);
+          out.push(`${block.work.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.work[0], opts)}`);
+          out.push(`jog after each: ${block.rec.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.rec[0], opts)}`);
           k += block.covered;
           // The lone recovery that separates one set from the next.
           if (k < seg.length && isRecovery(seg[k]) && setBlockAt(seg, k + 1, opts)) {
@@ -284,5 +287,22 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
     }
     i = j;
   }
-  return out;
+  return withEffortLine(out, all, opts);
+}
+
+/**
+ * The book's effort line goes after the main set, ahead of the cool-down. The all-out line stands in for a target
+ * the page does not give, so it prints only when a work step carries no pace, heart rate or watts.
+ */
+function withEffortLine(lines: string[], steps: PlannedStep[], opts: StepLineOptions): string[] {
+  const family = String(opts.family || '').toLowerCase();
+  let line: string | null = null;
+  if (TALK_TEST_LINE_FAMILIES.has(family)) line = TALK_TEST_LINE;
+  else if (ALL_OUT_LINE_FAMILIES.has(family)
+    && steps.some((s) => !isWarmup(s) && !isCooldown(s) && !isRecovery(s) && !paceText(s, opts) && !hrText(s) && !powerText(s))) {
+    line = ALL_OUT_LINE;
+  }
+  if (!line || lines.length === 0) return lines;
+  const at = isCooldown(steps[steps.length - 1]) ? lines.length - 1 : lines.length;
+  return [...lines.slice(0, at), line, ...lines.slice(at)];
 }
