@@ -1,6 +1,5 @@
 import React from 'react';
 import type { CoachWeekContextV1, RaceReadinessV1 } from '@/hooks/useCoachWeekContext';
-import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 
 /**
  * STATE SCREEN PRIMITIVES — extracted from StateTab 2026-09-01 (Round 0a).
@@ -142,98 +141,8 @@ export function WeekAccentLine({ sentence, detail }: { sentence: string; detail:
   );
 }
 
-// THE WEEK · MIX — planned vs actual by discipline, so a swap is SEEN, not just counted (a run traded
-// for a swim shows the run share shrink and the swim share grow). Bars share one scale, so an over- or
-// under-done week reads as a longer/shorter actual bar. Colors are the app's SPORT_COLORS.
-export function WeekMixBar({ counts, hasPlan, partialWeek, loadShare = null }: {
-  counts: Array<{ discipline: string; planned: number; done: number }>;
-  hasPlan: boolean;
-  partialWeek: boolean;
-  /** The coach's rolling-seven-day load shares (`load.composition_7d`) and their total (`load.total_7d`). */
-  loadShare?: { rows: Array<{ discipline: string; share_pct: number }>; totalPts: number } | null;
-}) {
-  const ORDER = ['strength', 'run', 'ride', 'swim'];
-  const NAME: Record<string, string> = { run: 'run', ride: 'bike', strength: 'strength', swim: 'swim', mobility: 'mobility' };
-  const ordered = ORDER.map((d) => counts.find((c) => c.discipline === d)).filter(Boolean) as typeof counts;
-  const totalPlanned = ordered.reduce((s, c) => s + c.planned, 0);
-  const totalDone = ordered.reduce((s, c) => s + c.done, 0);
-  const scale = Math.max(totalPlanned, totalDone, 1);
-  // F26 (2026-07-20): a no-plan athlete has NOTHING planned, so there is no "planned" row to draw.
-  // The old code drew an empty "planned" bar above a full "actual" bar — a shortfall a freeballer
-  // never signed up for. When nothing was planned, show only what they did, labelled as such.
-  const showPlanned = hasPlan && totalPlanned > 0;
-  // F21 (2026-07-20): `done` is week-TO-DATE while `planned` is the WHOLE week (server: coach counts
-  // planned over the full week, done bounded to [weekStart, today]). Drawn on one scale, a Monday
-  // shows a full plan over an empty result with no explanation. The SENTENCE already guards partial
-  // weeks (the Q-177 trap); the PICTURE never did. Label the result "so far" so the two bars aren't
-  // read on the same footing.
-  const doneLabel = !showPlanned ? 'this week' : partialWeek ? 'so far' : 'actual';
-  const Bar = ({ label, pick }: { label: string; pick: (c: { planned: number; done: number }) => number }) => (
-    <div className="flex items-center gap-2">
-      <span className="text-[12px] text-white/60 w-12 shrink-0 lowercase">{label}</span>
-      <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-white/[0.05]">
-        {ordered.map((c) => {
-          const v = pick(c);
-          if (v <= 0) return null;
-          return <div key={c.discipline} style={{ width: `${(v / scale) * 100}%`, backgroundColor: getDisciplineColor(c.discipline) }} />;
-        })}
-      </div>
-    </div>
-  );
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      {showPlanned && <Bar label="planned" pick={(c) => c.planned} />}
-      <Bar label={doneLabel} pick={(c) => c.done} />
-      {/**
-        * ⛔ THE LEGEND CARRIES THE LOAD SHARES (Michael, 2026-09-10): `strength 45% · run 10% · bike 45% ·
-        * 427 pts · 7 d`. They are the numbers LOAD's "Where your load is going" bar printed — the coach's
-        * `load.composition_7d[].share_pct` and `load.total_7d` over the rolling seven days — moved here
-        * when that bar came off. Nothing is summed or rounded on the phone. A sport with sessions but no
-        * load share keeps its name alone; a payload without shares prints the names as before.
-        */}
-      {/* ⚠️ THE SEPARATOR SITS IN A FIXED 12 px SLOT BEFORE EACH ENTRY and the inner row clips its left edge
-          (LoadBar's reading row does the same), so the line that wraps at 390 px starts with a sport or
-          the total, never a dangling "·". */}
-      <div className="pl-14 pt-1">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[12px] text-white/65 tabular-nums">
-        {(() => {
-          const canon = (d: string) => {
-            const t = String(d || '').toLowerCase();
-            return t === 'bike' || t === 'cycling' ? 'ride' : t === 'running' ? 'run' : t === 'swimming' ? 'swim'
-              : t === 'strength_training' || t === 'weight' || t === 'weights' ? 'strength' : t;
-          };
-          const shareOf = new Map((loadShare?.rows ?? []).map((r) => [canon(r.discipline), r.share_pct]));
-          const keys = ordered.filter((c) => c.planned > 0 || c.done > 0).map((c) => c.discipline);
-          for (const r of loadShare?.rows ?? []) {
-            const k = canon(r.discipline);
-            if (!keys.includes(k)) keys.push(k);
-          }
-          const sorted = [...ORDER.filter((d) => keys.includes(d)), ...keys.filter((d) => !ORDER.includes(d))];
-          // The coach's whole number (`load.total_7d`, rounded in `coach/load-composition.ts`) — this
-          // rounded it here until 2026-09-15.
-          const total = loadShare && loadShare.totalPts > 0 ? loadShare.totalPts : null;
-          const parts: React.ReactNode[] = sorted.map((d) => {
-            const share = shareOf.get(d);
-            return (
-              <span key={d} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: getDisciplineColor(d) }} />
-                {NAME[d] ?? d}{share != null ? ` ${share}%` : ''}
-              </span>
-            );
-          });
-          if (total != null) parts.push(<span key="pts">{total.toLocaleString()} pts · 7 d</span>);
-          return parts.map((node, i) => (
-            <span key={i} className="inline-flex items-center whitespace-nowrap -ml-3">
-              <span className="inline-block w-3 text-center text-white/35">·</span>
-              {node}
-            </span>
-          ));
-        })()}
-      </div>
-      </div>
-    </div>
-  );
-}
+// ⛔ `WeekMixBar` (planned-vs-done bars, the load shares and "N pts · 7 d") DELETED 2026-09-18 (Michael): the
+// load card opens with the week's time per sport instead — `load.week_time_line`, printed by LoadBar.
 
 // "as of {Mon D}" for a BODY row's newest session date — so a rolling 7d/week read isn't mistaken for
 // today's data (BODY-4.8 freshness-legibility). Null-safe: no date → no stamp.

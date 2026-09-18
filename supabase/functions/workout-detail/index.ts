@@ -3,6 +3,7 @@
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
 import { effortRowText, talkTestRowText } from '../_shared/effort-words.ts';
+import { middleHalf } from '../_shared/middle-half.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
 import { durationWord } from '../_shared/plan-tokens/quality-work.ts';
@@ -1062,16 +1063,14 @@ async function runSessionDetailPipelineAndPersist(
         .lte('date', workoutDate);
       const vals = ((loadRows ?? []) as any[])
         .map((r) => Number(r?.workload_actual))
-        .filter((v) => Number.isFinite(v) && v > 0)
-        .sort((a2, b2) => a2 - b2);
-      // A band drawn from a handful of sessions is a line through noise. Below this the chip shows the
-      // number and no range, and says nothing about where it sits.
-      const MIN_SESSIONS_FOR_RANGE = 5;
-      const pct = (q: number) => vals[Math.min(vals.length - 1, Math.floor(q * (vals.length - 1)))];
+        .filter((v) => Number.isFinite(v) && v > 0);
+      // The athlete's own middle half — one rule with State's fatigue "usual" (`_shared/middle-half.ts`). Below
+      // its minimum the chip shows the number and no range, and says nothing about where it sits.
+      const band = middleHalf(vals);
       loadContext = {
         workload: Number.isFinite(thisLoad) && thisLoad > 0 ? Math.round(thisLoad) : null,
-        typical_low: vals.length >= MIN_SESSIONS_FOR_RANGE ? Math.round(pct(0.25)) : null,
-        typical_high: vals.length >= MIN_SESSIONS_FOR_RANGE ? Math.round(pct(0.75)) : null,
+        typical_low: band?.low ?? null,
+        typical_high: band?.high ?? null,
         sample_count: vals.length,
       };
     } catch (e) {

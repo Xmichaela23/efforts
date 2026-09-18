@@ -23,7 +23,8 @@ export interface LoadBarData {
      */
     display?: {
       fitness: { value: string | null; change: string | null; window: string | null };
-      fatigue: { value: string | null; change: string | null; window: string | null };
+      /** `usual` — the athlete's own middle half of 12 weeks of daily fatigue ("44–60"), the coach's (v216). */
+      fatigue: { value: string | null; change: string | null; window: string | null; usual?: string | null };
       form: { value: string | null; change: string | null; window: string | null };
     } | null;
   } | null;
@@ -46,6 +47,8 @@ export interface LoadBarData {
   total_7d?: number;
   dominant?: string | null;
   composition_7d?: Array<{ discipline: string; load: number; share_pct: number }>;
+  /** The plan week so far, time per sport — "strength 2h 10m · run 2h 30m · bike 3h 40m" (coach v216). */
+  week_time_line?: string | null;
 }
 
 export interface LoadBarStatus {
@@ -190,13 +193,19 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   const Delta = ({ v }: { v: string | null | undefined }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
   const Window = ({ w }: { w: string | null | undefined }) => w ? <span className="ml-1">· {w}</span> : null;
 
-  // ⛔ THE LOAD-SHARE BAR LEFT THIS CARD (Michael, 2026-09-10). "Where your load is going", its bar and its
-  // legend are gone; the same `load.composition_7d` shares and `load.total_7d` now print once, as the legend
-  // line of THIS WEEK · SESSIONS PLANNED VS DONE (`WeekMixBar`). LOAD keeps fitness / fatigue / form and
-  // the Garmin line.
+  // ⛔ THE LOAD-SHARE BAR LEFT THIS CARD (Michael, 2026-09-10), and the planned-vs-done bars that carried its shares
+  // after it are gone too (2026-09-18). The card opens with the week so far in time per sport — the coach's
+  // `week_time_line`, printed as sent; no line when nothing is done yet.
+  const weekLine = load.week_time_line ?? null;
 
   return (
     <div className="px-3 py-3">
+      {weekLine && (
+        <div className="flex items-baseline gap-3 mb-2.5 text-[12.5px] leading-snug">
+          <span className="text-white/55 shrink-0">This week</span>
+          <span className="text-white/85 tabular-nums">{weekLine}</span>
+        </div>
+      )}
       {/* Fitness · Fatigue · Form — TrainingPeaks' three numbers on one line, the Form zone word beside form. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">
@@ -206,7 +215,9 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
         {rd && rd.fitness.value != null ? (
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap [&>span]:-ml-3">
             <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{rd.fitness.value}</span><Delta v={rd.fitness.change} /><Window w={rd.fitness.window} /></span>
-            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} /><Window w={rd.fatigue.window} /></span>
+            {/* ⛔ FATIGUE CARRIES ITS USUAL (2026-09-18, approved): "fatigue 56 · usual 44–60" — the athlete's own
+                middle half, the Performance screen's Workload rule. Without a usual the window prints as before. */}
+            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} />{rd.fatigue.usual ? <span className="ml-1">· usual <span className="text-white/75 tabular-nums">{rd.fatigue.usual}</span></span> : <Window w={rd.fatigue.window} />}</span>
             <span>
               <Dot />form <span className="readout-num text-[13px] text-white/85">{rd.form.value}</span>
               {zone && <><span className="ml-1">·</span><span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span></>}
