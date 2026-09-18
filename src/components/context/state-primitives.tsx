@@ -41,12 +41,12 @@ export type PrimaryRaceReadinessRow = NonNullable<CoachWeekContextV1['primary_ra
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 export function trendColor(dir: string, tone?: string): string {
-  if (tone === 'positive') return 'text-emerald-400/90';
-  if (tone === 'danger') return 'text-red-400/90';
-  if (tone === 'warning') return 'text-amber-400/90';
-  if (dir === 'improving') return 'text-emerald-400/85';
-  if (dir === 'declining') return 'text-amber-400/85';
-  return 'text-white/55';
+  if (tone === 'positive') return 'text-emerald-400';
+  if (tone === 'danger') return 'text-red-400';
+  if (tone === 'warning') return 'text-amber-400';
+  if (dir === 'improving') return 'text-emerald-400';
+  if (dir === 'declining') return 'text-amber-400';
+  return 'text-label-secondary';
 }
 
 
@@ -129,13 +129,13 @@ export function WeekAccentLine({ sentence, detail }: { sentence: string; detail:
       <button
         type="button"
         onClick={() => { if (detail) setOpen((o) => !o); }}
-        className="text-left text-[13px] leading-snug text-white/55 max-w-[min(100%,360px)]"
+        className="text-left text-footnote leading-snug text-label-secondary max-w-[min(100%,360px)]"
       >
         {sentence}
-        {detail && <span className="text-white/50 text-[11px]"> {open ? '▾' : 'ⓘ'}</span>}
+        {detail && <span className="text-label-secondary text-caption"> {open ? '▾' : 'ⓘ'}</span>}
       </button>
       {open && detail && (
-        <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
+        <p className="mt-1 text-caption text-label-secondary leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
       )}
     </div>
   );
@@ -207,10 +207,10 @@ export function Row({ label, children }: { label: string; children: React.ReactN
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
       {/* readout-label (index.css): the Details tab's instrument label, tinted by the plate's
           accent — neutral white on these multi-sport plates. */}
-      <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="readout-label text-caption font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-footnote text-label flex flex-wrap gap-x-3 gap-y-1 leading-none">
         {children}
       </div>
     </div>
@@ -220,7 +220,7 @@ export function Row({ label, children }: { label: string; children: React.ReactN
 export function Chip({ label, value, valueClass }: { label?: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      {label != null && <span className="text-white/60 text-[13px]">{label}</span>}
+      {label != null && <span className="text-label-secondary text-footnote">{label}</span>}
       {/* Values glow in the plate accent unless the caller pinned a colour (e.g. "week complete"). */}
       <span className={valueClass ?? 'readout-num'}>{value}</span>
     </span>
@@ -228,14 +228,14 @@ export function Chip({ label, value, valueClass }: { label?: string; value: Reac
 }
 
 export function Dot() {
-  return <span className="text-white/50 select-none">·</span>;
+  return <span className="text-label-secondary select-none">·</span>;
 }
 
 export function assessmentColor(a: RaceReadinessV1['assessment']): string {
-  if (a === 'ahead') return 'text-emerald-400/90';
-  if (a === 'on_track') return 'text-emerald-400/85';
-  if (a === 'behind') return 'text-amber-400/90';
-  return 'text-red-400/90';
+  if (a === 'ahead') return 'text-emerald-400';
+  if (a === 'on_track') return 'text-emerald-400';
+  if (a === 'behind') return 'text-amber-400';
+  return 'text-red-400';
 }
 
 export function assessmentLabel(a: RaceReadinessV1['assessment']): string {
@@ -246,9 +246,9 @@ export function assessmentLabel(a: RaceReadinessV1['assessment']): string {
 }
 
 export function signalToneColor(tone: string): string {
-  if (tone === 'positive') return 'text-emerald-400/85';
-  if (tone === 'warning') return 'text-amber-400/85';
-  return 'text-white/65';
+  if (tone === 'positive') return 'text-emerald-400';
+  if (tone === 'warning') return 'text-amber-400';
+  return 'text-label-secondary';
 }
 
 export function hasRaceProjectionDetail(rr: RaceReadinessV1 | null | undefined): boolean {

@@ -43,19 +43,19 @@ export default function StateHeaderBlock({
     <div className="flex items-start justify-between mb-4 px-0.5">
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-[13px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
+          <span className="text-footnote font-semibold tracking-widest text-label-secondary uppercase">{weekLabel}</span>
           {/* Chip Option A / research (Whoop): readiness is STRAIN-class — never headline/crown material.
               It moved to BODY as the row's driver. "WEEK" stays as the plain section header. */}
         </div>
         {isAimless ? (
           <>
-            <span className="text-[15px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
-            <span className="text-[13px] text-white/50 leading-snug">{aimlessSubtext}</span>
+            <span className="text-subhead font-medium text-label leading-snug">{aimlessHeadline}</span>
+            <span className="text-footnote text-label-secondary leading-snug">{aimlessSubtext}</span>
             {aimlessCtaAction !== 'none' && (
               <button
                 type="button"
                 onClick={onAimlessCta}
-                className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[13px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
+                className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-footnote font-medium text-teal-100 hover:bg-teal-500/15 active:opacity-90"
               >
                 {aimlessCtaLabel}
               </button>
@@ -64,17 +64,17 @@ export default function StateHeaderBlock({
         ) : (
           <>
             {intentSummary && (
-              <span className="text-[15px] font-medium text-white/85 leading-snug">{intentSummary}</span>
+              <span className="text-subhead font-medium text-label leading-snug">{intentSummary}</span>
             )}
             {loadHeadline && (
-              <span className="text-[14px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
+              <span className="text-subhead font-medium text-label leading-snug">{loadHeadline}</span>
             )}
             {(readinessWhy || readinessSuggestion) && (
               <div className="flex flex-col">
                 <button
                   type="button"
                   onClick={() => setNarrativeOpen((o) => !o)}
-                  className="self-start flex items-center gap-1 text-[13px] text-white/65 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
+                  className="self-start flex items-center gap-1 text-footnote text-label-secondary hover:text-label-secondary transition-colors mt-0.5 touch-manipulation"
                   aria-expanded={narrativeOpen}
                 >
                   {narrativeOpen ? 'Show less' : 'Show more'}
@@ -83,8 +83,8 @@ export default function StateHeaderBlock({
                 {narrativeOpen && (
                   <>
                     {/* D-232: the FATIGUED headline expands to its real factors, then the loaded-legs suggestion, then prose. */}
-                    {readinessWhy && <span className="text-[13px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
-                    {readinessSuggestion && <span className="text-[13px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
+                    {readinessWhy && <span className="text-footnote text-amber-300 leading-snug mt-1">{readinessWhy}</span>}
+                    {readinessSuggestion && <span className="text-footnote text-label-secondary leading-snug mt-1">{readinessSuggestion}</span>}
                   </>
                 )}
               </div>
@@ -97,10 +97,10 @@ export default function StateHeaderBlock({
             role="region"
             aria-label="Race-week guidance"
           >
-            <p className="text-[12px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1.5">
+            <p className="text-caption font-semibold tracking-[0.12em] text-sky-300 uppercase mb-1.5">
               {raceWeekGuidance.title}
             </p>
-            <ul className="text-[13px] text-white/72 leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400/50">
+            <ul className="text-footnote text-label-secondary leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400">
               {raceWeekGuidance.bullets.map((line, i) => (
                 <li key={i}>{line}</li>
               ))}
@@ -112,7 +112,7 @@ export default function StateHeaderBlock({
         type="button"
         onClick={onRefresh}
         disabled={coachBusy}
-        className="min-h-[44px] min-w-[44px] -mr-1 flex items-center justify-center rounded-lg text-white/60 hover:text-white/65 hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors shrink-0 touch-manipulation relative z-10"
+        className="min-h-[44px] min-w-[44px] -mr-1 flex items-center justify-center rounded-lg text-label-secondary hover:text-label-secondary hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors shrink-0 touch-manipulation relative z-10"
         aria-label={coachBusy ? 'Updating training data' : 'Refresh'}
       >
         <RefreshCw className={`w-4 h-4 ${coachBusy ? 'animate-spin' : ''}`} />

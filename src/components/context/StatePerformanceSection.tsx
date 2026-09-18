@@ -50,9 +50,9 @@ import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'up', cls: 'text-emerald-400', arr: '' },
-  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ NO WORD, NO ARROW (2026-09-01): "holding" meant both genuinely-flat AND too-noisy-to-call (Q-289). When the verdict can't call a direction, the row shows the number + count and stops.
+  holding: { word: '', cls: 'text-label-secondary', arr: '' }, // ⛔ NO WORD, NO ARROW (2026-09-01): "holding" meant both genuinely-flat AND too-noisy-to-call (Q-289). When the verdict can't call a direction, the row shows the number + count and stops.
   sliding: { word: 'down', cls: 'text-amber-300', arr: '' }, // ⛔ "easing off" told the athlete they CHOSE to ease off when the number simply dropped — interpretive and flattering (2026-09-01). State the measurement: down.
-  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
+  needs_data: { word: 'needs data', cls: 'text-label-secondary', arr: '' },
 };
 
 // ── ARROW + NUMBER, NO WORD (2026-08-01, Michael from his own screen) ────────────────────────────
@@ -65,7 +65,7 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 // ⛔ THE DOWN ARROW IS NEUTRAL-COLOURED, AND THAT IS THE POINT. Amber made a decline read as a
 // WARNING on a row that is only reporting a direction — and a decline is routinely correct (a
 // deload, a taper, a base block). Same reasoning that turned `holding` grey; this finishes it.
-// It matches `holding`'s `text-white/70` so the three states differ by ARROW, never by alarm.
+// It matches `holding`'s `text-label-secondary` so the three states differ by ARROW, never by alarm.
 //
 // ⚠️ SCOPED TO RUN + BIKE. Swim (`DisciplineRow`) and the rest-fraction tag still use `VERDICT` and
 // still print words — they were not part of this call, and swim's read is Q-038-clouded, so leaving
@@ -154,7 +154,7 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
   void sig;
   return (
     <span className="inline-flex items-baseline gap-1">
-      <span className="text-white/50">{label}</span>
+      <span className="text-label-secondary">{label}</span>
     </span>
   );
 }
@@ -283,17 +283,17 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         // still gates `building`); it is simply no longer rendered here. What remains is the
         // measurement promise. Floor absent → the original copy, unchanged.
         fitness.loadFloor ? (
-          <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
+          <span className="inline-flex items-baseline gap-1.5 flex-wrap text-label-secondary">
               {(fitness.loadFloor.newest_ride_recency_line ?? buildingRecency) && (
-              <span className="text-white/45">{fitness.loadFloor.newest_ride_recency_line ?? buildingRecency}</span>
+              <span className="text-label-secondary">{fitness.loadFloor.newest_ride_recency_line ?? buildingRecency}</span>
             )}
             {/* 2026-09-03 (Michael: "bike is the missing stepchild"): no sentence here — the count and the
                 recency above are the facts; the power read appears when it exists. */}
           </span>
         ) : (
-        <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
-          {ridesReadLine && <span className="text-white/85">{ridesReadLine}</span>}
-          {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
+        <span className="inline-flex items-baseline gap-1.5 flex-wrap text-label-secondary">
+          {ridesReadLine && <span className="text-label">{ridesReadLine}</span>}
+          {buildingRecency && <span className="text-label-secondary">{buildingRecency}</span>}
           <span className="basis-full">{noRidesYet ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
         </span>
         )
@@ -310,7 +310,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
           {/* Each chart on this card carries a title and a one-line key (Michael, 2026-09-04: "I don't know
               what each line is"). Solid = the readings, dashed = the fitted trend, right-hand number = low to
               high in the window. The receipts under the chart belong to the FTP estimate. */}
-          {!showFtpLine && <span className="basis-full text-white/80 text-[13px] mt-1">{ftpNow != null ? `FTP · ${ftpNow} W` : 'FTP'}</span>}
+          {!showFtpLine && <span className="basis-full text-label text-footnote mt-1">{ftpNow != null ? `FTP · ${ftpNow} W` : 'FTP'}</span>}
           {/* FTP over time — one dot per stored reading, the same fitted trendline (WKO5 least squares) and
               "start → end" caption the efficiency and drift charts use. TrainingPeaks threshold history. */}
           {showFtpLine && (
@@ -338,7 +338,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
               not where this athlete sits. */}
           {src === 'est (FTP)' && !showFtpLine && (
-            <span className="basis-full text-[12px] text-white/45 leading-snug">Estimated from your rides. It moves only when you accept a new number.</span>
+            <span className="basis-full text-caption text-label-secondary leading-snug">Estimated from your rides. It moves only when you accept a new number.</span>
           )}
         </>
       ) : (
@@ -354,22 +354,22 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         // ⛔ This replaced a separate "power trend ⓘ" button that sat at the bottom of the row saying the
         // same thing in different words. One question, one place to tap.
         <>
-          <span className="basis-full text-left text-white/45 text-[12px]">No hard efforts yet, so there is no threshold read</span>
-          <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">
+          <span className="basis-full text-left text-label-secondary text-caption">No hard efforts yet, so there is no threshold read</span>
+          <p className="basis-full text-caption text-label-secondary leading-snug mt-1 max-w-[min(100%,340px)]">
             {/* 2026-09-03: the heart-rate clause is cut — the bike is read on power (p172), and the
                 book's two FTP tests are the 20-minute effort × 0.95 and the ramp (pp.212–213). */}
             A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read.
           </p>
         </>
       ) : (
-        <span className="basis-full text-white/45 text-[12px]">Not enough hard rides yet for a threshold read</span>
+        <span className="basis-full text-label-secondary text-caption">Not enough hard rides yet for a threshold read</span>
       ))}
       {/* ⛔ "Your heart rate at the same power, from N easy rides" DELETED (2026-09-03, Michael:
           "lose the heart rate sentence, keep it strict to the book"). It described a read the card no
           longer makes. The ride count it carried is not lost — the rides card states its own. */}
       {/* The receipt: window · rides · recency. The provenance lines below it print open (one tap). */}
       {!showFtpLine && (tail || src || asOf(lead.newestAgeDays) || (anchoredPower && anchor?.label)) && (
-        <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
+        <span className="basis-full flex items-baseline justify-between gap-2 text-label-secondary text-caption">
           <span>{tail}</span>
         </span>
       )}
@@ -380,7 +380,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
       {/* WHERE THE NUMBER COMES FROM — basis, freshness, anchor. True and worth having, but three lines
           of provenance stacked under a one-line verdict buried the verdict. */}
       {(
-        <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-[12px] text-white/45">
+        <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-caption text-label-secondary">
           {/* "The dot is where this number sits in your last 12 weeks" is gone with the dot (2026-09-04). */}
           {/* ⛔ THE NUMBER THE READ WAS COMPUTED AGAINST, not one resolved here. It rides on the anchor
               (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
@@ -446,9 +446,9 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
 // not red (a deload/taper isn't a fitness loss). Industry-standard (Strong/Hevy/JEFIT).
 const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
   improving: { word: 'up', cls: 'text-emerald-400', arr: '' },
-  holding: { word: 'steady', cls: 'text-white/70', arr: '' }, // NEUTRAL — steady volume is not a caution
-  sliding: { word: 'down', cls: 'text-white/50', arr: '' },
-  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
+  holding: { word: 'steady', cls: 'text-label-secondary', arr: '' }, // NEUTRAL — steady volume is not a caution
+  sliding: { word: 'down', cls: 'text-label-secondary', arr: '' },
+  needs_data: { word: 'needs data', cls: 'text-label-secondary', arr: '' },
 };
 
 // STRENGTH row — PER-LIFT estimated 1RM read (Strong/Hevy + RTS/RP, verified vs field + science 2026-07-19).
@@ -531,10 +531,10 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
       {/* WHAT THE WEEK IS FOR, above the numbers it explains. Rendered even with no lifts logged yet —
           the block is running whether or not this row has anything to show. */}
       {blockLine && (
-        <span className="basis-full text-white/45 text-[11px] -mt-0.5">{blockLine}</span>
+        <span className="basis-full text-label-secondary text-caption -mt-0.5">{blockLine}</span>
       )}
       {lifts.length === 0 ? (
-        <span className="text-white/60">needs 2+ logged lifts to trend</span>
+        <span className="text-label-secondary">needs 2+ logged lifts to trend</span>
       ) : (
         <>
           {/* ⚠️ "· last 6 weeks" is gone with the direction it described. It named the trend window,
@@ -543,7 +543,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
           {/* readout-label / readout-num (index.css): the Details tab's instrument typography,
               tinted by the plate's own accent. Discipline HEADER labels stay white on purpose —
               that's the 2026-07-22 colored-icon-not-colored-text call, unreversed. */}
-          <span className="readout-label basis-full text-[11px] uppercase tracking-wider">estimated 1-rep max</span>
+          <span className="readout-label basis-full text-caption uppercase tracking-wider">estimated 1-rep max</span>
           {lifts.map((l, liftIdx) => {
             return (
               /* Each LIFT is its own lit card (2026-08-15, Michael: "give each strength exercise its
@@ -567,9 +567,9 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                     ⚠️ PR STAYS. It is not a direction: it is an exact fact about one measured set
                     against every previous one, decided on the spine (assemble.ts), not a trend. */}
                 <span className="basis-full inline-flex items-baseline gap-1.5">
-                  <span className="text-white/85 text-[14px] truncate">{l.displayName}</span>
+                  <span className="text-label text-subhead truncate">{l.displayName}</span>
                   {/* PR tags wear the sport colour, not green — green means bike (Michael 2026-08-15). */}
-                  {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
+                  {isPR(l) && <span className="text-strength text-caption uppercase tracking-wide font-semibold">PR</span>}
                 </span>
                 {/* ⛔ THE AMBIENT STATUS — SLICE b, AND IT IS ALWAYS ON. climbing · holding · reset,
                     with the training max it refers to.
@@ -590,7 +590,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                   const cal = calByRef.get(CALIBRATION_REF_BY_CANONICAL[l.canonical] ?? '');
                   if (!cal) return null;
                   return (
-                    <span className="basis-full text-white/45 text-[11px] -mt-0.5">
+                    <span className="basis-full text-label-secondary text-caption -mt-0.5">
                       {liftStatusLine(l.displayName, cal.status, cal.trainingMax)}
                     </span>
                   );
@@ -654,15 +654,15 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                   const aoDate = ao.date ? new Date(ao.date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
                   const tooManyReps = ao.reps > trustedMaxReps(l.canonical);
                   return (
-                    <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5 flex-wrap">
+                    <span className="basis-full text-label-secondary text-caption -mt-0.5 inline-flex items-baseline gap-1.5 flex-wrap">
                       {/* The set as the athlete reads it, unit and all, from the server (2026-09-15). */}
                       <span className="tabular-nums">all-out {(l as any).readout?.allOut ?? `${ao.weight} × ${ao.reps}`}</span>
-                      {aoDate && <span className="text-white/40">{aoDate}</span>}
+                      {aoDate && <span className="text-label-secondary">{aoDate}</span>}
                       {ao.isRepRecord && (
-                        <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
+                        <span className="text-strength text-caption uppercase tracking-wide font-semibold">rep PR</span>
                       )}
                       {tooManyReps && (
-                        <span className="text-white/40">· too many reps to estimate a max from</span>
+                        <span className="text-label-secondary">· too many reps to estimate a max from</span>
                       )}
                     </span>
                   );
@@ -704,7 +704,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
           shown is what was logged, and nothing is estimated. */}
       {fitness.pullups && (
         <>
-          <span className="readout-label basis-full text-[11px] uppercase tracking-wider mt-2">pull-ups</span>
+          <span className="readout-label basis-full text-caption uppercase tracking-wider mt-2">pull-ups</span>
           {/* Two tiles, side by side, NOT a progress pair — they are different measurements (one
               set to failure vs a session standard) and the layout must never imply "X of 50". */}
           <ReadoutTiles
@@ -726,7 +726,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
               on-ramp is the standard — but folded into the clean count the number
               climbs while the athlete gets no stronger. Walking the band down shows up here as this
               falling while the clean count rises, which is the actual thing happening. */}
-          <span className="basis-full text-white/50 text-[11px] -mt-0.5">
+          <span className="basis-full text-label-secondary text-caption -mt-0.5">
             {fitness.pullups.cleanReps} clean rep{fitness.pullups.cleanReps === 1 ? '' : 's'}
             {fitness.pullups.assistedReps > 0
               ? ` · ${fitness.pullups.assistedReps} band-assisted, counted separately`
@@ -743,7 +743,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
           `strength_rir_below_prescription` — rendered here, NOT recomputed, pulled from the nudge list so it
           lives in ONE place. Voice: fact-first, conditional, no imperative (docs/COPY-VOICE.md). */}
       {fatigue && (
-        <span className="basis-full text-[13px] text-amber-300/80 leading-snug mt-1">
+        <span className="basis-full text-footnote text-amber-300 leading-snug mt-1">
           Recent sets are landing below the planned reps in reserve — closer to failure than the plan called for. Held for weeks, that's the fatigue a deload clears.
         </span>
       )}
@@ -771,7 +771,7 @@ const DISCIPLINE_ICON: Record<string, LucideIcon> = { run: Activity, strength: D
 function Row({ label: _label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="py-2.5 border-b border-white/[0.055] last:border-0">
-      <div className="text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
+      <div className="text-footnote text-label flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
         {children}
       </div>
     </div>
@@ -786,7 +786,7 @@ function Row({ label: _label, children }: { label: string; children: React.React
 // the user did wrong); the label SCOPES the claim to steady runs (not intervals/short runs).
 const DECOUPLING_BAND: Record<DecouplingBand, { word: string; cls: string }> = {
   sound: { word: 'pace holds on long efforts', cls: 'text-emerald-300' },
-  needs_work: { word: 'pace fading on long efforts', cls: 'text-amber-400/90' },
+  needs_work: { word: 'pace fading on long efforts', cls: 'text-amber-400' },
 };
 
 // State v3 fitness DOT — the current value's position in the athlete's OWN 12-week range (left = worst,
@@ -803,7 +803,7 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
             the recent range (overflow) it pins at the edge with a caret ("you've been better than recently"). */}
         {tickLeft != null && (
           <div className="absolute top-1/2 h-3 w-[2px] rounded" style={{ left: tickLeft, transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(255,255,255,0.4)' }}>
-            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-white/60 text-[11px]">›</span>}
+            {overflow === 'better' && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-label-secondary text-caption">›</span>}
           </div>
         )}
         <div
@@ -843,7 +843,7 @@ function FitnessDotBlock({ label, range, verdict, signedPct, provisional, wordMa
   return (
     <>
       <span className="basis-full flex items-baseline justify-between gap-2">
-        <span className="text-white/55 text-[13px]">{label}</span>
+        <span className="text-label-secondary text-footnote">{label}</span>
         {/* ⛔ THE VERDICT WORD, ARROW AND PERCENT WERE DELETED FROM THIS ROW ON 2026-09-04 and the
             branch was left behind as `{false && …}`, referencing a `v` that no longer exists. Removed
             2026-09-15 rather than carried: it was unreachable and it did not compile. What it said,
@@ -852,14 +852,14 @@ function FitnessDotBlock({ label, range, verdict, signedPct, provisional, wordMa
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
       {showAxis ? (
-        <span className="basis-full flex items-center justify-between text-[11px] text-white/45">
+        <span className="basis-full flex items-center justify-between text-caption text-label-secondary">
           <span>weaker</span><span>{range.confident ? frame : 'thin data'}</span><span>stronger</span>
         </span>
       ) : !range.confident ? (
-        <span className="basis-full text-center text-[11px] text-white/45">thin data</span>
+        <span className="basis-full text-center text-caption text-label-secondary">thin data</span>
       ) : null}
       {explain && (
-        <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
+        <p className="basis-full text-caption text-label-secondary leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
       )}
     </>
   );
@@ -871,7 +871,7 @@ function FitnessDotBlock({ label, range, verdict, signedPct, provisional, wordMa
 // is Slice 2, so it shows the plain "no baseline set" — honest, not broken.
 function NoBaselineTag({ hint }: { hint?: string }) {
   return (
-    <span className="basis-full text-[12px] text-white/50">no baseline set{hint ? ` · ${hint}` : ''}</span>
+    <span className="basis-full text-caption text-label-secondary">no baseline set{hint ? ` · ${hint}` : ''}</span>
   );
 }
 
@@ -893,10 +893,10 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
   const v = VERDICT[rest.verdict];
   return (
     <span className={`inline-flex items-baseline gap-1 ${v.cls}`}>
-      <span className="text-white/60">· rest</span>
+      <span className="text-label-secondary">· rest</span>
       {v.arr && <span>{v.arr}</span>}
       <span>{v.word}</span>
-      {rest.signedPct && <span className="text-white/60">{rest.signedPct}</span>}
+      {rest.signedPct && <span className="text-label-secondary">{rest.signedPct}</span>}
     </span>
   );
 }
@@ -920,14 +920,14 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
   if (!vol.swims) {
     return (
       <Row label="swim">
-        <span className="text-white/60 text-[13px]">no swims in the last {weeks}</span>
+        <span className="text-label-secondary text-footnote">no swims in the last {weeks}</span>
       </Row>
     );
   }
   return (
     <Row label="swim">
-      <span className="text-white/70 text-[13px]">
-        <span className="text-white/85">{vol.swims}</span> {vol.swims === 1 ? 'swim' : 'swims'} in the last {weeks}
+      <span className="text-label-secondary text-footnote">
+        <span className="text-label">{vol.swims}</span> {vol.swims === 1 ? 'swim' : 'swims'} in the last {weeks}
       </span>
     </Row>
   );
@@ -948,7 +948,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
     // row now. A payload written before this carries no lines and the row prints none.
     const disp = (card as any).display as { evidence: string | null; needsDataReceipt: string | null; limitedData: boolean } | undefined;
     const thinStale = disp?.limitedData === true;
-    const vCls = thinStale ? 'text-white/60' : v.cls;
+    const vCls = thinStale ? 'text-label-secondary' : v.cls;
     const evidence = disp?.evidence ?? null;
     const hasEvidence = evidence != null;
     const range = (perf as any)?.range as { positionPct: number; confident: boolean } | null | undefined;
@@ -957,17 +957,17 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
         {range ? (
           <>
             <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} showAxis={showAxis} />
-            {evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
+            {evidence && <span className="basis-full text-label-secondary text-caption">{evidence}</span>}
           </>
         ) : (
           <>
-            {metricLabel && <span className="text-white/50 text-[13px]">{metricLabel}</span>}
+            {metricLabel && <span className="text-label-secondary text-footnote">{metricLabel}</span>}
             {/* 2026-09-04: the evidence count only — no verdict word, arrow or percent (the 28/28 rule is off State) */}
-            {hasEvidence && <span className={`text-[13px] ${vCls}`}>{evidence}</span>}
+            {hasEvidence && <span className={`text-footnote ${vCls}`}>{evidence}</span>}
           </>
         )}
-        {thinStale && <span className="text-white/50 text-[12px]">limited data</span>}
-        {asOf(perf?.newestAgeDays) && <span className="text-white/45 text-[12px]">· {asOf(perf?.newestAgeDays)}</span>}
+        {thinStale && <span className="text-label-secondary text-caption">limited data</span>}
+        {asOf(perf?.newestAgeDays) && <span className="text-label-secondary text-caption">· {asOf(perf?.newestAgeDays)}</span>}
         {/* 'provisional' now rides the dot block's arrow line (item 6, uniform) — no trailing chip */}
         {/* swim rest-fraction chip removed — "rest ↓ sliding −38.2%" was the same clipped telegram voice
             next to a clean dot. The swim row is the pace dot + arrow. */}
@@ -988,11 +988,11 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
   return (
     <Row label={card.discipline}>
       {ndReceipt ? (
-        <span className={`text-[13px] ${nd.cls}`}>{ndReceipt}</span>
+        <span className={`text-footnote ${nd.cls}`}>{ndReceipt}</span>
       ) : (
         <>
           <span className={nd.cls}>{nd.word}</span>
-          {card.adherence && <span className="text-white/55">· {card.adherence.ratioLabel}</span>}
+          {card.adherence && <span className="text-label-secondary">· {card.adherence.ratioLabel}</span>}
         </>
       )}
       {card.discipline === 'swim' && <RestTag rest={restTrend} />}
@@ -1215,8 +1215,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // now: the heading left, Reorder right (the Adjust tab's construction), and no gap under it.
   const headerRow = (withReorder: boolean) => (heading || withReorder) ? (
     <div className="px-1 mt-3 mb-1 flex items-baseline justify-between gap-3">
-      {heading ? <span className="text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">{heading}</span> : <span />}
-      {withReorder && <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-[11px] tracking-wider uppercase text-white/45 py-1 -my-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>}
+      {heading ? <span className="text-caption font-semibold tracking-[0.12em] uppercase text-label-secondary">{heading}</span> : <span />}
+      {withReorder && <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-caption tracking-wider uppercase text-label-secondary py-1 -my-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>}
     </div>
   ) : null;
   if (loading || cards.length === 0) return <div className="pb-3">{headerRow(false)}<EnduranceCheckpointSheet enabled={hasActivePlan === true} /></div>;
@@ -1429,7 +1429,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     value — the label was bigger than the thing it labelled. */}
                 <span className="flex items-center gap-2 shrink-0 w-[92px] pt-[3px]">
                   {Icon && <Icon size={15} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
-                  <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase text-white/70">{card.discipline}</span>
+                  <span className="text-caption font-semibold tracking-[0.14em] uppercase text-label-secondary">{card.discipline}</span>
                 </span>
                 {/* ⛔ TWO COLUMNS, NOT THREE (Michael 2026-09-03, on the phone: "loa…" and "heart rate at
                     easy …"). A third column for the note starved the name column — a long note
@@ -1445,14 +1445,14 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                   {rows.map((r, i) => (
                     <span key={`${r.name}-${i}`} className="flex flex-col">
                       <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                        <span className="text-[14px] text-white/85 leading-tight shrink-0">{r.name}</span>
-                        <span className="ml-auto text-[15px] text-white/90 leading-tight tabular-nums text-right">
-                          {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
+                        <span className="text-subhead text-label leading-tight shrink-0">{r.name}</span>
+                        <span className="ml-auto text-subhead text-label leading-tight tabular-nums text-right">
+                          {r.arrow && <span className={`${r.arrowCls ?? 'text-label-secondary'} mr-1`}>{r.arrow}</span>}
                           {r.value}
                         </span>
                       </span>
                       {/* the note on its own right-aligned line, full width, so nothing shares its width (2026-09-06) */}
-                      {r.note && <span className="mt-[2px] text-right text-[12.5px] text-white/65 leading-tight tabular-nums">{r.note}</span>}
+                      {r.note && <span className="mt-[2px] text-right text-caption text-label-secondary leading-tight tabular-nums">{r.note}</span>}
                     </span>
                   ))}
                 </span>
@@ -1462,11 +1462,11 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* down = opens in place (iOS/Material accordion); a right chevron would promise another screen */}
                 {reordering ? (
                   <span className="flex flex-col shrink-0 self-center gap-1">
-                    <span role="button" aria-label={`move ${card.discipline} up`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, -1); }} className="px-2 py-0.5 text-white/85 text-[14px] leading-none">▲</span>
-                    <span role="button" aria-label={`move ${card.discipline} down`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, 1); }} className="px-2 py-0.5 text-white/85 text-[14px] leading-none">▼</span>
+                    <span role="button" aria-label={`move ${card.discipline} up`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, -1); }} className="px-2 py-0.5 text-label text-subhead leading-none">▲</span>
+                    <span role="button" aria-label={`move ${card.discipline} down`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, 1); }} className="px-2 py-0.5 text-label text-subhead leading-none">▼</span>
                   </span>
                 ) : (
-                  <span className={`text-white/80 text-[16px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+                  <span className={`text-label text-body leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
                 )}
               </button>
               {open && <div className="px-3 pb-2">{inner}</div>}
@@ -1498,7 +1498,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // uses in StateTab. Glass depth on the OUTSIDE, grid on the inside. Neutral, because this
         // plate is now multi-sport: the sport colour lives on each row's icon.
         return (
-          <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+          <div className="galaxy-card plate-calm readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
             {active.map((card) => renderCard(card, card.discipline === firstAxisDisc))}
             {/* ⚠️ RESTING ROWS ARE RECESSED, NOT DISABLED (rule 5). They were `opacity-45` — which
                 dimmed a row that is still a button, still tappable, still holding real numbers. A
@@ -1518,7 +1518,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && (
         // ⚠️ NEUTRAL PLATE, matching the sports plate above (2026-09-03) — it used a strength-keyed
         // tint back when every sport wore its own; one screen, one plate language.
-        <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl px-3 mt-2" style={readoutPlateStyle(undefined, { galaxy: true })}>
+        <div className="galaxy-card plate-calm readout-texture readout-texture--spectral rounded-2xl px-3 mt-2" style={readoutPlateStyle(undefined, { galaxy: true })}>
           {strengthDetail}
         </div>
       )}

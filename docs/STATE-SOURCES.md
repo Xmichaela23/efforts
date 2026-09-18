@@ -205,6 +205,8 @@ Every screen reads one set of type tokens (`index.css` `--type-*`, `--label*`; t
 | The calmer layer behind text: 55% black | `index.css --text-plate` | **OURS** — the first value tried (30 %, 45 %, 55 %) that put every bottom-bar word over 4.5:1 at 390 and 1440 px |
 | The phone's text size scales every line, from 100 % up to xxxLarge (135 %) | `src/lib/dynamic-type.ts` | FIELD — Apple Dynamic Type: the Body size for the chosen setting ÷ 17; HIG → Typography, xxxLarge Body 23 pt. **OURS** — the floor at 100 % (smaller settings would take Caption 1 under Apple's 11 pt minimum) and the cap at the largest standard setting: the five accessibility sizes clip the fixed-height header and tab bar (iOS simulator, 2026-09-18). Browser zoom to 200 % (WCAG 2.2 SC 1.4.4) is checked separately at 195 px and 720 px wide |
 | From 110 % up the bottom bar stacks its mark over its word | `dynamic-type.ts`, `index.css` | **OURS** — worked out: "STATE" at 15 px mono with its letter-spacing is 57 px × the scale plus 24 px of mark and gap, and a third of a 390 px screen leaves 86 px inside the pill, so it stops fitting at 1.09 |
+| Status words as text: "optimal" #93B9A5, "high risk" #D38B87 (the fills stay #6FA287 / #C4645F) | `lib/context-utils.ts STATUS_TEXT_GOOD`, `STATUS_TEXT_RISK` | FIELD — WCAG 2.2 SC 1.4.3 (4.5:1). **OURS** — each hue mixed 25% toward white, the least single mix that clears 4.5:1 for both words on Today's lit date card (#3b3331 measured behind the line) |
+| "Garmin [device]" text in #409DD2 (was #007CC3) | `components/ProviderAttribution.tsx GARMIN_BLUE`, `UnifiedWorkoutView.tsx` | FIELD — WCAG 2.2 SC 1.4.3; #007CC3 measured 2.8–4.2:1. **OURS** — the same 25% mix toward white |
 
 ## Stage 5 — load-bearing constants sourced (2026-09-16)
 

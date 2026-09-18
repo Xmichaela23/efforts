@@ -231,17 +231,17 @@ export default function StateTab({
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-4 h-4 animate-spin text-white/65" />
+        <Loader2 className="w-4 h-4 animate-spin text-label-secondary" />
       </div>
     );
   }
 
   if (error || !data) {
-    return <div className="py-8 text-center text-[13px] text-white/50">{error ?? 'No data'}</div>;
+    return <div className="py-8 text-center text-footnote text-label-secondary">{error ?? 'No data'}</div>;
   }
 
   const wsv = data.weekly_state_v1;
-  if (!wsv) return <div className="py-8 text-center text-[13px] text-white/50">Loading state…</div>;
+  if (!wsv) return <div className="py-8 text-center text-footnote text-label-secondary">Loading state…</div>;
 
   const week = wsv.week;
   // ⛔ THE SAME planned-vs-done SOURCE THE BAR READS (2026-09-01) — `wsv.week_execution_v1.counts`,
@@ -519,11 +519,11 @@ export default function StateTab({
   const readinessWhy = trends.readiness_why ?? null; // D-232: FATIGUED "Why:" — now NON-RPE factors only
   const readinessSuggestion = trends.readiness_suggestion ?? null; // D-232: loaded-legs one-line suggestion
   const readinessColor =
-    readiness === 'fresh' ? 'text-emerald-400/90' :
-    readiness === 'adapting' ? 'text-sky-400/85' :
-    readiness === 'overreached' ? 'text-red-400/90' :
-    readiness === 'fatigued' ? 'text-amber-400/90' :
-    'text-white/60';
+    readiness === 'fresh' ? 'text-emerald-400' :
+    readiness === 'adapting' ? 'text-sky-400' :
+    readiness === 'overreached' ? 'text-red-400' :
+    readiness === 'fatigued' ? 'text-amber-400' :
+    'text-label-secondary';
 
   // #4 — deterministic glance headline (load + readiness + fitness, observation never a prescription).
   // The full LLM narrative goes behind an "open for more" expand (collapsed by default).
@@ -612,7 +612,7 @@ export default function StateTab({
             beside the four the block prices from. An older snapshot carries none and Adjust shows the four. */}
       {stateLens === 'adjust' && <StateAdjustLens mainLifts={(loggedSets?.main ?? []).map((m) => m.canonical)} />}
       {stateLens === 'schedule' && (
-        <div className="px-2 py-10 text-center text-white/40 text-[13px] leading-snug">
+        <div className="px-2 py-10 text-center text-label-secondary text-footnote leading-snug">
           Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.
         </div>
       )}
@@ -664,7 +664,7 @@ export default function StateTab({
           colours inside them are data (bars, legend chips), never the card's own chrome. The
           per-discipline plates live in <StatePerformanceSection>, where a card belongs to one
           sport and may wear it. */}
-      <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+      <div className="galaxy-card plate-calm readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar
@@ -729,7 +729,7 @@ export default function StateTab({
           sport-keyed plate inside the section. */}
       <StatePerformanceSection heading="trends · last 12 weeks" strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} appliedFtp={(wsv.trends as any)?.applied_ftp ?? null} appliedFtpWord={(wsv.trends as any)?.applied_ftp_word ?? null} runThreshold={{ pace: wsv.trends?.applied_run_threshold ?? null, word: wsv.trends?.applied_run_threshold_word ?? null, hr: wsv.trends?.applied_run_threshold_hr ?? null, easyTarget: wsv.trends?.run_easy_target ?? null }} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} hasActivePlan={wsv.plan.has_active_plan === true} asOf={data.as_of_date ?? null} />
 
-      <div className="mt-2 galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+      <div className="mt-2 galaxy-card plate-calm readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* ⛔ BODY SITS BELOW THE TRENDS (2026-09-17, Michael). It is the only block made from what the athlete
             typed, and it changes nothing in the plan — TrainingPeaks keeps logged soreness on the day's metrics

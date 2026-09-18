@@ -103,10 +103,10 @@ export default function FirstRunOverlay({ id = 'overlay', stops = HOME_STOPS, ac
       )}
 
       <div style={{ position: 'absolute', left: 16, right: 16, top: labelTop, bottom: labelBottom, textAlign: 'center', pointerEvents: 'none' }}>
-        <span className="inline-block rounded-xl border border-white/35 bg-black/85 px-4 py-2.5 text-[15px] text-white/95 leading-snug" style={{ maxWidth: 360 }}>
+        <span className="inline-block rounded-xl border border-white/35 bg-black/85 px-4 py-2.5 text-subhead text-label leading-snug" style={{ maxWidth: 360 }}>
           {stop.text}
         </span>
-        <div className="mt-2 text-[12px] text-white/60 tracking-wide">
+        <div className="mt-2 text-caption text-label-secondary tracking-wide">
           {step + 1 < STOPS.length ? `Tap to continue · ${step + 1} of ${STOPS.length}` : 'Tap to start'}
         </div>
       </div>

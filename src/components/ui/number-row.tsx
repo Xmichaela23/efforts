@@ -55,35 +55,35 @@ export function NumberRow({ id, name, value, editable = true, hint, sport, note,
   return (
     <div className="py-1">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[14px] text-white/85 min-w-0 leading-tight">{name}</span>
+        <span className="text-subhead text-label min-w-0 leading-tight">{name}</span>
         {right ? right : editing ? (
           <span className="flex items-center gap-2 min-w-0">
             <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') close(); }}
               onBlur={(e) => { if (!saveOnBlur) return; const to = e.relatedTarget as HTMLElement | null; if (to?.dataset?.rowControl) return; if (draft.trim()) void save(); else close(); }}
               type={inputType === 'date' ? 'date' : 'text'} inputMode={inputMode ?? (inputType === 'text' ? 'text' : 'decimal')} placeholder={hint}
-              className={`${wide ? 'w-40' : 'w-24'} min-w-0 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[16px] text-white/90 ${wide ? '' : 'text-right tabular-nums'} outline-none`} />
-            <button type="button" data-row-control="1" onClick={() => void save()} className="text-[12px] text-white/80 px-2 py-1 rounded-xl border border-white/15">save</button>
-            <button type="button" data-row-control="1" onClick={close} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
+              className={`${wide ? 'w-40' : 'w-24'} min-w-0 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-body text-label ${wide ? '' : 'text-right tabular-nums'} outline-none`} />
+            <button type="button" data-row-control="1" onClick={() => void save()} className="text-caption text-label px-2 py-1 rounded-xl border border-white/15">save</button>
+            <button type="button" data-row-control="1" onClick={close} className="text-caption text-label-secondary px-1 py-1">cancel</button>
           </span>
         ) : editable ? (
           <span className="inline-flex shrink-0 max-w-[62%] rounded-xl border overflow-hidden" style={{ borderColor: `${colour}55`, background: `${colour}14` }}>
             <button type="button" onClick={() => { setEditing(true); setDraft(seed ?? ''); onEditStart?.(); }} aria-label={`edit ${name}`}
-              className="inline-flex items-center px-2.5 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125 min-w-0">
-              <span className="truncate">{value ?? <span className="text-white/45">tap to add</span>}</span>
+              className="inline-flex items-center px-2.5 py-1 bg-transparent border-none text-subhead text-label tabular-nums outline-none focus:outline-none active:brightness-125 min-w-0">
+              <span className="truncate">{value ?? <span className="text-label-secondary">tap to add</span>}</span>
             </button>
             {mine && onAuto && (
               <button type="button" onClick={() => void onAuto()} aria-label={`${name}: back to auto`}
-                className="px-2 py-1 border-l text-[12px] text-white/70 bg-white/[0.04] outline-none focus:outline-none active:brightness-125" style={{ borderColor: `${colour}55` }}>
+                className="px-2 py-1 border-l text-caption text-label-secondary bg-white/[0.04] outline-none focus:outline-none active:brightness-125" style={{ borderColor: `${colour}55` }}>
                 auto
               </button>
             )}
           </span>
         ) : (
-          <span className="text-[14px] text-white/90 tabular-nums shrink-0 text-right">{value ?? <span className="text-white/35">no number yet</span>}</span>
+          <span className="text-subhead text-label tabular-nums shrink-0 text-right">{value ?? <span className="text-label-secondary">no number yet</span>}</span>
         )}
       </div>
-      {note && <p className="text-[12px] text-white/50 mt-1 leading-snug">{note}</p>}
+      {note && <p className="text-caption text-label-secondary mt-1 leading-snug">{note}</p>}
     </div>
   );
 }

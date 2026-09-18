@@ -31,14 +31,14 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
       <button
         type="button"
         onClick={() => setStrengthDetailOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[12px] uppercase tracking-wider text-white/55 hover:text-white/55 transition-colors"
+        className="flex items-center gap-1.5 text-caption uppercase tracking-wider text-label-secondary hover:text-label-secondary transition-colors"
         aria-expanded={strengthDetailOpen}
       >
         <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
         from your logged sets
         {/* ⚠️ THE COUNT INCLUDES THE OTHER LIFTS (item 5) — it named only the main ones while
             accessories had no home, and would understate the section the moment they got one. */}
-        <span className="text-white/45 normal-case tracking-normal">· {count} {count === 1 ? 'lift' : 'lifts'}</span>
+        <span className="text-label-secondary normal-case tracking-normal">· {count} {count === 1 ? 'lift' : 'lifts'}</span>
       </button>
       {strengthDetailOpen && sets.main.map((lt) => {
         // A SET HISTORY, LIKE STRONG/HEVY (2026-08-11, Michael: *"it should offer what the other apps
@@ -47,7 +47,7 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
         if (lt.sets.length === 0) return null;
         return (
           <div key={lt.canonical} className="space-y-1.5">
-            <div className="text-[13px] text-white/80">{lt.display_name}</div>
+            <div className="text-footnote text-label">{lt.display_name}</div>
             <div className="space-y-1">
               {lt.sets.map((e, i) => {
                 const dateLabel = e.date
@@ -58,10 +58,10 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
                 const setLine = (lt as any).set_lines?.[i] as string | undefined;
                 const e1rmLine = (lt as any).e1rm_lines?.[i] as string | null | undefined;
                 return (
-                  <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
-                    {setLine && <span className="text-white/75 tabular-nums">{setLine}</span>}
-                    {dateLabel && <span className="text-white/40">{dateLabel}</span>}
-                    {e1rmLine && <span className="text-white/45 tabular-nums">{e1rmLine}</span>}
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
+                    {setLine && <span className="text-label-secondary tabular-nums">{setLine}</span>}
+                    {dateLabel && <span className="text-label-secondary">{dateLabel}</span>}
+                    {e1rmLine && <span className="text-label-secondary tabular-nums">{e1rmLine}</span>}
                     {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
                     {e.best && <span className="text-strength font-medium">best</span>}
                   </div>
@@ -77,15 +77,15 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
           {/* ⚠️ ITS OWN QUIET HEADING, because these answer a DIFFERENT question from the rows above.
               A main lift shows a history trending toward a max; these show the best you have done.
               Running them together would imply the accessory has a max line, which it does not. */}
-          <div className="text-[11px] uppercase tracking-wider text-white/40">your best sets</div>
+          <div className="text-caption uppercase tracking-wider text-label-secondary">your best sets</div>
           {sets.others.map((l) => (
-            <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
-              <span className="text-white/75">{l.display_name}</span>
+            <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
+              <span className="text-label-secondary">{l.display_name}</span>
               {/* The heaviest set as the athlete reads it, from the server (2026-09-15). */}
-              {(l as any).set_line && <span className="text-white/75 tabular-nums">{(l as any).set_line}</span>}
+              {(l as any).set_line && <span className="text-label-secondary tabular-nums">{(l as any).set_line}</span>}
               {/* ⛔ NO e1RM AND NO DIRECTION WORD. Nobody trends a one-rep max on a curl, and this app
                   does not assert a direction it cannot support. The count is the receipt. */}
-              <span className="text-white/40 tabular-nums">{l.sessions} {l.sessions === 1 ? 'session' : 'sessions'}</span>
+              <span className="text-label-secondary tabular-nums">{l.sessions} {l.sessions === 1 ? 'session' : 'sessions'}</span>
             </div>
           ))}
         </div>

@@ -67,7 +67,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const pts = Array.isArray(series) ? series : [];
   if (pts.length < 2) {
     return pts.length === 1
-      ? <span className="basis-full text-[11px] text-white/45">building — 1 {dotNoun} so far; a few more draws the 12-week trend</span>
+      ? <span className="basis-full text-caption text-label-secondary">building — 1 {dotNoun} so far; a few more draws the 12-week trend</span>
       : null;
   }
   const runColor = color ?? getDisciplineColor('run');
@@ -108,18 +108,18 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       {label ? (
         <span className="flex items-end justify-between gap-2">
           <span className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-[11px] uppercase tracking-wider text-white/55">{label}</span>
+            <span className="text-caption uppercase tracking-wider text-label-secondary">{label}</span>
             <span className="flex items-baseline gap-2 min-w-0">
-              <span className="readout-num text-[24px] leading-none text-white/95 tabular-nums">{headline ?? `${fmtVal(line ? line.end : last.value)}${unit}`}</span>
-              {qualifier && <span className="text-[12px] text-white/60 truncate">{qualifier}</span>}
+              <span className="readout-num text-title1 leading-none text-label tabular-nums">{headline ?? `${fmtVal(line ? line.end : last.value)}${unit}`}</span>
+              {qualifier && <span className="text-caption text-label-secondary truncate">{qualifier}</span>}
             </span>
           </span>
-          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50 whitespace-nowrap shrink-0">{rangeLabel}</span>}
+          {rangeLabel && <span className="text-caption tabular-nums text-label-secondary whitespace-nowrap shrink-0">{rangeLabel}</span>}
         </span>
       ) : title && (
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-[15px] text-white/90">{title}</span>
-          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50 whitespace-nowrap shrink-0">{rangeLabel}</span>}
+          <span className="text-subhead text-label">{title}</span>
+          {rangeLabel && <span className="text-caption tabular-nums text-label-secondary whitespace-nowrap shrink-0">{rangeLabel}</span>}
         </span>
       )}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
@@ -132,25 +132,25 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
         {line && <line x1={x(0)} y1={y(line.start)} x2={x(pts.length - 1)} y2={y(line.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
-      {line && changeLine && <span className="text-[13px] text-white/85">{changeLine}</span>}
+      {line && changeLine && <span className="text-footnote text-label">{changeLine}</span>}
       {line && !changeLine && (
-        <span className="text-[13px] text-white/85">
+        <span className="text-footnote text-label">
           {trendWord && !title && !label ? `${trendWord} ` : ''}over {line.weeks} {line.weeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(line.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(line.end)}{unit}</span>
         </span>
       )}
       {(title || label) ? (
         ((building && spanWeeks != null) || provenance) && (
-          <span className="text-[12px] text-white/55">{[building && spanWeeks != null ? buildingLabel(spanWeeks) : null, provenance].filter(Boolean).join(' · ')}</span>
+          <span className="text-caption text-label-secondary">{[building && spanWeeks != null ? buildingLabel(spanWeeks) : null, provenance].filter(Boolean).join(' · ')}</span>
         )
       ) : (
-        <span className="text-[10px] text-white/45 flex items-center justify-between">
+        <span className="text-caption text-label-secondary flex items-center justify-between">
           <span>{spanWeeks == null ? '' : building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
-          {rangeLabel ? <span className="tabular-nums text-white/30">{rangeLabel}</span> : <span />}
+          {rangeLabel ? <span className="tabular-nums text-label-secondary">{rangeLabel}</span> : <span />}
         </span>
       )}
-      {provenance && !(title || label) && <span className="text-[12px] text-white/65">{provenance}</span>}
-      {keyLine && <span className="text-[12px] text-white/60 leading-snug">{keyLine}</span>}
-      {caption && <span className="text-[10px] text-white/40">{caption}</span>}
+      {provenance && !(title || label) && <span className="text-caption text-label-secondary">{provenance}</span>}
+      {keyLine && <span className="text-caption text-label-secondary leading-snug">{keyLine}</span>}
+      {caption && <span className="text-caption text-label-secondary">{caption}</span>}
     </span>
   );
 }

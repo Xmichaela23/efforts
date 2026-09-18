@@ -30,14 +30,14 @@ export default function StateBodyBlock({
         ⛔ NO LINK HERE (Michael 2026-09-10). The Adjust TAB at the top of the screen is the way in;
         a second door inside the block was a second route to the same place. */}
     <div className="flex items-baseline gap-x-3">
-      <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">
+      <span className="readout-label text-caption font-semibold tracking-[0.12em] uppercase">
         BODY{' '}
         {/* ⛔ THE BLOCK SAYS WHERE ITS NUMBERS COME FROM (Michael 2026-09-10) — every row here is what the
             athlete typed after a session, not something measured. Same words as the D-354 ruling. */}
-        <span className="normal-case tracking-normal font-normal text-[11px] text-white/45">(as you logged)</span>
+        <span className="normal-case tracking-normal font-normal text-caption text-label-secondary">(as you logged)</span>
         {/* ⛔ THE WINDOW, ONCE, IN THE SMALL GREY LABEL (Michael 2026-09-10) — the rows no longer repeat it. */}
         {windowLabel && visibleSignals.length > 0 && (
-          <span className="normal-case tracking-normal font-normal text-[11px] text-white/45 ml-1">· {windowLabel}</span>
+          <span className="normal-case tracking-normal font-normal text-caption text-label-secondary ml-1">· {windowLabel}</span>
         )}
       </span>
     </div>
@@ -45,12 +45,12 @@ export default function StateBodyBlock({
     {/* The readings — LoadBar's row construction verbatim: a fixed 12 px separator slot pulled into the
         gap before each reading, the row clipping its left edge so a wrapped line loses its leading dot
         instead of dangling one at the end of the line above. */}
-    <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-tight tabular-nums [&>span]:-ml-3">
+    <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-caption text-label-secondary leading-tight tabular-nums [&>span]:-ml-3">
       {/* overall_training_read "This week" fallback DELETED 2026-07-24 — the ~25-branch summary
           duplicated the load bar above (F8 / docs/COPY-VOICE.md). When BODY has no per-metric
           signals it now simply reads "not enough data". */}
       {visibleSignals.length === 0 && (
-        <span className="text-[13px] text-white/55">not enough data</span>
+        <span className="text-footnote text-label-secondary">not enough data</span>
       )}
       {visibleSignals.map((s) => (
         <span key={s.label}>
@@ -58,7 +58,7 @@ export default function StateBodyBlock({
           {s.label}{' '}
           {/* Only when the server sends a value slot (payload v189+); an older cached row still carries
               one sentence in `detail` and prints that as its reading. */}
-          <span className={`readout-num text-[13px] ${s.trend_tone === 'neutral' ? 'text-white/85' : trendColor(s.trend, s.trend_tone)}`}>
+          <span className={`readout-num text-footnote ${s.trend_tone === 'neutral' ? 'text-label' : trendColor(s.trend, s.trend_tone)}`}>
             {s.value_display ? s.value_display : s.detail}
           </span>
           {s.value_display && s.detail && <span className="ml-1">· {s.detail}</span>}

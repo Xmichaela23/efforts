@@ -91,7 +91,7 @@ interface LoadBarProps {
  * the windows made the row wrap at 390 px).
  */
 export function Dot() {
-  return <span aria-hidden className="inline-block w-3 text-center text-white/30 select-none">·</span>;
+  return <span aria-hidden className="inline-block w-3 text-center text-label-secondary select-none">·</span>;
 }
 
 // ⛔ THE ZONE WORD'S COLOUR HAS ONE OWNER (2026-09-09) — `formZoneColor` in `context-utils`, shared
@@ -119,7 +119,7 @@ export function Dot() {
  */
 export function LoadKeyWorkload() {
   return (
-    <p className="text-[12px] text-white/65 leading-snug">
+    <p className="text-caption text-label-secondary leading-snug">
       Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.
     </p>
   );
@@ -130,7 +130,7 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
   // without it prints no table rather than a copy kept here.
   const rows = Array.isArray(zones) ? zones : [];
   return (
-    <div className="text-[12px] text-white/65 leading-snug">
+    <div className="text-caption text-label-secondary leading-snug">
       {/**
         * ⛔ MICHAEL'S LINE (2026-09-09), VERBATIM. It replaced *"Form is one subtraction, fitness −
         * fatigue, taken as you start the day … The word beside it comes from this table:"* — which
@@ -147,10 +147,10 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
             today beside the bar's end-of-today numbers; TrainingPeaks prints no equation. */}
       </p>
       {rows.length > 0 && (
-        <table className="mt-1 text-[12px] tabular-nums">
+        <table className="mt-1 text-caption tabular-nums">
           <tbody>
             {rows.map((r) => (
-              <tr key={r.word} className={r.current ? 'text-white/95' : 'text-white/55'}>
+              <tr key={r.word} className={r.current ? 'text-label' : 'text-label-secondary'}>
                 <td className="pr-3 py-0.5 whitespace-nowrap">{r.range}</td>
                 <td className="pr-3 py-0.5 whitespace-nowrap">{r.current ? '▸ ' : ''}{r.word}</td>
                 <td className="py-0.5">{r.meaning}</td>
@@ -189,47 +189,60 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   // the model's own averaging constants (TrainingPeaks' PMC 42 and 7 — ledger row "Fitness (CTL, 42-day
   // EWMA)"). Fitness reads in weeks, fatigue in days; form has none, it is the gap between the two.
   const rd = ff?.display ?? null;
-  const Delta = ({ v }: { v: string | null | undefined }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
-  const Window = ({ w }: { w: string | null | undefined }) => w ? <span className="ml-1">· {w}</span> : null;
 
   // ⛔ THE LOAD-SHARE BAR LEFT THIS CARD (Michael, 2026-09-10), and the planned-vs-done bars that carried its shares
-  // after it are gone too (2026-09-18). The card opens with the week so far in time per sport — the coach's
-  // `week_time_line`, printed as sent; no line when nothing is done yet.
+  // after it are gone too (2026-09-18). The week so far in time per sport — the coach's `week_time_line`, printed
+  // as sent; no line when nothing is done yet.
   const weekLine = load.week_time_line ?? null;
+
+  // ⛔ FORM IS THE HEADLINE (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md §6, approved by Michael). Form
+  // is the number the zone word reads, so it is the Title 1 figure with its word beside it; fitness and fatigue
+  // sit beneath it, each with its window under it. The week's changes (`display.*.change`) are OFF the card —
+  // the coach still sends them. Every word is the coach's, printed as sent. What this replaced: one wrapped row
+  // of three numbers at 13 px with 10.5–11 px grey labels, changes and windows — 11 of its 20 lines measured
+  // under 4.5:1 over the card's glow. The calmer background the rule asks for is the plate's own (`plate-calm` on State's top plate).
+  const Reading = ({ label, value, window: w }: { label: string; value: string | null; window: string | null }) => (
+    <div>
+      <div className="text-footnote font-medium text-label-secondary">{label}</div>
+      <div className="readout-num text-body font-medium">{value ?? '—'}</div>
+      {w && <div className="text-caption text-label-secondary">{w}</div>}
+    </div>
+  );
 
   return (
     <div className="px-3 py-3">
-      {weekLine && (
-        <div className="flex items-baseline gap-3 mb-2.5 text-[12.5px] leading-snug">
-          <span className="text-white/55 shrink-0">This week</span>
-          <span className="text-white/85 tabular-nums">{weekLine}</span>
-        </div>
-      )}
-      {/* Fitness · Fatigue · Form — TrainingPeaks' three numbers on one line, the Form zone word beside form. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">
+      <div className="px-1 py-1">
+        <span className="readout-label text-footnote font-semibold tracking-[0.08em] uppercase">
           LOAD{' '}
-          <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
+          <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary normal-case tracking-normal font-normal text-subhead align-baseline">ⓘ</button>
         </span>
-        {rd && rd.fitness.value != null ? (
-          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap [&>span]:-ml-3">
-            <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{rd.fitness.value}</span><Delta v={rd.fitness.change} /><Window w={rd.fitness.window} /></span>
-            {/* ⛔ NO "usual" ON FATIGUE (2026-09-18, reverted the same day): form carries fatigue's context, TrainingPeaks' way. */}
-            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} /><Window w={rd.fatigue.window} /></span>
-            <span>
-              <Dot />form <span className="readout-num text-[13px] text-white/85">{rd.form.value}</span>
-              {zone && <><span className="ml-1">·</span><span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span></>}
-            </span>
-          </div>
+        {rd && rd.form.value != null ? (
+          <>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-footnote font-medium text-label-secondary">form</span>
+              <span className="readout-num text-title1 font-semibold">{rd.form.value}</span>
+              {zone && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zone}</span>}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-4">
+              <Reading label="fitness" value={rd.fitness.value} window={rd.fitness.window} />
+              <Reading label="fatigue" value={rd.fatigue.value} window={rd.fatigue.window} />
+            </div>
+          </>
         ) : (
-          <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
+          <div className="mt-2 text-subhead text-label-secondary">no sessions logged yet</div>
         )}
-      </div>
-      {showKey && ff && <LoadKey ff={ff} zones={load.form_zones} />}
+        {weekLine && (
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-2 leading-snug">
+            <span className="text-footnote font-medium text-label-secondary shrink-0">This week</span>
+            <span className="text-subhead text-label tabular-nums">{weekLine}</span>
+          </div>
+        )}
+        {showKey && ff && <LoadKey ff={ff} zones={load.form_zones} />}
 
-      {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the plate's
-          footer. Never in the ⓘ key above: "never bury the Garmin attribution in … expandable containers". */}
-      {garminDerived ? <GarminDerivedDataLine className="mt-2.5" /> : null}
+        {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the plate's
+            footer. Never in the ⓘ key above: "never bury the Garmin attribution in … expandable containers". */}
+        {garminDerived ? <GarminDerivedDataLine className="mt-3" /> : null}
+      </div>
     </div>
   );
 }

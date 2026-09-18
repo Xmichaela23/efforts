@@ -12,7 +12,7 @@ export default function StateNextBlock({
   return (
     <div className="px-3 py-3">
       <Row label="NEXT">
-        {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/55" />}
+        {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-label-secondary" />}
         {nextSessions.map((s, i) => (
           <React.Fragment key={i}>
             {i > 0 && <Dot />}

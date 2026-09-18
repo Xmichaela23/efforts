@@ -37,7 +37,7 @@ export default function StateReadinessRow({ checkinReadiness }: { checkinReadine
         <Dot />
         <Chip label="sleep" value={`${L.sleep}${arrow('sleep')}`} />
         {whenLabel && <Dot />}
-        {whenLabel && <Chip value={whenLabel} valueClass="text-white/65" />}
+        {whenLabel && <Chip value={whenLabel} valueClass="text-label-secondary" />}
       </Row>
     </div>
   );

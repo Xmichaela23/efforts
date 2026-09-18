@@ -29,9 +29,9 @@ export function loadRead(
   planned: number,
   done: number,
 ): LoadRead {
-  const fact = 'text-white/60';
-  if (status === 'on_target') return { text: 'balanced', cls: 'text-white/85', kind: 'state' };
-  if (status === 'productive') return { text: 'productive', cls: 'text-white/85', kind: 'state' };
+  const fact = 'text-label-secondary';
+  if (status === 'on_target') return { text: 'balanced', cls: 'text-label', kind: 'state' };
+  if (status === 'productive') return { text: 'productive', cls: 'text-label', kind: 'state' };
   const missed = hasPlan && planned > 0 && done < planned;
   const added = hasPlan && planned > 0 && done > planned;
   if (status === 'under') {

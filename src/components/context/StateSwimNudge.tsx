@@ -19,13 +19,13 @@ export default function StateSwimNudge({
     <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[12px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
-          <p className="text-[13px] text-white/75 leading-snug">{sentence}</p>
+          <p className="text-caption font-semibold tracking-[0.12em] text-sky-300 uppercase mb-1">Swim check-in</p>
+          <p className="text-footnote text-label-secondary leading-snug">{sentence}</p>
         </div>
         <button
           type="button"
           onClick={() => { snoozeNudge('swim_retest'); onDismiss(); }}
-          className="text-[13px] text-white/60 hover:text-white/70 shrink-0 touch-manipulation"
+          className="text-footnote text-label-secondary hover:text-label-secondary shrink-0 touch-manipulation"
           aria-label="Dismiss swim check-in"
         >
           Dismiss

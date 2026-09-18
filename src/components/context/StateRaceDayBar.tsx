@@ -7,8 +7,8 @@ import React from 'react';
 export default function StateRaceDayBar() {
   return (
     <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
-      <p className="text-[12px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
-      <p className="text-[13px] text-white/55 leading-snug">
+      <p className="text-caption font-semibold tracking-[0.12em] text-amber-300 uppercase">Race day</p>
+      <p className="text-footnote text-label-secondary leading-snug">
         Logging your race as a completed run auto-saves the elapsed (chip) result to My Record and ends this plan.
       </p>
     </div>

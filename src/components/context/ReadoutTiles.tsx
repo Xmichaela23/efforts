@@ -43,7 +43,7 @@ export function ReadoutTiles({
 }) {
   const shown = tiles.filter(Boolean) as ReadoutTile[];
   if (shown.length === 0) return null;
-  const valueCls = size === 'sm' ? 'text-[15px]' : 'text-[19px]';
+  const valueCls = size === 'sm' ? 'text-subhead' : 'text-title3';
   return (
     <div
       className={`basis-full grid gap-x-3 gap-y-2.5 ${columns === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
@@ -53,8 +53,8 @@ export function ReadoutTiles({
       {shown.map((t, i) => (
         <div key={i} className="min-w-0">
           <div className={`readout-num ${valueCls} leading-tight truncate`}>{t.value}</div>
-          <div className="readout-label text-[10px] uppercase leading-tight mt-0.5 truncate">{t.label}</div>
-          {t.note && <div className="text-white/40 text-[10px] leading-tight truncate">{t.note}</div>}
+          <div className="readout-label text-caption uppercase leading-tight mt-0.5 truncate">{t.label}</div>
+          {t.note && <div className="text-label-secondary text-caption leading-tight truncate">{t.note}</div>}
         </div>
       ))}
     </div>

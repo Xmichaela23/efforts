@@ -284,6 +284,12 @@
   .text-plate {
     background-color: var(--text-plate);
   }
+  /* The same layer for a whole readout plate whose rows are text: it darkens the plate's glow ground (the
+     .galaxy-card::before nebula) behind every row at once, so the rows keep their hairlines and the glow
+     still shows at the plate's edge, just dimmer. */
+  .galaxy-card.plate-calm::before {
+    box-shadow: inset 0 0 0 100vmax var(--text-plate);
+  }
   .font-mono {
     font-variant-numeric: tabular-nums;
   }

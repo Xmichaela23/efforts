@@ -108,33 +108,33 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
+          <span className="readout-label text-caption font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
+          <span className="text-footnote text-label-secondary text-right leading-snug">{distLabel} · result on file</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+            <p className="text-caption text-label-secondary leading-snug">Your goal</p>
+            <span className="text-title3 font-semibold tabular-nums text-label tracking-tight">
               {statedGoalDisplay}
             </span>
           </div>
         )}
         <div className="flex flex-col gap-0.5">
-          <p className="text-[12px] text-white/65 leading-snug">Completed</p>
-          <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
+          <p className="text-caption text-label-secondary leading-snug">Completed</p>
+          <span className="text-title3 font-semibold tabular-nums text-emerald-300 tracking-tight">
             {fmtGoalClock(officialResult.actual_seconds)}
           </span>
-          <p className="text-[12px] text-white/60 leading-snug max-w-[min(100%,320px)]">
+          <p className="text-caption text-label-secondary leading-snug max-w-[min(100%,320px)]">
             Official finish: elapsed (chip) time, not moving time. Training “projected” is replaced after you save this result.
           </p>
         </div>
         {officialResult.goal_target_seconds != null && (
-          <p className="text-[13px] text-white/50">
+          <p className="text-footnote text-label-secondary">
             {fmtSignedDeltaVsGoal(officialResult.actual_seconds, officialResult.goal_target_seconds)}
           </p>
         )}
         {officialResult.modelProjected && (
-          <p className="text-[13px] text-white/50 leading-snug">
+          <p className="text-footnote text-label-secondary leading-snug">
             Model had projected {officialResult.modelProjected.display} · {fmtSignedDeltaVsModel(officialResult.actual_seconds, officialResult.modelProjected.seconds)}
           </p>
         )}
@@ -146,38 +146,38 @@ function RaceSection({
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · {postRaceUnofficial.days_after_label}</span>
+          <span className="readout-label text-caption font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
+          <span className="text-footnote text-label-secondary text-right leading-snug">{distLabel} · {postRaceUnofficial.days_after_label}</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
-            <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+            <p className="text-caption text-label-secondary leading-snug">Your goal</p>
+            <span className="text-title3 font-semibold tabular-nums text-label tracking-tight">
               {statedGoalDisplay}
             </span>
           </div>
         )}
         <div className="flex flex-col gap-0.5">
-          <p className="text-[12px] text-white/65 leading-snug">Your finish (from log)</p>
-          <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
+          <p className="text-caption text-label-secondary leading-snug">Your finish (from log)</p>
+          <span className="text-title3 font-semibold tabular-nums text-emerald-300 tracking-tight">
             {postRaceUnofficial.logged_display}
           </span>
-          <p className="text-[12px] text-white/60 leading-snug max-w-[min(100%,320px)]">
+          <p className="text-caption text-label-secondary leading-snug max-w-[min(100%,320px)]">
             Elapsed (chip) time if your device reported it; otherwise we fall back to other durations. The large “Projected” block is hidden after race day so this stays primary.
           </p>
         </div>
         {postRaceUnofficial.model_projected_display != null && (
           <div className="space-y-1">
-            <p className="text-[12px] text-white/65 leading-snug">Model had projected (pre-race)</p>
-            <p className="text-[20px] font-semibold tabular-nums text-white/75">
+            <p className="text-caption text-label-secondary leading-snug">Model had projected (pre-race)</p>
+            <p className="text-title3 font-semibold tabular-nums text-label-secondary">
               {postRaceUnofficial.model_projected_display}
             </p>
-            <p className="text-[13px] text-white/50">
+            <p className="text-footnote text-label-secondary">
               {postRaceUnofficial.gap_display}
             </p>
           </div>
         )}
-        <p className="text-[12px] text-white/60 leading-snug">
+        <p className="text-caption text-label-secondary leading-snug">
           Race result auto-saves to My Record once your run is logged. The plan then moves to past on its own.
         </p>
       </div>
@@ -207,9 +207,9 @@ function RaceSection({
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between gap-3">
-        <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
+        <span className="readout-label text-caption font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
         {hasRealRace && (
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
+          <span className="text-footnote text-label-secondary text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
         )}
       </div>
 
@@ -218,39 +218,39 @@ function RaceSection({
         <div className="flex flex-col gap-3 min-w-0 flex-1">
           {statedGoalDisplay != null && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+              <p className="text-caption text-label-secondary leading-snug">Your goal</p>
+              <span className="text-title3 font-semibold tabular-nums text-label tracking-tight">
                 {statedGoalDisplay}
               </span>
             </div>
           )}
           {hasProjection && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[12px] text-white/65 leading-snug">Projected</p>
-              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+              <p className="text-caption text-label-secondary leading-snug">Projected</p>
+              <span className="text-title3 font-semibold tabular-nums text-label tracking-tight">
                 {projectedFromTraining}
               </span>
               {rr && (
-                <p className="text-[12px] text-white/32 leading-snug max-w-[280px]">
+                <p className="text-caption text-label-secondary leading-snug max-w-[280px]">
                   Matches the gap and details below — one model, from your threshold, fade over distance, and data confidence.
                 </p>
               )}
             </div>
           )}
           {showProjectionPlaceholder && (
-            <p className="text-[13px] text-white/55 leading-snug pr-1">
+            <p className="text-footnote text-label-secondary leading-snug pr-1">
               Can’t project a finish time yet (race date on the goal/plan, or baselines).
             </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
           {rr?.delta_display && (
-            <span className={`text-[14px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
+            <span className={`text-subhead font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
               {rr.delta_display}
             </span>
           )}
           {rr && (
-            <span className={`text-[12px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
+            <span className={`text-caption font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
               {assessmentLabel(rr.assessment)}
             </span>
           )}
@@ -260,14 +260,14 @@ function RaceSection({
       {/* Factual projection: framing + grouped sections (server); legacy flat list still supported */}
       {rr?.projection_display?.sections && rr.projection_display.sections.length > 0 && (
         <div className="space-y-3 pt-0.5">
-          <p className="text-[12px] text-white/60 uppercase tracking-wide">From your data</p>
+          <p className="text-caption text-label-secondary uppercase tracking-wide">From your data</p>
           {rr.projection_display.framing ? (
-            <p className="text-[13px] text-white/60 leading-relaxed">{rr.projection_display.framing}</p>
+            <p className="text-footnote text-label-secondary leading-relaxed">{rr.projection_display.framing}</p>
           ) : null}
           {rr.projection_display.sections.map((sec) => (
             <div key={sec.label} className="space-y-1.5">
-              <p className="text-[12px] font-semibold tracking-[0.1em] text-white/65 uppercase">{sec.label}</p>
-              <ul className="list-disc pl-4 space-y-1 text-[13px] text-white/65 leading-relaxed">
+              <p className="text-caption font-semibold tracking-[0.1em] text-label-secondary uppercase">{sec.label}</p>
+              <ul className="list-disc pl-4 space-y-1 text-footnote text-label-secondary leading-relaxed">
                 {sec.lines.map((line, i) => (
                   <li key={`${sec.label}-${i}`}>{line}</li>
                 ))}
@@ -278,8 +278,8 @@ function RaceSection({
       )}
       {rr?.projection_facts && rr.projection_facts.length > 0 && !(rr.projection_display?.sections?.length) && (
         <div className="space-y-1.5 pt-0.5">
-          <p className="text-[12px] text-white/60 uppercase tracking-wide">From your data</p>
-          <ul className="list-disc pl-4 space-y-1.5 text-[13px] text-white/60 leading-relaxed">
+          <p className="text-caption text-label-secondary uppercase tracking-wide">From your data</p>
+          <ul className="list-disc pl-4 space-y-1.5 text-footnote text-label-secondary leading-relaxed">
             {rr.projection_facts.map((line, i) => (
               <li key={i}>{line}</li>
             ))}
@@ -288,17 +288,17 @@ function RaceSection({
       )}
 
       {projection?.mismatch_blurb && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[13px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
+        <p className="text-footnote text-label-secondary leading-relaxed">{projection.mismatch_blurb}</p>
       )}
       {!hasAnyFinishTime && (
-        <p className="text-[13px] text-white/60 leading-snug">
+        <p className="text-footnote text-label-secondary leading-snug">
           Add a race target in your plan to see your goal and projection.
         </p>
       )}
 
       {/* Target comparison — full race_readiness only */}
       {rr?.target_finish_display && (
-        <div className="flex items-baseline gap-2 text-[13px] text-white/55">
+        <div className="flex items-baseline gap-2 text-footnote text-label-secondary">
           <span>Target {rr.target_finish_display}</span>
           <Dot />
           <span>Race pace {rr.predicted_race_pace_display}</span>
@@ -307,12 +307,12 @@ function RaceSection({
 
       {/* VDOT trend */}
       {rr && (
-        <div className="flex items-baseline gap-2 text-[13px]">
-          <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
+        <div className="flex items-baseline gap-2 text-footnote">
+          <span className="text-label-secondary">VDOT {rr.current_vdot.toFixed(1)}</span>
           {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
             <>
               <Dot />
-              <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400/85' : 'text-amber-400/85'}>
+              <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400' : 'text-amber-400'}>
                 {rr.vdot_delta > 0 ? '+' : ''}{rr.vdot_delta.toFixed(1)} since plan start
               </span>
             </>
@@ -322,26 +322,26 @@ function RaceSection({
 
       {/* Legacy narrative — hidden when projection display supplies factual copy */}
       {rr && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[13px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+        <p className="text-footnote text-label-secondary leading-relaxed">{rr.assessment_message}</p>
       )}
 
       {resolvedGoalId && (
         <div className="pt-0.5">
           {courseBusy ? (
-            <p className="text-[13px] text-white/60">Working on course…</p>
+            <p className="text-footnote text-label-secondary">Working on course…</p>
           ) : courseRow ? (
             <button
               type="button"
               onClick={onViewStrategy}
-              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
+              className="w-full text-left text-footnote text-sky-400 hover:text-sky-300 py-1"
             >
-              View terrain strategy → <span className="text-white/60">{courseRow.name}</span>
+              View terrain strategy → <span className="text-label-secondary">{courseRow.name}</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={onAddCourse}
-              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
+              className="w-full text-left text-footnote text-sky-400 hover:text-sky-300 py-1"
             >
               Add course for terrain strategy based on your data →
             </button>
@@ -356,21 +356,21 @@ function RaceSection({
           onClick={() => onOpenKeyRun(primaryRaceReadiness.workout_id)}
           className="w-full text-left rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 space-y-2.5 mt-1 active:opacity-90"
         >
-          <span className="text-[12px] font-medium text-white/65 uppercase tracking-wide">Key run</span>
-          <p className="text-[13px] text-white/50 tabular-nums">
+          <span className="text-caption font-medium text-label-secondary uppercase tracking-wide">Key run</span>
+          <p className="text-footnote text-label-secondary tabular-nums">
             {fmtDate(primaryRaceReadiness.workout_date)} · {primaryRaceReadiness.distance_miles}mi
           </p>
-          <p className="text-[14px] font-semibold text-white/90 leading-snug">{primaryRaceReadiness.headline}</p>
+          <p className="text-subhead font-semibold text-label leading-snug">{primaryRaceReadiness.headline}</p>
           {!!String(primaryRaceReadiness.tactical_instruction || '').trim() && (
             <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
-              <span className="text-[12px] font-medium text-white/65 uppercase tracking-wide">Race day</span>
-              <p className="text-[13px] text-white/85 mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
+              <span className="text-caption font-medium text-label-secondary uppercase tracking-wide">Race day</span>
+              <p className="text-footnote text-label mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
             </div>
           )}
           {!!String(primaryRaceReadiness.projection || '').trim() && (
-            <p className="text-[13px] text-white/65 leading-relaxed">{primaryRaceReadiness.projection}</p>
+            <p className="text-footnote text-label-secondary leading-relaxed">{primaryRaceReadiness.projection}</p>
           )}
-          <span className="text-[13px] font-normal text-white/60">View full analysis →</span>
+          <span className="text-footnote font-normal text-label-secondary">View full analysis →</span>
         </button>
       )}
 
@@ -378,8 +378,8 @@ function RaceSection({
       {rr && rr.training_signals.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
           {rr.training_signals.map((s, i) => (
-            <span key={i} className="text-[13px]">
-              <span className="text-white/50">{s.label}</span>{' '}
+            <span key={i} className="text-footnote">
+              <span className="text-label-secondary">{s.label}</span>{' '}
               <span className={signalToneColor(s.tone)}>{s.value}</span>
             </span>
           ))}
@@ -388,7 +388,7 @@ function RaceSection({
 
       {/* Pace zones */}
       {rr && (
-        <div className="flex items-center gap-3 pt-0.5 text-[12px] text-white/65">
+        <div className="flex items-center gap-3 pt-0.5 text-caption text-label-secondary">
           <span>Easy {rr.pace_zones.easy}</span>
           <span>Threshold {rr.pace_zones.threshold}</span>
           <span>Race {rr.pace_zones.race}</span>
@@ -397,7 +397,7 @@ function RaceSection({
 
       {/* Modifiers */}
       {rr && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-white/55">
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-caption text-label-secondary">
           {rr.data_source === 'plan_targets' && (
             <span className="italic">Based on plan targets</span>
           )}
@@ -405,7 +405,7 @@ function RaceSection({
             <span>Durability adj {((1 - rr.durability_factor) * 100).toFixed(1)}%</span>
           )}
           {rr.durability_factor >= 1.0 && (
-            <span className="text-emerald-400/40">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
+            <span className="text-emerald-400">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
           )}
           {rr.confidence_adjustment_pct > 0 && (
             <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
@@ -419,14 +419,14 @@ function RaceSection({
           null → hide. The colored-% branch is dark until block-adaptation data exists (Q-080). */}
       {blockVerdict && (
         blockVerdict.drivers.length === 0 ? (
-          <p className="text-[13px] text-white/60 pt-0.5">Goal trajectory · needs more comparable sessions</p>
+          <p className="text-footnote text-label-secondary pt-0.5">Goal trajectory · needs more comparable sessions</p>
         ) : (
-          <div className="flex items-baseline gap-2 pt-0.5 text-[13px]">
-            <span className="text-white/50">Goal trajectory</span>
+          <div className="flex items-baseline gap-2 pt-0.5 text-footnote">
+            <span className="text-label-secondary">Goal trajectory</span>
             <span className={
-              blockVerdict.goal_probability_pct >= 70 ? 'text-emerald-400/85'
-              : blockVerdict.goal_probability_pct >= 40 ? 'text-amber-400/85'
-              : 'text-rose-400/85'
+              blockVerdict.goal_probability_pct >= 70 ? 'text-emerald-400'
+              : blockVerdict.goal_probability_pct >= 40 ? 'text-amber-400'
+              : 'text-rose-400'
             }>{blockVerdict.goal_probability_pct}% on track</span>
           </div>
         )
@@ -437,7 +437,7 @@ function RaceSection({
       {divergence && divergence.observations.length > 0 && (
         <div className="pt-0.5 space-y-0.5">
           {divergence.observations.map((o, i) => (
-            <p key={i} className="text-[13px] text-amber-400/70 leading-snug">{o.note}</p>
+            <p key={i} className="text-footnote text-amber-400 leading-snug">{o.note}</p>
           ))}
         </div>
       )}

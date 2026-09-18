@@ -17,4 +17,4 @@ export const withWord = (num: string | null, src: string | null | undefined, isM
 };
 
 /** The plain pill used for actions beside the rows (Rebuild, Retest…). */
-export const pillClass = 'text-[13px] px-3 py-1.5 rounded-xl border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
+export const pillClass = 'text-footnote px-3 py-1.5 rounded-xl border border-white/15 bg-white/[0.05] text-label disabled:opacity-50';

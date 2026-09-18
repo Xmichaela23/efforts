@@ -36,7 +36,7 @@ export default function SportStrip({ value, onChange, sports, className = '' }: 
             role="tab"
             aria-selected={active}
             onClick={() => onChange(key)}
-            className={`flex items-center justify-center gap-1.5 py-2 text-[13px] font-light tracking-wide transition-colors border-b-2 ${active ? '' : 'text-gray-400 border-transparent hover:text-gray-300'}`}
+            className={`flex items-center justify-center gap-1.5 py-2 text-footnote font-normal tracking-wide transition-colors border-b-2 ${active ? '' : 'text-label-secondary border-transparent hover:text-label'}`}
             style={active ? { color: colour, borderColor: `${colour}cc` } : undefined}
           >
             <Icon className="h-4 w-4" />

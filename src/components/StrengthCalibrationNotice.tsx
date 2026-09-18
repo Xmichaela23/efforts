@@ -42,7 +42,7 @@ export function StrengthCalibrationNotice({ lifts, undo, variant = 'primary' }: 
   return (
     <div className="mt-3 space-y-3">
       {standing.map((l) => (
-        <div key={l.ref} className="text-[13px] leading-snug text-white/60">
+        <div key={l.ref} className="text-footnote leading-snug text-label-secondary">
           <p>
             {calibrationLine(l.event!.reason === 'reset' ? 'reset' : 'bump', {
               lift: l.name,
@@ -62,14 +62,14 @@ export function StrengthCalibrationNotice({ lifts, undo, variant = 'primary' }: 
               if (ok) setUndone((prev) => [...prev, l.ref]);
               setBusy(null);
             }}
-            className="mt-1 text-[12px] text-white/55 underline underline-offset-2 disabled:opacity-50"
+            className="mt-1 text-caption text-label-secondary underline underline-offset-2 disabled:opacity-50"
           >
             {busy === l.ref ? 'Working…' : CALIBRATION_UNDO_LABEL}
           </button>
         </div>
       ))}
       {variant === 'primary' && (
-        <p className="text-[12px] text-white/40 leading-snug">{CALIBRATION_SCOPE_NOTE}</p>
+        <p className="text-caption text-label-secondary leading-snug">{CALIBRATION_SCOPE_NOTE}</p>
       )}
     </div>
   );

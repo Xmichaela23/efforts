@@ -418,16 +418,16 @@ export default function StateAdjustLens({ mainLifts }: {
     { id: 'block', label: 'The block', Icon: Layers, body: (
       <>
         <button type="button" disabled={rebuilding} onClick={rebuild} className={pill}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
-        {rebuildNote && <p className="text-[13px] text-white/75 mt-1.5">{rebuildNote}</p>}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
+        {rebuildNote && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNote}</p>}
       </>
     ) },
     ...(deload?.canDeload && nextWeek != null ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
       <>
         <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
-        {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
-        {deloadNote && <p className="text-[13px] text-white/75 mt-1.5">{deloadNote}</p>}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
+        {deload.taperWeeks.length > 0 && <p className="text-caption text-label-secondary mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
+        {deloadNote && <p className="text-footnote text-label-secondary mt-1.5">{deloadNote}</p>}
       </>
     ) }] : []),
     { id: 'strength', label: 'Strength', sport: 'strength', Icon: Dumbbell, info: STRENGTH_INFO, body: (
@@ -437,15 +437,15 @@ export default function StateAdjustLens({ mainLifts }: {
             <Row key={lt.key} id={lt.key} name={lt.label} row={lt.row} sport="strength" />
           ))}
         </div>
-        <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
-          <span className="text-[14px] text-white/85">Retest</span>
+        <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3 mt-1.5">
+          <span className="text-subhead text-label">Retest</span>
           <span className="flex flex-wrap gap-2 justify-end">
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
           </span>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">A retest opens today, in the logger.</p>
-        {saveNote && lastSaved === 'strength' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">A retest opens today, in the logger.</p>
+        {saveNote && lastSaved === 'strength' && <p className="text-footnote text-label-secondary mt-1.5">{saveNote}</p>}
       </>
     ) },
     { id: 'run', label: 'Run', sport: 'run', Icon: Activity, info: RUN_INFO, body: (
@@ -454,14 +454,14 @@ export default function StateAdjustLens({ mainLifts }: {
           <Row id="threshold" name="Threshold pace" row={run?.threshold} sport="run" />
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">{thrProposal.text}</span>
-              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : thrProposal.button}</button>
+              <span className="text-footnote text-label-secondary">{thrProposal.text}</span>
+              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-footnote px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : thrProposal.button}</button>
             </div>
           )}
           <Row id="lthr" name="Threshold heart rate" row={run?.lthr} sport="run" />
           <Row id="easy" name="Easy pace" editable={false} row={run?.easy} sport="run" />
-          <div className="flex items-center justify-between py-1 gap-3">
-            <span className="text-[14px] text-white/85">Retest</span>
+          <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3">
+            <span className="text-subhead text-label">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">
               {scheduled.run ? (
                 <button type="button" disabled={testBusy === 'run'} onClick={() => removeTest('run')} className={pill}>Threshold · {fmtDay(scheduled.run.date)} · remove</button>
@@ -471,8 +471,8 @@ export default function StateAdjustLens({ mainLifts }: {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">The threshold test goes on the calendar today.</p>
-        {saveNote && lastSaved === 'run' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">The threshold test goes on the calendar today.</p>
+        {saveNote && lastSaved === 'run' && <p className="text-footnote text-label-secondary mt-1.5">{saveNote}</p>}
       </>
     ) },
     { id: 'bike', label: 'Bike', sport: 'bike', Icon: Bike, info: BIKE_INFO, body: (
@@ -481,12 +481,12 @@ export default function StateAdjustLens({ mainLifts }: {
           <Row id="ftp" name="FTP" row={bike?.ftp} sport="bike" />
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
-              <span className="text-[13px] text-white/70">{proposal.text}</span>
-              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : proposal.button}</button>
+              <span className="text-footnote text-label-secondary">{proposal.text}</span>
+              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-footnote px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : proposal.button}</button>
             </div>
           )}
-          <div className="flex items-center justify-between py-1 gap-3">
-            <span className="text-[14px] text-white/85">Retest</span>
+          <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3">
+            <span className="text-subhead text-label">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">
               {scheduled.ftp ? (
                 <button type="button" disabled={testBusy === 'ftp'} onClick={() => removeTest('ftp')} className={pill}>20 min · {fmtDay(scheduled.ftp.date)} · remove</button>
@@ -501,8 +501,8 @@ export default function StateAdjustLens({ mainLifts }: {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">The FTP tests go on the calendar today.</p>
-        {saveNote && lastSaved === 'bike' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">The FTP tests go on the calendar today.</p>
+        {saveNote && lastSaved === 'bike' && <p className="text-footnote text-label-secondary mt-1.5">{saveNote}</p>}
       </>
     ) },
   ];
@@ -514,8 +514,8 @@ export default function StateAdjustLens({ mainLifts }: {
   return (
     <div className="px-0.5 overflow-x-hidden">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <p className="text-[14px] text-white/70 leading-snug">Changes here go into the sessions you have not done yet.</p>
-        <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-[11px] tracking-wider uppercase text-white/45 py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
+        <p className="text-subhead text-label-secondary leading-snug">Changes here go into the sessions you have not done yet.</p>
+        <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-caption tracking-wider uppercase text-label-secondary py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
       </div>
       {/* ⛔ ONE PLATE, HAIRLINE DIVIDERS, the State construction — but plain glass, not the galaxy
           texture, so Adjust reads as its own zone (Michael, 2026-09-05). Left column: icon + label,
@@ -529,7 +529,7 @@ export default function StateAdjustLens({ mainLifts }: {
       }} />
       <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
         {ordered.map((sec, i) => {
-          const color = sec.sport ? getDisciplineColor(sec.sport) : 'rgba(255,255,255,0.7)';
+          const color = sec.sport ? getDisciplineColor(sec.sport) : 'var(--label-secondary)';
           const open = sec.info ? infoOpen.has(sec.id) : false;
           // Label on its own line, body full width (Michael, 2026-09-05: "a lot of dead space on the
           // left"). The State plate's side column works for name + number rows; these rows carry pills
@@ -538,19 +538,19 @@ export default function StateAdjustLens({ mainLifts }: {
             <div key={sec.id} id={sec.sport ? `adjust-section-${sec.sport}` : undefined} className="px-3 py-3 scroll-mt-24">
               <div className="flex items-center gap-2 mb-2">
                 <sec.Icon size={15} strokeWidth={2.25} style={{ color }} className="shrink-0" aria-hidden="true" />
-                <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>
+                <span className="text-caption font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>
                 {sec.info && (
-                  <button type="button" onClick={() => toggleInfo(sec.id)} aria-label={`About ${sec.label.toLowerCase()} on this screen`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-white/45 text-[12px] leading-none">ⓘ</button>
+                  <button type="button" onClick={() => toggleInfo(sec.id)} aria-label={`About ${sec.label.toLowerCase()} on this screen`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary text-caption leading-none">ⓘ</button>
                 )}
                 {reordering && (
                   <span className="ml-auto flex items-center shrink-0 -mr-1">
-                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} up`} onClick={() => moveSection(sec.id, -1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === 0 ? 'text-white/25' : 'text-white/85'}`}>▲</span>
-                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} down`} onClick={() => moveSection(sec.id, 1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === ordered.length - 1 ? 'text-white/25' : 'text-white/85'}`}>▼</span>
+                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} up`} onClick={() => moveSection(sec.id, -1)} className={`px-2 py-0.5 text-subhead leading-none ${i === 0 ? 'text-label-secondary' : 'text-label'}`}>▲</span>
+                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} down`} onClick={() => moveSection(sec.id, 1)} className={`px-2 py-0.5 text-subhead leading-none ${i === ordered.length - 1 ? 'text-label-secondary' : 'text-label'}`}>▼</span>
                   </span>
                 )}
               </div>
-              {open && sec.info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{sec.info}</p>}
-              {sec.id === firstSportId && <p className="mb-2 text-[13px] text-white/60 leading-snug">Tap a value to change it.</p>}
+              {open && sec.info && <p className="mb-2 text-caption text-label-secondary leading-snug">{sec.info}</p>}
+              {sec.id === firstSportId && <p className="mb-2 text-footnote text-label-secondary leading-snug">Tap a value to change it.</p>}
               {sec.body}
             </div>
           );

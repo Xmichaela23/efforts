@@ -14,10 +14,15 @@ import { getProviderAttribution, garminAttributionText } from '@/lib/provider-at
  *    v6.30.2025: "Never bury the Garmin attribution in tooltips, footnotes or expandable containers."
  */
 
-/** Garmin's blue, the colour the drawer already uses for "Garmin [device]". */
-export const GARMIN_BLUE = '#007CC3';
+/**
+ * Garmin's blue for "Garmin [device]" — as TEXT (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). Garmin's
+ * #007CC3 measured 2.8–4.2:1 on the dark cards, under WCAG 2.2 SC 1.4.3's 4.5:1. The attribution work order took the blue from the drawer
+ * (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md, "Garmin's #007CC3 where the drawer already uses it"). OURS — the same
+ * 25%-toward-white mix the status words use (`STATUS_TEXT_*`, context-utils), which clears 4.5:1 on Today's done card.
+ */
+export const GARMIN_BLUE = '#409DD2';
 /** The muted token the surrounding metadata uses. */
-const MUTED = 'rgba(255,255,255,0.45)';
+const MUTED = 'var(--label-secondary)';
 
 export const ProviderAttributionLine: React.FC<{
   workout: unknown;
@@ -34,7 +39,7 @@ export const ProviderAttributionLine: React.FC<{
        Garmin device arriving through Strava reads "Garmin [device] via Strava" —
        developers.strava.com/guidelines (Garmin attribution notice) defers to Garmin's rule. */
     return (
-      <span className={`text-xs font-light whitespace-nowrap ${className}`} style={{ color: GARMIN_BLUE, ...style }}>
+      <span className={`text-caption font-normal whitespace-nowrap ${className}`} style={{ color: GARMIN_BLUE, ...style }}>
         {garminText}
       </span>
     );
@@ -46,7 +51,7 @@ export const ProviderAttributionLine: React.FC<{
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${className}`} style={style}>
       <img src="/icons/strava-powered-by.svg" alt="Powered by Strava" className="h-3" />
       {a.deviceName ? (
-        <span className="text-xs font-light" style={{ color: MUTED }}>via {a.deviceName}</span>
+        <span className="text-caption font-normal" style={{ color: MUTED }}>via {a.deviceName}</span>
       ) : null}
     </span>
   );
@@ -59,7 +64,7 @@ export const ProviderAttributionLine: React.FC<{
  * `useGarminDataPresence`): never on an account with no Garmin data.
  */
 export const GarminDerivedDataLine: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className = '', style }) => (
-  <div className={`text-xs font-light leading-snug ${className}`} style={{ color: MUTED, ...style }}>
+  <div className={`text-caption font-normal leading-snug ${className}`} style={{ color: MUTED, ...style }}>
     Insights derived in part from Garmin device-sourced data.
   </div>
 );

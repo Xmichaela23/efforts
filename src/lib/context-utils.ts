@@ -94,11 +94,21 @@ export const STATUS_COLORS = {
  */
 export function formZoneColor(zone: string | null | undefined): string {
   switch (zone) {
-    case 'optimal': return STATUS_COLORS.good;
-    case 'high risk': return STATUS_COLORS.risk;
-    default: return 'rgba(255,255,255,0.62)';
+    case 'optimal': return STATUS_TEXT_GOOD;
+    case 'high risk': return STATUS_TEXT_RISK;
+    default: return 'var(--label-secondary)';
   }
 }
+
+/**
+ * ⛔ THE STATUS COLOURS AS TEXT (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). `STATUS_COLORS` are fill
+ * colours (the calendar's missed-session bar). As words they measured under WCAG 2.2 SC 1.4.3's 4.5:1 — "high
+ * risk" 3.9:1 on State's LOAD card, "optimal" 4.0:1 on Today's lit date card. OURS — each hue mixed 25% toward
+ * white: the least single mix that clears 4.5:1 for both words on the lightest card they sit on (Today's date
+ * card, #3b3331 measured behind the line). Ledger: docs/STATE-SOURCES.md.
+ */
+export const STATUS_TEXT_GOOD = '#93B9A5';
+export const STATUS_TEXT_RISK = '#D38B87';
 
 /**
  * ⛔ NOT A DISCIPLINE — the Focus door's Race card (2026-08-05).

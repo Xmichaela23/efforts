@@ -16,7 +16,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
 
       <div className="instrument-surface w-full h-full flex flex-col min-h-0">
         <div className="px-1 pt-1 pb-3 flex-shrink-0">
-          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Today</p>
+          <p className="text-caption text-label-secondary uppercase tracking-widest mb-2">Today</p>
         </div>
 
         <div aria-hidden="true" className="instrument-divider" />

@@ -197,18 +197,18 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
 
   return (
     <div className="px-3 py-3 border-t border-white/[0.055]">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-white/55">this week's lifting</div>
+      <div className="text-caption uppercase tracking-[0.08em] text-label-secondary">this week's lifting</div>
 
       {/* ── 1. WHAT EACH SESSION COST — LEADS (p086: 6-8 recovers in 24-48h, 14+ up to 72h) ──── */}
       {week.perSession.length > 0 && (
         <div className="mt-2">
-          <div className="text-[11px] text-white/55">{RECOVERY_GAUGE_LINE}</div>
+          <div className="text-caption text-label-secondary">{RECOVERY_GAUGE_LINE}</div>
           <div className="mt-1 space-y-1">
             {week.perSession.map((s, i) => (
               <div key={`${s.label}-${i}`} className="flex items-baseline justify-between gap-3">
-                <span className="text-[13px] text-white/80">{spelledIntentLabel(s.label)}</span>
-                <span className="text-[12px] text-white/60 tabular-nums">
-                  <span className="text-white/80">{s.countedSets}</span> work sets
+                <span className="text-footnote text-label">{spelledIntentLabel(s.label)}</span>
+                <span className="text-caption text-label-secondary tabular-nums">
+                  <span className="text-label">{s.countedSets}</span> work sets
                   {isSessionVerdict(s.verdict) && SESSION_VERDICT_WORD[s.verdict] && <> · {SESSION_VERDICT_WORD[s.verdict]}</>}
                 </span>
               </div>
@@ -223,7 +223,7 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
           line renders ONLY with a plan. `hasPlan` is `has_active_plan`, this card's own input; it
           does not read whether another block rendered. */}
       {coverageVisible(hasPlan, week.belowFloor) && (
-        <div className="text-[13px] text-white/80 mt-3">
+        <div className="text-footnote text-label mt-3">
           nothing this week for {week.belowFloor.map((m) => word(MUSCLE_WORD, m)).join(', ')}
         </div>
       )}
@@ -240,19 +240,19 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
         */}
       {week.offPlan && week.offPlan.known && week.offPlan.perMuscle.length > 0 && (
         <div className="mt-3">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-white/55">outside the plan this week</div>
+          <div className="text-caption uppercase tracking-[0.08em] text-label-secondary">outside the plan this week</div>
           <div className="mt-1 space-y-1">
             {week.offPlan.perMuscle.map((m) => (
               <div key={m.muscle} className="flex items-baseline justify-between gap-3">
-                <span className="text-[13px] text-white/80">{word(MUSCLE_WORD, m.muscle)}</span>
-                <span className="text-[12px] text-white/60 tabular-nums">
-                  <span className="text-white/80">{m.sets}</span> sets · {m.effectiveReps} effective reps
+                <span className="text-footnote text-label">{word(MUSCLE_WORD, m.muscle)}</span>
+                <span className="text-caption text-label-secondary tabular-nums">
+                  <span className="text-label">{m.sets}</span> sets · {m.effectiveReps} effective reps
                   {OVER_BAND_WORD[m.verdict] && <> · {OVER_BAND_WORD[m.verdict]}</>}
                 </span>
               </div>
             ))}
           </div>
-          <div className="text-[11px] text-white/55 mt-1">
+          <div className="text-caption text-label-secondary mt-1">
             anything you add outside the plan is the volume the programme has not already counted
           </div>
         </div>
@@ -275,7 +275,7 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
         * phrase follows the server's `basis`. Absent mid-week for want of two closed weeks = CORRECT.
         */}
       {changeParts && (
-        <div className="text-[12px] text-white/70 mt-2">
+        <div className="text-caption text-label-secondary mt-2">
           {weekChangeLead(week.weekChange)}: {changeParts.join(', ')}
         </div>
       )}

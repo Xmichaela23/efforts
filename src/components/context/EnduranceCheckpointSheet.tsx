@@ -43,7 +43,7 @@ export function EnduranceCheckpointSheet({ enabled }: { enabled: boolean }) {
 
   if (cp.answered) {
     return (
-      <div className="galaxy-card readout-texture rounded-2xl px-3 py-2.5 mb-2 text-[12px] text-white/60">
+      <div className="galaxy-card readout-texture rounded-2xl px-3 py-2.5 mb-2 text-caption text-label-secondary">
         {cp.answered.decision === 'accept'
           ? `Checkpoint answered: ${cp.answered.rowsRepriced} upcoming endurance ${cp.answered.rowsRepriced === 1 ? 'session' : 'sessions'} re-priced to the numbers the app measures now.`
           : 'Checkpoint answered: the block keeps the numbers it was built on.'}
@@ -59,30 +59,30 @@ export function EnduranceCheckpointSheet({ enabled }: { enabled: boolean }) {
   return (
     <div className="galaxy-card readout-texture rounded-2xl px-3 py-3 mb-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13.5px] font-semibold tracking-[0.12em] uppercase text-white/85">week {cp.week} checkpoint</span>
-        <span className="text-[11px] text-white/55">{cp.rowsPending} upcoming endurance {cp.rowsPending === 1 ? 'session' : 'sessions'}</span>
+        <span className="text-footnote font-semibold tracking-[0.12em] uppercase text-label">week {cp.week} checkpoint</span>
+        <span className="text-caption text-label-secondary">{cp.rowsPending} upcoming endurance {cp.rowsPending === 1 ? 'session' : 'sessions'}</span>
       </div>
-      <p className="text-[12px] text-white/55 mt-1 leading-snug">
+      <p className="text-caption text-label-secondary mt-1 leading-snug">
         {stamped
           ? 'What the upcoming sessions were priced off, and what the app measures now.'
           : 'What the app measures now. These sessions were built before the app kept a record of their numbers.'}
       </p>
       <div className="mt-2 space-y-1.5">
         {rows.map((n) => (
-          <div key={n.key} className="flex items-baseline justify-between gap-3 text-[13px]">
-            <span className="text-white/70">{LABEL[n.key]}</span>
-            <span className="tabular-nums text-white/90">
-              {stamped && n.on_plan_display ? <>{n.on_plan_display} <span className="text-white/45">→</span> </> : null}
+          <div key={n.key} className="flex items-baseline justify-between gap-3 text-footnote">
+            <span className="text-label-secondary">{LABEL[n.key]}</span>
+            <span className="tabular-nums text-label">
+              {stamped && n.on_plan_display ? <>{n.on_plan_display} <span className="text-label-secondary">→</span> </> : null}
               {n.live_display ?? '—'}
-              {n.large && <span className="ml-2 text-[11px] text-white/50">big move</span>}
+              {n.large && <span className="ml-2 text-caption text-label-secondary">big move</span>}
             </span>
           </div>
         ))}
-        {rows.length === 0 && <div className="text-[12px] text-white/50">No threshold pace, FTP or threshold heart rate on file yet.</div>}
+        {rows.length === 0 && <div className="text-caption text-label-secondary">No threshold pace, FTP or threshold heart rate on file yet.</div>}
       </div>
       {lines.length > 0 && (
         <div className="mt-2 space-y-1">
-          {lines.map((l, i) => <p key={i} className="text-[12px] text-white/60 leading-snug">{l}</p>)}
+          {lines.map((l, i) => <p key={i} className="text-caption text-label-secondary leading-snug">{l}</p>)}
         </div>
       )}
       <div className="mt-3 flex items-center gap-2">
@@ -90,7 +90,7 @@ export function EnduranceCheckpointSheet({ enabled }: { enabled: boolean }) {
           type="button"
           disabled={busy != null || rows.length === 0}
           onClick={async () => { setBusy('accept'); await cp.answer('accept'); setBusy(null); }}
-          className="text-[12px] font-medium px-3 py-1.5 rounded-xl text-white bg-white/[0.12] border border-white/25 disabled:opacity-50"
+          className="text-caption font-medium px-3 py-1.5 rounded-xl text-white bg-white/[0.12] border border-white/25 disabled:opacity-50"
         >
           {busy === 'accept' ? 'Working…' : 'Use the measured numbers'}
         </button>
@@ -98,12 +98,12 @@ export function EnduranceCheckpointSheet({ enabled }: { enabled: boolean }) {
           type="button"
           disabled={busy != null}
           onClick={async () => { setBusy('keep'); await cp.answer('keep'); setBusy(null); }}
-          className="text-[12px] font-medium px-3 py-1.5 rounded-xl text-white/70 bg-white/[0.05] border border-white/15 disabled:opacity-50"
+          className="text-caption font-medium px-3 py-1.5 rounded-xl text-label-secondary bg-white/[0.05] border border-white/15 disabled:opacity-50"
         >
           {busy === 'keep' ? 'Working…' : 'Keep the block as built'}
         </button>
       </div>
-      <p className="text-[11px] text-white/40 mt-2 leading-snug">Unanswered, the block keeps its numbers. Completed sessions never change.</p>
+      <p className="text-caption text-label-secondary mt-2 leading-snug">Unanswered, the block keeps its numbers. Completed sessions never change.</p>
     </div>
   );
 }

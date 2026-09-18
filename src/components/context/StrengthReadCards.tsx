@@ -196,9 +196,9 @@ function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; tren
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] text-white/80">{label}</span>
+        <span className="text-footnote text-label">{label}</span>
         {/* ⚠️ THE COUNT, NOT A WEEK NUMBER. This card has no block axis by construction. */}
-        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged</span>
+        <span className="text-caption text-label-secondary tabular-nums">{pts.length} logged</span>
       </div>
 
       {/* which session the headline IS — directly under the number it names, not under the drift line (2026-09-04) */}
@@ -248,7 +248,7 @@ function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; tren
           ⛔ THE TEST IS THE SERVER'S (2026-09-15, Stage 4 session 2) — `heatInWindow`, beside the points it
           reads. This card compared every point's temperature against the cut-off itself. */}
       {trends?.heatInWindow === true && (
-        <div className="text-[12px] text-white/55 mt-1 leading-snug">
+        <div className="text-caption text-label-secondary mt-1 leading-snug">
           Hot days read lower on efficiency and higher on drift: heat raises heart rate at the same {isRide ? 'power' : 'pace'}.
         </div>
       )}
@@ -276,36 +276,36 @@ function EnduranceCard({ session }: { session: NamedSession }) {
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] text-white/80">{session.label}</span>
-        <span className="text-[11px] text-white/60 tabular-nums">week {latest.week}</span>
+        <span className="text-footnote text-label">{session.label}</span>
+        <span className="text-caption text-label-secondary tabular-nums">week {latest.week}</span>
       </div>
 
       {/* ── ROW 1: the reference number. Ride only — see the header. ── */}
       {refLatest ? (
         <>
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="readout-num text-[26px] leading-none">{Math.round(refLatest.value)}</span>
-            <span className="text-[12px] text-white/60">{ref!.unit} threshold</span>
+            <span className="readout-num text-title1 leading-none">{Math.round(refLatest.value)}</span>
+            <span className="text-caption text-label-secondary">{ref!.unit} threshold</span>
           </div>
           <RefChart points={ref!.points} color={color} />
         </>
       ) : (
         <div className="flex items-baseline gap-1.5 mt-1">
-          <span className="readout-num text-[26px] leading-none">{latest.hrAvg}</span>
-          <span className="text-[12px] text-white/60">bpm avg</span>
+          <span className="readout-num text-title1 leading-none">{latest.hrAvg}</span>
+          <span className="text-caption text-label-secondary">bpm avg</span>
         </div>
       )}
 
       {/* ── ROW 2: cost per session. ── */}
       {latest.efficiency != null && (
-        <div className="text-[12px] text-white/50 mt-2">
+        <div className="text-caption text-label-secondary mt-2">
           {/* Same rename as the spine card above — the field's name, not ours. */}
           efficiency factor{' '}
-          <span className="tabular-nums text-white/75">{fmtEff(latest.efficiency, isRide)}</span>
+          <span className="tabular-nums text-label-secondary">{fmtEff(latest.efficiency, isRide)}</span>
           {/* ⚠️ Only when there IS an earlier reading of the same session. One number is not a trend,
               and a second number that is the first would state a comparison that has not happened. */}
           {prior?.efficiency != null && (
-            <span className="text-white/55"> · week {prior.week} <span className="tabular-nums">{fmtEff(prior.efficiency, isRide)}</span></span>
+            <span className="text-label-secondary"> · week {prior.week} <span className="tabular-nums">{fmtEff(prior.efficiency, isRide)}</span></span>
           )}
         </div>
       )}
@@ -314,7 +314,7 @@ function EnduranceCard({ session }: { session: NamedSession }) {
       {/* ⛔ ROW 3 (fade / second-half drift) REMOVED (2026-09-01, Michael: "gobbely gook nonsense") —
           same reason as the spine card above. The decoupling signal stays server-side, off the card. */}
 
-      {durLabel && prior?.efficiency != null && <div className="text-[11px] text-white/55 mt-1">same {durLabel} session</div>}
+      {durLabel && prior?.efficiency != null && <div className="text-caption text-label-secondary mt-1">same {durLabel} session</div>}
     </div>
   );
 }
