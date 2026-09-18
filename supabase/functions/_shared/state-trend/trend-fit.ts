@@ -150,3 +150,18 @@ export function spineTrends(points: ReadonlyArray<SpinePointLike>): {
     heatInWindow: points.some((p) => typeof p.tempF === 'number' && p.tempF >= HEAT_NOTE_TEMP_F),
   };
 }
+
+/**
+ * ⛔ THE AEROBIC EFFICIENCY CHART'S LINE — THE CHANGE AGAINST THE ATHLETE'S OWN START (2026-09-18). The fitted
+ * line's end against its start, as a whole percent, over the line's own weeks: "8% lower than 10 weeks ago"
+ * (1.625 → 1.497). The start is the fitted value at the first run in the window, so it is the athlete's own
+ * reading, not a population norm.
+ * FIELD — definition (percent change, (end − start) ÷ start). Null with no fitted line.
+ */
+export function efficiencyChangeLine(fit: TrendFit | null | undefined): string | null {
+  if (!fit || fit.tooFew !== false || !(fit.start > 0)) return null;
+  const pct = Math.round(Math.abs((fit.end - fit.start) / fit.start) * 100);
+  const ago = `${fit.weeks} ${fit.weeks === 1 ? 'week' : 'weeks'} ago`;
+  if (pct === 0) return `the same as ${ago}`;
+  return `${pct}% ${fit.end > fit.start ? 'higher' : 'lower'} than ${ago}`;
+}

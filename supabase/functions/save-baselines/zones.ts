@@ -40,6 +40,7 @@ import {
   resolveCurrentRunEasyPace,
   resolveCurrentRunThresholdPace,
   pendingRunThresholdProposal,
+  runThresholdSourceWord,
 } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
@@ -306,17 +307,8 @@ function buildReadout(args: {
 
   const thr = resolveCurrentRunThresholdPace(baselinesLike);
   const thrMine = pn.threshold_pace_source === 'manual';
-  const thrSamples = Number((learned as { run_threshold_pace_sec_per_km?: { sample_count?: unknown } } | null)
-    ?.run_threshold_pace_sec_per_km?.sample_count);
-  const thrAccepted = positive((learned as { run_threshold_pace_accepted?: { value?: unknown } } | null)
-    ?.run_threshold_pace_accepted?.value) != null;
-  const thrNote = thrMine
-    ? 'your number'
-    : thr.source === 'learned'
-      ? (thrAccepted
-          ? 'accepted from runs'
-          : `from runs${Number.isFinite(thrSamples) && thrSamples > 0 ? `, ${thrSamples} best efforts` : ''}`)
-      : thr.sec_per_mi != null ? 'typed, until your runs measure' : null;
+  // The word is `runThresholdSourceWord`'s (2026-09-18) — the same call the coach payload makes for State's run row.
+  const thrNote = runThresholdSourceWord(baselinesLike);
   const thrPaceText = pace(thr.sec_per_mi);
   const thresholdRow: BaselineReadoutRow = {
     value: pill(thrPaceText, thr.source, thrMine),

@@ -727,7 +727,7 @@ export default function StateTab({
           (null before a plan starts and after it ends), so the two always agree.
           Sits OUTSIDE the neutral plates: its rows are per-discipline, and each wears its own
           sport-keyed plate inside the section. */}
-      <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} appliedFtp={(wsv.trends as any)?.applied_ftp ?? null} appliedFtpWord={(wsv.trends as any)?.applied_ftp_word ?? null} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} hasActivePlan={wsv.plan.has_active_plan === true} asOf={data.as_of_date ?? null} />
+      <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} appliedFtp={(wsv.trends as any)?.applied_ftp ?? null} appliedFtpWord={(wsv.trends as any)?.applied_ftp_word ?? null} runThreshold={{ pace: wsv.trends?.applied_run_threshold ?? null, word: wsv.trends?.applied_run_threshold_word ?? null, hr: wsv.trends?.applied_run_threshold_hr ?? null, easyTarget: wsv.trends?.run_easy_target ?? null }} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} hasActivePlan={wsv.plan.has_active_plan === true} asOf={data.as_of_date ?? null} />
 
       <div className="mt-2 galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 

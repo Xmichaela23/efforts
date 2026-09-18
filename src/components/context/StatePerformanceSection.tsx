@@ -1006,7 +1006,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, appliedFtpWord = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; appliedFtpWord?: string | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, appliedFtpWord = null, runThreshold = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; appliedFtpWord?: string | null; /** the coach payload's run threshold, printed as sent (v215) */ runThreshold?: { pace: string | null; word: string | null; hr: number | null; easyTarget: string | null } | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -1100,46 +1100,37 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       return [n > 0 ? { name: 'sessions', value: String(n), note: 'this week' } : { name: 'lifts', value: 'none logged' }];
     }
     if (disc === 'run') {
-      // ⛔ EASY AND HARD ON THEIR OWN POOLS (Michael 2026-09-01: "show both easy and hard runs"). Each
-      // group carries its OWN recent pace + HR (real recorded pace, never the index reconstruction);
-      // no real pace for a group → its run count, never a fabricated number. Term is "hard", not
-      // "quality" — plainer for this audience, and it pairs with "easy".
-      const groups = runFitness?.efficiency?.groups;
-      const rowFor = (g: string, label: string): SportRow | null => {
-        const grp = Array.isArray(groups) ? groups.find((x) => x.group === g) : undefined;
-        if (!grp || (grp.runs ?? 0) === 0) return null;
-        if (grp.recentPaceSecPerKm != null) {
-          // 2026-09-04: the warm-up stand-in (easy rows read off the warm-ups of hard runs) was OURS and is gone —
-          // an easy row is easy runs, a hard row is hard runs, recorded pace and heart rate, nothing borrowed.
-          // ⛔ THE PACE ARRIVES IN THE ATHLETE'S OWN UNIT (2026-09-15, Stage 4 session 2). This multiplied
-          // the server's seconds-per-kilometre by 1.60934 in the render — a unit pick on the screen.
-          return { name: label, value: grp.recentPaceDisplay ?? '—', note: [grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '', grp.paceIsGraded === false ? 'flat pace, no elevation' : ''].filter(Boolean).join(' · ') || undefined };
-        }
-        return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
-      };
-      const rows = [rowFor('easy', 'easy'), rowFor('quality', 'hard')].filter((x): x is SportRow => !!x);
-      // ⛔ AEROBIC EFFICIENCY IS THE TOP NUMBER, TRAININGPEAKS' WAY AND NOTHING ELSE'S (Michael 2026-09-04:
-      // one absolute reference per metric, never "the formula is TrainingPeaks and the window is Garmin's").
-      // FIELD — TrainingPeaks: Efficiency Factor is a PER-WORKOUT number, printed in the workout summary
-      // (graded pace ÷ average heart rate); the dashboard trends it as one dot per workout over the date
-      // range. So the row prints the LAST steady run's EF and says which run. No 28-day average (Garmin's
-      // window) and no ↑→↓ arrow (Garmin's three states) — both were the other product's rule on this
-      // product's number. The chart on the open card is the trend; TrainingPeaks' instruction is to read
-      // the line, not one run against the last.
-      // ⚠️ The chart's points and its fitted line are the server's (`enduranceSpineTrends`, audit 2026-09-10 H-B07).
-      const aero = stateDisplay?.enduranceSpineTrends?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
-      const aeroPts = aero?.efficiencyTrend.points ?? [];
-      // The row reads the TREND LINE (WKO5's fitted line), start → end, never one run (2026-09-04, Michael).
-      const aeroFit = aero?.efficiencyTrend.fit ?? null;
-      const aeroLast = latestPoint(aeroPts);
-      if (aeroFit && aeroFit.tooFew === false) {
-        rows.unshift({
-          name: 'aerobic efficiency',
-          value: fmtEff(aeroFit.end, false),
-          note: `${aeroFit.weeks}-week trend · from ${fmtEff(aeroFit.start, false)}`,
+      // ⛔ THE THRESHOLD IS THE HEADLINE (2026-09-18) — the bike row's shape: the number the app runs on, then its
+      // word. Pace, threshold heart rate and word are the coach payload's (`trends.applied_run_threshold*`, from
+      // `resolveCurrentRunThresholdPace`, `resolveCurrentLthr` and `runThresholdSourceWord` — the calls the plan and
+      // Adjust make). Printed as sent. A cached row before v215 has none and the row starts at easy.
+      const rows: SportRow[] = [];
+      if (runThreshold?.pace) {
+        rows.push({
+          name: 'threshold',
+          value: runThreshold.hr != null ? `${runThreshold.pace} · ${runThreshold.hr} bpm` : runThreshold.pace,
+          note: runThreshold.word ?? undefined,
         });
-      } else if (aeroFit && aeroLast != null) {
-        rows.unshift({ name: 'aerobic efficiency', value: fmtEff(aeroLast.value, false), note: `${fmtDayShort(aeroLast.date)} run · too few for a trend` });
+      }
+      // ⛔ THE EASY ROW: what was run, with the plan's easy range under it. Recorded pace + heart rate of the easy
+      // pool (never the index reconstruction); no real pace → the run count. The target is the server's
+      // (`trends.run_easy_target`, the plan's easy range off the same threshold), so it moves with an accepted one.
+      // ⛔ THE HARD ROW IS GONE (Michael, 2026-09-18): it averaged whole hard sessions, warm-up and jogs included.
+      // ⛔ AEROBIC EFFICIENCY LEFT THIS ROW FOR ITS CHART (2026-09-18) — the open run card, whose line states the
+      // change against the start of the window.
+      const groups = runFitness?.efficiency?.groups;
+      const easy = Array.isArray(groups) ? groups.find((x) => x.group === 'easy') : undefined;
+      if (easy && (easy.runs ?? 0) > 0) {
+        if (easy.recentPaceSecPerKm != null) {
+          // ⛔ THE PACE ARRIVES IN THE ATHLETE'S OWN UNIT (2026-09-15, Stage 4 session 2).
+          rows.push({
+            name: 'easy',
+            value: [easy.recentPaceDisplay ?? '—', easy.recentHrAvg != null ? `${easy.recentHrAvg} bpm` : ''].filter(Boolean).join(' · '),
+            note: [runThreshold?.easyTarget ? `target ${runThreshold.easyTarget}` : '', easy.paceIsGraded === false ? 'flat pace, no elevation' : ''].filter(Boolean).join(' · ') || undefined,
+          });
+        } else {
+          rows.push({ name: 'easy', value: `${easy.runs} run${easy.runs === 1 ? '' : 's'}` });
+        }
       }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
       // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot

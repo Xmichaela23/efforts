@@ -587,6 +587,11 @@ export type CoachWeekContextV1 = {
     } | null;
     trends: {
       fitness_direction: string;
+      /** The run threshold the app runs on, as printed ("9:35/mi"), its word, its heart rate, and the plan's easy range (v215). */
+      applied_run_threshold?: string | null;
+      applied_run_threshold_word?: string | null;
+      applied_run_threshold_hr?: number | null;
+      run_easy_target?: string | null;
       /** S2: the pre-assembled State display contract (cards + per-discipline fitness reads), built on
        *  the server and rendered verbatim by StatePerformanceSection. null only before the first snapshot
        *  produces it → the client shows a loading state (there is NO client-side fallback assembly anymore). */

@@ -40,7 +40,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, fit = null, trendWord }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, fit = null, trendWord, changeLine = null }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
@@ -61,6 +61,8 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   fit?: TrendFit | null;
   /** The noun for the caption, e.g. 'efficiency' / 'drift'. */
   trendWord?: string;
+  /** The server's change line ("8% lower than 10 weeks ago"), printed in place of "start → end" when present. */
+  changeLine?: string | null;
 }) {
   const pts = Array.isArray(series) ? series : [];
   if (pts.length < 2) {
@@ -130,7 +132,8 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
         {line && <line x1={x(0)} y1={y(line.start)} x2={x(pts.length - 1)} y2={y(line.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
-      {line && (
+      {line && changeLine && <span className="text-[13px] text-white/85">{changeLine}</span>}
+      {line && !changeLine && (
         <span className="text-[13px] text-white/85">
           {trendWord && !title && !label ? `${trendWord} ` : ''}over {line.weeks} {line.weeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(line.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(line.end)}{unit}</span>
         </span>

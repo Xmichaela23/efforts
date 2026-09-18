@@ -209,7 +209,8 @@ function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; tren
         return (
           <DatedChart points={eff} color={color} dotNoun={noun} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" fit={f}
             label="Efficiency" headline={f.tooFew === false ? fmtEff(f.end, isRide) : undefined} qualifier="higher is better"
-            keyLine={`dots: one ${noun}, ${isRide ? 'power' : 'pace'} ÷ heart rate · dashed: the trend${leftOutNote}`} />
+            keyLine={`dots: one ${noun}, ${isRide ? 'power' : 'pace'} ÷ heart rate · dashed: the trend${leftOutNote}`}
+            changeLine={trends.efficiencyChangeLine ?? null} />
         );
       })()}
       {/* The chart's own key, the same shape as the drift chart's (Michael, 2026-09-04: "efficiency needs to know if
@@ -348,9 +349,9 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 // The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
-function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, fit, title, label, headline, qualifier, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; label?: string; headline?: string; qualifier?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string; /** the server's fitted line through `points` (H-B07); none → no line */ fit?: TrendFit | null }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, fit, title, label, headline, qualifier, keyLine, divider, changeLine }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; label?: string; headline?: string; qualifier?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string; /** the server's fitted line through `points` (H-B07); none → no line */ fit?: TrendFit | null; /** the server's change line, in place of start → end */ changeLine?: string | null }) {
   const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} fit={fit ?? null} trendWord={trendWord} title={title} label={label} headline={headline} qualifier={qualifier} keyLine={keyLine} divider={divider} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} fit={fit ?? null} trendWord={trendWord} title={title} label={label} headline={headline} qualifier={qualifier} keyLine={keyLine} divider={divider} changeLine={changeLine ?? null} />;
 }
 
 export default EnduranceReadCards;

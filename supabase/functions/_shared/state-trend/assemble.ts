@@ -32,7 +32,7 @@ import { canonicalDisplayName, canonicalize } from '../canonicalize.ts';
 // Audit 2026-09-10 (item 17): the slot fold, the chart trendlines and the logged-sets list, each moved
 // off the State screen — see each file's header.
 import { foldVariantSlots } from './fold-lift-slots.ts';
-import { spineTrends, fitTrend, type ChartTrend } from './trend-fit.ts';
+import { spineTrends, fitTrend, efficiencyChangeLine, type ChartTrend } from './trend-fit.ts';
 import { KG_PER_LB } from '../strength/session-volume.ts';
 import { buildLoggedLifts, type LoggedLift } from './logged-sets.ts';
 // ⛔ VIADA'S TWO LIFTING DOSES, PERFORMED — the counting lives in `accessory-dosing`, which owns his
@@ -1623,7 +1623,14 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // ⛔ THE SPINE'S CHART TRENDS, BESIDE IT AND NOT ON IT (H-B07). The series stays exactly as the caller
     // built it (`run-grouping-spine.test.ts` pins that); each series' efficiency and drift chart — the
     // points drawn and the fitted line through exactly those points — rides here, keyed by sport + group.
-    enduranceSpineTrends: (inp.enduranceSpine ?? []).map((s) => ({ sport: s.sport, group: s.group, ...spineTrends(s.points ?? []) })),
+    // The run's aerobic efficiency chart also carries its change line (2026-09-18) — the only chart that prints one.
+    enduranceSpineTrends: (inp.enduranceSpine ?? []).map((s) => {
+      const t = spineTrends(s.points ?? []);
+      return {
+        sport: s.sport, group: s.group, ...t,
+        ...(s.sport === 'run' && s.group === 'aerobic' ? { efficiencyChangeLine: efficiencyChangeLine(t.efficiencyTrend.fit) } : {}),
+      };
+    }),
     // ⛔ HIS TWO LIFTING DOSES, OVER WHAT WAS ACTUALLY LOGGED. Computed HERE and not at the caller
     // because the percentages need `refMaxByCanonical`, which is resolved a few lines up — the same
     // windowed max the derived heavy gate uses. A second resolution of "what is this lift's max"
@@ -2034,6 +2041,9 @@ export interface EnduranceSpineTrends {
   /** A session in the window at or above Garmin's 72 °F cut-off → the card prints its fixed heat line.
    *  ⛔ The test used to run on the phone over every point (2026-09-15, Stage 4 session 2). */
   heatInWindow?: boolean;
+  /** The run aerobic series only: "8% lower than 10 weeks ago", off the efficiency line (`efficiencyChangeLine`).
+   *  Absent on a snapshot written before 2026-09-18; the chart then prints its start → end line. */
+  efficiencyChangeLine?: string | null;
 }
 
 export interface StateDisplayV1 {

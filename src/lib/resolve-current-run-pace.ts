@@ -469,3 +469,41 @@ export function acceptLearnedRunThreshold(
     run_threshold_pace_accepted: { ...(est as object), value, accepted_at: now.toISOString(), accepted_from: value, accepted_via: via },
   };
 }
+
+/**
+ * ⛔ WHERE THE THRESHOLD PACE CAME FROM, IN ADJUST'S WORDS — ONE RULE, BOTH SCREENS (2026-09-18). The run twin
+ * of `ftpSourceWord`. Adjust's readout (`save-baselines/zones.ts`) wrote this inline; State's run row prints the
+ * same word off the coach payload, so the rule moved here and both call it.
+ */
+export function runThresholdSourceWord(baselines: RunBaselinesLike): string | null {
+  /**
+   * ⛔ THE WORD FOLLOWS THE TIER THE PACE IN USE CAME FROM (2026-09-18). It used to test the athlete's choice
+   * first and fall through to "typed" for anything not `learned`, so two cases printed the wrong source:
+   *   · `learned-low` (measured from runs, low confidence) read "typed, until your runs measure";
+   *   · "my number" chosen with no typed pace on file read "your number" over a pace measured from runs.
+   */
+  const thr = resolveCurrentRunThresholdPace(baselines);
+  if (thr.sec_per_mi == null) return null;
+  switch (thr.source) {
+    case 'manual-chosen': return 'your number';
+    case 'manual': return 'typed, until your runs measure';
+    case 'learned':
+    case 'learned-low': {
+      if (asPositiveFinite(baselines?.learned_fitness?.run_threshold_pace_accepted?.value) != null) return 'accepted from runs';
+      const n = Number(baselines?.learned_fitness?.run_threshold_pace_sec_per_km?.sample_count);
+      return `from runs${Number.isFinite(n) && n > 0 ? `, ${n} best efforts` : ''}`;
+    }
+    default: return null;
+  }
+}
+
+/**
+ * A pace as a screen prints it — `M:SS/mi`, or `M:SS/km` on a metric account. sec/MILE in. The whole pace is
+ * rounded once, then split (rounding the seconds on their own printed "7:60/mi", §8.0 #2).
+ */
+export function formatRunPace(secPerMi: number | null | undefined, metric: boolean): string | null {
+  const v = asPositiveFinite(secPerMi);
+  if (v == null) return null;
+  const s = Math.round(metric ? v / SEC_PER_KM_TO_SEC_PER_MI : v);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}${metric ? '/km' : '/mi'}`;
+}
