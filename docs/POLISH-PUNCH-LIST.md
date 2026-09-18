@@ -14,7 +14,7 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## AWAITING MICHAEL (2026-09-17, PUSHED f1a39cda, iOS synced) — TAB BAR ABOVE THE SWIPE ZONE; DAY SWIPE
+## [x] VERIFIED ON A DEVICE 2026-09-18 (Michael: "tab is fixed") — TAB BAR ABOVE THE SWIPE ZONE; DAY SWIPE
 
 Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall, 14 px labels; the + no longer covers
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
