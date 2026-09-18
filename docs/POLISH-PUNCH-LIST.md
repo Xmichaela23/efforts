@@ -20,6 +20,15 @@ Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall,
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
 start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
 
+## QUEUED (2026-09-18, Michael on the Pull day logger) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
+
+Kroc Row (catalogue `isUnilateral: true`, `src/lib/exercise-config.ts` 'kroc row') prints "target 2-4 · 3 to 4 in
+reserve" with no word that the reps are per arm. Standard logging practice: log the one dumbbell's weight and count
+reps per side — 10 left and 10 right is 10 reps, not 20; if one arm gets fewer, log the fewer (steady.rocks
+"How to Track Unilateral Exercises"; getbazu.com "How to Log Workout Weight"). Strong/Hevy's own handling not found.
+Approved words (Michael, 2026-09-18), for every movement the catalogue marks one-arm, read off that one flag:
+`target 2-4 per arm · 3 to 4 in reserve`. One row per set covers both arms.
+
 ## QUEUED (2026-09-18, seen on Michael's 2026-09-14 run) — A 47-SECOND WALK WAS PAIRED WITH A 0:45 REP
 
 A session whose watch laps do not fit the plan (the athlete ran the rep block as one lap) still paired one short
