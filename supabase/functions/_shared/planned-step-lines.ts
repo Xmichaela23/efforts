@@ -17,6 +17,7 @@
  * round; a lone recovery after a block of rounds that then repeats is the rest between sets. A step that
  * repeats nothing prints on its own line.
  */
+import { isCeilingOnly } from './ride-power.ts';
 
 type Range = { lower?: number; upper?: number };
 export type PlannedStep = {
@@ -108,6 +109,8 @@ function powerText(s: PlannedStep): string | undefined {
   if (!(r && typeof r.lower === 'number')) return undefined;
   const lo = Math.round(r.lower);
   if (typeof r.upper !== 'number') return `${lo} W and up`;
+  // p239's easy step, 0 up to the ceiling: "under 126 W" (approved by Michael, 2026-09-18).
+  if (isCeilingOnly(r.lower, r.upper)) return `under ${Math.round(r.upper)} W`;
   const hi = Math.round(r.upper);
   return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
 }

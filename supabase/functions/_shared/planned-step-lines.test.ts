@@ -128,3 +128,9 @@ Deno.test('a run warm-up and cool-down print "easy pace" and the range; /km for 
   assertEquals(metric[0], '10:00 warm-up · easy pace 6:48–7:41/km');
   assertEquals(metric[2], '8:00 cool-down · easy pace 6:48–7:41/km');
 });
+
+/** p239's easy step, 0 up to 75% of FTP: "under 126 W" (approved by Michael, 2026-09-18). */
+Deno.test('a ceiling-only ride step prints "under N W"', () => {
+  const lines = plannedStepLines([{ kind: 'work', seconds: 4800, powerRange: { lower: 0, upper: 126 } } as PlannedStep], { sport: 'ride' } as never);
+  assertEquals(lines, ['1:20:00 @ under 126 W']);
+});
