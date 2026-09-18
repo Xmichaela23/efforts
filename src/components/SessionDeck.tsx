@@ -132,9 +132,9 @@ export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows
   if (!spacing) return null;
   return (
     <div
-      className="text-[13px] font-light leading-snug"
+      className="text-footnote font-normal leading-snug"
       /* 12 px to the first card (Michael, 2026-09-09). */
-      style={{ color: 'rgba(255,255,255,0.72)', padding: '0 0.35rem 12px' }}
+      style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 12px' }}
     >
       <div>{spacing.lead}</div>
       {/* ⛔ THE TAP THE LOAD CARD'S CHEVRON HAD: the words left, the chevron at the far right, turning
@@ -145,18 +145,18 @@ export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="mt-0.5 flex w-full items-center justify-between bg-transparent border-none p-0 text-left cursor-pointer text-[13px] font-light leading-snug"
-            style={{ color: 'rgba(255,255,255,0.55)' }}
+            className="mt-0.5 flex w-full items-center justify-between bg-transparent border-none p-0 text-left cursor-pointer text-footnote font-normal leading-snug"
+            style={{ color: 'var(--label-secondary)' }}
           >
             <span>{spacing.closerLabel}</span>
             <ChevronDown
-              className="h-4 w-4 shrink-0 text-white/40"
+              className="h-4 w-4 shrink-0 text-label-secondary"
               aria-hidden="true"
               style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
             />
           </button>
           {open ? (
-            <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.55)' }}>{spacing.closer}</div>
+            <div style={{ marginTop: 2, color: 'var(--label-secondary)' }}>{spacing.closer}</div>
           ) : null}
         </>
       ) : null}
@@ -195,20 +195,20 @@ export const SessionDeck: React.FC<{
         <div className="flex items-baseline justify-between gap-3">
           {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
           <div
-            className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
+            className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
             style={{ letterSpacing: '-0.01em', color: emphasis === 'lead' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.82)' }}
           >
             {c.name}
           </div>
           {c.meta ? (
-            <div className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.38)' }}>
+            <div className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
               {c.meta}
             </div>
           ) : null}
         </div>
         {c.kind ? (
           <div
-            className="flex items-center gap-2 text-[12px] uppercase tracking-[0.08em]"
+            className="flex items-center gap-2 text-caption uppercase tracking-[0.08em]"
             style={{ color: colour, margin: '5px 0 8px' }}
           >
             <span
@@ -221,8 +221,8 @@ export const SessionDeck: React.FC<{
         ) : null}
         {c.cue ? (
           <div
-            className="text-[15px]"
-            style={{ lineHeight: 1.35, color: 'rgba(255,255,255,0.92)', marginTop: c.kind ? 0 : 8 }}
+            className="text-subhead"
+            style={{ lineHeight: 1.35, color: 'var(--label)', marginTop: c.kind ? 0 : 8 }}
           >
             {c.cue}
           </div>
@@ -335,13 +335,13 @@ export const LiftSessionCard: React.FC<{
           tabIndex={0}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen?.(); } }}
-          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
+          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
           style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86, cursor: 'pointer' }}
         >
           {title}
         </span>
         {meta ? (
-          <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>{meta}</span>
+          <span className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>{meta}</span>
         ) : null}
       </div>
 
@@ -369,26 +369,26 @@ export const LiftSessionCard: React.FC<{
                   WHOLE to its own line under the name — `white-space: nowrap` is what keeps "MAXIMAL
                   EFFORT" from splitting into two lines of one word each. */}
               <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[16px] font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>{c.name}</span>
+                <span className="text-body font-medium" style={{ color: 'var(--label)' }}>{c.name}</span>
                 {c.kind ? (
-                  <span className="text-[12px] uppercase tracking-[0.08em]" style={{ color: colour, whiteSpace: 'nowrap' }}>{c.kind}</span>
+                  <span className="text-caption uppercase tracking-[0.08em]" style={{ color: colour, whiteSpace: 'nowrap' }}>{c.kind}</span>
                 ) : null}
               </div>
-              <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
+              <span className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
                 {/* server-word: materialize-plan stamps `weight_display: 'By feel'` (2026-09-17, Stage C). */}
                 {c.meta ?? ''}
               </span>
             </div>
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
             {c.cues.map((cue) => (
-              <div key={cue} className="text-[14px]" style={{ lineHeight: 1.28, marginTop: 2, color: 'rgba(255,255,255,0.72)' }}>{cue}</div>
+              <div key={cue} className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{cue}</div>
             ))}
           </div>
         ))}
       </div>
 
       {!open && more > 0 ? (
-        <div className="text-[13px]" style={{ marginTop: 10, color: 'rgba(255,255,255,0.55)' }}>{more} more</div>
+        <div className="text-footnote" style={{ marginTop: 10, color: 'var(--label-secondary)' }}>{more} more</div>
       ) : null}
     </div>
   );
@@ -422,20 +422,20 @@ export const SessionCard: React.FC<{
       <div className="flex items-baseline justify-between gap-3">
         {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
         <div
-          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
+          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
           style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86 }}
         >
           {title}
           {/* ⛔ THE MACHINE, BESIDE THE NAME (work order 2026-09-09 §1). It is the same session
               performed somewhere else, so it qualifies the name rather than replacing it. */}
           {venueLabel ? (
-            <span className="text-[13px] font-light ml-2" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <span className="text-footnote font-normal ml-2" style={{ color: 'var(--label-secondary)' }}>
               {venueLabel}
             </span>
           ) : null}
         </div>
         {meta ? (
-          <div className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
+          <div className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
             {meta}
           </div>
         ) : null}
@@ -443,7 +443,7 @@ export const SessionCard: React.FC<{
       {lines.map((line, i) => (
         <div
           key={line}
-          className="text-[15px]"
+          className="text-subhead"
           style={{ lineHeight: 1.35, marginTop: i === 0 ? 8 : 6, color: i === 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.62)' }}
         >
           {line}
@@ -481,11 +481,13 @@ const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSPrope
    * without the grid — verified on screen, Sep 10, two done cards reading as a different material
    * from the load card directly beneath them.
    * ⚠️ DONE STILL READS AS DONE, and it does NOT do it with a different surface: the edge is thinner
-   * and unglowed, the title sits at low alpha, and the row carries a checkmark. Same material, quieter.
+   * and unglowed, and the row carries a checkmark. Same material, quieter. (The title was at low alpha
+   * until 2026-09-18; it measured under 4.5:1, so it is full colour and the card's ground is calmed —
+   * `plate-calm` — so Garmin's device line under it clears 4.5:1 too.)
    */
   // ⛔ THINNER EDGE, NO GLOW, WHEN IT IS NOT THE FIRST SESSION (§3e.2).
   // ⛔ NO OUTLINE HERE EITHER — see `deckGlass`. A done card was already the quietest edge on the
-  // screen; the checkmark and the low-alpha title are what say done, not a line.
+  // screen; the checkmark is what says done, not a line.
   border: 'none',
   boxShadow: emphasis === 'lead'
     ? `0 0 0 1px rgba(255,255,255,0.02) inset, 0 14px 40px rgba(0,0,0,0.5), 0 0 24px rgba(${rgb},0.06)`
@@ -542,21 +544,22 @@ export const CompletedSessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="w-full text-left galaxy-card readout-texture readout-texture--spectral"
+      className="w-full text-left galaxy-card plate-calm readout-texture readout-texture--spectral"
       style={{ ...doneGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        {/* ⚠️ THE SPORT COLOUR AT LOW ALPHA — done, not gone. A flat grey title would lose which
-            sport this was, which is the one thing the row still has to say at a glance. */}
+        {/* ⚠️ THE SPORT COLOUR, FULL STRENGTH (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). It was
+            the sport colour at 55% / 43% — "done, not gone" — and measured 2.2–2.6:1, under WCAG 2.2's 4.5:1.
+            The ✓ beside it says done; a flat grey title would lose which sport this was. */}
         {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
         <div
-          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
-          style={{ color: `${colour}${emphasis === 'lead' ? '8C' : '6E'}` }}
+          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
+          style={{ color: colour }}
         >
           {deriveWorkoutTitle(workout as never)}
         </div>
-        <span aria-label="Completed" className="text-[13px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.45)' }}>✓</span>
+        <span aria-label="Completed" className="text-footnote flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>✓</span>
       </div>
 
       {/* ⛔ WHERE THE ROW CAME FROM, DIRECTLY UNDER THE NAME (docs/WORKORDER-garmin-strava-attribution-
@@ -568,7 +571,7 @@ export const CompletedSessionCard: React.FC<{
       <ProviderAttributionLine workout={workout} className="block" style={{ marginTop: 3 }} />
 
       {headline ? (
-        <div className="text-[15px] tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.62)' }}>
+        <div className="text-subhead tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'var(--label-secondary)' }}>
           {headline}
         </div>
       ) : null}
@@ -580,7 +583,7 @@ export const CompletedSessionCard: React.FC<{
         * what keeps it worth reading on the sessions that do.
         */}
       {boom ? (
-        <div className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.92)' }}>
+        <div className="text-subhead" style={{ lineHeight: 1.35, marginTop: 6, color: 'var(--label)' }}>
           {boom}
         </div>
       ) : null}

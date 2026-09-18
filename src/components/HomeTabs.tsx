@@ -34,10 +34,10 @@ export default function HomeTabs({
             type="button"
             onClick={() => onChange(key)}
             aria-current={active}
-            className={`flex items-center justify-center gap-1.5 py-2 text-[13px] font-light tracking-wide transition-colors border-b-2 ${
+            className={`flex items-center justify-center gap-1.5 py-2 text-footnote font-normal tracking-wide transition-colors border-b-2 ${
               active
                 ? 'text-white border-white/30'
-                : 'text-gray-400 border-transparent hover:text-gray-300'
+                : 'text-label-secondary border-transparent hover:text-label'
             }`}
           >
             <Icon className="h-4 w-4" />

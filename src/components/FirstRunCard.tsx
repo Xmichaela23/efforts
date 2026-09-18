@@ -55,7 +55,7 @@ export default function FirstRunCard({ id, children }: { id: string; children: R
     <button
       type="button"
       onClick={dismiss}
-      className="w-full text-left rounded-xl border border-white/25 bg-white/[0.06] px-4 py-3 text-white/85 text-sm"
+      className="w-full text-left rounded-xl border border-white/25 bg-white/[0.06] px-4 py-3 text-label text-subhead"
     >
       {children}
     </button>

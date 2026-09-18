@@ -77,7 +77,7 @@ export default function AdherenceChips({
   hideTopAdherence,
   dense = false,
 }: AdherenceChipsProps) {
-  const numCls = dense ? 'readout-num text-sm whitespace-nowrap' : 'readout-num text-lg whitespace-nowrap';
+  const numCls = dense ? 'readout-num text-subhead whitespace-nowrap' : 'readout-num text-body whitespace-nowrap';
   /**
    * ⛔ 12 px, AND THE MUTED TOKEN AT 0.7 (Michael, 2026-09-09, on the device). The tile label and its
    * sub-label were 9 px on the done card — smaller than any other text on the screen — at 40 per
@@ -86,8 +86,8 @@ export default function AdherenceChips({
    * ⚠️ THE SAME SIZE DENSE AND NOT. The dense variant existed to fit four tiles across a card, and
    * what it actually bought was four unreadable ones — the tiles wrap, and wrapping is fine.
    */
-  const labelCls = 'readout-label text-[12px] uppercase text-center whitespace-nowrap';
-  const subCls = 'text-[12px] text-white/70 text-center leading-snug whitespace-nowrap';
+  const labelCls = 'readout-label text-caption uppercase text-center whitespace-nowrap';
+  const subCls = 'text-caption text-label-secondary text-center leading-snug whitespace-nowrap';
   const rowCls = dense
     ? 'flex items-start justify-between w-full px-0 gap-1'
     : 'flex items-start justify-between w-full px-3';
@@ -99,8 +99,10 @@ export default function AdherenceChips({
    */
   const rowOf = (nodes: React.ReactNode[]) => {
     const shown = nodes.filter(Boolean);
-    if (!dense && shown.length >= 4) {
-      return <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-3">{shown}</div>;
+    // ⛔ AND ON THE DONE CARD TOO (2026-09-18). The dense variant kept four in one row; once a ride carried a
+    // workload tile, Today's done card printed "usual 26–54" over "14 of 17 intervals done" at 390 px.
+    if (shown.length >= 4) {
+      return <div className={`grid grid-cols-2 gap-x-3 ${dense ? 'gap-y-3 px-0' : 'gap-y-4 px-3'} w-full`}>{shown}</div>;
     }
     return <div className={rowCls}>{shown}</div>;
   };
@@ -342,7 +344,7 @@ export default function AdherenceChips({
 
       return (
         <div className="w-full pt-1 pb-2">
-          {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
+          {weekLabel && <div className="readout-label mb-2 text-center text-caption uppercase">{weekLabel}</div>}
           <div className={outerCls}>
             <div className={rowCls}>
               {chipText('Workload', loadValue, loadSubtitle)}
@@ -358,7 +360,7 @@ export default function AdherenceChips({
     if (isRide) {
       return (
         <div className="w-full pt-1 pb-2">
-          {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
+          {weekLabel && <div className="readout-label mb-2 text-center text-caption uppercase">{weekLabel}</div>}
           <div className={outerCls}>
             {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
                 performance screens for running and riding"). Power / Easy reads live in Insights.
@@ -392,7 +394,7 @@ export default function AdherenceChips({
 
     return (
       <div className="w-full pt-1 pb-2">
-        {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
+        {weekLabel && <div className="readout-label mb-2 text-center text-caption uppercase">{weekLabel}</div>}
         <div className={outerCls}>
           {rowOf([
             loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,

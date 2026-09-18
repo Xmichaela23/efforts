@@ -114,7 +114,7 @@ const WorkoutCardExpandable: React.FC<{
             e.stopPropagation();
             onToggleExpand();
           }}
-          className="text-xs font-light mt-1 w-full text-left"
+          className="text-caption font-normal mt-1 w-full text-left"
           style={{ 
             color: getDisciplinePhosphorCore(workoutType),
             opacity: 0.7,
@@ -1397,15 +1397,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // ⛔ A TYPOGRAPHIC MINUS, as the work order prints it (`form −21 · optimal`).
     const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (
-      <span className="inline-flex items-baseline gap-1 tabular-nums whitespace-nowrap">
+      <span className="inline-flex flex-wrap items-baseline gap-x-1 tabular-nums">
         {/* ⛔ THE NUMBER IS THE SESSION CARDS' BODY SIZE AND THE WORDS ARE ONE STEP DOWN (Michael
             2026-09-10) — the card set every line at 13px under session cards whose bodies run 15px,
             and read as a footnote to them. 15 / 13 / 12 is `SessionDeck`'s own scale (its body rows
-            are text-[15px], its meta 13, its smallest 12), so the card now wears the deck's type. */}
+            are text-subhead, its meta 13, its smallest 12), so the card now wears the deck's type. */}
         {/* ⛔ THE SMALL WORDS ON TODAY ARE WHITE AT 60%, NOT 45% (2026-09-17, Michael: "a little brighter and more
             readable"). At 45% they measured 4.5:1 on the card's dark bed and 3.8:1 under its lighter top — below
             WCAG AA's 4.5:1 for small text; at 60%, 6.9:1 and 5.4:1. The numbers stay at 92%. */}
-        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.60)' }}>form</span>
+        <span className="text-footnote" style={{ color: 'var(--label-secondary)' }}>form</span>
         {/* ⛔ THE SAME ⓘ STATE'S LOAD LABEL CARRIES (LoadBar.tsx) — same glyph, same dim treatment, and
             it opens the same component. It sits after the WORD, where State's sits after "LOAD", not
             at the end of the reading. It never opens State: the tap is swallowed, or reading the key
@@ -1416,16 +1416,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             onClick={(e) => { e.stopPropagation(); setShowFormKey((o) => !o); }}
             aria-label="What does form mean?"
             aria-expanded={showFormKey}
-            className="bg-transparent border-none p-0 cursor-pointer text-white/60 align-baseline text-[13px]"
+            className="bg-transparent border-none p-0 cursor-pointer text-label-secondary align-baseline text-footnote"
           >
             ⓘ
           </button>
         ) : null}
-        <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.92)' }}>{shown}</span>
+        <span className="text-subhead" style={{ color: 'var(--label)' }}>{shown}</span>
         {zone ? (
           <>
-            <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.38)' }}>·</span>
-            <span className="text-[13px]" style={{ color: formZoneColor(zone) }}>{zone}</span>
+            <span className="text-footnote" style={{ color: 'var(--label-secondary)' }}>·</span>
+            <span className="text-footnote" style={{ color: formZoneColor(zone) }}>{zone}</span>
           </>
         ) : null}
       </span>
@@ -1496,8 +1496,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               className="inline-block w-1.5 h-1.5 rounded-full shrink-0 translate-y-[-1px]"
               style={{ backgroundColor: getDisciplineColor(p.sport) }}
             />
-            {p.label ? <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.60)' }}>{p.label}</span> : null}
-            <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.92)' }}>{p.value}</span>
+            {p.label ? <span className="text-footnote" style={{ color: 'var(--label-secondary)' }}>{p.label}</span> : null}
+            <span className="text-subhead" style={{ color: 'var(--label)' }}>{p.value}</span>
           </span>
         ))}
       </span>
@@ -1519,7 +1519,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   if (blockLoading) {
     return (
       <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ height: 'var(--todays-h)' }}>
-        <p className="text-muted-foreground text-sm">Loading...</p>
+        <p className="text-muted-foreground text-subhead">Loading...</p>
       </div>
     );
   }
@@ -1695,7 +1695,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <button
                   type="button"
                   onClick={() => navigate('/goals')}
-                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
+                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-label text-subhead"
                 >
                   Build a training or race plan ›
                 </button>
@@ -1851,7 +1851,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 aria-label="Previous day"
                 /* ⚠️ A DRAG IS NOT A TAP — the same rule the decks keep. */
                 onClick={(e) => { e.stopPropagation(); if (daySwipe.current.movedAny > 8) return; handleDayNav('prev'); }}
-                className="p-0.5 -ml-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+                className="p-0.5 -ml-1 rounded-xl flex-shrink-0 self-center text-label-secondary hover:text-label transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -1861,12 +1861,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 * that lost — it sits last, so it truncated to "Stan…" on every day of the block. The day
                 * and the week are short and fixed in length; the name is the variable one, so it gets
                 * the line to itself and the other two stop competing with it.
+                * ⛔ AND THEY WRAP, NEVER TRUNCATE (2026-09-18, WCAG 2.2 SC 1.4.4): at 200% zoom both lines
+                * were cut off with an ellipsis; a narrow screen now takes a second line instead.
                 */}
               <span className="min-w-0 flex flex-col items-center">
                 <span
-                  className="text-[0.82rem] font-light tracking-wide truncate max-w-full"
+                  className="text-footnote font-normal tracking-wide text-center max-w-full"
                   style={{
-                    color: 'rgba(255, 255, 255, 1.0)',
+                    color: 'var(--label)',
                     textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)',
                     lineHeight: 1.05,
                   }}
@@ -1877,7 +1879,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       the raw number, which is why Today was the one surface saying "Week 3" with a
                       capital and no length. The date beside it is the only thing this screen adds. */}
                   {trainingPlanContext?.weekPosition ? (
-                    <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                    <span style={{ color: getDisciplinePhosphorCore('run') }}>
                       {' · '}{trainingPlanContext.weekPosition}
                     </span>
                   ) : null}
@@ -1887,8 +1889,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     predates `weekLabel`. */}
                 {(trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext?.weekLabel : trainingPlanContext?.focus) ? (
                   <span
-                    className="text-[0.72rem] font-light tracking-wide truncate max-w-full"
-                    style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72, lineHeight: 1.2, marginTop: 1 }}
+                    className="text-caption font-normal tracking-wide text-center max-w-full"
+                    style={{ color: getDisciplinePhosphorCore('run'), lineHeight: 1.2, marginTop: 1 }}
                   >
                     {trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
                   </span>
@@ -1897,8 +1899,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {/* ⛔ NO BLOCK LABEL ON A STANDING PLAN — it has no build or peak to name. Race plans keep it. */}
               {blockLabel && !trainingPlanContext?.standingPlan ? (
                 <span
-                  className="text-[0.62rem] font-light tracking-wide flex-shrink-0"
-                  style={{ color: 'rgba(255,255,255,0.38)', lineHeight: 1.05 }}
+                  className="text-caption font-normal tracking-wide flex-shrink-0"
+                  style={{ color: 'var(--label-secondary)', lineHeight: 1.05 }}
                 >
                   {blockLabel}
                 </span>
@@ -1907,7 +1909,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 type="button"
                 aria-label="Next day"
                 onClick={(e) => { e.stopPropagation(); if (daySwipe.current.movedAny > 8) return; handleDayNav('next'); }}
-                className="p-0.5 -mr-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+                className="p-0.5 -mr-1 rounded-xl flex-shrink-0 self-center text-label-secondary hover:text-label transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -1918,7 +1920,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 ⚠️ THE CITY LEFT THIS LINE for the sunrise/sunset row inside the weather — it says
                 where the reading came from, not what day it is. */}
             {(trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0) ? (
-              <div className="flex items-center gap-1 flex-wrap text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.1 }}>
+              <div className="flex items-center gap-1 flex-wrap text-caption font-normal tracking-normal" style={{ color: 'var(--label-secondary)', lineHeight: 1.1 }}>
                 <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
@@ -2006,11 +2008,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                */
             }}
           >
-            {formLine ? <span className="block font-light" style={formStyle} aria-hidden={!dayForm.own || undefined}>{formLine}</span> : null}
+            {formLine ? <span className="block font-normal" style={formStyle} aria-hidden={!dayForm.own || undefined}>{formLine}</span> : null}
             {bodyTodayLine ? (
               <span
-                className="block font-light tabular-nums text-[13px]"
-                style={{ color: 'rgba(255,255,255,0.60)', marginTop: formLine ? 2 : 0, ...(bodyStyle ?? {}) }}
+                className="block font-normal tabular-nums text-footnote"
+                style={{ color: 'var(--label-secondary)', marginTop: formLine ? 2 : 0, ...(bodyStyle ?? {}) }}
                 aria-hidden={!dayBody.own || undefined}
               >
                 {bodyTodayLine}
@@ -2032,8 +2034,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               */}
             {weekTotalsLine ? (
               <span
-                className="block font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine || bodyTodayLine ? 2 : 0 }}
+                className="block font-normal tabular-nums"
+                style={{ color: 'var(--label)', marginTop: formLine || bodyTodayLine ? 2 : 0 }}
               >
                 {weekTotalsLine}
               </span>
@@ -2043,7 +2045,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE CREDIT SHOWS WHENEVER A NUMBER IT CREDITS SHOWS — form on today, the totals on any day. Hidden
                 (space kept) only on a day with no totals, where form is the only thing it would credit. */}
             {garminDerived && (formLine || weekTotalsLine) ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2, color: 'rgba(255,255,255,0.60)', ...(weekTotalsLine || dayForm.own ? {} : hiddenStyle) }} />
+              <GarminDerivedDataLine className="text-caption" style={{ marginTop: 2, color: 'var(--label-secondary)', ...(weekTotalsLine || dayForm.own ? {} : hiddenStyle) }} />
             ) : null}
           </div>
         ) : null}
@@ -2057,7 +2059,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               onClick={() => navigate('/connections')}
               className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
               style={{
-                fontSize: '0.72rem',
+                fontSize: 'var(--type-caption)',
                 fontWeight: 400,
                 letterSpacing: '0.02em',
                 color: 'rgba(255, 205, 130, 0.9)',
@@ -2079,10 +2081,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 onClick={() => navigate('/goals')}
                 className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--type-caption)',
                   fontWeight: 400,
                   letterSpacing: '0.02em',
-                  color: 'rgba(255, 255, 255, 0.38)',
+                  color: 'var(--label-secondary)',
                 }}
               >
                 {arcLineText}
@@ -2091,10 +2093,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <p
                 className="m-0"
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--type-caption)',
                   fontWeight: 400,
                   letterSpacing: '0.02em',
-                  color: 'rgba(255, 255, 255, 0.38)',
+                  color: 'var(--label-secondary)',
                 }}
               >
                 {arcLineText}
@@ -2114,7 +2116,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // date, composed by `_shared/empty-day-line.ts`. The rest/logged/scheduled/plan-starts choice ran here
           // and a second copy of its first half ran in the calendar. server-word: printed, never chosen.
           <div className="px-4 py-10">
-            <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
+            <p className="text-center text-body font-medium italic" style={{ color: 'var(--label-secondary)' }}>
               {emptyDayLines?.[activeDate] ?? ''}
             </p>
           </div>
@@ -2235,7 +2237,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       tabIndex={0}
                       aria-label="Swap sport for this session"
                       title="Swap sport"
-                      className="p-1 -m-1 rounded-lg text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
+                      className="p-1 -m-1 rounded-lg text-label-secondary hover:text-label hover:bg-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSwap(); }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openSwap(); }
@@ -2364,7 +2366,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             ? ((workout as any)?.computed?.swim_distance?.label || null)
                             : null;
                           return swimChip ? (
-                            <span className="text-[11px] text-blue-200/95">
+                            <span className="text-caption text-blue-200">
                               {swimChip}
                             </span>
                           ) : null;
@@ -2373,7 +2375,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     ) : (
                     <div className="flex items-center justify-between gap-3">
                       <div
-                        className="font-medium tracking-normal text-base"
+                        className="font-medium tracking-normal text-body"
                         style={{
                           color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(displayType),
                           // Legibility: slight dark edge + faint discipline bloom
@@ -2388,8 +2390,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             aria-label="Completed"
                             className="inline-flex items-center justify-center flex-shrink-0 ml-2"
                             style={{
-                              color: 'rgba(255, 255, 255, 0.95)',
-                              fontSize: 14,
+                              color: 'var(--label)',
+                              fontSize: 'var(--type-subhead)',
                               fontWeight: 700,
                               lineHeight: 1,
                             }}
@@ -2410,7 +2412,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             different set — one rule, two inputs, two possible answers for one session. */}
                         {(workout as any)?.unlinked === true && (
                           <span
-                            className="ml-2 align-middle text-[10px] font-normal text-amber-300/85"
+                            className="ml-2 align-middle text-caption font-normal text-amber-300"
                             title="Didn't match a planned session — tap to link it"
                           >
                             unlinked
@@ -2431,8 +2433,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
                     {isSkipped && (
                       <div
-                        className="mt-1 text-[11px] font-light leading-snug"
-                        style={{ color: 'rgba(255,255,255,0.42)' }}
+                        className="mt-1 text-caption font-normal leading-snug"
+                        style={{ color: 'var(--label-secondary)' }}
                       >
                         Skipped{skipSubtitle ? ` · ${skipSubtitle}` : ''}
                       </div>
@@ -2444,7 +2446,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <div
                           className="tabular-nums"
                           style={{
-                            color: 'rgba(255,255,255,0.78)',
+                            color: 'var(--label)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -2453,14 +2455,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           {compactMetrics.map((m, idx) => (
                             <span
                               key={idx}
-                              className="text-xs font-light"
+                              className="text-caption font-normal"
                               style={{
                                 textShadow: '0 1px 1px rgba(0,0,0,0.55), 0 0 8px rgba(0,0,0,0.35)',
                               }}
                             >
                               {m}
                               {idx < compactMetrics.length - 1 ? (
-                                <span style={{ color: 'rgba(255,255,255,0.35)' }}>{' \u00A0\u00A0'}</span>
+                                <span style={{ color: 'var(--label-secondary)' }}>{' \u00A0\u00A0'}</span>
                               ) : null}
                             </span>
                           ))}
@@ -2528,8 +2530,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <DrawerHeader className="text-left">
             {plannedDrawerStep === 'skip' ? (
               <>
-                <DrawerTitle className="text-white font-light tracking-wide text-lg">Skip this session?</DrawerTitle>
-                <DrawerDescription className="text-white/55 font-light text-[13px]">
+                <DrawerTitle className="text-white font-normal tracking-wide text-body">Skip this session?</DrawerTitle>
+                <DrawerDescription className="text-label-secondary font-normal text-footnote">
                   Optional — sharing why helps your coach interpret the week. You can skip without sharing.
                 </DrawerDescription>
               </>
@@ -2601,11 +2603,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <>
                   {coachingNote && !isDismissed && (
                     <div className="mb-3 flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2.5">
-                      <p className="flex-1 text-sm leading-snug text-white/60">{coachingNote}</p>
+                      <p className="flex-1 text-subhead leading-snug text-label-secondary">{coachingNote}</p>
                       <button
                         type="button"
                         aria-label="Dismiss coaching note"
-                        className="mt-0.5 shrink-0 text-white/30 hover:text-white/60 text-base leading-none"
+                        className="mt-0.5 shrink-0 text-label-secondary hover:text-label-secondary text-body leading-none"
                         onClick={() => {
                           if (dismissKey) {
                             localStorage.setItem(dismissKey, '1');
@@ -2658,7 +2660,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       const byHeartRate = isRun && steps.some((st) => st?.prescription === 'heart_rate');
                       if (!byHeartRate || !isTodayDate || !heatNote) return null;
                       return (
-                        <p className="mt-2 text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.62)' }}>
+                        <p className="mt-2 text-caption leading-snug" style={{ color: 'var(--label-secondary)' }}>
                           {heatNote}
                         </p>
                       );
@@ -2707,7 +2709,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return (
                     <div className="flex flex-col gap-2 w-full">
                       {/* ⛔ MICHAEL'S HEADER (2026-09-09), sent by `swap-session` with every other word here. */}
-                      <div className="text-[13px] text-white/70 pb-1">{swapSheet?.header}</div>
+                      <div className="text-footnote text-label-secondary pb-1">{swapSheet?.header}</div>
                       {/* ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order §6). Just today is the
                           default — one row — and Rest of plan writes this session's later repeats too.
                           ⛔ AN EASY SESSION OFFERS JUST TODAY ONLY (Michael, 2026-09-10). Easy work can
@@ -2717,13 +2719,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(false)}
-                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                          className={`px-2.5 py-1 rounded-xl text-caption border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-label-secondary hover:text-label'}`}
                         >Just today</button>
                         {swapSheet?.rest_of_plan ? (
                           <button
                             type="button"
                             onClick={() => setSwapRestOfPlan(true)}
-                            className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                            className={`px-2.5 py-1 rounded-xl text-caption border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-label-secondary hover:text-label'}`}
                           >Rest of plan</button>
                         ) : null}
                       </div>
@@ -2739,19 +2741,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         >
                           {/* ⛔ 15 / 13 px (Michael, 2026-09-11) — the Today card's own sizes. The paces line is
                               what says what the workout is, and it was the smallest text on the sheet. */}
-                          <div className="text-[15px] font-medium">{opt.label}</div>
+                          <div className="text-subhead font-medium">{opt.label}</div>
                           {/* ⛔ THE SESSION YOU GET, OR THE MACHINE'S / THE WAY BACK'S APPROVED LINE —
                               resolved by the server with the same resolver the tap writes with. */}
-                          {opt.line ? <div className="text-[13px] text-white/55 mt-1">{opt.line}</div> : null}
+                          {opt.line ? <div className="text-footnote text-label-secondary mt-1">{opt.line}</div> : null}
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
-                            <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
+                            <div key={warn} className="text-caption text-amber-200 mt-1">{warn}</div>
                           ))}
                         </button>
                       ))}
                       <button
                         type="button"
-                        className="w-full px-4 py-2 rounded-xl text-[13px] text-white/55 hover:text-white/80"
+                        className="w-full px-4 py-2 rounded-xl text-footnote text-label-secondary hover:text-label"
                         onClick={() => setPlannedDrawerStep('detail')}
                       >
                         Back
@@ -2774,7 +2776,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return (
                     <button
                       type="button"
-                      className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white border border-white/15 bg-white/[0.04]"
+                      className="w-full px-4 py-3 rounded-xl text-body font-medium tracking-wide text-white border border-white/15 bg-white/[0.04]"
                       onClick={() => setSelectedPlannedWorkout(null)}
                     >
                       Close
@@ -2790,7 +2792,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <button
                   type="button"
                   onClick={() => { setSwapRestOfPlan(false); setPlannedDrawerStep('swap'); }}
-                  className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white/85 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 rounded-xl text-body font-medium tracking-wide text-label border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
                   Swap sport
@@ -2808,7 +2810,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
                 return (
                   <button
-                    className="w-full px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                    className="w-full px-4 py-3 rounded-xl text-body font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                     style={{
                       backgroundColor: 'transparent',
                       borderColor: border,
@@ -2860,7 +2862,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 type="button"
                 disabled={skippingSession || markingComplete}
                 onClick={() => setPlannedDrawerStep('skip')}
-                className="w-full py-2.5 rounded-xl text-[13px] font-light text-white/45 border border-white/12 hover:text-white/60 hover:border-white/18 disabled:opacity-40"
+                className="w-full py-2.5 rounded-xl text-footnote font-normal text-label-secondary border border-white/12 hover:text-label-secondary hover:border-white/18 disabled:opacity-40"
               >
                 Skip session…
               </button>
@@ -2877,14 +2879,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 return (
                   <>
                     <div className="w-full">
-                      <div className="text-xs text-white/50 mb-1.5">Pool length</div>
+                      <div className="text-caption text-label-secondary mb-1.5">Pool length</div>
                       <div className="flex gap-2 w-full">
                         {POOL_CHOICES.map((c) => (
                           <button
                             key={c.value}
                             disabled={savingPool}
                             onClick={() => setPlannedPool(c)}
-                            className="flex-1 px-3 py-2 rounded-xl text-sm font-light text-white border transition-all disabled:opacity-50"
+                            className="flex-1 px-3 py-2 rounded-xl text-subhead font-normal text-white border transition-all disabled:opacity-50"
                             style={{ borderColor: border, borderWidth: '0.5px', borderStyle: 'solid', backgroundColor: activeVal === c.value ? `rgba(${rgb}, 0.18)` : 'transparent' }}
                           >
                             {c.label}
@@ -2907,7 +2909,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <button
                           disabled={sendingToWatch === selectedPlannedWorkout?.id}
                           onClick={(ev) => handleSendToWatch(ev, selectedPlannedWorkout)}
-                          className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide text-white border transition-all disabled:opacity-50"
+                          className="flex-1 px-4 py-3 rounded-xl text-body font-medium tracking-wide text-white border transition-all disabled:opacity-50"
                           style={{ borderColor: border, borderWidth: '0.5px', borderStyle: 'solid', backgroundColor: 'transparent' }}
                           onMouseEnter={(ev) => { ev.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`; }}
                           onMouseLeave={(ev) => { ev.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -2934,7 +2936,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return (
                     <>
                       <button
-                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                        className="flex-1 px-4 py-3 rounded-xl text-body font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                         style={{
                           backgroundColor: 'transparent',
                           borderColor: border,
@@ -2953,7 +2955,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         {markingComplete ? 'Marking...' : 'Mark as Complete'}
                       </button>
                       <button
-                        className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
+                        className="flex-1 px-4 py-3 rounded-xl text-body font-medium tracking-wide transition-all backdrop-blur-md text-white border"
                         style={{
                           backgroundColor: 'transparent',
                           borderColor: border,
