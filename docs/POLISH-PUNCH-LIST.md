@@ -20,6 +20,12 @@ Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall,
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
 start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
 
+## QUEUED (2026-09-18, seen in the ride-limits throwaway) — A RIDE WITH NO POWER DATA PRINTS "0 W", MARKED IN RANGE
+
+An easy endurance ride recorded with no power meter scores on heart rate (6be65b0b), but its Performance row still
+prints "0 W" and marks it in range against "under 126 W". It should print no watts and no in-range mark. Only riders
+without a power meter see it.
+
 ## QUEUED (2026-09-18, Michael on the Pull day logger) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
 
 Kroc Row (catalogue `isUnilateral: true`, `src/lib/exercise-config.ts` 'kroc row') prints "target 2-4 · 3 to 4 in
