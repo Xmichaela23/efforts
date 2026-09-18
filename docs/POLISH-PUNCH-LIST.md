@@ -26,7 +26,12 @@ An easy endurance ride recorded with no power meter scores on heart rate (6be65b
 prints "0 W" and marks it in range against "under 126 W". It should print no watts and no in-range mark. Only riders
 without a power meter see it.
 
-## QUEUED (2026-09-18, Michael on the Pull day logger) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
+## [x] CLOSED 2026-09-17 (clean-up batch item 2, 204224d9) — A ONE-ARM MOVEMENT DOES NOT SAY THE REPS ARE PER ARM
+
+> The logger's set line reads "target 2-4 per arm · 3 to 4 in reserve" on every catalogue `isUnilateral` movement
+> that is upper body (rows, archer push-up, external rotation). The flag also marks one-leg and one-side core
+> movements (Bulgarian split squat, lunges, side plank, suitcase carry); "per arm" stays off those, which print
+> as before — their word ("per leg" / "per side") is copy and waits for Michael. Everything below is history.
 
 Kroc Row (catalogue `isUnilateral: true`, `src/lib/exercise-config.ts` 'kroc row') prints "target 2-4 · 3 to 4 in
 reserve" with no word that the reps are per arm. Standard logging practice: log the one dumbbell's weight and count
@@ -57,7 +62,11 @@ Not a small job: each line needs a source and his word for word yes (the existin
 how-to becomes a property of the MOVEMENT, so the current substitute-only gate in `executionHowTo` has to split into
 "what this movement is" and "how to do it with your kit".
 
-## QUEUED (2026-09-17, proposed, no go) — WEATHER CACHE TIMES
+## [x] CLOSED 2026-09-17 (clean-up batch item 8, 5c8ce614; needs get-weather deployed + a phone build) — WEATHER CACHE TIMES
+
+> Approved and built, one rule on the server and the phone: today every 15 minutes; future days hourly, fetched only
+> when shown; the last 5 days once a day; older days never fetched again. Ledger row in STATE-SOURCES. The
+> proposal below is history.
 
 Today 15 min (Open-Meteo current data is 15-minutely) · future days and the last 5 days 1 hour (fastest models update
 hourly) · older days kept (a year on the server, until the app closes on the phone). Today all but the oldest are 15 min.
@@ -109,11 +118,25 @@ in that change. A file that is meant to match the phone row for row needs every 
 
 ## QUEUED (2026-09-17, throwaway round for D-479) — THE WEEK LIST PRINTS "Lateral Raise", THE WORKOUT SCREEN "Dumbbell Lateral Raise"
 
+> **Traced 2026-09-17 (clean-up batch item 3), not fixed — a choice.** Throwaway home-gym build: the plan screen's week
+> list already prints "Dumbbell Lateral Raise" (it reads the server's lines, built from the session's steps). The
+> stored row still says "Lateral Raise" with no shown name: the composer does not rename it, and materialize-plan's
+> older equipment swap (`substituteExerciseForEquipment`, `materialize-plan/index.ts:2559-2562`) renames only the
+> step. Every screen that reads the stored row prints "Lateral Raise": the Today card's lift lines
+> (`today-lines.ts rowsOf`) and the setup sample week (`WeekGrid`). The logger, the drawer and the export read the
+> steps. Fix options: (a) materialize-plan writes the step's name back onto the row as its shown name (one place;
+> `restate.ts` counts a shown-name change as a change, so a restate compare may churn — not traced); (b) the
+> composer names the row for the kit up front, so the swap never fires. Commercial gym: no rename, all screens agree.
+
 Day 1 of every week, home and commercial gym alike: the week list prints the stored name where the workout screen
 and the export print the shown name (`execution_name || name`). Older than the D-479 work. Same fix as the export
 got: the week list uses the shown name. Not traced to a file yet.
 
-## QUEUED (Michael, 2026-09-16 night, Today screenshot) — A DONE PLYOMETRICS SESSION READS "3 lifts"
+## [x] CLOSED 2026-09-17 (clean-up batch item 4, dc5a796e; needs get-week deployed) — A DONE PLYOMETRICS SESSION READS "3 lifts"
+
+> The done line reads "3 exercises" (one: "1 exercise") on a row whose plan carries the `plyo` tag. The Week bar's
+> "N lifts" no longer counts the plyo day (the rule `_shared/week-one-summary.ts` already keeps). A plyo session
+> logged with no plan behind it has no tag and still reads "lifts". Everything below is history.
 
 The done card's line is the server's `done_headline` (`get-week/week-totals.ts:112-117`): every `strength` row
 counts its logged exercises and prints "N lift(s)", with the pounds in front when there are any. A plyometrics
@@ -173,7 +196,10 @@ athlete sees: with Dumbbells ticked and no Kettlebell, the hinge row can offer "
 right (dumbbells allowed or not) is the fix's question. Red check: `src/lib/strength-gear-catalogue.test.ts` "A PLURAL
 AND ITS SINGULAR AGREE".
 
-## QUEUED (2026-09-17, Stage A, check left red) — SEATED DB PRESS PRINTS ONE WEIGHT WITH NO "EACH"
+## [x] CLOSED 2026-09-17 (clean-up batch item 5, 2ebc58e7) — SEATED DB PRESS PRINTS ONE WEIGHT WITH NO "EACH"
+
+> `seated db press` is per hand with `ratioIsTotal` (0.45 × bench = both dumbbells), like `dumbbell shoulder press`:
+> a priced row prints "45 lb each" where it printed "90 lb". The per-hand audit is green. Everything below is history.
 
 `src/lib/exercise-config.ts:3181` marks `seated db press` as one total weight; the other two-dumbbell presses are
 per hand (`dumbbell shoulder press`, :630). What the athlete sees: the planned row prints a bare "90 lb"
@@ -181,7 +207,12 @@ per hand (`dumbbell shoulder press`, :630). What the athlete sees: the planned r
 from both. That 90 lb means both dumbbells together is an inference: the entry is 0.45 × bench and says neither. Added
 in 817af3de. Red check: `src/lib/exercise-config.reconcile.test.ts` "THE PER-HAND AUDIT".
 
-## QUEUED (2026-09-17, Stage A, checks left red) — ELEVEN MOVEMENTS HAVE NO TYPE
+## [x] CLOSED 2026-09-17 (clean-up batch item 6, 1fe786f0) — ELEVEN MOVEMENTS HAVE NO TYPE
+
+> All eleven are in the type table: ten `loaded_accessory`, GHD back extension `bodyweight`. Both COVERAGE checks are
+> green. Two screen changes: freestanding barbell calf raise and seated calf raise now get a weight box in the
+> logger (the name guess had filed them as bodyweight); a logged GHD back extension now counts body weight × reps in
+> the session's pounds. Everything below is history.
 
 Weighted reverse hyper, split squat, freestanding barbell calf raise, seated calf raise, GHD back extension, machine
 back extension, behind-the-neck DB triceps extension, rear delt machine, weighted knee raise, machine hip thrust,
@@ -207,7 +238,11 @@ run step went to Garmin as a distance (16 Sep run: 6 × 0.41 mi for a 6 × 4:00 
 a time countdown on the watch for warm-up, reps and cool-down. Also deployed the same night (1da1fd91): lap pairing
 when a watch joins or splits laps — not seen on a real run yet; the word "not matched" needs his yes before a merge.
 
-## QUEUED (2026-09-16) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
+## [x] MOOT 2026-09-17 (clean-up batch item 1, 4740f7d9) — MANUAL "SEND TO GARMIN" IS NOT RECORDED BY THE SYNC
+
+> The "Send to Garmin" and "Start on Phone" buttons are gone from the planned-session sheet and the Planned tab; the
+> calendar sync is the one path to the watch. Nothing in `src/` or `supabase/functions/` calls `send-workout-to-garmin`
+> any more (grep 2026-09-17: comments and tests only); the function is kept. Everything below is history.
 
 `calendar-sync` records a fingerprint of every copy it sends (Garmin: delete + resend on change; Intervals: update
 in place; removes rows deleted or moved out of the 14-day window). The manual "Send to Garmin" button
@@ -290,7 +325,10 @@ no run segments to swing (rung 6) and no rendered rows at the boom line (rung 7)
 gets a whole-file drift number. Related: the same file's set detector is relative with no absolute floor, so on a
 session where nothing is easy the least-hard step becomes "easy". After the workorder.
 
-## QUEUED — "Zwift - Intervals icu:" PREFIX ON A RIDE TITLE (Michael, 2026-09-15, screenshot)
+## [x] CLOSED 2026-09-17 (clean-up batch item 7, 68c6a2b5; first half only) — "Zwift - Intervals icu:" PREFIX ON A RIDE TITLE (Michael, 2026-09-15, screenshot)
+
+> The title rule drops a leading "Zwift - <anything>:" and prints what follows ("Anaerobic Ride"); "Zwift - Watopia"
+> (no colon) is left alone. The second half (Intervals as the source) waits on the parked import. Everything below is history.
 
 A Zwift ride built in Intervals.icu arrives via the Strava webhook titled "Zwift - Intervals icu: Anaerobic Ride"
 with "powered by Strava via Zwift". The attribution is right (Strava delivered the file; `lib/provider-attribution.ts`).
@@ -330,7 +368,11 @@ set plan the server already sends (ramp + work sets) and pick each set's plates 
 plates are only added; say so when a target needs a swap. Presentation only, no new number, stays on the phone.
 Missing input: the athlete's own rack (a Baselines field if wanted). Not a build until the workorder is through.
 
-## QUEUED — ZONE 5 STARTS AT 105% OF THRESHOLD HEART RATE, FRIEL PRINTS 100% (filed 2026-09-16, WORKORDER §3b item 5; no change)
+## [x] CLOSED 2026-09-17 (clean-up batch item 9, 05d43ca3; needs deploy + the 16-week recalculation to re-bin stored runs) — ZONE 5 STARTS AT 105% OF THRESHOLD HEART RATE, FRIEL PRINTS 100% (filed 2026-09-16, WORKORDER §3b item 5)
+
+> `Z5_FLOOR_PCT_LTHR = 1.00`: zone 4 is 95–99%, zone 5 from 100%. The two hand copies of the percentages
+> (`compute-workout-analysis` facts bins, `save-imported-workout`'s FIT zones) now read the table's constants.
+> Everything below is history.
 
 The one run zone table (`src/lib/friel-zones.ts` `Z5_FLOOR_PCT_LTHR = 1.05`) starts zone 5 at 105% of
 threshold heart rate and ends zone 4 one beat below it. Its own receipt, TrainingPeaks' "A Quick Guide to
@@ -339,7 +381,11 @@ cuts are pre-existing and kept deliberately. Every reader of the table (zone row
 analyser's bins, the facts bins) moves together if it changes, and stored run analyses would need a
 recalculation to re-bin.
 
-## QUEUED — A RUN OR RIDE'S DISTANCE COMES FROM THE SAMPLES BEFORE THE DEVICE'S OWN TOTAL (filed 2026-09-16, WORKORDER Stage 7 session 1; Michael: its own item, after this session)
+## [x] ALREADY DONE (277c515c, 2026-09-16, Stage 7 session 3; inside the deployed 508a54cf) — A RUN OR RIDE'S DISTANCE COMES FROM THE SAMPLES BEFORE THE DEVICE'S OWN TOTAL (filed 2026-09-16, WORKORDER Stage 7 session 1)
+
+> Found closed on 2026-09-17 (clean-up batch item 11): `compute-workout-analysis` takes the device's `distance` first,
+> samples only when none was sent; `workout-detail` takes the device's `max_speed` first. The entry was never marked.
+> Stored sessions move on the next recalculation. Everything below is history.
 
 `compute-workout-analysis/index.ts` (the non-swim `distance_m`, ~1907) takes the last sample's running distance
 first and the device's summary `distance` only when the samples carry none. Every distance reader
@@ -351,7 +397,13 @@ rung (the app's own previous value); the order of the first two is this item.
 **Seen in the same session's throwaway check, same kind:** Details' ride max speed reads the samples' best
 before the device's `max_speed` (`workout-detail/index.ts` `max_speed_mps`).
 
-## QUEUED — THE RUN ANALYSER TAKES ONE MORE BEAT OFF A STORED ZONE 1 (filed 2026-09-16, WORKORDER §3b item 5; no change)
+## [x] CLOSED 2026-09-17 (clean-up batch item 10, 30e16321; needs deploy + the recalculation) — THE RUN ANALYSER TAKES ONE MORE BEAT OFF A STORED ZONE 1 (filed 2026-09-16, WORKORDER §3b item 5)
+
+> Traced the four writers of `configured_hr_zones.zones`: Friel from Baselines stores a zone's top as the beat below
+> the next floor; Karvonen, Strava and a FIT file store it as the next floor. Priority 1 now reads every zone's top
+> as the next zone's floor minus one, which is right for all four (zone 1 was a beat low on Friel rows; zones 2–4 a
+> beat high on the other three). Not changed: `compute-workout-analysis` Priority 1 builds its facts bins from the
+> stored tops too — not traced whether its bins count the boundary beat up or down. Everything below is history.
 
 `analyze-running-workout/index.ts` Priority 1 (the athlete's `configured_hr_zones.zones`) reads zone 1's
 top as `zones[0].max − 1`, while zones 2–4 are read as stored. When the stored table was written from
