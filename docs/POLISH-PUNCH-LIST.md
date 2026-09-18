@@ -20,6 +20,21 @@ Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall,
 the cards; a day changes on a shorter swipe both ways and a swipe never opens a session. Cause of the low bar: a
 start-up style block in `src/main.tsx` zeroed the safe area, so the 2026-09-06 `--tabbar-extra` change never applied.
 
+## QUEUED (2026-09-17, Michael on the Pull day screen) — EVERY MOVEMENT NEEDS A HOW-TO, NOT ONLY THE HOME SUBSTITUTES
+
+The logger prints a how-to only when one exists (`StrengthLogger.tsx:5059`, the sheet at `:6909`), and the table has
+**14 entries** (`_shared/strength-grid/grid.ts:598` `EXECUTION_HOW_TO`) against **362 catalogue entries**
+(`src/lib/exercise-config.ts`). Every one of the 14 is a home version of a machine movement, and `executionHowTo`
+(`grid.ts:629`) returns null when the athlete has the station — the how-to exists to describe a SUBSTITUTE, not the
+movement. What the athlete sees: a Kroc row on the p220 secondary-pull slot (`standing-plan/frames.ts:218`, the
+book's own first pick, not a substitute) prints its set line and nothing about how to do it. Michael, 2026-09-17:
+everything should have one.
+
+Not a small job: each line needs a source and his word for word yes (the existing 14 are all his). Scope first —
+362 catalogue entries is not the count, the count is the movements a plan can actually print. Second decision: the
+how-to becomes a property of the MOVEMENT, so the current substitute-only gate in `executionHowTo` has to split into
+"what this movement is" and "how to do it with your kit".
+
 ## QUEUED (2026-09-17, proposed, no go) — WEATHER CACHE TIMES
 
 Today 15 min (Open-Meteo current data is 15-minutely) · future days and the last 5 days 1 hour (fastest models update
