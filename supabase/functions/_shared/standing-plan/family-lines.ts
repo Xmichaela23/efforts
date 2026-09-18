@@ -72,6 +72,13 @@ export const RIDE_ENDURANCE_DRAWER_NOTE =
   'Spend a few minutes of the ride paying attention to how you pedal (smooth circles, not stomping) and how you sit on the bike.';
 
 /**
+ * ⛔ THE ERG NOTE ON THE ANAEROBIC RIDE, IN THE DRAWER AFTER THE LINE (approved by Michael, 2026-09-18). p237: *"best
+ * done by feel with a power FLOOR rather than a specific power target"* — ERG holds a target, so it comes off.
+ * The session note goes to the Planned tab, the Garmin workout description and the Intervals.icu description.
+ */
+export const RIDE_ANAEROBIC_DRAWER_NOTE = 'On Zwift, turn ERG off.';
+
+/**
  * The approved line for a family (and, for the endurance ride, its archetype), or null.
  * ⚠️ A RIDE WITH WORK WHOSE SPRINT INTERVAL IS NOT KNOWN GETS NO LINE. The plain line would say "the
  * whole way" over a ride with pushes in it, and a guessed interval is the fixed word this replaced.

@@ -127,6 +127,12 @@ export function judgedPowerRange(
   return { lower: lo, upper: hi };
 }
 
+/** p239's easy step: a floor of exactly zero under a real ceiling ("easy ride below 75%"). */
+export function isCeilingOnly(lowerW: number | null | undefined, upperW: number | null | undefined): boolean {
+  const hi = Number(upperW);
+  return lowerW != null && Number(lowerW) === 0 && upperW != null && Number.isFinite(hi) && hi > 0;
+}
+
 /**
  * Share of the stream's samples (zeros kept — coasting is 0 W) at or above the floor and, when there is a ceiling,
  * at or under it; the caller multiplies by the interval's seconds. A floor with no ceiling (p237) counts every
@@ -140,7 +146,8 @@ export function shareInPowerRange(
 ): number | null {
   const judged = judgedPowerRange(lowerW, upperW);
   const lo = judged.lower;
-  if (!stream.length || !(Number.isFinite(lo) && lo > 0)) return null;
+  // p239's easy ceiling: a floor of zero with a ceiling counts every second at or under the ceiling.
+  if (!stream.length || !(Number.isFinite(lo) && (lo > 0 || isCeilingOnly(lo, judged.upper)))) return null;
   upperW = judged.upper;
   const hiRaw = Number(upperW);
   const hi = upperW != null && Number.isFinite(hiRaw) && hiRaw >= lo ? hiRaw : Infinity;
@@ -186,8 +193,9 @@ export function judgedPowerW(
  * as Infinity since it was written, and the zone rows print an absent bound as "176 bpm and up".
  * This function used to answer `null` on one, so p237's anaerobic work was either ungraded or, once
  * the floor and the ceiling were written as the same number, red on every single repeat.
- * ⚠️ A MISSING FLOOR IS STILL NO VERDICT. There is no session in the app prescribed as a ceiling with
- * nothing under it; "below 75%" is written as a floor of zero, which is a real floor.
+ * ⛔ A CEILING WITH A FLOOR OF ZERO IS JUDGED TOO (2026-09-18, p239 "easy ride below 75%"): at or under the ceiling
+ * is in, over it is above, and nothing reads below — nothing marks a rider down for going easier.
+ * ⚠️ A MISSING FLOOR (no number at all) IS STILL NO VERDICT.
  */
 export function powerRangeBand(
   watts: number | null | undefined,
@@ -198,7 +206,7 @@ export function powerRangeBand(
   const lo = judged.lower;
   const hi = judged.upper == null ? Infinity : judged.upper;
   const w = Number(watts);
-  if (watts == null || !Number.isFinite(w) || !(lo > 0) || !(hi > 0)) return null;
+  if (watts == null || !Number.isFinite(w) || !(isCeilingOnly(lo, hi) || lo > 0) || !(hi > 0)) return null;
   if (w < lo) return 'below';
   if (w > hi) return 'above';
   return 'in';

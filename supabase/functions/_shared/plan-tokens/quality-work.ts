@@ -167,7 +167,7 @@ export const SINGLE_PERCENT_BAND = 0.10;
 
 /**
  * ⛔ THE CEILING A FLOOR-ONLY STEP LEAVES THE APP WITH — p237: *"start at 110% and progress to
- * 125-130% by the end"*. The plan keeps the ceiling off (see `floorOnlyAtOrAbovePct` below); a Garmin step's
+ * 125-130% by the end"*. The plan keeps the ceiling off (see the `floor` rule below); a Garmin step's
  * power target is a low/high pair and Intervals.icu's workout text takes `lo-hi%`, so the page's own top fills
  * the high in both senders. ⚠️ PERCENT OF FTP, not a multiple of the floor. Defined once (2026-09-16): it lived in
  * the Garmin sender only, and the Intervals writer refused the whole ride (`unreadable power range {"lower":185}`).
@@ -175,11 +175,29 @@ export const SINGLE_PERCENT_BAND = 0.10;
 export const FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP = 1.30;
 
 /**
+ * ⛔ THE RIDE TYPE'S OWN RULE FOR A STEP'S RANGE (2026-09-18, Michael approved). Decided here, where a percentage
+ * becomes watts, and read by every reader off the saved step: the Planned tab, the Performance rows, Execution, the
+ * off-prescription line, the Garmin send and the Intervals.icu send.
+ *   · `floor` — p237 anaerobic: *"best done by feel with a power FLOOR rather than a specific power target — the
+ *     numbers are guidelines"*. EVERY work step is a floor ("N W and up"); recoveries keep their range.
+ *   · `under_threshold` — pp238–239 sweet spot: *"as close to threshold as possible without exceeding it"*. A single
+ *     number at or below 100% runs from −`SINGLE_PERCENT_BAND` up to the lower of +`SINGLE_PERCENT_BAND` and FTP;
+ *     a printed surge above 100% (the 105% on the minute) keeps its own ±`SINGLE_PERCENT_BAND`.
+ *   · none — VO2 (p238, *"more carefully controlled"*) and everything else: a printed range as printed, a single
+ *     number ±`SINGLE_PERCENT_BAND`.
+ * The endurance ceiling (p239) is `EASY_RIDE_CEILING_PCT_OF_FTP`; sprints (p236) carry no target.
+ */
+export type RidePowerRule = 'floor' | 'under_threshold' | null;
+
+/** Viada p239 — *"easy ride below 75%"*. An easy endurance step is 0 up to this share of FTP, and nothing under it. */
+export const EASY_RIDE_CEILING_PCT_OF_FTP = 0.75;
+
+/**
  * Percent of FTP as watts. Undefined without an FTP — the step then carries no target, as it always did.
  *
  * ⛔ A SINGLE PERCENTAGE GETS `SINGLE_PERCENT_BAND` EITHER SIDE. Both ends equal is the caller saying
  * "the page printed one number here", which is the whole of the rule's trigger.
- * ⛔ AND `floorOnlyAtOrAbovePct` LEAVES THE CEILING OFF — p237, see `FAMILIES.ride_anaerobic.floorOnly`.
+ * ⛔ AND THE `floor` RULE LEAVES THE CEILING OFF — p237, `FAMILIES.ride_anaerobic.floorOnly`.
  * An ABSENT `upper` is the app's existing way of saying "no ceiling": `analyze-cycling-workout` already
  * reads a missing upper as Infinity, and the zone rows already print an absent bound as "176 bpm and up".
  */
@@ -187,18 +205,18 @@ export function wattsAt(
   lo: number,
   hi: number,
   ftp: number | null | undefined,
-  floorOnlyAtOrAbovePct?: number | null,
+  rule?: RidePowerRule,
 ): { lower: number; upper?: number } | undefined {
   const f = Number(ftp);
   if (!Number.isFinite(f) || f <= 0) return undefined;
-  const floorPct = Number(floorOnlyAtOrAbovePct);
-  if (Number.isFinite(floorPct) && floorPct > 0 && lo >= floorPct) {
-    return { lower: Math.round(lo * f) };
-  }
+  // p237 — a floor and no ceiling. The caller offers the rule to work steps only.
+  if (rule === 'floor') return { lower: Math.round(lo * f) };
   if (lo === hi) {
+    // pp238–239 — never over threshold. A printed surge above 100% keeps its own band.
+    const top = rule === 'under_threshold' && lo <= 1 ? Math.min(lo * (1 + SINGLE_PERCENT_BAND), 1) : lo * (1 + SINGLE_PERCENT_BAND);
     return {
       lower: Math.round(lo * f * (1 - SINGLE_PERCENT_BAND)),
-      upper: Math.round(lo * f * (1 + SINGLE_PERCENT_BAND)),
+      upper: Math.round(top * f),
     };
   }
   return { lower: Math.round(lo * f), upper: Math.round(hi * f) };
@@ -256,13 +274,13 @@ export function qualityRunSteps(
 
 /**
  * The work as riding steps — what `expandBikeToken` pushes for these three shapes, id aside.
- * ⚠️ `floorOnlyAtOrAbovePct` IS THE FAMILY'S WORK FLOOR, and only `ride_anaerobic` passes one
- * (`FAMILIES.ride_anaerobic.floorOnly`, p237). Every other family passes nothing and builds as before.
+ * ⚠️ `rule` IS THE RIDE TYPE'S (`ridePowerRuleOf`, `endurance-library/source-rules.ts`). A family with no rule
+ * passes nothing and builds as before.
  */
 export function qualityRideSteps(
   work: QualityWork,
   ftp: number | null | undefined,
-  floorOnlyAtOrAbovePct?: number | null,
+  rule?: RidePowerRule,
 ): RideStep[] {
   const recovery = wattsAt(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi, ftp);
   const out: RideStep[] = [];
@@ -273,13 +291,13 @@ export function qualityRideSteps(
         if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds });
         else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, ...(recovery ? { power_range: recovery } : {}) });
         else {
-          // ⚠️ THE FLOOR IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
+          // ⚠️ THE RULE IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
           // 50% half) is a stated number, not an effort with a floor, and keeps its band.
           const w = wattsAt(
             seg.pct ?? 0,
             seg.pctHi ?? seg.pct ?? 0,
             ftp,
-            seg.role === 'work' ? floorOnlyAtOrAbovePct : null,
+            seg.role === 'work' ? rule : null,
           );
           out.push({ kind: seg.role, duration_s: seg.seconds, ...(w ? { power_range: w } : {}) });
         }
@@ -291,7 +309,7 @@ export function qualityRideSteps(
     return out;
   }
   if (work.kind === 'band') {
-    const w = wattsAt(work.lo, work.hi, ftp);
+    const w = wattsAt(work.lo, work.hi, ftp, rule);
     for (let i = 0; i < work.reps; i += 1) {
       out.push({ kind: 'work', duration_s: work.workS, ...(w ? { power_range: w } : {}) });
       // ⚠️ `bike_thr_` RESTS CARRY NO POWER and `bike_ss_` RESTS DO — see `restPowered`.
@@ -323,11 +341,10 @@ export type QualityPricing = {
   /** What the athlete reads distance in. Paces print per mile or per kilometre; watts are watts. */
   units?: 'imperial' | 'metric' | null;
   /**
-   * The family's work floor, where the family prescribes a floor and no ceiling — `ride_anaerobic`
-   * and nothing else (p237). The sheet's line and the steps the tap builds read the same number, so
-   * the line cannot promise a ceiling the session does not carry.
+   * The ride type's rule (`ridePowerRuleOf`). The sheet's line and the steps the tap builds read the same rule, so
+   * the line cannot promise a range the session does not carry.
    */
-  floorOnlyAtOrAbovePct?: number | null;
+  rule?: RidePowerRule;
 };
 
 // FIELD — definition (1 mi = 1.609344 km; 1.60934 as written)
@@ -412,7 +429,7 @@ function rideSegmentWord(seg: QualitySegment, p: QualityPricing): string {
   if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
   const hi = seg.pctHi ?? seg.pct;
-  const w = wattsAt(seg.pct, hi, p.ftp, seg.role === 'work' ? p.floorOnlyAtOrAbovePct : null);
+  const w = wattsAt(seg.pct, hi, p.ftp, seg.role === 'work' ? p.rule : null);
   return `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, hi)}`;
 }
 
@@ -439,12 +456,12 @@ export function qualityWorkLine(work: QualityWork | null, sport: 'run' | 'ride',
   }
   if (work.kind === 'interval') {
     const paced = pacedAt(work.pct, p.thresholdSecPerMi);
-    const iw = wattsAt(work.pct, work.pct, p.ftp, p.floorOnlyAtOrAbovePct);
+    const iw = wattsAt(work.pct, work.pct, p.ftp, p.rule);
     const at = sport === 'run'
       ? (paced ? paceWord(paced, p.units) : percentWord(work.pct, work.pct))
       : (iw ? wattWord(iw) : percentWord(work.pct, work.pct));
     return `${work.reps} × ${durationWord(work.workS)} at ${at}${between(work.restS)}`;
   }
-  const w = wattsAt(work.lo, work.hi, p.ftp);
+  const w = wattsAt(work.lo, work.hi, p.ftp, p.rule);
   return `${work.reps} × ${durationWord(work.workS)} at ${w ? wattWord(w) : percentWord(work.lo, work.hi)}${between(work.restS)}`;
 }

@@ -39,7 +39,7 @@ export function powerBand(
   watts: number | null | undefined,
   range: IntervalRow['planned_power_range'] | null | undefined,
 ): IntervalBand | null {
-  if (!range || !(Number(range.lower_w) > 0)) return null;
+  if (!range || !(Number(range.lower_w) >= 0)) return null;
   // ⛔ ONE RULE WITH THE ANALYZER (2026-09-18): `powerRangeBand` — a single target is judged ±`SINGLE_PERCENT_BAND`.
   return powerRangeBand(watts, range.lower_w, range.upper_w ?? null);
 }

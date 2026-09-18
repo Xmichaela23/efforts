@@ -64,7 +64,16 @@ Deno.test('the range itself, no allowance', () => {
   assertEquals(powerRangeBand(126, 109, 126), 'in');
   assertEquals(powerRangeBand(128, 109, 126), 'above');
   assertEquals(powerRangeBand(108, 109, 126), 'below');
-  assertEquals(powerRangeBand(128, 0, 126), null);
+  assertEquals(powerRangeBand(0, 0, 0), null);         // 0–0 is still not a range
+});
+
+/** ⛔ p239's easy step, 0 up to 75% of FTP (2026-09-18): at or under is in, over is above, nothing is below. */
+Deno.test('a ceiling with a floor of zero: under it is in, over it is above, never below', () => {
+  assertEquals(powerRangeBand(128, 0, 126), 'above');
+  assertEquals(powerRangeBand(126, 0, 126), 'in');
+  assertEquals(powerRangeBand(60, 0, 126), 'in');
+  assertEquals(powerRangeBand(0, 0, 126), 'in');
+  assertEquals(shareInPowerRange([60, 90, 130, 140], 0, 126), 0.5);
 });
 
 /**

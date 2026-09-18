@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RIDE_ENDURANCE_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
 
@@ -825,6 +825,8 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   if (line) parts.push(line);
   // ⛔ THE PEDALLING NOTE, UNDER THE LINE, IN THE DRAWER ONLY (2026-09-10, p239).
   if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);
+  // ⛔ p237 — ERG off on the anaerobic ride, after its line (2026-09-18).
+  if (session.family === 'ride_anaerobic') parts.push(RIDE_ANAEROBIC_DRAWER_NOTE);
   if (session.family === 'run_mlss') {
     parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
   }

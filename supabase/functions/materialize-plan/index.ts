@@ -39,12 +39,11 @@ import {
   qualityRideSteps,
   qualityRunSteps,
   wattsAt,
+  EASY_RIDE_CEILING_PCT_OF_FTP,
 } from '../_shared/plan-tokens/quality-work.ts';
-// ⛔ THE FAMILY'S OWN RULES — `floorOnly` + `workFloorPct`, read for the one question "does this
-// family prescribe a floor and no ceiling" (p237). The tag on the row names the family; the library
-// states the rule, so the materializer does not carry a second list of which families those are.
-import { FAMILIES } from '../_shared/endurance-library/source-rules.ts';
-import type { FamilyId } from '../_shared/endurance-library/types.ts';
+// ⛔ THE RIDE TYPE'S OWN RULE — p237 floor, pp238–239 never over threshold (`ridePowerRuleOf`). The tag on the row
+// names the family; the library states the rule, so the materializer does not carry a second list.
+import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -2244,13 +2243,21 @@ function expandBikeToken(
   tok: string,
   baselines: Baselines,
   /**
-   * The family's work floor, where the family prescribes a floor and no ceiling — p237's anaerobic
-   * work, and nothing else (`FAMILIES.ride_anaerobic.floorOnly`). Absent on every other row, which
-   * builds exactly as before.
+   * The row's ride type (`family:` tag). Its rule (`ridePowerRuleOf`: p237 floor, pp238–239 never over threshold)
+   * and, on `ride_endurance`, p239's easy ceiling. Absent on a row with no family, which builds exactly as before.
    */
-  floorOnlyAtOrAbovePct?: number | null,
+  family?: string | null,
 ): any[] {
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
+  const rule = ridePowerRuleOf(family);
+  /**
+   * ⛔ p239 — "easy ride below 75%" (Michael, 2026-09-18). On an endurance ride the easy steps are 0 up to 75% of
+   * FTP, as the library's own easy steps are: nothing marks a rider down for going easier. Other rows keep the
+   * Coggan Z2 band they had.
+   */
+  const easyRange = () => family === 'ride_endurance'
+    ? (ftp ? { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * ftp) } : undefined)
+    : pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi);
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
     if (!ftp) return undefined;
@@ -2322,7 +2329,7 @@ function expandBikeToken(
     // ⛔ ONE PARSER, ONE ARITHMETIC — `parseQualityWork` + `qualityRideSteps`.
     const work = parseQualityWork(lower);
     if (work && work.kind === 'round') {
-      for (const st of qualityRideSteps(work, ftp, floorOnlyAtOrAbovePct)) out.push({ id: uid(), ...st });
+      for (const st of qualityRideSteps(work, ftp, rule)) out.push({ id: uid(), ...st });
       return out;
     }
   }
@@ -2332,7 +2339,7 @@ function expandBikeToken(
   {
     const work = parseQualityWork(lower);
     if (work && work.kind === 'band') {
-      for (const st of qualityRideSteps(work, ftp, floorOnlyAtOrAbovePct)) out.push({ id: uid(), ...st });
+      for (const st of qualityRideSteps(work, ftp, rule)) out.push({ id: uid(), ...st });
       return out;
     }
   }
@@ -2349,7 +2356,7 @@ function expandBikeToken(
   if (m) {
     const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
     // Viada p237 (see above): 1.1 = the page's 110% floor. OURS — the 1.2 ceiling, used only on a row with no floor-only family tag.
-    const band = wattsAt(1.1, 1.2, ftp, floorOnlyAtOrAbovePct);
+    const band = wattsAt(1.1, 1.2, ftp, rule);
     for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: band }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); }
     return out;
   }
@@ -2365,16 +2372,16 @@ function expandBikeToken(
     const total = parseInt(m[1], 10) * 60, sprint = parseInt(m[2], 10), every = parseInt(m[3], 10) * 60;
     const n = every > sprint ? Math.floor(total / every) : 0;
     for (let k = 0; k < n; k += 1) {
-      out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) });
+      out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: easyRange() });
       out.push({ id: uid(), kind: 'work', duration_s: sprint, label: 'Sprint' });
     }
     const tail = total - n * every;
-    if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) });
+    if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: easyRange() });
     return out;
   }
   // Endurance z2 time: bike_endurance_90min_Z2
   m = lower.match(/bike_endurance_(\d+)min/);
-  if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) }); return out; }
+  if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: easyRange() }); return out; }
   // Tempo steady time: bike_tempo_Xmin (map to race power ~80-85% FTP)
   // OURS — `expandBikeToken` tempo 80–85% of FTP; race prep recovery = work length; openers 8 min. No page.
   m = lower.match(/bike_tempo_(\d+)min/);
@@ -3386,22 +3393,19 @@ export function expandTokensForRow(
   }
   console.log(`🔍 Parsing ${tokens.length} tokens for ${discipline}:`, tokens);
   /**
-   * ⛔ DOES THIS ROW'S FAMILY PRESCRIBE A FLOOR AND NO CEILING? (2026-09-15, p237.) The composer
-   * stamps `family:<id>` on the row; `FAMILIES` states the rule. Null on every row that is not a
-   * floor-only family, and the bike expander then builds exactly as it did.
+   * ⛔ THE ROW'S RIDE TYPE (2026-09-15, p237; every type 2026-09-18). The composer stamps `family:<id>` on the row;
+   * `ridePowerRuleOf` states the rule. A row with no family tag builds exactly as it did.
    */
-  const floorOnlyPct: number | null = (() => {
+  const rowFamily: string | null = (() => {
     const raw = (row as any)?.tags;
     const tags: unknown[] = Array.isArray(raw) ? raw : [];
     const hit = tags.map((t) => String(t ?? '').toLowerCase()).find((t) => t.startsWith('family:'));
-    if (!hit) return null;
-    const rules = FAMILIES[hit.slice('family:'.length) as FamilyId];
-    return rules?.floorOnly ? rules.workFloorPct : null;
+    return hit ? hit.slice('family:'.length) : null;
   })();
   for (const tok of tokens) {
     let added: any[] = [];
     if (discipline==='run' || discipline==='walk') added = stampRunPrescription(tok, expandRunToken(tok, baselines), baselines);
-    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines, floorOnlyPct);
+    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines, rowFamily);
     else if (discipline==='swim') {
       // Detailed swim expansion — one line per rep
       const s = String(tok).toLowerCase();

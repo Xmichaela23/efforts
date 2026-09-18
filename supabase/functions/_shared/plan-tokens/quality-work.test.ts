@@ -15,16 +15,19 @@
  * judged against one number and read red. Two rules replaced it and the reference carries both:
  *   · a single percentage gets `SINGLE_PERCENT_BAND` either side (OURS — see the constant);
  *   · a WORK step at or above a floor-only family's work floor gets the floor and NO upper (p237).
+ * ⛔ AND ONCE MORE (2026-09-18, the rule per ride type): EVERY anaerobic work step is a floor (p237), and a sweet-spot
+ * single number at or below 100% is capped at FTP (pp238–239). The reference carries both.
  * ⚠️ THE RUN REFERENCE IS UNTOUCHED, and so is every ride shape the page prints as a range.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   parseQualityWork,
   qualityRideSteps,
+  type RidePowerRule,
   qualityRunSteps,
   qualityWorkLine,
 } from './quality-work.ts';
-import { archetypesFor, FAMILIES } from '../endurance-library/index.ts';
+import { archetypesFor, FAMILIES, ridePowerRuleOf } from '../endurance-library/index.ts';
 import { composedHardSession } from '../session-swap/workout-choice.ts';
 
 const BASELINES = {
@@ -89,7 +92,7 @@ function refRun(tok: string, thr: number | undefined, easy: number | undefined):
 }
 
 // deno-lint-ignore no-explicit-any
-function refRide(tok: string, ftp: number | undefined, floorPct?: number | null): any[] {
+function refRide(tok: string, ftp: number | undefined, rule?: RidePowerRule): any[] {
   // deno-lint-ignore no-explicit-any
   const out: any[] = [];
   const lower = tok.toLowerCase();
@@ -98,10 +101,13 @@ function refRide(tok: string, ftp: number | undefined, floorPct?: number | null)
     if (lo !== hi) return { lower: Math.round(lo * ftp), upper: Math.round(hi * ftp) };
     return { lower: Math.round(lo * ftp * (1 - BAND)), upper: Math.round(lo * ftp * (1 + BAND)) };
   };
-  /** A WORK step at or above a floor-only family's floor: the floor, no ceiling. */
+  /** A WORK step: p237 a floor, no ceiling; pp238–239 never over FTP; else the band. */
   const workAt = (pct: number) => {
     if (!ftp) return undefined;
-    if (floorPct != null && floorPct > 0 && pct >= floorPct) return { lower: Math.round(pct * ftp) };
+    if (rule === 'floor') return { lower: Math.round(pct * ftp) };
+    if (rule === 'under_threshold' && pct <= 1) {
+      return { lower: Math.round(pct * ftp * (1 - BAND)), upper: Math.round(Math.min(pct * (1 + BAND), 1) * ftp) };
+    }
     return pctRange(pct, pct);
   };
   const mRound = lower.match(/^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_r(\d+)s)?$/);
@@ -147,16 +153,16 @@ function refRide(tok: string, ftp: number | undefined, floorPct?: number | null)
 }
 
 /** Every work token the four hard families emit, at every level, with its sport. */
-function everyQualityToken(): Array<{ token: string; sport: 'run' | 'ride'; floorPct: number | null; where: string }> {
-  const out: Array<{ token: string; sport: 'run' | 'ride'; floorPct: number | null; where: string }> = [];
+function everyQualityToken(): Array<{ token: string; sport: 'run' | 'ride'; rule: RidePowerRule; where: string }> {
+  const out: Array<{ token: string; sport: 'run' | 'ride'; rule: RidePowerRule; where: string }> = [];
   for (const family of ['run_mlss', 'run_near_threshold', 'ride_anaerobic', 'ride_sweet_spot'] as const) {
     const sport = FAMILIES[family].sport as 'run' | 'ride';
-    const floorPct = FAMILIES[family].floorOnly ? FAMILIES[family].workFloorPct : null;
+    const rule = ridePowerRuleOf(family);
     for (const level of [1, 2, 3] as const) {
       for (const a of archetypesFor(family, level)) {
         const s = composedHardSession({ family, level, archetype: a.id, baselines: BASELINES });
         for (const token of s.steps_preset) {
-          if (parseQualityWork(token)) out.push({ token, sport, floorPct, where: `${family} L${level} ${a.id}` });
+          if (parseQualityWork(token)) out.push({ token, sport, rule, where: `${family} L${level} ${a.id}` });
         }
       }
     }
@@ -168,7 +174,7 @@ Deno.test('every quality token the four hard families emit expands exactly as th
   const tokens = everyQualityToken();
   // The sweep is worthless if the families stopped emitting these shapes.
   assertEquals(tokens.length > 30, true, `only ${tokens.length} quality tokens found`);
-  for (const { token, sport, floorPct, where } of tokens) {
+  for (const { token, sport, rule, where } of tokens) {
     const work = parseQualityWork(token)!;
     if (sport === 'run') {
       const now = qualityRunSteps(work, { thresholdSecPerMi: THRESHOLD, easySecPerMi: EASY });
@@ -177,10 +183,10 @@ Deno.test('every quality token the four hard families emit expands exactly as th
       const bare = qualityRunSteps(work, { thresholdSecPerMi: null, easySecPerMi: null });
       assertEquals(JSON.parse(JSON.stringify(bare)), JSON.parse(JSON.stringify(refRun(token, undefined, undefined))), `${where} ${token} (no paces)`);
     } else {
-      const now = qualityRideSteps(work, FTP, floorPct);
-      assertEquals(JSON.parse(JSON.stringify(now)), JSON.parse(JSON.stringify(refRide(token, FTP, floorPct))), `${where} ${token}`);
-      const bare = qualityRideSteps(work, null, floorPct);
-      assertEquals(JSON.parse(JSON.stringify(bare)), JSON.parse(JSON.stringify(refRide(token, undefined, floorPct))), `${where} ${token} (no ftp)`);
+      const now = qualityRideSteps(work, FTP, rule);
+      assertEquals(JSON.parse(JSON.stringify(now)), JSON.parse(JSON.stringify(refRide(token, FTP, rule))), `${where} ${token}`);
+      const bare = qualityRideSteps(work, null, rule);
+      assertEquals(JSON.parse(JSON.stringify(bare)), JSON.parse(JSON.stringify(refRide(token, undefined, rule))), `${where} ${token} (no ftp)`);
     }
   }
 });
@@ -199,13 +205,26 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
     '8 × 4 min at 8:20/mi, 1:15 easy between',
   );
   /**
-   * ⛔ p237 anaerobic: the sandwich, in watts. The 120% surge is WORK at or above the family's floor,
-   * so it prints its floor and no ceiling; the 90% middle is below the floor and keeps its band.
+   * ⛔ p237 anaerobic: the sandwich, in watts. EVERY work step is a floor with no ceiling (2026-09-18) —
+   * the 120% surge and the 90% sustained middle alike.
    */
-  const anaerobic = { ...ride, floorOnlyAtOrAbovePct: FAMILIES.ride_anaerobic.workFloorPct };
+  const anaerobic = { ...ride, rule: ridePowerRuleOf('ride_anaerobic') };
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', anaerobic),
-    '8 rounds: 30 s at 252 W and up, 2:30 at 170–208 W; 4 min easy between',
+    '8 rounds: 30 s at 252 W and up, 2:30 at 189 W and up; 4 min easy between',
+  );
+  /**
+   * ⛔ pp238–239 sweet spot: never over threshold. 95% of 210 is 180–210 W (−10%, capped at FTP); the 105% surge on
+   * the minute keeps its own ±10%.
+   */
+  const sweet = { ...ride, rule: ridePowerRuleOf('ride_sweet_spot') };
+  assertEquals(
+    qualityWorkLine(parseQualityWork('round_6x_240s95_R120s'), 'ride', sweet),
+    '6 rounds: 4 min at 180–210 W, 2 min easy between',
+  );
+  assertEquals(
+    qualityWorkLine(parseQualityWork('round_3x_10s105-50s90_R180s'), 'ride', sweet),
+    '3 rounds: 10 s at 198–243 W, 50 s at 170–208 W; 3 min easy between',
   );
   // And the same shape with no family floor: both steps are single percentages and both get the band.
   assertEquals(

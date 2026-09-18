@@ -29,6 +29,7 @@ import {
   buildEnduranceSession,
   FAMILIES,
   resolveEnduranceAnchors,
+  ridePowerRuleOf,
   type EnduranceBaselines,
   type FamilyId,
   type Level,
@@ -251,11 +252,9 @@ export function workoutChoiceOptions(
     const held = tagValue(r, 'archetype:');
     if (held) taken.add(held);
   }
-  // ⛔ THE SHEET PRICES THE SLOT'S FAMILY THE WAY THE TAP WILL BUILD IT (2026-09-15). p237's anaerobic
-  // work carries a floor and no ceiling, so the line has to say "202 W and up" where the step will.
-  const slotPricing: QualityPricing = FAMILIES[slot.family].floorOnly
-    ? { ...pricing, floorOnlyAtOrAbovePct: FAMILIES[slot.family].workFloorPct }
-    : pricing;
+  // ⛔ THE SHEET PRICES THE SLOT'S FAMILY THE WAY THE TAP WILL BUILD IT (2026-09-15; the rule per ride type
+  // 2026-09-18). p237's anaerobic work carries a floor and no ceiling, so the line says "202 W and up" where the step will.
+  const slotPricing: QualityPricing = { ...pricing, rule: ridePowerRuleOf(slot.family) };
   const out: SwapOption[] = [];
   for (const w of workoutsForSlot(slot)) {
     if (w.id === slot.archetype || w.id === planned || taken.has(w.id)) continue;

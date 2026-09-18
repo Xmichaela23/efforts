@@ -7,7 +7,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeBlock } from '../standing-plan/compose.ts';
 import { ARCHETYPES } from '../standing-plan/golden-block.ts';
-import { archetypesFor, FAMILIES } from '../endurance-library/index.ts';
+import { archetypesFor, ridePowerRuleOf } from '../endurance-library/index.ts';
 import {
   composedHardSession,
   hardSlotOf,
@@ -125,9 +125,7 @@ Deno.test('every offered workout\'s line is the work its own patch writes, price
         // ⚠️ THE SHEET PRICES THE SLOT'S FAMILY (2026-09-15): p237's anaerobic work carries a floor and
         // no ceiling, so the line reads "231 W and up" where the step will. The expectation prices it
         // the same way the sheet does, off the family's own rule.
-        const slotPricing = FAMILIES[slot.family].floorOnly
-          ? { ...pricing, floorOnlyAtOrAbovePct: FAMILIES[slot.family].workFloorPct }
-          : pricing;
+        const slotPricing = { ...pricing, rule: ridePowerRuleOf(slot.family) };
         assertEquals(o.line, work.map((w) => qualityWorkLine(w, slot.sport, slotPricing)).join('; '));
         assert((o.line ?? '').length > 0, `${slot.family} ${o.archetype} has no line`);
         // Priced: a run line names a pace, a ride line names watts. Never a percentage here.

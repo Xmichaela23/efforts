@@ -16,6 +16,7 @@
 // ============================================================================
 
 import type { FamilyId, Intensity, Level, Range, Sport } from './types.ts';
+import type { RidePowerRule } from '../plan-tokens/quality-work.ts';
 
 // ── THE PERCENTAGE BASIS ────────────────────────────────────────────────────────────────────────
 
@@ -557,11 +558,16 @@ export const FAMILIES: Record<FamilyId, {
    * ("110-115%+", starting at 110% and progressing to 125-130%). p238 names the same principle from
    * the outside: the anaerobic sessions run on *"more power is generally better"*, which VO2 is then
    * told NOT to do ("more carefully controlled").
-   * ⚠️ ONLY THE WORK. A step BELOW `workFloorPct` — p237's 90% sustained middle, its 50% half — is a
-   * printed number and keeps a band around it. The floor is the discriminator, not the family alone.
+   * ⛔ EVERY WORK STEP, INCLUDING p237's 90% SUSTAINED MIDDLE (Michael, 2026-09-18 — "the numbers are
+   * guidelines" covers the whole family). Only a RECOVERY the page prints a number for (the 50% half) keeps its band.
    * ⚠️ ABSENT ON EVERY OTHER FAMILY, including `ride_vo2`, on p238's own instruction.
    */
   floorOnly?: true;
+  /**
+   * ⛔ NEVER OVER THRESHOLD (2026-09-18) — pp238–239 sweet spot: *"as close to threshold as possible without
+   * exceeding it"*. A single number at or below 100% is capped at FTP; see `wattsAt`'s `under_threshold`.
+   */
+  underThreshold?: true;
   /** The family's stated intent, in his words where he gives one. */
   intent: string;
   cite: string;
@@ -1384,6 +1390,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'ride',
     label: 'Sweet spot',
     workFloorPct: 0.80,
+    underThreshold: true,
     intent: 'As close to threshold as possible without exceeding it — plenty of time in the zone '
       + 'with far less fatigue than riding at or above it.',
     cite: 'Viada pp238-239',
@@ -1768,3 +1775,15 @@ export const SWIM_DRILLS = [
 /** p239 — form work is part of the long ride, in his words. */
 export const FORM_FOCUS_NOTE =
   'Several minutes of a long ride spent on pedal stroke and position is time well used.';
+
+/**
+ * The ride type's rule for a step's range (2026-09-18) — p237 floor, pp238–239 never over threshold, else none.
+ * Read by materialize-plan and the Instead sheet, so the line and the steps the tap builds cannot differ.
+ */
+export function ridePowerRuleOf(family: string | null | undefined): RidePowerRule {
+  const f = family ? FAMILIES[family as FamilyId] : undefined;
+  if (!f) return null;
+  if (f.floorOnly) return 'floor';
+  if (f.underThreshold) return 'under_threshold';
+  return null;
+}

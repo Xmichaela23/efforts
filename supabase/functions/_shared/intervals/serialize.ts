@@ -17,6 +17,7 @@
 //   category WORKOUT · start_date_local `YYYY-MM-DDT00:00:00` · type · name · description · external_id
 
 import { FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts';
+import { isCeilingOnly } from '../ride-power.ts';
 
 export class IntervalsSerializeError extends Error {
   constructor(message: string) {
@@ -76,6 +77,10 @@ function stepLine(step: any, index: number, ftp: number): string {
   let target: string;
   if (step?.powerRange == null) {
     // The plan gives this step no power (e.g. a sprint by feel): ERG off.
+    target = 'freeride';
+  } else if (isCeilingOnly(step.powerRange.lower, step.powerRange.upper)) {
+    // ⛔ p239's EASY STEP (0 up to 75% of FTP) GOES OUT WITH NO TARGET (Michael, 2026-09-18). A range that starts at
+    // 0 would be refused here, and on Zwift ERG would hold a number the page never printed. Garmin keeps the range.
     target = 'freeride';
   } else if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi >= lo) {
     const pLo = Math.round((lo / ftp) * 100);

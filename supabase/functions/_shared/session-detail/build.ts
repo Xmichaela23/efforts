@@ -572,9 +572,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * the sets inside the same session.
        * ⚠️ THE ORIGINAL GUARD'S INTENT SURVIVES: a band of 0–0 is still not a range. Only the upper
        * has to be positive; the lower may be zero, and a negative one is still refused.
-       * ⚠️ NO WORDS CHANGE. `powerBand` in `interval-compare.ts` keeps its own `lower_w > 0` test,
-       * so a zero-lower band still colours nothing, and nothing on the phone renders the watts as
-       * text — the field is read by the comparison and by the drift window.
+       * ⛔ AND IT IS JUDGED (2026-09-18, p239): `powerBand` reads a floor of zero under a ceiling as p239's easy
+       * step — at or under the ceiling is in, over it is above, nothing is below (`ride-power.ts isCeilingOnly`).
        */
       /**
        * ⛔ AND A BAND WITH NO TOP IS A REAL PRESCRIPTION TOO (2026-09-15, p237). The anaerobic work

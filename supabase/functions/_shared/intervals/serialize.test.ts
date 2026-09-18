@@ -58,3 +58,12 @@ Deno.test('explicit failures', () => {
   assertThrows(() => serializeRide({ id: 'h', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', label: 'Hard — 3 min', seconds: 180 }] } }), IntervalsSerializeError, 'contains digits');
   assertThrows(() => serializeRide({ id: 'i', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', powerRange: { lower: 100, upper: 120 } }] } }), IntervalsSerializeError, 'no duration');
 });
+
+/** ⛔ p239's easy step (0 up to 75% of FTP) goes to Intervals.icu / Zwift with no target (Michael, 2026-09-18). */
+Deno.test('a ceiling-only easy step goes out as freeride', () => {
+  const ev = serializeRide({
+    id: 'j', date: '2026-09-15', type: 'ride', name: 'Easy', description: 'Easy ride, under 75 percent of FTP the whole way.',
+    computed: { anchors, steps: [{ kind: 'work', seconds: 3600, powerRange: { lower: 0, upper: 158 } }] },
+  });
+  assertEquals(ev.description, 'Easy ride, under 75 percent of FTP the whole way.\n\n- 1h freeride');
+});

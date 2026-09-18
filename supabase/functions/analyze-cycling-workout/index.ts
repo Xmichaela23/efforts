@@ -1,5 +1,5 @@
 import { withAlarm } from '../_shared/alarm.ts';
-import { judgedPowerRange, normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
+import { isCeilingOnly, judgedPowerRange, normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
@@ -219,6 +219,8 @@ export function generateCyclingAdherenceSummary(opts: {
         const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower);
         const hiRaw = i?.planned_power_range_upper ?? i?.planned?.power_range?.upper ?? null;
         const hi = hiRaw == null ? null : Number(hiRaw);
+        // p239's easy step has no approved words on this line; it stays off it, as before (2026-09-18).
+        if (isCeilingOnly(lo, hi)) return null;
         const band = powerRangeBand(w, lo, hi);
         return band ? { w: Math.round(w), lo: Math.round(lo), hi: hi == null ? null : Math.round(hi), band } : null;
       })
@@ -230,7 +232,8 @@ export function generateCyclingAdherenceSummary(opts: {
         technical_insights.push({ label: 'Power', value: `${w} W against a floor of ${lo} W.` });
       } else {
         const tail = band === 'above' ? `, ${w - hi} W over the top` : band === 'below' ? `, ${lo - w} W under the bottom` : '';
-        technical_insights.push({ label: 'Power', value: `${w} W against ${lo}–${hi} W${tail}.` });
+        // One target prints once — "160 W against 151 W" (approved 2026-09-18).
+        technical_insights.push({ label: 'Power', value: `${w} W against ${lo === hi ? `${lo} W` : `${lo}–${hi} W`}${tail}.` });
       }
     } else if (judged.length > 1) {
       const inside = judged.filter((j) => j.band === 'in').length;
@@ -871,7 +874,8 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     const judgedR = judgedPowerRange(plannedPowerLower, Number.isFinite(plannedPowerUpper) ? plannedPowerUpper : null);
     const judgedLower = judgedR.lower;
     const judgedUpper = judgedR.upper ?? Infinity;
-    if (plannedPowerLower > 0 && actualPower > 0) {
+    // p239's easy step (a floor of zero under a ceiling) is judged too: at or under it is 100, over it loses ground.
+    if ((plannedPowerLower > 0 || isCeilingOnly(plannedPowerLower, plannedPowerUpper)) && actualPower > 0) {
       // Check if actual power is within range
       // OURS — power score = 100 inside the range, else 100 minus the gap as a percent of the nearer edge; no source, kept as found
       if (actualPower >= judgedLower && actualPower <= judgedUpper) {
@@ -1566,7 +1570,8 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       .map((iv: any) => {
         const pr = iv?.power_range || iv?.planned?.power_range;
         const lo = Number(pr?.lower ?? pr?.min);
-        if (!(lo > 0) || planStepById.get(String(iv?.planned_step_id))?.watch_target === 'none') return null;
+        // p239's easy step (0 up to the ceiling) is a section like any other (2026-09-18).
+        if (!(lo > 0 || isCeilingOnly(lo, pr?.upper ?? pr?.max)) || planStepById.get(String(iv?.planned_step_id))?.watch_target === 'none') return null;
         // The warm-up and cool-down are never scored, on any plan (2026-09-17) — decided by the step's kind.
         const kindOf = `${iv?.role ?? ''} ${iv?.kind ?? ''} ${planStepById.get(String(iv?.planned_step_id))?.kind ?? ''}`.toLowerCase();
         if (/warm|cool/.test(kindOf)) return null;

@@ -22,6 +22,8 @@ export type PlannedWorkout = {
 
 export type GarminWorkout = {
   workoutName: string
+  /** The session note (rides), Garmin Training API workout `description`. */
+  description?: string
   sport: string
   poolLength?: number
   poolLengthUnit?: string
@@ -814,8 +816,14 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     const meters = len >= 40 ? 50.0 : 25.0
     return { poolLength: meters, poolLengthUnit: 'METER' }
   })()
+  /**
+   * ⛔ THE SESSION NOTE GOES WITH A RIDE (Michael, 2026-09-18) — the row's `description`, the same note the Planned
+   * tab shows and the Intervals.icu send carries. One note, one more destination; runs and swims unchanged.
+   */
+  const rideNote = sport === 'CYCLING' ? String((workout as any)?.description ?? '').trim() : ''
   return {
     workoutName: workout.name,
+    ...(rideNote ? { description: rideNote } : {}),
     sport,
     ...(isSwimSport ? poolFields : {}),
     ...(typeof estSecs === 'number' ? { estimatedDurationInSecs: estSecs } : {}),
