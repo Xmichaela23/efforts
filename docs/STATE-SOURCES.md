@@ -190,6 +190,22 @@ The week-execution bars (a count). Add rows when touched.
 | A segment's overall placing is printed only inside the top ten | `workout-detail/index.ts OVERALL_RANK_SHOWN_THROUGH` (`display_metrics.segments[].show_overall_rank`) | **OURS** — Strava publishes the leaderboard itself, not a rule for when a placing is worth showing. It was a bare `<= 10` in the map's render until 2026-09-16 | 2026-09-16 |
 | Every distance, pace and set weight on the Performance and Details tabs is written in the athlete's own unit by the server, and the screen prints the string | `_shared/session-detail/build.ts` (`distance_display`, `duration_display`, `avg_pace_display`, `swim_pace_display`, each interval's `pace_display` / `gap_display` / `distance_display`, each set's `weight_display`); `workout-detail/index.ts display_metrics` | FIELD — 1 mi = 1609.344 m, 1 yd = 0.9144 m, 1 lb = 0.45359237 kg, all by definition. The two tabs converted in their renders with no metric branch at all, so a metric athlete read miles, yards and pounds on their own screens; the swim pace was computed in the PLAN's unit and labelled with the ATHLETE's, which printed metres as "/100yd" (§8.0 A4) | 2026-09-16 |
 
+## Type and legibility (2026-09-18)
+
+Every screen reads one set of type tokens (`index.css` `--type-*`, `--label*`; tailwind `text-title1 … text-caption`,
+`text-label[-secondary|-tertiary]`). Plan: `docs/AUDIT-type-legibility-2026-09-18.md`.
+
+| Number | Where | Source |
+|---|---|---|
+| Six sizes 28 / 20 / 17 / 15 / 13 / 12 px with line heights 34 / 25 / 22 / 20 / 18 / 16 | `index.css --type-*` | FIELD — Apple HIG, Typography, iOS "Large (default)": Title 1, Title 3, Body, Subhead, Footnote, Caption 1 (read 2026-09-18; the same sizes from `UIFont.preferredFont` on the iOS 26.2 simulator) |
+| Nothing under 12 px | every migrated screen | FIELD — Apple HIG, Typography: iOS minimum 11 pt; Caption 1 (12) is the smallest style the scale uses |
+| Weights 400 / 500 / 600, no Light | every migrated screen | FIELD — Apple HIG, Typography: "avoid Ultralight, Thin, and Light font weights, which can be difficult to see, especially when text is small" |
+| Text colours: white · rgba(235,235,245,0.6) · rgba(235,235,245,0.3) | `index.css --label`, `--label-secondary`, `--label-tertiary` | FIELD — Apple HIG, Color: label / secondary label / tertiary label; values are UIColor.label / .secondaryLabel / .tertiaryLabel resolved in dark mode on the iOS 26.2 simulator (the HIG page names them but prints no values) |
+| Every line of information at least 4.5:1 against the rendered pixels behind it | the audit's measurement | FIELD — WCAG 2.2 SC 1.4.3 |
+| The calmer layer behind text: 55% black | `index.css --text-plate` | **OURS** — the first value tried (30 %, 45 %, 55 %) that put every bottom-bar word over 4.5:1 at 390 and 1440 px |
+| The phone's text size scales every line, from 100 % up to xxxLarge (135 %) | `src/lib/dynamic-type.ts` | FIELD — Apple Dynamic Type: the Body size for the chosen setting ÷ 17; HIG → Typography, xxxLarge Body 23 pt. **OURS** — the floor at 100 % (smaller settings would take Caption 1 under Apple's 11 pt minimum) and the cap at the largest standard setting: the five accessibility sizes clip the fixed-height header and tab bar (iOS simulator, 2026-09-18). Browser zoom to 200 % (WCAG 2.2 SC 1.4.4) is checked separately at 195 px and 720 px wide |
+| From 110 % up the bottom bar stacks its mark over its word | `dynamic-type.ts`, `index.css` | **OURS** — worked out: "STATE" at 15 px mono with its letter-spacing is 57 px × the scale plus 24 px of mark and gap, and a third of a 390 px screen leaves 86 px inside the pill, so it stops fitting at 1.09 |
+
 ## Stage 5 — load-bearing constants sourced (2026-09-16)
 
 One table per file group of the load-bearing scope (DESIGN-one-truth-guard §2.1). Each row is a number that carries an OURS marker (or a FIELD citation worth recording) beside it in the code. Report: `docs/STAGE5-REPORT-2026-09-16.md`.

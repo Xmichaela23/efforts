@@ -2,6 +2,7 @@
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { followPhoneTextSize } from './lib/dynamic-type'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 function applyRuntimeLayoutOverrides() {
@@ -170,4 +171,6 @@ window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120))
 })();
 
 // Remove dark mode class addition
+// The phone's text-size setting scales every line on iPhone (src/lib/dynamic-type.ts).
+followPhoneTextSize();
 createRoot(document.getElementById("root")!).render(<App />);

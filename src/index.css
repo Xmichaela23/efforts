@@ -17,6 +17,24 @@
 
 @layer base {
   :root {
+    /* ⛔ TYPE TOKENS (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). Read through tailwind's
+       text-title1 / title3 / body / subhead / footnote / caption and text-label[-secondary|-tertiary].
+       Sizes and line heights: Apple's iOS text styles at the default text size (HIG → Typography,
+       "Large (default)"), in rem so a browser's text size moves them; on iPhone the phone's own
+       text-size setting scales every line (src/lib/dynamic-type.ts). Weights: 400 / 500 / 600 only —
+       Apple's Typography page says to avoid Light at small sizes. */
+    --type-title1: 1.75rem;     --type-title1-lh: 2.125rem;   /* 28 / 34  Title 1 */
+    --type-title3: 1.25rem;     --type-title3-lh: 1.5625rem;  /* 20 / 25  Title 3 */
+    --type-body: 1.0625rem;     --type-body-lh: 1.375rem;     /* 17 / 22  Body */
+    --type-subhead: 0.9375rem;  --type-subhead-lh: 1.25rem;   /* 15 / 20  Subhead */
+    --type-footnote: 0.8125rem; --type-footnote-lh: 1.125rem; /* 13 / 18  Footnote */
+    --type-caption: 0.75rem;    --type-caption-lh: 1rem;      /* 12 / 16  Caption 1 — the floor */
+    /* Apple's dark-mode label colours (HIG → Color; UIColor.label / .secondaryLabel / .tertiaryLabel
+       resolved dark on the iOS 26.2 simulator: 255,255,255 · 235,235,245 @ 0.600 · 235,235,245 @ 0.298).
+       Tertiary is for disabled and placeholder text only. */
+    --label: #ffffff;
+    --label-secondary: rgba(235, 235, 245, 0.6);
+    --label-tertiary: rgba(235, 235, 245, 0.3);
     /* Dark steel panel background */
     --background: 0 0% 8%;
     /* Phosphor white for primary text (warm, not pure white) */
@@ -256,6 +274,16 @@
 }
 
 @layer components {
+  /* ⛔ THE CALMER LAYER (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). Where Apple's secondary
+     label falls under 4.5:1 (WCAG 2.2 SC 1.4.3) because a sport-colour glow sits behind the words, the
+     glow is darkened BEHIND THE TEXT — the grey is never raised. OURS — 55% black. The audit's mock used 30%,
+     enough for the LOAD card; on the bottom bar 30% and 45% left a tab word under 4.5:1 (4.35:1 at 45%),
+     and 55% was the first tried that put every tab word over 4.5:1 against the rendered pixels at 390
+     and 1440 px. Ledger: docs/STATE-SOURCES.md. */
+  :root { --text-plate: rgba(0, 0, 0, 0.55); }
+  .text-plate {
+    background-color: var(--text-plate);
+  }
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
@@ -864,12 +892,26 @@
 
   .tabbar-label {
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    /* 12.5 → 14 px (2026-09-17, Michael: "a little larger, more prominent"). */
-    font-size: 14px;
+    /* 12.5 → 14 px (2026-09-17, Michael: "a little larger, more prominent") → Subhead 15 (2026-09-18, the
+       type scale). Colour comes from the button (Apple's label / secondary label); no opacity of its own. */
+    font-size: var(--type-subhead);
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    opacity: 0.86;
   }
+  /* ⛔ NOTHING CUT OFF AT 200% (WCAG 2.2 SC 1.4.4, 2026-09-18). When the bar gets narrow — a zoomed browser —
+     or the phone's text size is large, each button stacks its mark above its word and drops the wide
+     letter-spacing, the way iOS's own tab bars stack. At 390 px and the default text size nothing changes. */
+  .mobile-tabbar {
+    container-type: inline-size;
+    container-name: tabbar;
+  }
+  @container tabbar (max-width: 340px) {
+    .mobile-tabbar > .w-full { margin-inline: -12px; }
+    .tabbar-button { flex-direction: column; gap: 3px !important; padding: 6px 2px !important; }
+    .tabbar-label { letter-spacing: 0; }
+  }
+  html[data-text-large] .tabbar-button { flex-direction: column; gap: 3px !important; padding: 6px 4px !important; }
+  html[data-text-large] .tabbar-label { letter-spacing: 0; }
 
   /* 🧩 Calendar frame alignment: show all grid lines; calendar provides bottom frame */
 }

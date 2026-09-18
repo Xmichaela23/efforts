@@ -34,6 +34,17 @@ export default {
         // ⛔ SAME RULE FOR PLYO. The plyometric drill day is `type: 'strength'` on the wire and
         // wore strength's orange until 2026-08-25; it is its own hue now. Never `pink-*`.
         plyo: '#B9678F',
+        // ⛔ THE THREE TEXT LEVELS ARE APPLE'S (2026-09-18) — iOS dark-mode label colours (HIG → Color →
+        // "Label / Secondary label / Tertiary label"; values read from UIColor.label / .secondaryLabel /
+        // .tertiaryLabel resolved in dark mode on the iOS 26.2 simulator). `text-label` = primary content,
+        // `text-label-secondary` = secondary content, `text-label-tertiary` = disabled and placeholder ONLY —
+        // never information (it cannot clear 4.5:1). Where secondary fails over the glow, the fix is the
+        // `.text-plate` layer behind the text, never a brighter grey.
+        label: {
+          DEFAULT: 'var(--label)',
+          secondary: 'var(--label-secondary)',
+          tertiary: 'var(--label-tertiary)',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -77,6 +88,19 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))'
         }
+      },
+      // ⛔ THE TYPE SCALE (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). Six sizes, each one of
+      // Apple's iOS text styles at the default text size (HIG → Typography → "Large (default)"; confirmed
+      // with UIFont.preferredFont on the iOS 26.2 simulator): Title 1 28/34, Title 3 20/25, Body 17/22,
+      // Subhead 15/20, Footnote 13/18, Caption 1 12/16. Nothing below Caption 1. Values live in index.css
+      // (--type-*) so every screen reads one set; in rem, so a browser's own text size moves them.
+      fontSize: {
+        title1: ['var(--type-title1)', { lineHeight: 'var(--type-title1-lh)' }],
+        title3: ['var(--type-title3)', { lineHeight: 'var(--type-title3-lh)' }],
+        body: ['var(--type-body)', { lineHeight: 'var(--type-body-lh)' }],
+        subhead: ['var(--type-subhead)', { lineHeight: 'var(--type-subhead-lh)' }],
+        footnote: ['var(--type-footnote)', { lineHeight: 'var(--type-footnote-lh)' }],
+        caption: ['var(--type-caption)', { lineHeight: 'var(--type-caption-lh)' }],
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'monospace'],

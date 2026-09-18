@@ -1725,10 +1725,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 const goalsActive = showGoals;
                 const tabBase =
                   'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
+                // ⛔ Apple's label colours (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md): the open tab's word
+                // is the primary label, the others the secondary label. The bar sits on the sport-colour bleed,
+                // where the secondary label measured under 4.5:1 — so the pill carries a dark layer behind its word
+                // (the .text-plate black, --text-plate, OURS) under its white wash, instead of a brighter grey.
                 const tabChrome =
-                  'border-2 rounded-xl bg-white/[0.07] text-white/75 hover:bg-white/[0.09] hover:text-white/90 border-white/30 hover:border-white/45';
+                  'border-2 rounded-xl text-label-secondary hover:text-label border-white/30 hover:border-white/45';
                 const tabActive =
-                  'bg-white/[0.10] text-white border-white/55';
+                  'text-label border-white/55';
+                const tabFill = (active: boolean) =>
+                  `linear-gradient(rgba(255,255,255,${active ? 0.10 : 0.07}), rgba(255,255,255,${active ? 0.10 : 0.07})), var(--text-plate)`;
                 const tabStyle: React.CSSProperties = {
                   padding: '10px 14px',
                   // 44 → 48 (2026-09-17): Apple's minimum hit target is 44×44 pt, Material 3's 48×48 dp. The bar sat
@@ -1769,7 +1775,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     setActiveBottomNav('home');
                   }}
                   className={`${tabBase} ${tabChrome} ${homeActive ? tabActive : ''}`}
-                  style={tabStyle}
+                  style={{ ...tabStyle, background: tabFill(homeActive) }}
                 >
                   <span aria-hidden="true" style={lampStyle(homeActive)} />
                   <span aria-hidden="true" className={sigilClass('home', homeActive)} />
@@ -1778,7 +1784,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button data-first-run="state"
                   onClick={openStateTab}
                   className={`${tabBase} ${tabChrome} ${contextActive ? tabActive : ''}`}
-                  style={tabStyle}
+                  style={{ ...tabStyle, background: tabFill(contextActive) }}
                 >
                   <span aria-hidden="true" style={lampStyle(contextActive)} />
                   <span aria-hidden="true" className={sigilClass('context', contextActive)} />
@@ -1792,7 +1798,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     setShowGoals(true);
                   }}
                   className={`${tabBase} ${tabChrome} ${goalsActive ? tabActive : ''}`}
-                  style={tabStyle}
+                  style={{ ...tabStyle, background: tabFill(goalsActive) }}
                 >
                   <span aria-hidden="true" style={lampStyle(goalsActive)} />
                   {/* ⛔ "Goals" → "Focus", with the eye (2026-08-05). The screen behind this tab is
