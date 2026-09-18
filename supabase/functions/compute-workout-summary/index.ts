@@ -1091,7 +1091,7 @@ Deno.serve(async (req) => {
     }
 
     type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number; number:number };
-    function normalizeLaps(raw:any): Lap[] {
+    function normalizeLaps(raw:any, activityEndTs?: number | null): Lap[] {
       if (!raw) return [];
       // Garmin rows written before 2026-09-07 hold the laps as a JSON STRING inside the jsonb column
       // (ingest-activity stringified them). A string read as "no laps" made every structured Garmin run
@@ -1100,8 +1100,12 @@ Deno.serve(async (req) => {
       const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.laps) ? raw.laps : []);
       const out: Lap[] = [];
       // Garmin laps carry ONLY a start time (`startTimeInSeconds`, epoch). A lap with no end was
-      // dropped below, so every Garmin lap vanished. Each lap ends where the next begins; the last
-      // one takes the median length of the others (or the activity's end when there is only one).
+      // dropped below, so every Garmin lap vanished. Each lap ends where the next begins; the last one ends
+      // where the recording ends.
+      // ⛔ THE LAST LAP ENDS WITH THE RECORDING, NOT AT THE MEDIAN LAP (2026-09-17). It used to take the median length
+      // of the others. On a 4:00-rep session the median is 4:00, so the cool-down lap (the last one, 8:00) was cut to
+      // 4:00, fitted a rep's time, and was paired as a rep — five reps shown, the fifth slow. The median stays only
+      // when the recording's end is unknown.
       const starts = arr.map((L: any) => Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0));
       const gaps = starts.slice(1).map((v: number, i: number) => v - starts[i]).filter((g: number) => g > 0).sort((a: number, b: number) => a - b);
       const medianGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
@@ -1111,7 +1115,10 @@ Deno.serve(async (req) => {
           || Number(L?.elapsed_time ?? L?.moving_time ?? L?.totalElapsedTimeInSeconds ?? L?.totalTimerTimeInSeconds ?? 0) > 0;
         if (!hasEnd && starts[li] > 0) {
           const next = starts[li + 1];
-          const derivedEnd = (Number.isFinite(next) && next > starts[li]) ? next : (medianGap > 0 ? starts[li] + medianGap : 0);
+          const endOfRecording = Number(activityEndTs);
+          const derivedEnd = (Number.isFinite(next) && next > starts[li]) ? next
+            : (Number.isFinite(endOfRecording) && endOfRecording > starts[li]) ? endOfRecording
+            : (medianGap > 0 ? starts[li] + medianGap : 0);
           if (derivedEnd > 0) (L as any).endTimeInSeconds = derivedEnd;
         }
         let start_ts = Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0);
@@ -1152,7 +1159,12 @@ Deno.serve(async (req) => {
       }
       return out.sort((a,b)=>a.start_ts - b.start_ts);
     }
-    const laps: Lap[] = normalizeLaps((w as any)?.laps);
+    const laps: Lap[] = normalizeLaps((w as any)?.laps, (() => {
+      // The recording's last clock second (`ts`, epoch) — where a last lap with no end of its own stops.
+      let last: number | null = null;
+      for (const r of rows) { const t = Number((r as any)?.ts); if (Number.isFinite(t) && (last == null || t > last)) last = t; }
+      return last != null ? last + 1 : null;
+    })());
 
     // Lightweight diagnostics to aid field forensics (safe to leave enabled)
     try {

@@ -1893,7 +1893,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
      * ⛔ EXECUTION = COROS'S EFFORT ACCURACY: DONE, AND DONE IN RANGE (2026-09-17, Michael) — `_shared/execution-score.ts`
      * carries COROS's words and URL. Set ONCE, here, after everything else; nothing below rewrites it.
      *   · The sections scored are the plan's steps that carry a target: a pace range, and not sent to the watch as
-     *     time only (`watch_target: 'none'` — the warm-up, the cool-down, an easy jog). COROS: open sections get no score.
+     *     time only (`watch_target: 'none'`, an easy jog). The warm-up and cool-down never count, by their kind, on any
+     *     plan. COROS: open sections get no score.
      *   · Completion: done ÷ planned per section (distance when the step prescribes distance, else time), capped at
      *     100%, weighted by planned time; a section never reached counts 0. Intensity: seconds inside each section's
      *     own range (counted per second by compute-workout-summary, `executed.in_range_s`) ÷ seconds done. The range
@@ -1929,6 +1930,11 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             const role = String(iv?.role ?? iv?.kind ?? '').toLowerCase();
             const st = iv?.planned_step_id != null ? planStepsById.get(String(iv.planned_step_id)) : null;
             const range = st?.pace_range ?? null;
+            // ⛔ The warm-up and the cool-down are never scored, on any plan (2026-09-17): the book prescribes both as an
+            // "easy jog" with no target (p231–235), and plans built before they went to the watch as time only still
+            // carry a pace range on them. Decided by the step's kind, not by the range.
+            const stepKind = String(st?.kind ?? st?.type ?? '').toLowerCase();
+            if (/warm|cool/.test(stepKind) || /warm|cool/.test(role)) return null;
             if (!st || !range || st?.watch_target === 'none' || role === 'lap' || role === 'overall') return null;
             const notDone = iv?.not_done === true || !iv?.executed;
             const secs = notDone ? 0 : (Number(iv.executed?.moving_s ?? iv.executed?.duration_s) || 0);

@@ -1559,6 +1559,9 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         const pr = iv?.power_range || iv?.planned?.power_range;
         const lo = Number(pr?.lower ?? pr?.min);
         if (!(lo > 0) || planStepById.get(String(iv?.planned_step_id))?.watch_target === 'none') return null;
+        // The warm-up and cool-down are never scored, on any plan (2026-09-17) — decided by the step's kind.
+        const kindOf = `${iv?.role ?? ''} ${iv?.kind ?? ''} ${planStepById.get(String(iv?.planned_step_id))?.kind ?? ''}`.toLowerCase();
+        if (/warm|cool/.test(kindOf)) return null;
         const hiRaw = pr?.upper ?? pr?.max;
         const notDone = (iv as any)?.not_done === true || !iv?.executed;
         const secs = notDone ? 0 : (Number(iv.executed?.duration_s) || 0);

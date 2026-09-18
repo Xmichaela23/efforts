@@ -15,8 +15,9 @@
  *   at 100%, sections weighted by planned time. A section never reached counts as 0 done.
  * - Intensity: seconds inside each section's own range (the plan's range, no allowance) ÷ the seconds done. Easy
  *   sessions: moving seconds at or under the easy heart-rate ceiling ÷ moving seconds.
- * - A section with no target (the warm-up, the cool-down, a time-only jog — `watch_target: 'none'`) gets no score.
- *   No targeted section at all: no score (null).
+ * - A section with no target (a time-only jog — `watch_target: 'none'`) gets no score. The warm-up and cool-down
+ *   never count, on any plan, decided by the step's kind: the book prescribes both as an "easy jog" with no target
+ *   (p231–235), and plans built before 2026-09-17 still carry a pace range on them. No targeted section: no score.
  *
  * OURS (docs/STATE-SOURCES.md, "Execution score")
  * - The fallback: a section with no per-second count is judged on its average — all its seconds in range when the
