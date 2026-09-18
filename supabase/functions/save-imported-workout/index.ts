@@ -4,7 +4,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
-import { zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
+import { zone3FloorBpm, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR } from '../../../src/lib/friel-zones.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -196,11 +196,11 @@ Deno.serve(async (req) => {
             const lthr = Number(fitLthr);
             const z2z3 = zone3FloorBpm(lthr);
             configuredZones.zones = [
-              { min: 0, max: Math.round(lthr * 0.85) },
-              { min: Math.round(lthr * 0.85), max: z2z3 },
-              { min: z2z3, max: Math.round(lthr * 0.95) },
-              { min: Math.round(lthr * 0.95), max: Math.round(lthr * 1.05) },
-              { min: Math.round(lthr * 1.05), max: null },
+              { min: 0, max: Math.round(lthr * Z2_FLOOR_PCT_LTHR) },
+              { min: Math.round(lthr * Z2_FLOOR_PCT_LTHR), max: z2z3 },
+              { min: z2z3, max: Math.round(lthr * Z4_FLOOR_PCT_LTHR) },
+              { min: Math.round(lthr * Z4_FLOOR_PCT_LTHR), max: Math.round(lthr * Z5_FLOOR_PCT_LTHR) },
+              { min: Math.round(lthr * Z5_FLOOR_PCT_LTHR), max: null },
             ];
           }
           await svcClient

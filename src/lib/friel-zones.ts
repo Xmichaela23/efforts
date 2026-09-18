@@ -28,8 +28,9 @@
  *   Z3 tempo       90-94% LTHR
  *   Z4 threshold   95-99% LTHR
  *   Z5 VO2max     100%+ LTHR
- * (The Z4/Z5 cuts below keep the pre-existing 0.95 / 1.05 boundaries — this module changes ONLY the
- * Z2/Z3 seam, which is the one that was fractured. Do not "tidy" the others without a reason.)
+ * ⛔ Z5 STARTS AT 100% (2026-09-17, clean-up batch item 9). It kept a pre-existing 1.05 until then, so zone 4 ran
+ * 95–104% against the receipt's 95–99%. Every reader moved together: Profile's zone rows, the run analyser's bins,
+ * the facts bins (`compute-workout-analysis`) and the zones written from a FIT file (`save-imported-workout`).
  */
 
 /** Friel Z2 ceiling — the top of easy/aerobic. Z1 < 85% LTHR, Z2 85-89%; above 89% is Z3 (not easy). */
@@ -38,9 +39,9 @@ export const EASY_CEILING_PCT_LTHR = 0.89;
 export const EASY_FLOOR_PCT_LTHR = 0.70;
 /** Z1/Z2 seam. */
 export const Z2_FLOOR_PCT_LTHR = 0.85;
-/** Z3/Z4 and Z4/Z5 seams — unchanged from the pre-existing model. */
+/** Z3/Z4 and Z4/Z5 seams — Friel via TrainingPeaks: Z4 threshold 95–99%, Z5 100%+. */
 export const Z4_FLOOR_PCT_LTHR = 0.95;
-export const Z5_FLOOR_PCT_LTHR = 1.05;
+export const Z5_FLOOR_PCT_LTHR = 1.00;
 
 /**
  * FRIEL RUN PACE ZONE 2 — the easy pace range, as multiples of threshold PACE (2026-09-15, TRUTH-MAP §9 Q2, D-478).

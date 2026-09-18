@@ -47,7 +47,7 @@
 // reads too. It was hardcoded in three files that rounded independently (0.89 here, 0.90 in the analyzer,
 // 0.90 in TrainingBaselines) — so a 135 bpm run was "Zone 2" on the athlete's screen and "not easy" to this
 // learner. Re-exported here so every existing importer keeps working unchanged.
-export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
+export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
 import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 /** Friel Z3 floor — kept as a named export for existing importers; delegates to the ONE model (D-286). */

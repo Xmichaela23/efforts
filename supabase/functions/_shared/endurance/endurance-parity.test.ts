@@ -17,11 +17,11 @@ import {
 } from '../../generate-combined-plan/science.ts';
 
 // ── PARITY 1 — HR zones (vs the client getFrielZones/getKarvonenZones formula + your confirmed golden) ──
-Deno.test('PARITY: HR zones — ONE Friel table (D-286): the server zones ARE frielRunZones (LTHR 158 → Z2 141 / Z3 149 / Z4 165)', () => {
+Deno.test('PARITY: HR zones — ONE Friel table (D-286): the server zones ARE frielRunZones (LTHR 158 → Z2 141 / Z3 149 / Z4 157)', () => {
   const z = frielZones(158);
   assertEquals(z[1].max, 141); // Z2 top = easy ceiling = round(0.89 × LTHR)
   assertEquals(z[2].max, 149); // Z3
-  assertEquals(z[3].max, 165); // Z4
+  assertEquals(z[3].max, 157); // Z4 — ends the beat below 100% (Z5 starts at LTHR, Friel via TrainingPeaks)
   for (const lthr of [140, 150, 152, 158, 165, 172, 185]) {
     const zz = frielZones(lthr);
     const one = frielRunZones(lthr);

@@ -12,7 +12,7 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
-import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
+import { runEasyZone3FloorBpm, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR } from '../_shared/easy-hr.ts';
 import { cumulativeFlatMeters, cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { isIndoorSession } from '../_shared/indoor-session.ts';
 import { buildDisplaySeriesColumn } from './display-series.ts';
@@ -1566,10 +1566,10 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
         // the easy ceiling makes "easy" === "Zone 1 or 2" by construction — they can no longer drift.
         hrZoneBoundaries = [
           0,
-          Math.round(lthr * 0.85),
+          Math.round(lthr * Z2_FLOOR_PCT_LTHR),
           runEasyZone3FloorBpm(lthr),
-          Math.round(lthr * 0.95),
-          Math.round(lthr * 1.05),
+          Math.round(lthr * Z4_FLOOR_PCT_LTHR),
+          Math.round(lthr * Z5_FLOOR_PCT_LTHR), // the ONE table's seams (friel-zones.ts), not copies
           Math.round(lthr * 1.15),
         ];
         hrZoneSchema = 'lthr-friel';
