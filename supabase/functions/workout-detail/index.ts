@@ -5,6 +5,7 @@
 import { effortRowText, talkTestRowText } from '../_shared/effort-words.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
+import { durationWord } from '../_shared/plan-tokens/quality-work.ts';
 import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { unattachedPlannedIds } from '../_shared/unattached-planned.ts';
@@ -1950,7 +1951,10 @@ Deno.serve(async (req) => {
           };
         }
         if (!iv.planned_label && iv.interval_type === 'work') {
-          iv.planned_label = `Work · ${iv.actual_duration_s ? `${Math.round(iv.actual_duration_s / 60)} min` : ''}`;
+          // The step's planned length as the page writes it ("30 s", "2:30", "3 min"), not the ridden time rounded to
+          // whole minutes — a 30-second step read "Work · 1 min" (2026-09-18).
+          const len = Number(iv.planned_duration_s) > 0 ? Number(iv.planned_duration_s) : Number(iv.actual_duration_s);
+          iv.planned_label = `Work · ${len > 0 ? durationWord(len) : ''}`;
         } else if (!iv.planned_label) {
           iv.planned_label = String(iv.interval_type || '');
         }

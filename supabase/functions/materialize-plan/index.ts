@@ -2233,10 +2233,9 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
  * lap-button hill tests; the bike half was the one nothing could reach.
  */
 export /**
- * ⛔ A RIDE RECOVERY STEP CARRIES WATTS (Michael 2026-09-02, from the Kickr: "by feel is a little weird
- * when it's controlling the trainer"). A recovery step with no target leaves an ERG trainer with nothing
- * to hold, so the athlete freewheels or guesses. 45–55% of FTP is OURS: Coggan's active-recovery zone
- * (Z1, under 55%) is where every ERG platform parks a recovery. Not a training dose — a held resistance.
+ * ⛔ A RIDE RECOVERY CARRIES WATTS ONLY WHERE THE PAGE PRINTS A NUMBER (Michael, 2026-09-18). p237's "1 min @ 50%"
+ * goes as its range; a plain "easy spin" goes with no target, the same to Garmin and to Intervals.icu/Zwift.
+ * Replaces the OURS 45–55% every recovery carried from 2026-09-02 (`quality-work.ts`, above `SEGMENT`).
  */
 
 function expandBikeToken(
@@ -2280,17 +2279,16 @@ function expandBikeToken(
   }
   
   // Cooldown tokens with proper FTP-based power ranges
-  // OURS — `expandBikeToken` cool-down and recovery band 40–55% of FTP; 10-min / 5-min defaults. No page.
+  // OURS — `expandBikeToken` cool-down band 40–55% of FTP; 10-min / 5-min defaults. No page.
   if (/cooldown.*\d+min/.test(lower)) { 
     const sec = minutesTokenToSeconds(lower) ?? 600; 
     out.push({ id: uid(), kind:'cooldown', duration_s: sec, power_range: pctRange(0.40, 0.55) }); 
     return out; 
   }
-  // Recovery zone tokens: bike_recovery_5min_Z1
-  // OURS — 40–55% of FTP, see the cool-down note above.
+  // Recovery zone tokens: bike_recovery_5min — p239's "easy spin" between blocks, printed with no number: no target.
   if (/bike_recovery_\d+min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 300;
-    out.push({ id: uid(), kind:'recovery', duration_s: sec, power_range: pctRange(0.40, 0.55), label: 'Recovery' });
+    out.push({ id: uid(), kind:'recovery', duration_s: sec, label: 'Recovery' });
     return out;
   }
   // FTP Test: bike_ftp_test_20min - maximal sustainable effort (no upper cap!)
@@ -2335,7 +2333,7 @@ function expandBikeToken(
   }
   // SS: bike_ss_3x12min_R4min · Threshold: bike_thr_4x8min_R5min
   // ⛔ ONE PARSER, ONE ARITHMETIC — the two bands and their two rest treatments live on
-  // `parseQualityWork` (`BIKE_BANDS`, `restPowered`), which the Instead sheet reads too.
+  // `parseQualityWork` (`BIKE_BANDS`), which the Instead sheet reads too.
   {
     const work = parseQualityWork(lower);
     if (work && work.kind === 'band') {

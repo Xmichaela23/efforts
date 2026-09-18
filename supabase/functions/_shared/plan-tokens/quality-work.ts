@@ -52,12 +52,6 @@ export type QualityWork =
   /** `bike_ss_` / `bike_thr_` — n repeats inside a BAND the token names by its prefix, not by a number. */
   | {
     kind: 'band'; reps: number; workS: number; restS: number; lo: number; hi: number;
-    /**
-     * ⚠️ THE TWO BRANCHES DIFFERED AND THE DIFFERENCE IS KEPT: a sweet-spot rest carries the
-     * recovery band, a threshold rest carries no power at all. Preserved rather than tidied — a
-     * step that gains a target here would change what every existing plan's watch file asks for.
-     */
-    restPowered: boolean;
   };
 
 /**
@@ -70,9 +64,11 @@ export const BIKE_BANDS = {
   thr: { lo: 0.95, hi: 1.05 },
 } as const;
 
-/** The recovery spin either side of a bike interval — `RIDE_RECOVERY_PCT`, unchanged. */
-// OURS — `RIDE_RECOVERY_PCT` recovery spin 45–55% of FTP; no source, kept as found
-export const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
+/**
+ * ⛔ A RIDE RECOVERY CARRIES A TARGET ONLY WHERE THE PAGE PRINTS ONE (Michael, 2026-09-18). p237's "1 min @ 50%"
+ * goes as its range (50% ±`SINGLE_PERCENT_BAND`, 45–55%); a plain "easy spin" goes with no target, to Garmin and to
+ * Intervals.icu/Zwift alike. Replaces the OURS 45–55% every unprinted recovery carried (2026-09-02).
+ */
 
 // ⚠️ `allout` AND `{lo}to{hi}` ADDED 2026-09-13 for p278's VO2 and sprint rides. Additive: every token
 // that parsed before parses to the same thing.
@@ -134,7 +130,6 @@ export function parseQualityWork(token: string | null | undefined): QualityWork 
       restS: parseInt(band[4], 10) * 60,
       lo: b.lo,
       hi: b.hi,
-      restPowered: band[1] === 'ss',
     };
   }
 
@@ -282,14 +277,14 @@ export function qualityRideSteps(
   ftp: number | null | undefined,
   rule?: RidePowerRule,
 ): RideStep[] {
-  const recovery = wattsAt(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi, ftp);
   const out: RideStep[] = [];
   if (work.kind === 'round') {
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
         // ⛔ AN ALL-OUT STEP IS WORK WITH NO POWER TARGET — p236's "max effort", unresolved on purpose (p229).
         if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds });
-        else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, ...(recovery ? { power_range: recovery } : {}) });
+        // A plain easy spin: no target (see the note above `SEGMENT`).
+        else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds });
         else {
           // ⚠️ THE RULE IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
           // 50% half) is a stated number, not an effort with a floor, and keeps its band.
@@ -303,7 +298,7 @@ export function qualityRideSteps(
         }
       }
       if (work.restBetweenS > 0 && r < work.sets - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restBetweenS, ...(recovery ? { power_range: recovery } : {}) });
+        out.push({ kind: 'recovery', duration_s: work.restBetweenS });
       }
     }
     return out;
@@ -312,9 +307,9 @@ export function qualityRideSteps(
     const w = wattsAt(work.lo, work.hi, ftp, rule);
     for (let i = 0; i < work.reps; i += 1) {
       out.push({ kind: 'work', duration_s: work.workS, ...(w ? { power_range: w } : {}) });
-      // ⚠️ `bike_thr_` RESTS CARRY NO POWER and `bike_ss_` RESTS DO — see `restPowered`.
+      // The rest between repeats is an easy spin the page gives no number: no target.
       if (work.restS > 0 && i < work.reps - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restS, ...(work.restPowered && recovery ? { power_range: recovery } : {}) });
+        out.push({ kind: 'recovery', duration_s: work.restS });
       }
     }
   }

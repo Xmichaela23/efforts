@@ -199,8 +199,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       }
       // CYCLING: apply POWER range from computed when available
       if (sport === 'CYCLING') {
-        // A REST/RECOVERY step goes up WITH a power target when the row carries one (2026-09-02: a
-        // recovery spin at 45–55% FTP so an ERG trainer holds resistance) and with none otherwise.
+        // A REST/RECOVERY step goes up WITH a power target when the saved step carries one (p237's "1 min @ 50%")
+        // and with none otherwise (a plain easy spin) — the same as the Intervals.icu send (2026-09-18).
         const recHasPower = !!((cs as any)?.power_range || (cs as any)?.powerRange || (cs as any)?.powerTarget || (cs as any)?.target_watts)
         if ((upper === 'REST' || upper === 'RECOVERY') && !recHasPower) return
         const userFTP: number | undefined = ((): number | undefined => {
@@ -676,7 +676,9 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             // ⛔ A RUN'S RECOVERY JOG CARRIES THE PACE THE PAGE PRINTS FOR IT (2026-09-17) — the ladder's "@ 60%".
             // Every rest went with no target before, even those. The computed step decides: a jog the page gives
             // no percentage is stamped time-only and stays clear.
-            if (sport === 'RUNNING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
+            // ⛔ A RIDE RECOVERY TOO (2026-09-18): it went with no target even where the saved step has p237's printed
+            // 50%, while Intervals.icu sent the range. Both senders now read the saved step.
+            if (sport === 'RUNNING' || sport === 'CYCLING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
           }
           // Update or carry-forward SPEED targets for RUNNING
           if (sport === 'RUNNING') {
@@ -764,8 +766,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       normalizeTargetBounds(step)
     } else {
       clearTargets(step)
-      // A run's recovery jog carries the page's percentage pace, or nothing — see the segment path above.
-      if (sport === 'RUNNING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
+      // A run's recovery jog and a ride's recovery carry the page's percentage, or nothing — see the segment path above.
+      if (sport === 'RUNNING' || sport === 'CYCLING') { applyComputedTargetIfMissing(step, true); normalizeTargetBounds(step) }
     }
     if (sport === 'RUNNING') {
       const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'

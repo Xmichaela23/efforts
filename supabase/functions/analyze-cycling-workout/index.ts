@@ -1528,7 +1528,23 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     // falls back to duration alone. Same rule here: with no graded power interval, execution IS
     // duration adherence, and power_adherence is NULL (not 0 — "we did not measure" is not "you
     // scored zero", and build.ts hides the chips when every number is 0).
-    const hasGradedPower = Array.isArray(intervalBreakdown)
+    /**
+     * ⛔ A RIDE WITH NO POWER DATA IS NOT GRADED ON POWER (2026-09-18, Michael). p239's easy steps (0 up to 75% of
+     * FTP) made an endurance ride a power-scored ride; with no power meter every interval read 0 W and 0% power, and
+     * Execution was half the completion. An easy ride with no power data is scored on time under the easy
+     * heart-rate ceiling, as it was before the steps carried watts.
+     */
+    // Read off the ridden steps: compute-workout-summary writes no power on a step when the ride recorded none.
+    const rideHasPower = (Array.isArray(intervals) ? intervals : []).some((iv: any) =>
+      iv?.executed?.judged_power_w != null || iv?.executed?.avg_power_w != null);
+    const plannedPowerSteps = (Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [])
+      .filter((st: any) => !/warm|cool/.test(String(st?.kind ?? st?.type ?? '').toLowerCase()))
+      .map((st: any) => st?.power_range || st?.powerRange)
+      .filter((pr: any) => pr != null);
+    const easyRideWithoutPower = !rideHasPower
+      && plannedPowerSteps.length > 0
+      && plannedPowerSteps.every((pr: any) => isCeilingOnly(pr?.lower, pr?.upper));
+    const hasGradedPower = !easyRideWithoutPower && Array.isArray(intervalBreakdown)
       && intervalBreakdown.some((iv: any) => iv?.power_adherence_percent != null);
 
     // ⛔ AN EASY PRESCRIPTION IS GOVERNED BY HEART RATE (2026-08-01, Michael: "it was prescribed as
@@ -1566,7 +1582,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
      * twice) stays as its own number — the written read and the chips still print it — and no longer feeds this.
      */
     const planStepById = new Map<string, any>((Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : []).map((st: any) => [String(st?.id), st]));
-    const rideSections = (Array.isArray(intervals) ? intervals : [])
+    const rideSections = (easyRideWithoutPower ? [] : Array.isArray(intervals) ? intervals : [])
       .map((iv: any) => {
         const pr = iv?.power_range || iv?.planned?.power_range;
         const lo = Number(pr?.lower ?? pr?.min);

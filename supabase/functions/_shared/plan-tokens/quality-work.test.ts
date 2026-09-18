@@ -38,7 +38,6 @@ const BASELINES = {
 const THRESHOLD = 7 * 60 + 30; // sec/mi
 const EASY = 9 * 60 + 30;
 const FTP = 210;
-const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
 /** The one band around a single printed percentage — `SINGLE_PERCENT_BAND`, transcribed as the rest is. */
 const BAND = 0.10;
 
@@ -123,11 +122,11 @@ function refRide(tok: string, ftp: number | undefined, rule?: RidePowerRule): an
         const secs = parseInt(m2[2], 10);
         const at = m2[3];
         if (at === 'racepace') out.push({ kind: 'work', duration_s: secs });
-        else if (at === 'vt1' || at === 'easy') out.push({ kind: 'recovery', duration_s: secs, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
+        else if (at === 'vt1' || at === 'easy') out.push({ kind: 'recovery', duration_s: secs }); // 2026-09-18: a plain easy spin, no target
         else if (isRec) { const pct = parseInt(at, 10) / 100; out.push({ kind: 'recovery', duration_s: secs, power_range: pctRange(pct, pct) }); }
         else { const pct = parseInt(at, 10) / 100; out.push({ kind: 'work', duration_s: secs, power_range: workAt(pct) }); }
       }
-      if (rest_s > 0 && r < rounds - 1) out.push({ kind: 'recovery', duration_s: rest_s, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
+      if (rest_s > 0 && r < rounds - 1) out.push({ kind: 'recovery', duration_s: rest_s });
     }
     return out;
   }
@@ -136,7 +135,7 @@ function refRide(tok: string, ftp: number | undefined, rule?: RidePowerRule): an
     const reps = parseInt(m[1], 10), work = parseInt(m[2], 10) * 60, rest = parseInt(m[3], 10) * 60;
     for (let i = 0; i < reps; i++) {
       out.push({ kind: 'work', duration_s: work, power_range: pctRange(0.85, 0.95) });
-      if (rest && i < reps - 1) out.push({ kind: 'recovery', duration_s: rest, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
+      if (rest && i < reps - 1) out.push({ kind: 'recovery', duration_s: rest });
     }
     return out;
   }
