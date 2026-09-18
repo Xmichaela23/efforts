@@ -14,6 +14,13 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED (2026-09-18, Michael: "so we have an ours thing happening?") — THE PERFORMANCE WORKLOAD "usual" RANGE IS OURS
+
+The workload chip on Performance prints "usual 36–54" (`src/components/AdherenceChips.tsx:319-331`, server
+`typical_low/typical_high`): the athlete's own middle half of that sport's sessions, at least 5 sessions. The framing
+borrows Strava's Relative Effort and Garmin's Training Load bands, but the method is ours (ledger row added
+2026-09-18, b75b3114). Replace it with one named app's own method, or take the range off.
+
 ## AWAITING MICHAEL — DAY SWIPE (tab bar above the swipe zone VERIFIED on a device 2026-09-18, Michael: "tab is fixed")
 
 Look for: the bottom buttons sit clear of the iPhone's swipe-up bar, 48 pt tall, 14 px labels; the + no longer covers
