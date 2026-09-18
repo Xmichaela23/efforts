@@ -11,9 +11,8 @@ import type { SessionWeatherForDisplay } from '@/lib/sessionWeather';
  * ⛔ ICONS, NEVER EMOJI. `lucide-react`, which the app already draws every other glyph from.
  *
  * ⛔ THE CONDITION IS A CODE, NOT A WORD. Open-Meteo's archive returns no condition text — that is
- * why `condition` has always been `'—'` — but it does return a WMO `weather_code`, which
- * `get-weather` now asks for. The code travels raw and the mapping to a picture lives here, because
- * which glyph stands for "overcast" is a display decision.
+ * why `condition` has always been `'—'` — but it does return a WMO `weather_code`. `get-weather`
+ * turns the code into an icon name (`weather_icon`); the phone only draws it.
  *
  * ⚠️ EVERY FIELD IS OPTIONAL AND EVERY ONE IS GUARDED. A row written before
  * `WEATHER_SCHEMA_VERSION` 5 carries no code and no dew point, and the device-temperature fallback
@@ -22,27 +21,18 @@ import type { SessionWeatherForDisplay } from '@/lib/sessionWeather';
  */
 
 /**
- * WMO weather code → glyph, per the work order's own banding.
- *
- *   0 clear · 1-2 mainly clear / partly cloudy · 3 overcast · 45-48 fog · 51-67 drizzle and rain
- *   (including freezing) · 71-77 snow · 80-82 rain showers · 85-86 snow showers · 95-99 thunderstorm
- *
- * ⚠️ AN UNKNOWN CODE DRAWS NOTHING rather than a guess — the block simply has no icon that day.
+ * The icon `get-weather` names → the glyph. ⛔ THE SERVER PICKS THE ICON (2026-09-18, Stage C follow-up); this is
+ * only the drawing for each name. A name missing or not in this list draws nothing.
  */
-export function weatherIconFor(code: number | undefined): typeof Sun | null {
-  if (code == null || !Number.isFinite(code)) return null;
-  const c = Math.round(code);
-  if (c === 0) return Sun;
-  if (c === 1 || c === 2) return CloudSun;
-  if (c === 3) return Cloud;
-  if (c >= 45 && c <= 48) return CloudFog;
-  if (c >= 51 && c <= 67) return CloudRain;
-  if (c >= 71 && c <= 77) return CloudSnow;
-  if (c >= 80 && c <= 82) return CloudRain;
-  if (c >= 85 && c <= 86) return CloudSnow;
-  if (c >= 95 && c <= 99) return CloudLightning;
-  return null;
-}
+const WEATHER_GLYPH: Record<string, typeof Sun> = {
+  sun: Sun,
+  cloud_sun: CloudSun,
+  cloud: Cloud,
+  fog: CloudFog,
+  rain: CloudRain,
+  snow: CloudSnow,
+  storm: CloudLightning,
+};
 
 /** `6:32am` — the shape the date line already used for sunrise and sunset. */
 function clock(iso: string | undefined): string | null {
@@ -74,7 +64,7 @@ const TodayWeather: React.FC<{
 }> = ({ weather, city, className = '', style }) => {
   if (!weather || !Number.isFinite(Number(weather.temperature))) return null;
 
-  const Icon = weatherIconFor(weather.weather_code);
+  const Icon = weather.weather_icon ? WEATHER_GLYPH[weather.weather_icon] ?? null : null;
   const temp = Math.round(Number(weather.temperature));
   const feels =
     weather.feels_like != null && Number.isFinite(weather.feels_like)

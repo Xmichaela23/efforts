@@ -15,6 +15,36 @@ function heatNoteFor(weather: unknown, wantsCurrentConditions: boolean): string 
   return load != null && load > 0 ? HEAT_NOTE : null;
 }
 
+/**
+ * ⛔ THE ICON IS NAMED HERE, NOT ON THE PHONE (2026-09-18, the Stage C follow-up). The phone used to band the WMO
+ * code itself; now it looks the name up and draws it, and an unknown code sends no name, so no icon is drawn.
+ * FIELD — WMO code table 4677 as Open-Meteo documents it (open-meteo.com/en/docs, "WMO Weather interpretation
+ * codes"): 0 clear · 1-2 mainly clear / partly cloudy · 3 overcast · 45-48 fog · 51-67 drizzle and rain (incl.
+ * freezing) · 71-77 snow · 80-82 rain showers · 85-86 snow showers · 95-99 thunderstorm. The bands are unchanged.
+ * Added to the response, not stored, so every cached row gets it without a schema bump.
+ */
+type WeatherIcon = 'sun' | 'cloud_sun' | 'cloud' | 'fog' | 'rain' | 'snow' | 'storm';
+function weatherIconName(code: unknown): WeatherIcon | undefined {
+  const n = Number(code);
+  if (code == null || !Number.isFinite(n)) return undefined;
+  const c = Math.round(n);
+  if (c === 0) return 'sun';
+  if (c === 1 || c === 2) return 'cloud_sun';
+  if (c === 3) return 'cloud';
+  if (c >= 45 && c <= 48) return 'fog';
+  if (c >= 51 && c <= 67) return 'rain';
+  if (c >= 71 && c <= 77) return 'snow';
+  if (c >= 80 && c <= 82) return 'rain';
+  if (c >= 85 && c <= 86) return 'snow';
+  if (c >= 95 && c <= 99) return 'storm';
+  return undefined;
+}
+function withIcon(weather: unknown): unknown {
+  if (!weather || typeof weather !== 'object') return weather;
+  const icon = weatherIconName((weather as { weather_code?: unknown }).weather_code);
+  return icon ? { ...(weather as Record<string, unknown>), weather_icon: icon } : weather;
+}
+
 /** How long a reading is kept in the shared cache — see the write below. The phone keeps the same times. */
 function weatherKeepMs(daysAgo: number, current: boolean): number {
   const MIN = 60 * 1000;
@@ -55,8 +85,8 @@ interface WeatherData {
   /**
    * ⛔ `'—'` NO LONGER, WHERE OPEN-METEO ANSWERS (work order 2026-09-09 §3b.1). The archive does not
    * return condition TEXT, which is why this shipped as an em dash — but it does return a WMO
-   * `weather_code`, and the screen wants an icon rather than a word. The code travels raw and the
-   * client maps it; a picture is a display decision and does not belong in the payload.
+   * `weather_code`, and the screen wants an icon rather than a word. The code is stored raw; the icon's NAME is
+   * added to every response by `withIcon` (2026-09-18) and the phone only draws it.
    * ⚠️ STILL `'—'` when the request predates this or the code is missing, so nothing that reads
    * `condition` has to learn a new empty value.
    */
@@ -299,7 +329,7 @@ Deno.serve(async (req) => {
             w?.schema_version === WEATHER_SCHEMA_VERSION
           ) {
             console.log('🌡️ [WEATHER] Returning from shared cache');
-            return new Response(JSON.stringify({ weather: cached.weather, heat_note: heatNoteFor(cached.weather, wantsCurrentConditions) }), {
+            return new Response(JSON.stringify({ weather: withIcon(cached.weather), heat_note: heatNoteFor(cached.weather, wantsCurrentConditions) }), {
               status: 200,
               headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
             });
@@ -329,7 +359,7 @@ Deno.serve(async (req) => {
       const cached = rowWeatherData as WeatherData & { schema_version?: number };
       if (cached?.schema_version === WEATHER_SCHEMA_VERSION) {
         console.log('🌡️ [WEATHER] Returning from workout cache');
-        return new Response(JSON.stringify({ weather: rowWeatherData, heat_note: heatNoteFor(rowWeatherData, wantsCurrentConditions) }), {
+        return new Response(JSON.stringify({ weather: withIcon(rowWeatherData), heat_note: heatNoteFor(rowWeatherData, wantsCurrentConditions) }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
@@ -420,7 +450,7 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    return new Response(JSON.stringify({ weather: weatherData, heat_note: heatNoteFor(weatherData, wantsCurrentConditions) }), { 
+    return new Response(JSON.stringify({ weather: withIcon(weatherData), heat_note: heatNoteFor(weatherData, wantsCurrentConditions) }), { 
       status: 200, 
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });

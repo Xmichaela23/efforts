@@ -100,7 +100,8 @@
         "src/components/StrengthLogger.tsx",
         "src/components/NonRaceBuilder.tsx",
         "src/components/SessionDeck.tsx",
-        "src/components/TrainingBaselines.tsx"
+        "src/components/TrainingBaselines.tsx",
+        "src/components/TodayWeather.tsx"
       ]
     },
     "parked": [
@@ -388,6 +389,13 @@
         "words": [
           "· auto`",
           "Your runs suggest about "
+        ]
+      },
+      {
+        "field": "get-weather weather.weather_icon",
+        "words": [
+          "weatherIconFor(",
+          "c >= 95 && c <= 99"
         ]
       }
     ]

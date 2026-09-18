@@ -24,6 +24,11 @@ export type SessionWeatherForDisplay = {
    * ⚠️ ABSENT ON EVERY ROW WRITTEN BEFORE `WEATHER_SCHEMA_VERSION` 5. A reader must cope with that.
    */
   weather_code?: number;
+  /**
+   * The icon to draw, named by `get-weather` from `weather_code` (2026-09-18). One of sun / cloud_sun / cloud /
+   * fog / rain / snow / storm; absent when the code is unknown or missing, and then no icon is drawn.
+   */
+  weather_icon?: string;
   /** Omitted when unknown (e.g. device-only fallback). */
   humidity?: number;
   /** °F. Shown beside humidity. Absent on rows written before schema 5, and on the device fallback. */
@@ -99,6 +104,7 @@ export function parseWorkoutWeatherDataForDisplay(raw: unknown): SessionWeatherF
     feels_like: num(w.feels_like),
     condition,
     ...(num(w.weather_code) != null ? { weather_code: num(w.weather_code) } : {}),
+    ...(typeof w.weather_icon === 'string' && w.weather_icon ? { weather_icon: w.weather_icon } : {}),
     ...(humidityRaw != null ? { humidity: Math.round(humidityRaw) } : {}),
     ...(num(w.dew_point) != null ? { dew_point: Math.round(num(w.dew_point)!) } : {}),
     ...(num(w.device_temp_f) != null ? { device_temp_f: Math.round(num(w.device_temp_f)!) } : {}),
