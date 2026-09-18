@@ -506,6 +506,16 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   // option read as a run-on: *"Back Extension - feet under a loaded bar - for your gear"*.
   'back extension': 'Back Extension',
   /**
+   * ⛔ THE LATERAL RAISE, NAMED FOR THE KIT WHEN THE PLAN IS BUILT (2026-09-17, clean-up batch item 3, option b). The
+   * names are the ones materialize-plan's older equipment swap printed ("Dumbbell Lateral Raise", "Band Lateral
+   * Raise"), moved here so the stored row, the step and every screen carry one name. Dumbbells first, as that swap
+   * did. A cable-only kit keeps "Lateral Raise".
+   */
+  'lateral raise': [
+    { route: ['dumbbells'], value: 'Dumbbell Lateral Raise' },
+    { route: ['bands'], value: 'Band Lateral Raise' },
+  ],
+  /**
    * ⛔ THE GHD BACK EXTENSION ON A BACK EXTENSION BENCH (D-479, 2026-09-16) — "Back Extension", the name lifters
    * use. Shown only when the bench route resolved; a gym member who owns the station reads "GHD Back Extension".
    * Name approved by Michael 2026-09-16 night. It shares the floor version's name above; the clash check (every

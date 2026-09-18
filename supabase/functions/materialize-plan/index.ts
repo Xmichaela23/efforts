@@ -52,6 +52,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
 import { executionHowTo, executionName } from '../_shared/strength-grid/grid.ts';
+import { canPerform } from '../../../src/lib/strength-gear.ts';
 import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
 import { liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
@@ -2509,6 +2510,9 @@ export function expandTokensForRow(
   // progression (the composer already owns the ramp). Concurrent strength is untouched.
   const isStrengthPrimary = Array.isArray((row as any)?.tags)
     && (row as any).tags.some((t: any) => String(t).toLowerCase() === 'protocol:strength_primary');
+  // A row the standing-plan composer built — it names the row for the athlete's kit itself (`execution_name`).
+  const isStandingPlanRow = Array.isArray((row as any)?.tags)
+    && (row as any).tags.some((t: any) => String(t).toLowerCase() === 'standing_plan');
   // OURS — 1.05 / 0.85 ceilings, see `resolveStrengthPercentForLift`.
   const strengthMaxPct = isStrengthPrimary ? 1.05 : 0.85;
   const discipline = String(row?.type||'').toLowerCase();
@@ -2556,7 +2560,13 @@ export function expandTokensForRow(
           // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
           // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
           // printed a movement the row never named, and the bodyweight label came with it.
-          const substituted = executionHowTo(originalName, userEquipment) != null
+          // ⛔ AND A STANDING-PLAN ROW THE KIT REACHES KEEPS ITS NAME (2026-09-17, clean-up batch item 3, option b). The
+          // composer names the row for the athlete's kit when the plan is built (`execution_name`, "Dumbbell Lateral
+          // Raise"); a rename here gave the step one name and the stored row another, so the Today card and the setup
+          // sample week said "Lateral Raise" while the logger said "Dumbbell Lateral Raise". A row the kit no longer
+          // reaches (the equipment changed after the build) still falls to the swap below.
+          const substituted = (executionHowTo(originalName, userEquipment) != null
+            || (isStandingPlanRow && canPerform(originalName, userEquipment)))
             ? { name: originalName }
             : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           let name = substituted.name;
@@ -3000,7 +3010,13 @@ export function expandTokensForRow(
           // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
           // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
           // printed a movement the row never named, and the bodyweight label came with it.
-          const substituted = executionHowTo(originalName, userEquipment) != null
+          // ⛔ AND A STANDING-PLAN ROW THE KIT REACHES KEEPS ITS NAME (2026-09-17, clean-up batch item 3, option b). The
+          // composer names the row for the athlete's kit when the plan is built (`execution_name`, "Dumbbell Lateral
+          // Raise"); a rename here gave the step one name and the stored row another, so the Today card and the setup
+          // sample week said "Lateral Raise" while the logger said "Dumbbell Lateral Raise". A row the kit no longer
+          // reaches (the equipment changed after the build) still falls to the swap below.
+          const substituted = (executionHowTo(originalName, userEquipment) != null
+            || (isStandingPlanRow && canPerform(originalName, userEquipment)))
             ? { name: originalName }
             : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           let name = substituted.name;

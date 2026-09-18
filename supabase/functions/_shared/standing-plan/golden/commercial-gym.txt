@@ -65,7 +65,7 @@ WEEK 02  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -114,7 +114,7 @@ WEEK 03  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -163,7 +163,7 @@ WEEK 04  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -212,7 +212,7 @@ WEEK 05  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -261,7 +261,7 @@ WEEK 06  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -310,7 +310,7 @@ WEEK 07  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -359,7 +359,7 @@ WEEK 08  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -408,7 +408,7 @@ WEEK 09  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -457,7 +457,7 @@ WEEK 10  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -505,7 +505,7 @@ WEEK 11  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -553,7 +553,7 @@ WEEK 12  column=standard
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise"
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
