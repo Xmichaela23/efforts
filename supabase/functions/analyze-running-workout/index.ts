@@ -1027,11 +1027,22 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         const czArr = (configuredHrZones as any)?.zones as Array<{ min?: number; max?: number | null }> | undefined;
         if (Array.isArray(czArr) && czArr.length >= 4) {
           // zones[0]=Z1, [1]=Z2, [2]=Z3, [3]=Z4, [4]=Z5
+          /**
+           * ⛔ EACH ZONE ENDS ONE BEAT BELOW THE NEXT ZONE'S FLOOR (2026-09-17, clean-up batch item 10). The four
+           * writers store a zone's top two ways: Friel from Baselines (`save-baselines` → `frielRunZones`) as the
+           * beat below the next floor; Karvonen (`hrZones`), Strava (`strava-token-exchange`) and a FIT file
+           * (`save-imported-workout`) as the next floor itself. Zone 1 took a beat off and zones 2–4 did not, so each
+           * was one beat wrong for one of the two shapes. The floors agree in both, so the ceiling is read off them.
+           */
           const get = (i: number) => czArr[i];
-          const z1Max = Number(get(0)?.max ?? get(1)?.min ?? 0) - 1;
-          const z2Max = Number(get(1)?.max ?? 0);
-          const z3Max = Number(get(2)?.max ?? 0);
-          const z4Max = Number(get(3)?.max ?? 0);
+          const topOf = (i: number) => {
+            const nextFloor = Number(get(i + 1)?.min);
+            return Number.isFinite(nextFloor) && nextFloor > 0 ? nextFloor - 1 : Number(get(i)?.max ?? 0);
+          };
+          const z1Max = topOf(0);
+          const z2Max = topOf(1);
+          const z3Max = topOf(2);
+          const z4Max = topOf(3);
           if (z1Max > 0 && z2Max > z1Max && z3Max > z2Max && z4Max > z3Max) {
             return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
           }
