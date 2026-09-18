@@ -14,12 +14,9 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { EXERCISE_CONFIG, getExerciseConfig, resolveExerciseConfig } from './exercise-config.ts';
-import { getInSlotAlternatives } from './exercise-alternatives.ts';
 import { isMainBarbellLift, lookupExerciseType } from './exercise-role.ts';
-import { intensityTierForExercise } from './strength-intensity-tier.ts';
 import { equipmentForExercise } from './strength-logging-mode.ts';
 
-const FULL_GYM = ['Full commercial gym access'];
 const keyOf = (cfg: unknown) => Object.entries(EXERCISE_CONFIG).find(([, v]) => v === cfg)?.[0] ?? null;
 /** Every real name must land on ITSELF, not on a neighbour. */
 const resolvesToItself = (name: string, key: string) => assertEquals(keyOf(getExerciseConfig(name)), key, `${name} should resolve to '${key}'`);
@@ -90,17 +87,6 @@ Deno.test('TRICEP DIPS is pinned rather than left to fuzzy luck', () => {
   // Same movement as `dips`, so the values were already right — pinning keeps them right.
   const t = EXERCISE_CONFIG['tricep dips'], d = EXERCISE_CONFIG['dips'];
   assertEquals([t.pattern, t.primaryRef, t.ratio, t.displayFormat], [d.pattern, d.primaryRef, d.ratio, d.displayFormat]);
-});
-
-Deno.test('⛔ THE SWAP LIST FOR SINGLE LEG HIP THRUST IS CLEAN', () => {
-  // One pattern, one tier, all the way down — the Band Face Pulls standard.
-  const slot = 'Single Leg Hip Thrust';
-  const alts = getInSlotAlternatives(slot, FULL_GYM);
-  assert(alts.length > 0, 'it must still have options');
-  for (const o of alts) {
-    assertEquals(getExerciseConfig(o.name)?.pattern, 'hip_dominant', `${o.name} left the pattern`);
-    assertEquals(intensityTierForExercise(o.name), intensityTierForExercise(slot), `${o.name} crossed the tier`);
-  }
 });
 
 Deno.test('the plural / case variants all reach their prescription without guessing', () => {

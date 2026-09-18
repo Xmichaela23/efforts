@@ -231,6 +231,25 @@ function poolFor(
 }
 
 /**
+ * THE BUILDER'S OWN CELL, AS IS — the movements the definitions file under this heading and pattern, the ones the
+ * athlete's kit reaches, in the builder's order. No substitution: an empty cell stays empty. Read by the logger's
+ * Swap sheet (`standing-plan/swap-groups.ts`, 2026-09-18) so a swap offers what the builder can place, sorted the
+ * same way.
+ */
+export function cellOptions(
+  category: ViadaCategory,
+  pattern: ViadaPattern | null,
+  equipment: string[] | null | undefined,
+): GridMovement[] {
+  return poolFor(category, category === 'core' || category === 'carry' ? null : pattern, false, equipment, true);
+}
+
+/** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
+export function builderReaches(name: string, equipment: string[] | null | undefined): boolean {
+  return reachable(name, equipment);
+}
+
+/**
  * ⛔ FILL THE SLOT. Never returns an empty option list; throws only when the request itself is
  * incoherent (an unknown category, or a pattern asked of `core`/`carry`, which his key does not
  * split by pattern).

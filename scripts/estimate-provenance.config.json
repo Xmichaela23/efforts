@@ -436,6 +436,13 @@
           "Speed day",
           "Maximal effort"
         ]
+      },
+      {
+        "field": "swap-list lists",
+        "words": [
+          "getInSlotAlternatives(",
+          "Direct swaps"
+        ]
       }
     ]
   }

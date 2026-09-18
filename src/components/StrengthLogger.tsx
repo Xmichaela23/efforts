@@ -15,7 +15,11 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, R
 import { repFloorFor, repsAreBlank } from '@/lib/logged-rep-entry';
 import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
-import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
+// ⛔ THE SWAP LIST IS THE SERVER'S (2026-09-18, the Stage C follow-up): `swap-list` returns what the plan builder
+// files under each page heading for the row. The phone prints them; the plyo drills below are the one
+// list still read here, off `@shared/standing-plan/plyo`.
+import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
+type AlternativeOption = { name: string; display?: string };
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
 import {
   getExerciseConfig,
@@ -106,7 +110,7 @@ function plyoAlternatives(name: string, equipment: string[]): AlternativeOption[
   return fam.drills
     .filter((d) => d.toLowerCase() !== n)
     .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
-    .map((d) => ({ name: d, same_pattern: true, equipment: 'bodyweight' } as AlternativeOption));
+    .map((d) => ({ name: d }));
 }
 import { platePlanForSets, type PlatePlanStep } from '@/lib/plate-plan';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
@@ -599,6 +603,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // pick something the app never showed them).
   const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
   const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
+  // The server's swap list per exercise id, fetched when its sheet opens (`swap-list`). 'loading' until it lands.
+  const [swapLists, setSwapLists] = useState<Record<string, SwapGroup[] | 'loading'>>({});
   const [howToFor, setHowToFor] = useState<string | null>(null); // exercise.id whose how-to sheet is open
   const [setTypeFor, setSetTypeFor] = useState<'ME' | 'DE' | 'SKILL' | 'HYP' | null>(null); // the set-type sheet
   const [swapRestOfPlan, setSwapRestOfPlan] = useState(false); // when on, a swap persists to the plan (not just today)
@@ -739,6 +745,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // `exercises` (which would tear it down + restart on every set edit → the stuttering timer). (Q-timer)
   const exercisesRef = useRef(exercises);
   useEffect(() => { exercisesRef.current = exercises; }, [exercises]);
+  // ⛔ THE SWAP SHEET ASKS THE SERVER EACH TIME IT OPENS (2026-09-18): `swap-list` reads the athlete's kit itself and
+  // returns the page's movements for the row. A plyo drill keeps its own list (below) and asks nothing.
+  useEffect(() => {
+    if (!swapFor) return;
+    const ex = exercisesRef.current.find((e) => e.id === swapFor);
+    if (!ex || plyoFamilyFor(ex.name)) return;
+    let cancelled = false;
+    setSwapLists((m) => ({ ...m, [swapFor]: 'loading' }));
+    (async () => {
+      const slot = ex.planned_name || ex.name;
+      const { data, error } = await supabase.functions.invoke('swap-list', {
+        body: {
+          rows: [{
+            name: slot,
+            now: ex.name !== slot ? ex.name : undefined,
+            swap_options: Array.isArray(ex.swap_options) ? ex.swap_options.map((o) => o.name) : undefined,
+          }],
+        },
+      });
+      if (cancelled) return;
+      const groups = !error && Array.isArray(data?.lists?.[0]) ? (data.lists[0] as SwapGroup[]) : [];
+      setSwapLists((m) => ({ ...m, [swapFor]: groups }));
+    })();
+    return () => { cancelled = true; };
+  }, [swapFor]);
   // Q-TIMER — RECONCILE EVERY RUNNING TIMER FROM THE WALL CLOCK.
   //
   // Seconds-remaining is a DERIVED value, never an authority. The authority is the persisted `endsAt`.
@@ -5109,39 +5140,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const k = n.toLowerCase().trim();
                   return k === String(exercise.name || '').toLowerCase().trim() || k === String(exercise.execution_name || '').toLowerCase().trim();
                 };
-                const alts: AlternativeOption[] = (exercise.swap_options && exercise.swap_options.length > 0)
-                  ? exercise.swap_options
-                    .filter((o) => !isSelf(o.name) && !isSelf(o.display))
-                    .map((o) => ({ name: o.name, display: o.display, same_pattern: true as const, equipment: 'unknown' as const, tier: 'direct' as const }))
-                  : plyoFamilyFor(exercise.name)
-                  ? plyoAlternatives(exercise.name, strengthEquipment)
-                  : getInSlotAlternatives(
-                  exercise.planned_name || exercise.name,
-                  strengthEquipment,
-                  // ⛔ WORK WITHIN THE PLAN'S FRAMEWORK (Michael, 2026-07-30). On an assistance row the
-                  // block already defined the shortlist — the three slots and their options, which the
-                  // athlete picked from at build time. Offering a movement off that list offers one
-                  // the block never considered, at a rep total the slot was never scaled for.
-                  {
-                    // ⛔ TWO SIGNALS, BECAUSE THE FIRST DOES NOT EXIST ON EXISTING PLANS.
-                    // `load_prescribed: false` is now carried through materialize — but every row
-                    // already written lacks it, including the block Michael is running today. The
-                    // second signal is on every assistance row ever authored: its prescription is a
-                    // rep TOTAL ("25 total"), because assistance states a movement and a total and
-                    // never a weight. A main lift always prescribes a number, never a total.
-                    assistanceRow: exercise.load_prescribed === false
-                      || /total/i.test(String(exercise.target_reps ?? '')),
-                    // ⛔ THE DAY'S MAIN LIFT, so the offer follows the block's own day rule: on a
-                    // bench day the push slot pulls, on a squat day the single-leg slot hinges
-                    // (Q-212 / p86). It is the row the block PRICED — assistance is never priced —
-                    // so an authored percentage is the marker, not a name list.
-                    mainLift: exercises.find((e) => e.load_prescribed !== false
-                      && typeof e.planned_percent_1rm === 'number' && e.planned_percent_1rm > 0)?.planned_name
-                      ?? exercises.find((e) => e.load_prescribed !== false
-                        && typeof e.planned_percent_1rm === 'number' && e.planned_percent_1rm > 0)?.name
-                      ?? null,
-                  },
-                  );
+                // The page's movements for this row, grouped under the page's headings (`swap-list`); a plyo drill's
+                // own family (p227). Nothing is worked out here.
+                const served = swapLists[exercise.id];
+                const plyo = plyoFamilyFor(exercise.name) ? plyoAlternatives(exercise.name, strengthEquipment) : null;
+                const groups: { heading: string | null; options: AlternativeOption[] }[] = plyo
+                  ? (plyo.length > 0 ? [{ heading: null, options: plyo }] : [])
+                  : Array.isArray(served)
+                    ? served.map((g) => ({ heading: g.heading, options: g.options.filter((o) => !isSelf(o.name) && !isSelf(o.display)) }))
+                      .filter((g) => g.options.length > 0)
+                    : [];
+                const alts: AlternativeOption[] = groups.flatMap((g) => g.options);
+                const swapLoading = !plyo && served === 'loading';
                 return (
                   <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -5271,25 +5281,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           className="px-2.5 py-1.5 text-caption"
                         >{a.display ?? a.name}</GalaxyButton>
                       );
-                      const direct = alts.filter((a) => a.tier === 'direct');
-                      const lighter = alts.filter((a) => a.tier === 'lighter');
+                      // ⛔ THE HEADINGS ARE THE PAGE'S (Primary / Secondary / Braced / Focused, Core exercises, the
+                      // carry headings), sent with the list — 2026-09-18. They replaced "Direct swaps" / "Alternatives".
                       return (
                         <>
-                          {direct.length > 0 && (
-                            <>
-                              <p className="text-caption uppercase tracking-wide text-label-secondary mb-1.5">Direct swaps</p>
-                              <div className="flex flex-wrap gap-1.5 mb-3">{direct.map(chip)}</div>
-                            </>
-                          )}
-                          {lighter.length > 0 && (
-                            <>
-                              <p className="text-caption uppercase tracking-wide text-label-secondary mb-1.5">Alternatives</p>
-                              <div className="flex flex-wrap gap-1.5">{lighter.map(chip)}</div>
-                            </>
-                          )}
+                          {groups.map((g, gi) => (
+                            <React.Fragment key={g.heading ?? gi}>
+                              {g.heading ? (
+                                <p className="text-caption uppercase tracking-wide text-label-secondary mb-1.5">{g.heading}</p>
+                              ) : null}
+                              <div className={`flex flex-wrap gap-1.5 ${gi < groups.length - 1 ? 'mb-3' : ''}`}>{g.options.map(chip)}</div>
+                            </React.Fragment>
+                          ))}
                         </>
                       );
-                    })() : (
+                    })() : swapLoading ? null : (
                       /* We do not know this exercise's movement pattern — so we do not guess at a
                          substitute. Say so, and let them search. (Law 2.) */
                       <p className="text-caption text-label-secondary leading-snug">

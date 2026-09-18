@@ -846,3 +846,9 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 | FIELD — Stephen Sheehan, CPT / Garage Gym Reviews, "10 Best Cable Fly Alternatives" (Resistance Band Fly) (https://www.garagegymreviews.com/cable-fly-alternatives) | Chest Fly (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — Stephen Sheehan, CPT / Garage Gym Reviews, "18 Trainer-Approved Weight Plate Exercises" (Weight Plate Front Raise) (https://www.garagegymreviews.com/weight-plate-exercises) | Plate Raise | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — Tomah Memorial Hospital Physical Therapy (E. Bender, MSPT, CSCS; W. Gnewikow, DPT) / MSD Manual, "Standing Resisted Shoulder External Rotation" (https://www.msdmanuals.com/professional/multimedia/video/standing-resisted-shoulder-external-rotation) | External Rotation (band) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+
+## Swap sheet (2026-09-18)
+
+| Rule | Where | Source | Date |
+|---|---|---|---|
+| A swap never goes up the key: a row is offered its own heading and the ones printed after it (Primary → Secondary → Braced → Focused) | `standing-plan/swap-groups.ts swapGroupsFor` | **OURS** — carried over from the phone's one-directional rule (accessory never offered a main lift); FIELD — Fitbod "same muscles at equivalent intensity". The pages (pp218–223) file every heading under one pattern and state no direction | 2026-09-18 |
