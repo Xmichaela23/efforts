@@ -562,7 +562,7 @@ The logger's save-time fill did not visibly fire on his Mon/Tue test saves. Depl
 - [ ] If Check says `no_completed_test_sets`: report back — that's an attach failure
       (logged tests not linked to planned rows), needs a data look.
 
-## QUEUED — STEP 8 CONFIRM SCREEN (Michael, 2026-08-25, "when we get to it")
+## [x] VERIFIED ON A DEVICE 2026-09-18 (Michael: "step 8 confirmed") — STEP 8 CONFIRM SCREEN
 
 - [~] **FIXED IN WORKING TREE 2026-08-26** (client only, not device-seen): `WeekGrid` colors each
       session name by sport via `getDisciplineColor`, same palette + same plyo-by-tag / ride→bike
