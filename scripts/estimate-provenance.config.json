@@ -101,7 +101,9 @@
         "src/components/NonRaceBuilder.tsx",
         "src/components/SessionDeck.tsx",
         "src/components/TrainingBaselines.tsx",
-        "src/components/TodayWeather.tsx"
+        "src/components/TodayWeather.tsx",
+        "src/components/MobileSummary.tsx",
+        "src/components/WorkoutCalendar.tsx"
       ]
     },
     "parked": [
@@ -404,6 +406,17 @@
           "Set up your season",
           "Build block",
           "buildArcLine("
+        ]
+      },
+      {
+        "field": "get-week / workout-detail row.analysis_readout; recompute-workout line",
+        "words": [
+          "analysisNeedsAttention(",
+          "analysisFailureLine(",
+          "describeRecomputeError(",
+          "Analysis did not finish",
+          "Analysis failed at ",
+          "STALLED_AFTER_MS"
         ]
       }
     ]

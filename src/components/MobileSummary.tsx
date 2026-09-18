@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { analysisFailureLine, describeRecomputeError, type AnalysisRow } from '@/lib/analysis-state';
 import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
@@ -63,6 +62,18 @@ type MobileSummaryProps = {
   sessionDetailLoading?: boolean;
 };
 
+/**
+ * recompute-workout's own line for a failed tap (2026-09-18). When nothing came back from it, it did not answer.
+ * server-word: the one case the server cannot word, because it never replied.
+ */
+function recomputeLine(bodyText: string): string {
+  try {
+    const j = JSON.parse(bodyText);
+    if (typeof j?.line === 'string' && j.line) return j.line;
+  } catch { /* not JSON */ }
+  return 'Analysis failed: the server did not answer.';
+}
+
 export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   /**
    * docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the four tiles (workload, execution,
@@ -95,9 +106,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
   const type = String(sd?.type || (planned as any)?.type || (completed as any)?.type || '').toLowerCase();
 
-  // "Failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3): the stored analysis_status /
-  // analysis_error / analysis_updated_at on the completed row become one plain line, with "Try again".
-  const analysisFailure = analysisFailureLine(completed as AnalysisRow | null);
+  // "Failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3): one plain line, with "Try again". Since
+  // 2026-09-18 the line is the server's (`analysis_readout`, sent by workout-detail and get-week).
+  const analysisFailure: string | null = (completed as any)?.analysis_readout?.line ?? null;
 
   useEffect(() => {
     setRecomputeError(null);
@@ -133,8 +144,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         const ctx = (res.error as { context?: Response }).context;
         let detail = '';
         try { detail = ctx ? (await ctx.text()).slice(0, 2000) : ''; } catch { /* no body */ }
-        // recompute-workout answers 500 with { error: '<step>: <reason>' } (plumbing §1) — same words as the card.
-        throw new Error(describeRecomputeError(detail, res.error.message));
+        // recompute-workout answers with `line`, the card's words for its error (2026-09-18). No body from it
+        // means it did not answer at all.
+        throw new Error(recomputeLine(detail));
       }
 
       const result = res.data as {
@@ -143,6 +155,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         steps: string[];
         error?: string;
         code?: string;
+        line?: string;
       };
 
       if (result.ok) {
@@ -156,7 +169,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           console.warn('[MobileSummary] recompute partial success, steps:', result.steps);
         }
       } else {
-        throw new Error(describeRecomputeError(JSON.stringify(result), result.error ?? 'Recompute failed'));
+        throw new Error(recomputeLine(JSON.stringify(result)));
       }
     } catch (e: unknown) {
       setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));

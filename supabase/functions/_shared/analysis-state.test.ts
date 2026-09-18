@@ -3,6 +3,8 @@ import {
   analysisState,
   analysisFailureLine,
   analysisNeedsAttention,
+  analysisReadout,
+  recomputeErrorLine,
   describeRecomputeError,
   splitStepError,
   STALLED_AFTER_MS,
@@ -51,4 +53,19 @@ Deno.test('the tap error uses the same words', () => {
   assertEquals(describeRecomputeError(JSON.stringify({ ok: false, error: 'facts: compute-facts 500' }), 'x'), 'Analysis failed at the facts: compute-facts 500.');
   assertEquals(describeRecomputeError('', 'Edge Function returned a non-2xx status code'), 'Analysis failed: the server did not answer.');
   assertEquals(describeRecomputeError(JSON.stringify({ error: 'Workout not found' }), 'x'), 'Analysis failed: Workout not found.');
+});
+
+Deno.test('the readout the rows carry: state, line and dot together', () => {
+  assertEquals(analysisReadout({ analysis_status: 'analyzing', analysis_updated_at: '2026-09-07T11:00:00Z' }, now),
+    { state: 'stalled', line: 'Analysis did not finish.', needs_attention: true });
+  assertEquals(analysisReadout({ analysis_status: 'analyzing', analysis_updated_at: '2026-09-07T11:59:00Z' }, now),
+    { state: 'analyzing', line: null, needs_attention: false });
+  assertEquals(analysisReadout({ analysis_status: 'complete' }, now), { state: 'complete', line: null, needs_attention: false });
+  assertEquals(analysisReadout(null, now), { state: null, line: null, needs_attention: false });
+});
+
+Deno.test('recompute-workout\'s line: the same words as the tap error', () => {
+  assertEquals(recomputeErrorLine('facts: compute-facts 500'), 'Analysis failed at the facts: compute-facts 500.');
+  assertEquals(recomputeErrorLine('Workout not found'), 'Analysis failed: Workout not found.');
+  assertEquals(recomputeErrorLine(''), 'Analysis failed.');
 });

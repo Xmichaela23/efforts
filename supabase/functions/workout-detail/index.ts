@@ -58,6 +58,7 @@ import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
 import { clock, displayFormat, durationClock } from '../_shared/display-format.ts';
+import { analysisReadout } from '../_shared/analysis-state.ts';
 import {
   buildArcPerformanceBridge,
   ARC_PERFORMANCE_BRIDGE_VERSION,
@@ -1655,6 +1656,8 @@ function normalizeBasic(w: any) {
     analysis_status: w?.analysis_status ?? null,
     analysis_error: w?.analysis_error ?? null,
     analysis_updated_at: w?.analysis_updated_at ?? null,
+    // The state, the card's line and the Home dot, judged here (2026-09-18); the phone prints them.
+    analysis_readout: analysisReadout(w),
   };
 }
 

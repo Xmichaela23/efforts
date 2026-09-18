@@ -16,6 +16,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import { withAlarm } from '../_shared/alarm.ts';
+import { recomputeErrorLine } from '../_shared/analysis-state.ts';
 import {
   mondayOf,
   resolveAnalyzeEdgeFn,
@@ -212,7 +213,10 @@ function json(
   },
   status = 200,
 ) {
-  return new Response(JSON.stringify(body), {
+  // ⛔ THE ATHLETE'S LINE RIDES WITH EVERY FAILURE (2026-09-18, Stage C follow-up): the phone prints `line`
+  // and no longer words the error itself. Same words as the card (`_shared/analysis-state.ts`).
+  const out = body.ok ? body : { ...body, line: recomputeErrorLine(body.error) };
+  return new Response(JSON.stringify(out), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

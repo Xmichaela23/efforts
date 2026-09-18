@@ -3,7 +3,6 @@ import { sessionDisplayName } from '@/lib/session-display-name';
 import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
@@ -2374,11 +2373,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             ✓
                           </span>
                         )}
-                        {/* "Failed" on screen (plumbing §3): a small dot; the card says why when opened. */}
-                        {isCompleted && analysisNeedsAttention(workout as never) && (
+                        {/* "Failed" on screen (plumbing §3): a small dot; the card says why when opened. The dot and
+                            its words are get-week's `analysis_readout` (2026-09-18), judged on the server's clock. */}
+                        {isCompleted && (workout as any)?.analysis_readout?.needs_attention === true && (
                           <span
-                            aria-label={analysisFailureLine(workout as never) || 'Analysis failed'}
-                            title={analysisFailureLine(workout as never) || 'Analysis failed'}
+                            aria-label={(workout as any).analysis_readout.line ?? undefined}
+                            title={(workout as any).analysis_readout.line ?? undefined}
                             className="inline-block w-1.5 h-1.5 rounded-full ml-2 align-middle bg-amber-300/85"
                           />
                         )}

@@ -45,6 +45,7 @@ import { doneLines, weekBarTotals } from './week-totals.ts';
 import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 import { emptyDayLine } from '../_shared/empty-day-line.ts';
+import { analysisReadout } from '../_shared/analysis-state.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -990,10 +991,12 @@ Deno.serve(async (req)=>{
         computed: w?.computed ?? null,
         workout_analysis: w?.workout_analysis ?? null,
         // Selected above and dropped here until 2026-09-07, so the Home row and the week chip could
-        // never show a failed analysis. The client reads these three (src/lib/analysis-state.ts).
+        // never show a failed analysis. Since 2026-09-18 the phone reads only `analysis_readout` — the state,
+        // the line and the dot, judged here (`_shared/analysis-state.ts`), not on the phone's clock.
         analysis_status: w?.analysis_status ?? null,
         analysis_error: w?.analysis_error ?? null,
         analysis_updated_at: w?.analysis_updated_at ?? null,
+        analysis_readout: analysisReadout({ ...w, workout_status: w?.workout_status || status }),
         name: w?.name ?? null,
         timestamp: w?.timestamp ?? null,
         // Workload data from database (single source of truth)

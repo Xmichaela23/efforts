@@ -6,7 +6,11 @@
  * last changed). This module turns those into the one line the Performance card prints and the one
  * dot the Home rows show. Plain words, no codes.
  *
- * Run: ~/.deno/bin/deno test --no-check src/lib/analysis-state.test.ts
+ * ⛔ ON THE SERVER SINCE 2026-09-18 (the Stage C follow-up). It was `src/lib/analysis-state.ts`, and the
+ * phone judged "did not finish" off its own clock. Now `get-week` and `workout-detail` send
+ * `analysis_readout` on each row and `recompute-workout` sends `line` with its error; the phone prints them.
+ *
+ * Run: ~/.deno/bin/deno test --no-check supabase/functions/_shared/analysis-state.test.ts
  */
 
 export type AnalysisState = 'failed' | 'stalled' | 'analyzing' | 'pending' | 'complete' | null;
@@ -86,12 +90,33 @@ export function analysisFailureLine(row: AnalysisRow | null | undefined, nowMs: 
   return null;
 }
 
+/**
+ * What `get-week` and `workout-detail` send on each row: the state, the card's line, and whether the Home
+ * row gets its dot. Judged on the server's clock at the moment it answers.
+ */
+export type AnalysisReadout = { state: AnalysisState; line: string | null; needs_attention: boolean };
+export function analysisReadout(row: AnalysisRow | null | undefined, nowMs: number = Date.now()): AnalysisReadout {
+  const state = analysisState(row, nowMs);
+  return {
+    state,
+    line: analysisFailureLine(row, nowMs),
+    needs_attention: state === 'failed' || state === 'stalled',
+  };
+}
+
 /** The Home dot: failed or stalled. */
 export function analysisNeedsAttention(row: AnalysisRow | null | undefined, nowMs: number = Date.now()): boolean {
   const s = analysisState(row, nowMs);
   return s === 'failed' || s === 'stalled';
 }
 
+/**
+ * The athlete's own tap came back with an error: recompute-workout answers 500 with
+ * { error: '<step>: <reason>' }. Same words as the stored line. `recompute-workout` sends this as `line`.
+ */
+export function recomputeErrorLine(error: string | null | undefined): string {
+  return describeRecomputeError(JSON.stringify({ error: String(error || '') }), '');
+}
 /**
  * The athlete's own tap came back with an error: recompute-workout answers 500 with
  * { error: '<step>: <reason>' }. Same words as the stored line.
