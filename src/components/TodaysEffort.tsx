@@ -2,7 +2,6 @@ import FirstRunOverlay from '@/components/FirstRunOverlay';
 import { sessionDisplayName } from '@/lib/session-display-name';
 import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
 import { useWeather } from '@/hooks/useWeather';
@@ -40,7 +39,6 @@ import TodayWeather from './TodayWeather';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
-import { WorkoutExecutionContainer } from './workout-execution';
 import { mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
@@ -213,7 +211,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [sessionInView, setSessionInView] = useState(0);
   const sessionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
-  const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [skippingSession, setSkippingSession] = useState(false);
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
@@ -464,7 +461,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   
   // Expanded details toggle per workout (id → boolean)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [sendingToGarmin, setSendingToGarmin] = useState<string | null>(null);
   // Bottom-sheet swim controls (D-165): pool selector + Copy-for-FORM, matching the Planned tab.
   const [savingPool, setSavingPool] = useState(false);
   const [localPlannedPool, setLocalPlannedPool] = useState<{ lengthM: number } | null>(null);
@@ -521,49 +517,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     isWorkoutKitAvailable().then(setWorkoutKitAvailable);
   }, []);
   
-  // Send workout to Garmin
-  const handleSendToGarmin = async (e: React.MouseEvent, workout: any) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    try {
-      setSendingToGarmin(workout.id);
-      const userId = getStoredUserId();
-      if (!userId) {
-        toast({ title: 'Error', description: 'Please log in to send to Garmin', variant: 'destructive' });
-        return;
-      }
-      
-      const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
-        body: { workoutId: workout.id, userId: userId }
-      });
-      
-      if (error) {
-        toast({ title: 'Error', description: `Failed to send: ${error.message}`, variant: 'destructive' });
-      } else if (result?.success) {
-        toast({ title: 'Sent!', description: 'Workout sent to Garmin' });
-      } else {
-        toast({ title: 'Error', description: result?.error || 'Unknown error', variant: 'destructive' });
-      }
-    } catch (err) {
-      toast({ title: 'Error', description: 'Failed to send to Garmin', variant: 'destructive' });
-    } finally {
-      setSendingToGarmin(null);
-    }
-  };
-  
   // Check if workout is endurance type
   const isEnduranceType = (type: string) => {
     const t = (type || '').toLowerCase();
     return ['run', 'ride', 'bike', 'swim', 'cycling'].includes(t);
   };
   
-  // Check if workout can be executed on phone (run or ride only for now)
-  const isPhoneExecutable = (type: string) => {
-    const t = (type || '').toLowerCase();
-    return ['run', 'ride', 'bike', 'cycling'].includes(t);
-  };
-
   // Provider + device attribution for completed imports (Strava/Garmin) — LIFTED to
   // src/lib/provider-attribution.ts (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md) so the
   // done card, the Week tab and the drawer read the same answer. `getProviderAttribution` is imported.
@@ -2906,76 +2865,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 Skip session…
               </button>
 
-              {/* Top row: Start on Phone and Send to Garmin - side by side with yellow outlines */}
-              <div className="flex gap-2 w-full">
-                {selectedPlannedWorkout && isPhoneExecutable(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
-                  const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
-                  const isRun = ['run', 'running', 'walk'].includes(workoutType);
-                  const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                  const baseType = isRun ? 'run' : (isRide ? 'ride' : 'run');
-                  const sportColor = getDisciplinePhosphorCore(baseType);
-                  const rgb = getDisciplineColorRgb(baseType);
-                  const border = `rgba(${rgb}, 0.55)`;
-                  
-                  return (
-                    <button
-                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
-                      style={{
-                        backgroundColor: 'transparent',
-                        borderColor: border,
-                        borderWidth: '0.5px',
-                        borderStyle: 'solid',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                      onClick={() => {
-                        setExecutingWorkout(selectedPlannedWorkout);
-                        setSelectedPlannedWorkout(null);
-                      }}
-                    >
-                      Start on Phone
-                    </button>
-                  );
-                })()}
-                
-                {selectedPlannedWorkout && isEnduranceType(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '') && (() => {
-                  const workoutType = (selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
-                  const isRun = ['run', 'running', 'walk'].includes(workoutType);
-                  const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-                  const baseType = isRun ? 'run' : (isRide ? 'ride' : 'run');
-                  const sportColor = getDisciplinePhosphorCore(baseType);
-                  const rgb = getDisciplineColorRgb(baseType);
-                  const border = `rgba(${rgb}, 0.55)`;
-                  
-                  return (
-                    <button
-                      className="flex-1 px-4 py-3 rounded-xl font-medium tracking-wide transition-all backdrop-blur-md text-white border"
-                      style={{
-                        backgroundColor: 'transparent',
-                        borderColor: border,
-                        borderWidth: '0.5px',
-                        borderStyle: 'solid',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = `rgba(${rgb}, 0.15)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                      onClick={(e) => {
-                        handleSendToGarmin(e, selectedPlannedWorkout);
-                      }}
-                    >
-                      {sendingToGarmin === selectedPlannedWorkout?.id ? 'Sending...' : 'Send to Garmin'}
-                    </button>
-                  );
-                })()}
-              </div>
-
               {/* Swim-only (D-165): pool selector + Copy-for-FORM-Goggles + Apple Watch placeholder.
                   Mirrors the Planned tab so the home/calendar bottom sheet isn't a downgraded surface. */}
               {selectedPlannedWorkout && String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase() === 'swim' && (() => {
@@ -3093,24 +2982,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </DrawerContent>
       </Drawer>
       
-      {/* Workout Execution Modal - Rendered via Portal to avoid z-index conflicts */}
-      {executingWorkout && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black">
-          <WorkoutExecutionContainer
-            plannedWorkoutId={executingWorkout.id}
-            plannedWorkoutStructure={executingWorkout.computed || { steps: [], total_duration_seconds: 0 }}
-            workoutType={['ride', 'bike', 'cycling'].includes((executingWorkout.type || executingWorkout.workout_type || '').toLowerCase()) ? 'ride' : 'run'}
-            workoutDescription={executingWorkout.rendered_description || executingWorkout.description || executingWorkout.name}
-            onClose={() => setExecutingWorkout(null)}
-            onComplete={(workoutId) => {
-              setExecutingWorkout(null);
-              // Refresh the view
-              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-            }}
-          />
-        </div>,
-        document.body
-      )}
     </div>
   );
 };

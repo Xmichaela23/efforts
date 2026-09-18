@@ -5,7 +5,7 @@ import { swappedSessionBlock, swappedStructureIsStale } from '@/lib/session-disc
 import PlannedSessionHeader, { plannedDurationSecondsOf } from './PlannedSessionHeader';
 import { Copy } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
@@ -57,8 +57,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const swapped = swappedStructureIsStale(workout as never);
   const hasStructured = !swapped && !!(structureAny && typeof structureAny === 'object');
   const hasComputedV3 = !swapped && Array.isArray(computedAny?.steps) && computedAny.steps.length > 0;
-  // D-196: grouped swim actions (Copy FORM · Send to Apple Watch · Send to Garmin) up top.
-  const isPlanned = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
+  // D-196: grouped swim actions (Copy FORM · Send to Apple Watch) up top. The calendar sync is the one path to Garmin.
   const isIosNative = Capacitor.getPlatform() === 'ios';
   // D-197: session-level snorkel brief — shown for any swim that suggests snorkel (snorkel is now
   // drill-only per-step; this explains the "occasional on mains" usage).
@@ -482,45 +481,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   };
 
-  const handleGarminExport = async () => {
-    try {
-      // Call the Garmin export function
-      const userId = getStoredUserId();
-      if (!userId) {
-        alert('Please log in to export to Garmin');
-        return;
-      }
-
-      const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
-        body: {
-          workoutId: workout.id,
-          userId: userId
-        }
-      });
-
-      if (error) {
-        let detailsTxt = '';
-        try {
-          const ctx = (error as any)?.context;
-          if (ctx && typeof ctx.text === 'function') {
-            const txt = await ctx.text();
-            detailsTxt = `\nDetails: ${txt}`;
-          }
-        } catch {}
-        alert(`Failed to send to Garmin: ${error.message}${detailsTxt}`);
-      } else if (result?.success) {
-        const dbg = result?.debug?.mapped;
-        const dbgTxt = dbg ? `\nPool sent: ${dbg.poolLength ?? 'null'} ${dbg.poolLengthUnit ?? ''}` : '';
-        alert(`Workout sent to Garmin successfully!${dbgTxt}`);
-      } else {
-        alert(`Failed to send to Garmin: ${result?.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Garmin export error:', error);
-      alert('Failed to export to Garmin');
-    }
-  };
-
   // Removed: client-side defaulting of pool settings to avoid flicker; rely on activation.
 
   const setPool = async (unit: 'yd' | 'm' | null, lengthM: number | null) => {
@@ -615,15 +575,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           </div>
           {hasComputedV3 ? (
             <div className="mt-3">
-              {isPlanned && (
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={handleGarminExport}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
-                  >Send to Garmin</button>
-                </div>
-              )}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -705,7 +656,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
               })()]).map((ln, i)=>{
             const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
             const isStrengthContext = (String((workout as any)?.workout_structure?.type||'').toLowerCase()==='strength_session') || (parentDisc === 'strength');
-            const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
             return (
               <li key={i} className="text-sm text-gray-200 font-light tracking-normal flex items-start justify-between">
                 <span className="flex items-baseline gap-2 flex-wrap">
@@ -714,16 +664,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                     <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-sky-500/15 text-sky-300/80 border border-sky-400/20 whitespace-nowrap">{lineEquip[i]}</span>
                   )}
                 </span>
-                {/* Non-swims keep Garmin on the first row; swims show all three actions grouped up top (D-196). */}
-                {i===0 && isPlannedRow && parentDisc !== 'swim' && (
-                  <div className="ml-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleGarminExport}
-                      className="px-3 py-1.5 rounded-xl bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
-                    >Send to Garmin</button>
-                  </div>
-                )}
               </li>
             );
           })}
