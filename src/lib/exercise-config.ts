@@ -3178,7 +3178,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // ── SECONDARY PUSH UPPER (p220) ─────────────────────────────────────────────────────────────────
   'larsen press':    { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.90, displayFormat: 'total', isUnilateral: false },
   'jm press':        { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.55, displayFormat: 'total', isUnilateral: false },
-  'seated db press': { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.45, displayFormat: 'total', isUnilateral: false },
+  'seated db press': { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.45, displayFormat: 'perHand', isUnilateral: false, ratioIsTotal: true }, // two dumbbells: 0.45 = both together, printed per hand like 'dumbbell shoulder press'
   'arnold press':    { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.40, displayFormat: 'total', isUnilateral: false },
 
   // ── SECONDARY PULL UPPER (p220) — ⛔ THIS CELL WAS COMPLETELY EMPTY ──────────────────────────────
