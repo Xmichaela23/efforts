@@ -16,7 +16,7 @@ import { repFloorFor, repsAreBlank } from '@/lib/logged-rep-entry';
 import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ THE SWAP LIST IS THE SERVER'S (2026-09-18, the Stage C follow-up): `swap-list` returns what the plan builder
-// files under each page heading for the row. The phone prints them; the plyo drills below are the one
+// fills the row's own level and pattern with (one heading). The phone prints them; the plyo drills below are the one
 // list still read here, off `@shared/standing-plan/plyo`.
 import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
 type AlternativeOption = { name: string; display?: string };
@@ -112,7 +112,7 @@ function plyoAlternatives(name: string, equipment: string[]): AlternativeOption[
     .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
     .map((d) => ({ name: d }));
 }
-import { platePlanForSets, type PlatePlanStep } from '@/lib/plate-plan';
+import { platePlanForSets, platesPerSideText, type PlatePlanStep } from '@/lib/plate-plan';
 // The assistance rep TOTAL — one parser for "50 total", and the countdown it feeds.
 import { hasRepTotal, parseRepTotal, repsRemaining, repTotalLine } from '@/lib/rep-total';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -534,14 +534,14 @@ const plateBarFor = (barType: string, unit: 'lb' | 'kg') => (BAR_TYPES[barType] 
   : BAR_TYPES[barKeysForUnit(unit)[0]]);
 
 /**
- * ⛔ THE PLATES FOR THIS SET, PER SIDE, AND NOTHING ELSE (2026-09-18) — e.g. "45 25 10", in the order they sit
- * on the bar, inside first. `step` is this set's entry in `platePlanForSets` over the exercise's sets in order:
- * the plates carry over from the set before, and each load is the fewest plate changes from it
- * (src/lib/plate-plan.ts). An empty bar prints nothing.
+ * ⛔ THE PLATES FOR THIS SET, PER SIDE, AND NOTHING ELSE (Michael, 2026-09-18) — e.g. "45 + 2 × 10 per side",
+ * inside first; an empty bar is "bar only". `step` is this set's entry in `platePlanForSets` over the exercise's
+ * sets in order: the fewest plates per side, carried over only when the next set adds one plate outside
+ * (src/lib/plate-plan.ts).
  */
 const PlateMath: React.FC<{ step: PlatePlanStep | null }> = ({ step }) => (
   <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-caption text-label shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-    {(step?.plates ?? []).join(' ')}
+    {platesPerSideText(step?.plates ?? [])}
   </div>
 );
 
@@ -760,7 +760,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           rows: [{
             name: slot,
             now: ex.name !== slot ? ex.name : undefined,
-            swap_options: Array.isArray(ex.swap_options) ? ex.swap_options.map((o) => o.name) : undefined,
           }],
         },
       });
@@ -3336,10 +3335,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
-    setExpandedPlates(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    // One set's plates open at a time (Michael, 2026-09-18): tapping a chip closes any other.
+    setExpandedPlates(prev => (prev[key] ? {} : { [key]: true }));
   };
 
   const toggleExerciseExpanded = (exerciseId: string) => {
@@ -5146,8 +5143,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   "its job is not to stop you moving; it is to make sure you know you moved."
               ─────────────────────────────────────────────────────────────────────────────────────── */}
               {swapFor === exercise.id && (() => {
-                // 2026-09-08: a frame accessory row carries its slot's own pick list; that is the
-                // swap list, the same one the builder showed. Nothing else is offered for it.
+                // 2026-09-18: the swap list is the slot's own level and pattern, as the builder fills it (`swap-list`).
                 const isSelf = (n: string) => {
                   const k = n.toLowerCase().trim();
                   return k === String(exercise.name || '').toLowerCase().trim() || k === String(exercise.execution_name || '').toLowerCase().trim();

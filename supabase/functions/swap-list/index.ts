@@ -1,9 +1,9 @@
 /**
  * swap-list — the logger's Swap sheet, built on the server (2026-09-18, the Stage C follow-up).
  *
- * POST { rows: [{ name, now?, swap_options?: string[] }] } → { lists: SwapGroup[][] }, one list per row in the order sent.
+ * POST { rows: [{ name, now? }] } → { lists: SwapGroup[][] }, one list per row in the order sent.
  * `name` is the slot's own movement; `now` is what the row holds after a swap, when it differs.
- * Each list is what the plan builder files under each page heading for that row's pattern, the ones the athlete's
+ * Each list is the slot's own level and pattern as the builder fills it (one heading), the ones the athlete's
  * kit reaches (`_shared/standing-plan/swap-groups.ts`). The phone prints it and decides nothing.
  * The athlete's kit is read here (`user_baselines.equipment.strength`), never sent by the phone.
  */
@@ -22,16 +22,15 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
   try {
     const { userId, supabase } = await requireUser(req);
-    const body = (await req.json().catch(() => ({}))) as { rows?: Array<{ name?: unknown; now?: unknown; swap_options?: unknown }> };
+    const body = (await req.json().catch(() => ({}))) as { rows?: Array<{ name?: unknown; now?: unknown }> };
     const rows = Array.isArray(body.rows) ? body.rows.slice(0, 60) : [];
     const { data } = await supabase.from('user_baselines').select('equipment').eq('user_id', userId).maybeSingle();
     const strength = (data?.equipment as { strength?: unknown } | null)?.strength;
     const equipment = Array.isArray(strength) ? strength.map(String) : null;
     const lists = rows.map((r) => {
       const name = typeof r?.name === 'string' ? r.name : '';
-      const slot = Array.isArray(r?.swap_options) ? r.swap_options.map(String) : null;
       const now = typeof r?.now === 'string' && r.now ? r.now : null;
-      return name ? swapGroupsFor(name, equipment, slot, now) : [];
+      return name ? swapGroupsFor(name, equipment, now) : [];
     });
     return json({ lists });
   } catch (e) {

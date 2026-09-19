@@ -1,92 +1,64 @@
 /**
- * ═══ THE LOGGER'S SWAP SHEET, BUILT ON THE SERVER, SORTED THE WAY THE BUILDER SORTS ═════════════
+ * ═══ THE LOGGER'S SWAP SHEET — THE SLOT'S OWN LEVEL AND PATTERN, NOTHING ELSE ═════════════════
  *
- * ⛔ 2026-09-18, the Stage C follow-up. The phone used to build this list itself (`src/lib/exercise-alternatives.ts`,
- * removed): every catalogue movement sharing a movement pattern, under "Direct swaps" / "Alternatives", two headings
- * no page prints. Now `swap-list` builds it here and the phone prints it.
+ * ⛔ Michael, 2026-09-18: "a row's swap options match its exercise and that day's intention exactly: the SAME level
+ * the page gives the slot (primary / secondary / braced / focused / core / carry) AND the same movement pattern …
+ * A secondary pull offers only secondary pulls. Nothing from another level or pattern."
  *
- * ⛔ ONE SORTING, THE BUILDER'S (Michael, 2026-09-18: "the page DEFINITIONS reading … same rule the builder uses; no
- * second sorting"). Each heading is a page's own, and what goes under it is what the builder's classifier files
- * there by that page's definition (`strength-grid/taxonomy.ts`), reached by the builder's own kit test and in the
- * builder's own order (`cellOptions`):
- *   Primary (pp218–219) · Secondary (p220: "compound noncontested movements, dumbbell variants") · Braced
- *   (pp221–222) · Focused (pp222–223) · Core exercises (p223) · Carry/drag/pick options (p226).
+ * The level and pattern are the slot's as the page files its movement (`FILING`, pp218–223, p226; the day's slot
+ * line names the same cell — "1 x HYP: Accessory: secondary push"). The options are that one cell as the builder
+ * fills it (`cellOptions`: the filed movements, the builder's kit test, the builder's order), less the movement the
+ * row holds now. ONE RULE FOR THE BUILDER AND THIS LIST. The "never above its own level" rule is gone.
  *
- * ⛔ A ROW THAT CARRIES ITS SLOT'S OWN LIST (`swap_options`, written by the composer — the ME row's p220 list, an
- * accessory slot's pick list) is offered that list, grouped under the same headings. The builder chose it.
+ * ⚠️ THE SLOT IS READ OFF THE MOVEMENT THE PLAN PUT THERE (`planned_name`), because `materialize-plan` rebuilds each
+ * row field by field and keeps no slot fields. The builder only places a movement in its own cell, so the two agree;
+ * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
+ * movement it holds.
  */
 import { cellOptions, builderReaches } from '../strength-grid/grid.ts';
-import { CATEGORY_DEFINITION, viadaCategoryOf, viadaPatternOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
+import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { movementLabel } from './accessory-picks.ts';
 
 export type SwapOption = { name: string; display: string };
 export type SwapGroup = { heading: string; page: string; options: SwapOption[] };
 
-/** The page's heading for each category, in the key's order. */
-const HEADING: Array<[ViadaCategory, string]> = [
-  ['primary', 'Primary'],
-  ['secondary', 'Secondary'],
-  ['braced', 'Braced'],
-  ['focused', 'Focused'],
-  ['core', 'Core exercises'],
-  ['carry', 'Carry/drag/pick options'],
-];
-const LIFTING: ViadaCategory[] = ['primary', 'secondary', 'braced', 'focused'];
-
-const same = (a: string, b: string) => canonicalize(a) === canonicalize(b);
+/** The page's heading for each level. */
+const HEADING: Record<ViadaCategory, string> = {
+  primary: 'Primary',
+  secondary: 'Secondary',
+  braced: 'Braced',
+  focused: 'Focused',
+  core: 'Core exercises',
+  carry: 'Carry/drag/pick options',
+};
 
 /**
- * @param slotName the movement the slot was written for (`planned_name`), which sets the pattern and heading
- * @param slotList the slot's own list, when the composer wrote one
+ * @param slotName the movement the plan put in the slot (`planned_name`) — it names the level and pattern
  * @param rowNow   what the row holds now, when a swap has moved it off `slotName`; it is the one left out
  */
 export function swapGroupsFor(
   slotName: string,
   equipment: string[] | null | undefined,
-  slotList?: readonly string[] | null,
   rowNow?: string | null,
 ): SwapGroup[] {
-  const now = rowNow || slotName;
-  const byCategory = new Map<ViadaCategory, SwapOption[]>();
-  const add = (cat: ViadaCategory, name: string) => {
-    if (same(name, now)) return;
-    const list = byCategory.get(cat) ?? [];
-    if (list.some((o) => same(o.name, name))) return;
-    list.push({ name, display: movementLabel(name) });
-    byCategory.set(cat, list);
-  };
-
-  if (Array.isArray(slotList) && slotList.length > 0) {
-    for (const name of slotList) {
-      const cat = viadaCategoryOf(name);
-      if (cat && builderReaches(name, equipment)) add(cat, name);
-    }
-  } else {
-    const own = viadaCategoryOf(slotName);
-    if (!own) return [];
-    if (own === 'core' || own === 'carry') {
-      for (const m of cellOptions(own, null, equipment)) add(own, m.name);
-    } else {
-      const pattern = viadaPatternOf(slotName);
-      if (!pattern) return [];
-      /**
-       * ⛔ NEVER UP THE KEY: the row's own heading and the ones printed after it; a Primary row gets all four. OURS —
-       * carried over from the phone's one-directional rule (an accessory is never offered a main lift; swapping down
-       * from a squat to a lunge is the athlete's call), which followed Fitbod's "same muscles at equivalent
-       * intensity". The pages file every heading under one pattern and state no direction. Ledger row:
-       * docs/STATE-SOURCES.md "Swap sheet".
-       */
-      for (const cat of LIFTING.slice(LIFTING.indexOf(own))) {
-        for (const m of cellOptions(cat, pattern, equipment)) add(cat, m.name);
-      }
-    }
+  const filed = filingOf(slotName);
+  if (!filed) return [];
+  const now = canonicalize(rowNow || slotName);
+  const seen = new Set<string>();
+  const options: SwapOption[] = [];
+  for (const m of cellOptions(filed.category, filed.pattern, equipment)) {
+    const k = canonicalize(m.name);
+    if (k === now || seen.has(k)) continue;
+    seen.add(k);
+    options.push({ name: m.name, display: movementLabel(m.name) });
   }
-
-  const out: SwapGroup[] = [];
-  for (const [cat, heading] of HEADING) {
-    const options = byCategory.get(cat);
-    if (options && options.length > 0) out.push({ heading, page: CATEGORY_DEFINITION[cat].cite, options });
+  // The slot's own movement comes back after a swap, if the kit reaches it.
+  if (rowNow && canonicalize(rowNow) !== canonicalize(slotName) && !seen.has(canonicalize(slotName))
+    && builderReaches(slotName, equipment)) {
+    options.unshift({ name: slotName, display: movementLabel(slotName) });
   }
-  return out;
+  return options.length > 0
+    ? [{ heading: HEADING[filed.category], page: CATEGORY_DEFINITION[filed.category].cite, options }]
+    : [];
 }
