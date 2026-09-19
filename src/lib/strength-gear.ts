@@ -781,7 +781,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // the rear delt above): "a flat-bench dumbbell pullover for the pullover machine (same pattern as
   // the incline dumbbell chest-supported row)". The station route stays; the execution name says
   // which one the kit resolved to.
-  'pullover machine': [['dumbbells', 'bench'], ['machine']],
+  // ⛔ STATION ONLY SINCE 2026-09-18 (Michael): the flat-bench dumbbell pullover is p220's DB pullover, the same movement,
+  // so a dumbbell kit does it on the Secondary pull row and the Focused pull row no longer offers it.
+  'pullover machine': [['machine']],
   'hip adduction machine': [['machine']],
   /**
    * ⛔ THE SLED (D-479, 2026-09-16, Michael's ruling from the page). p226 prints both under CARRY/DRAG/PICK,

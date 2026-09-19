@@ -630,11 +630,7 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
     { route: ['dumbbells', 'incline_bench'], value: 'Chest-Supported Rear Delt Fly' },
     { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
   ],
-  /**
-   * ⛔ THE FLAT-BENCH DUMBBELL PULLOVER (Michael, 2026-09-10, same addendum): p222's pullover machine
-   * has a home route now, and the name says what the athlete will lie across.
-   */
-  'pullover machine': 'Flat-Bench Dumbbell Pullover',
+  // ⛔ THE PULLOVER MACHINE'S HOME NAME IS GONE (2026-09-18): at home it is p220's DB pullover (`strength-gear.ts`).
   // ⛔ ONE NAME FOR ONE MOVEMENT AT HOME (Michael, 2026-09-18): on a dumbbell kit the Romanian deadlift IS the DB Romanian
   // deadlift, and a rear delt fly IS the bent-over dumbbell rear delt fly the rear delt machine becomes. Same words, one
   // option (the swap list shows a name once; the builder places a name once).
@@ -973,8 +969,7 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
   'pullover machine': [
     { route: ['machine'], value: { text: 'Set the seat so your shoulders line up with the machine\'s pivot. Sit with your back against the pad and hold the handles or bar above and behind your head. Pull it down in an arc until it reaches your stomach, then let it go back up until you feel a stretch.',
       source: 'ExRx, "Lever Pullover" — https://exrx.net/WeightExercises/LatissimusDorsi/LVPullover' } },
-    { route: ['dumbbells', 'bench'], value: { text: 'Lie on your back on a flat bench, feet on the floor, holding one dumbbell in both hands above your chest. With a slight bend in the elbows, lower the dumbbell in an arc behind your head until you feel a stretch, then pull it back over your chest. Keep your hips down on the bench.',
-      source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' } },
+    // The flat-bench dumbbell route left 2026-09-18: at home this is p220's DB pullover, which carries the same words.
   ],
   'push up': { text: 'Start with your hands on the floor a little wider than your shoulders and your body in a straight line from head to heels. Lower your chest to just above the floor, elbows at about 45 degrees from your body, then push back up. Keep your hips in line with your shoulders.',
     source: 'ExRx, "Push-up" — https://exrx.net/WeightExercises/PectoralSternal/BWPushup' },
@@ -1100,7 +1095,7 @@ export function executionHowTo(name: string, equipment: string[] | null | undefi
  * names and the same station test.
  */
 const HOME_ROUTE_MOVEMENTS = new Set([
-  'rear delt machine', 'pullover machine', 'preacher curl', 'back extension', 'leg curl', 'leg curls', 'lying leg curl',
+  'rear delt machine', 'preacher curl', 'back extension', 'leg curl', 'leg curls', 'lying leg curl',
   'hamstring curl', 'chest supported row', 'reverse hyper', 'calf raise', 'calf raises', 'ghd back extension',
   'weighted reverse hyper',
 ]);

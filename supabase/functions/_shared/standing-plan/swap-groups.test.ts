@@ -58,7 +58,8 @@ Deno.test('after a swap the slot\'s movement comes back; a stand-in is never off
 Deno.test('⛔ THE KIT\'S OWN NAME: no machine name without the machine; the dumbbell stiff-legged deadlift by that name', () => {
   const home = swapGroupsFor('Preacher Curl', HOME).flatMap((g) => g.options.map((o) => o.display));
   assert(!home.includes('Pullover Machine') && !home.includes('Rear Delt Machine'), home.join(', '));
-  assert(home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
+  // The pullover is p220's DB pullover at home, on the Secondary pull row, not here (Michael, 2026-09-18).
+  assert(!home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
   const hinge = swapGroupsFor('Romanian Deadlift', HOME).flatMap((g) => g.options.map((o) => o.display));
   assert(hinge.includes('Dumbbell Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
   assert(swapGroupsFor('Romanian Deadlift', [...HOME, 'Sandbag']).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
