@@ -66,7 +66,10 @@ export function standingWorkingNumberLine(x: StandingWorkingNumberLine): string 
   // (~96% of the tested max, p215 H2) sat next to the Performance tab's tested max with nothing saying
   // which was which — "sets the block at 176" beside "185" read as a contradiction. Naming it the
   // working weight, derived from the max, makes them two labelled quantities instead of two numbers.
-  return `${x.movement} — ${x.weight} lb × ${x.reps} sets the working weight at ${Math.round(x.workingNumber)} lb (about 96% of the tested max).`;
+  // ⛔ 2026-09-18: the page's term and words — p214 "your working 1-rep max, which I define as (roughly) 96
+  // percent of your true 1-rep max". "(about 96% of the tested max)" was a paraphrase. "your" is cut (the
+  // line runs through the voice gate, which bars the second person).
+  return `${x.movement} — ${x.weight} lb × ${x.reps} sets the working 1-rep max at ${Math.round(x.workingNumber)} lb: (roughly) 96 percent of true 1-rep max.`;
 }
 
 /**

@@ -48,6 +48,8 @@ export type TestSessionRow = {
   planned_name?: string;
   target_reps?: string;
   target_rir?: number;
+  /** p218's intent, so the logger prints the reserve band (`reserveTextFor`) rather than the stamped midpoint. */
+  slot_intent?: string;
   notes?: string;
   /** On a row with an anchor set: the increment `pretestStepWeights` rounds A and the steps to, in `unit`. */
   anchor_round_to?: number;
@@ -92,27 +94,59 @@ function inAthletesUnit(rows: TestSessionRow[], metric: boolean): TestSessionRow
   }));
 }
 
-// Moved word for word from StrengthLogger.tsx.
-const EMPTY_BAR_HINT = 'Empty bar — a few easy reps to groove the movement.';
-const TEST_LAST_SET_HINT =
-  'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.';
-// OURS — `ANCHOR_HINT` "8 to 10 reps near failure": a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count
-const ANCHOR_HINT = 'A weight for 8 to 10 reps near failure. Enter it here.';
-const PULLUP_SCAP_HINT = 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.';
-// OURS — `PULLUP_EASY_HINT` 2–3 easy pull-ups and ~2 min rest: moved from the logger, no source
-const PULLUP_EASY_HINT = '2–3 easy pull-ups, then rest ~2 min before the test set.';
-const PULLUP_TEST_HINT =
-  'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.';
+/**
+ * ⛔⛔ THE TEST DAY'S WORDS ARE p215's, CUT, NEVER REWORDED (book-language fix, 2026-09-18). Page photo:
+ * `book-sources/p215.png`. ONE OWNER: the plan's test rows (`compose.ts`) import the last-set line from here.
+ *
+ * p215 step 1: "Perform a regular warm-up in your chosen lift, slowly working your way up to a starting
+ * weight of 75 percent or so of your predicted max; perform 6 reps." — the first clause, on the empty bar.
+ * It replaces "Empty bar — a few easy reps to groove the movement." ("easy"; p140 says rapid).
+ */
+const EMPTY_BAR_HINT =
+  'Perform a regular warm-up in your chosen lift, slowly working your way up to a starting weight of 75 percent or so of your predicted max.';
+/**
+ * p215 step 8: "Perform the maximum number of repetitions possible with this weight, and enter the number
+ * of repetitions here:" — cut after "weight". It replaces four wordings of the same set (this file, the plan
+ * row's note, the logger's "All-out set… training max", and a "clean reps" line); "clean" and "stop when
+ * form breaks" are not on p215.
+ */
+export const TEST_LAST_SET_LINE = 'Perform the maximum number of repetitions possible with this weight.';
+const TEST_LAST_SET_HINT = TEST_LAST_SET_LINE;
+/**
+ * ⛔ THE STARTING WEIGHT WITH NO MAX ON FILE — p215 steps 1 and 2, cut (2026-09-18). "A weight for 8 to 10
+ * reps near failure" squeezed the page's "comfortably 8, approaching failure at 10" into one band.
+ * p215: "…it's a weight where you can comfortably perform 8 repetitions but are approaching failure if you
+ * had to push to 10." and step 2 "Enter this weight here:".
+ */
+const ANCHOR_HINT =
+  'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. '
+  + 'Enter this weight here.';
+// ⛔ 2026-09-18: the pull-up test's three hints (scap pulls; "2–3 easy pull-ups, then rest ~2 min"; "ONE
+// all-out set: strict, full range, no kipping…") and its two warm-up sets (5 scap pulls, 3 easy pull-ups)
+// came off — no page gives a pull-up test, and every count was ours. The one set that records the count stays.
 
-const stepHint = (i: number): string =>
-  i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.`;
+/**
+ * ⛔ p215's own words per step (2026-09-18). "Step 1 — the first ramp set, as prescribed." was ours.
+ * Step 1 (75% × 6): "(This may be a guess, but it's a weight where you can comfortably perform 8
+ * repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this
+ * feels about right.)" — cut at the front. Step 2: "Perform 5 repetitions with this weight D." — the
+ * letter cut; the rep count is the row's own, which is p215's 5.
+ */
+const P215_STEP_ONE =
+  "A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. "
+  + 'Use this set of 6 to confirm that this feels about right.';
+const stepHint = (i: number, reps?: number): string =>
+  i === 0 ? P215_STEP_ONE : `Perform ${Number(reps) > 0 ? reps : 5} repetitions with this weight.`;
 
-const fileNoteFor = (name: string, onFile: number | undefined, hasSteps: boolean, metric: boolean): string =>
+/**
+ * The number on file, as app state. ⛔ 2026-09-18: "The steps below are a share of that number; the last one
+ * is what you are trying to beat." came off — nothing on p215 is a number to beat; the steps say what p215
+ * says on their own rows.
+ */
+const fileNoteFor = (name: string, onFile: number | undefined, _hasSteps: boolean, metric: boolean): string =>
   onFile && onFile > 0
-    ? `${name} on file: ${Math.round(liftInAthletesUnit(onFile, metric))} ${metric ? 'kg' : 'lb'} (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
-    : hasSteps
-      ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
-      : '';
+    ? `${name} on file: ${Math.round(liftInAthletesUnit(onFile, metric))} ${metric ? 'kg' : 'lb'} (typed in your baselines).`
+    : '';
 
 /** The typed max on file for a lift, as stored (the alias keys the logger read, moved unchanged). */
 export function typedMaxFor(name: string, perf: Record<string, unknown> | null | undefined): number | undefined {
@@ -146,10 +180,7 @@ function pullUpRow(name: string): TestSessionRow {
   return {
     name,
     sets: [
-      // OURS — 5 scap pulls and 3 easy pull-ups; the logger carried these counts with no source.
-      { weight: 0, reps: 5, set_type: 'warmup', set_hint: PULLUP_SCAP_HINT },
-      { weight: 0, reps: 3, set_type: 'warmup', set_hint: PULLUP_EASY_HINT },
-      { weight: 0, set_type: 'working', rep_max_test: true, set_hint: PULLUP_TEST_HINT },
+      { weight: 0, set_type: 'working', rep_max_test: true },
     ],
   };
 }
@@ -175,7 +206,7 @@ function barbellTestRow(
         prefilled: true as const,
         ...(p.amrap
           ? { amrap: true as const, set_hint: TEST_LAST_SET_HINT }
-          : { set_hint: stepHint(i) }),
+          : { set_hint: stepHint(i, Number(p.reps) > 0 ? Number(p.reps) : undefined) }),
       }))
     // p215's own protocol with the athlete supplying A: A for 6, then 1.10A for 5, then 1.15A for max
     // reps (`PRETEST_STEPS`). The rep counts are the page's.
@@ -251,6 +282,7 @@ export function plannedTestSession(
           ? { target_reps: plannedReps.trim() }
           : (typeof plannedReps === 'number' && plannedReps > 0 ? { target_reps: String(plannedReps) } : {})),
         ...(typeof ex?.target_rir === 'number' ? { target_rir: ex.target_rir } : {}),
+        ...(typeof ex?.slot_intent === 'string' && ex.slot_intent ? { slot_intent: String(ex.slot_intent) } : {}),
         ...(String(ex?.notes || '').trim() ? { notes: String(ex.notes).trim() } : {}),
         sets: setRows
           .map((st) => ({

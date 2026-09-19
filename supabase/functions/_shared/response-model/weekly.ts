@@ -36,6 +36,7 @@ import { computeCrossDomain } from './cross-domain.ts';
 // ratio the plan produced. See the mint's header block for the law and why ACWR is not an input.
 import { mintOverloadVerdict, type OverloadVerdict } from '../load-status-reconcile.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
+import { rirOffTarget } from '../strength-grid/intents.ts';
 // Q-254 slice 2b — the BOOK'S rule for what an all-out set means, already written and fixtured.
 // ⛔ Imported rather than re-derived: a second answer to "did the top set pass" is how the working
 // number and the words on screen start disagreeing about one session.
@@ -195,7 +196,15 @@ export function computeLiftVerdict(
   bestWeight: number | null = null,
   /** Q-254 slice 2b: the last all-out (AMRAP) top set. Optional so every existing caller is unchanged. */
   allOut: LiftAllOut | null = null,
+  /**
+   * ⛔ PASS 7 (book-language fix): p218's band for the lift's intent. When present the deviation is how far the
+   * logged reserve sits off the band (0 inside it), not `rir - targetRir` against the stamped midpoint.
+   */
+  targetBand: { lo: number; hi: number } | null = null,
 ): { label: string; tone: LiftVerdictTone } {
+  const offTarget = (r: number): number | null => targetBand
+    ? rirOffTarget(r, { lo: targetBand.lo, hi: targetBand.hi, band: true })
+    : (targetRir != null ? r - targetRir : null);
   // ⛔ [D-373] COACHING LANGUAGE IS FOR MAIN LIFTS ONLY. This gate is the whole fix for the
   // "back off weight" bug (SPEC-strength-language, Axis 1): this function ran EVERY movement
   // through identical RIR-deviation logic and never consulted role, so a hard-feeling Hip Thrust
@@ -228,7 +237,7 @@ export function computeLiftVerdict(
   if (weekIntent === 'peak') {
     const lower = isLowerBodyLift(_canonical);
     if (lower) return { label: 'hold — peak week', tone: 'neutral' };
-    if (rir != null && targetRir != null && (rir - targetRir) >= VERDICT_DEVIATION.ADD_WEIGHT) {
+    if (rir != null && (offTarget(rir) ?? -Infinity) >= VERDICT_DEVIATION.ADD_WEIGHT) {
       return { label: 'add weight', tone: 'action' };
     }
     return { label: 'hold weight', tone: 'neutral' };
@@ -253,13 +262,13 @@ export function computeLiftVerdict(
   }
 
   // Base / build — deviation from target RIR
-  if (rir == null || targetRir == null) {
+  if (rir == null || (targetRir == null && targetBand == null)) {
     if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
     if (e1rmTrend === 'declining') return { label: 'strength slipping', tone: 'caution' };
     return { label: 'holding steady', tone: 'neutral' };
   }
 
-  const deviation = rir - targetRir;
+  const deviation = offTarget(rir)!;
 
   if (deviation <= VERDICT_DEVIATION.BACK_OFF) {
     // D-231 baseline-aware de-alarm: a RIR back-off on a weight well under the tested 1RM (150) is
@@ -332,7 +341,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
 
     const anchor_1rm = l.anchor_1rm ?? null;
     const best_weight = l.best_weight ?? null;
-    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name, anchor_1rm, best_weight, l.last_all_out ?? null);
+    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name, anchor_1rm, best_weight, l.last_all_out ?? null, l.target_rir_band ?? null);
 
     return {
       canonical_name: l.canonical_name,

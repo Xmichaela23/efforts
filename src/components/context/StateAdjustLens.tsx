@@ -425,7 +425,10 @@ export default function StateAdjustLens({ mainLifts }: {
     ...(deload?.canDeload && nextWeek != null ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
       <>
         <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
-        <p className="text-footnote text-label-secondary mt-2 leading-snug">Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
+        {/* ⛔ 2026-09-18 (book-language fix, strength half): "Max-effort sets become skill and speed sets, the extra
+            lower-body sets come out" came off — no quoted words on any page, "speed" is not the book's word for DE,
+            and the substitution differs by program (p274 substitutes; p278 only cuts). */}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">The endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
         {deload.taperWeeks.length > 0 && <p className="text-caption text-label-secondary mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
         {deloadNote && <p className="text-footnote text-label-secondary mt-1.5">{deloadNote}</p>}
       </>

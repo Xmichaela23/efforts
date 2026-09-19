@@ -39,18 +39,18 @@ Deno.test('the four intents print the book’s word and its cue', () => {
     { slot_intent: 'HYP', name: 'dumbbell curl' },
   ]), bar);
   assertEquals(rows[0].kind, 'Maximum effort');
-  assertEquals(rows[0].cue, '1 to 5 reps, stop short of failure.');
+  assertEquals(rows[0].cue, '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.'); // p218 row + p219 (page photos)
   assertEquals(rows[1].kind, 'Skill');
-  assert(rows[1].cue?.startsWith('Form and consistency over speed.'));
+  assertEquals(rows[1].cue, '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.'); // p218 row + p219
   assertEquals(rows[2].kind, 'Hypertrophy');
-  assertEquals(rows[2].cue, '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.');
+  assertEquals(rows[2].cue, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
 });
 
-Deno.test('⛔ THE SPEED CUE FOLLOWS THE LOAD — a bar says "Bar", anything else says "Move"', () => {
+Deno.test('⛔ THE DE CUE IS p218\'S NUMBERS ON A BAR AND OFF IT — "Bar slows, set is over" is on no page', () => {
   const onBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), bar)[0];
   const offBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'dumbbell reverse lunge' }]), bar)[0];
-  assertEquals(onBar.cue, 'As fast as possible on every rep. Bar slows, set is over.');
-  assertEquals(offBar.cue, 'As fast as possible on every rep. Move slows, set is over.');
+  assertEquals(onBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
+  assertEquals(offBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
 });
 
 Deno.test('the cue repeats when the kind repeats', () => {
@@ -102,7 +102,7 @@ Deno.test('⛔ A SUPERSET PAIR IS ONE LINE — names joined, the kind word once,
   ]), bar);
   assertEquals(lines.map((l) => l.movement), ['barbell bench press', 'tate press + drag curl', 'lateral raise']);
   assertEquals(lines[1].kind, 'Hypertrophy superset');
-  assertEquals(lines[1].cues, ['8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.']);
+  assertEquals(lines[1].cues, ['6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.']);
   assertEquals(lines[1].rows, [1, 2]);
   assertEquals(lines[0].rows, [0]);
   assertEquals(lines[2].rows, [3]);
@@ -115,8 +115,8 @@ Deno.test('a pair of two kinds names both kinds and carries both cues', () => {
   ]), bar);
   assertEquals(line.kind, 'Dynamic effort + Hypertrophy superset');
   assertEquals(line.cues, [
-    'As fast as possible on every rep. Bar slows, set is over.',
-    '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.',
+    '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.',
+    '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',
   ]);
 });
 

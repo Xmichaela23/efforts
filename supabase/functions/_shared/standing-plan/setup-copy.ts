@@ -7,6 +7,7 @@
  * in braces are filled with the athlete's own values (weeks, minutes, lift names) and nothing else.
  */
 import { FRAMES, type FrameId } from './frames.ts';
+import { intentLine } from '../strength-grid/intents.ts';
 
 // ── Train screen and program list ─────────────────────────────────────────────────────────────
 
@@ -57,20 +58,27 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   all_rounder: {
     name: 'Run + Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
-    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. The weights go up as you adapt to the training.',
+    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." was a paraphrase; p275's own words (All
+    // Rounder notes): "few changes are needed as the months progress beyond adjustment of 1RM and threshold as
+    // you improve."
+    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. Few changes are needed as '
+      + 'the months progress beyond adjustment of 1RM and threshold as you improve.',
     ftp_note: null,
   },
   strength_5k: {
     name: 'Run + Strength',
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
-    confirm_line: 'A {weeks}-week block. Two cycles build, the third measures — the last set of that cycle is the test, '
-      + 'so there is no separate retest week.',
+    // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
+    // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
+    confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
   },
   cycling_base: {
     name: 'Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
-    confirm_line: 'A {weeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.',
+    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." came off — a paraphrase, and p278/p280
+    // print no sentence on it.
+    confirm_line: 'A {weeks}-week plan to get faster and stronger.',
     ftp_note: "If you're coming back from a riding break, make sure your FTP is current.",
   },
 };
@@ -118,9 +126,9 @@ export const NUMBERS_COPY = {
 export const BUILD_FOCUS_COPY = {
   subtitle: 'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the '
     + 'day or adjust now for the plan.',
-  // Viada p86: 8 to 10 reps is the preferred hypertrophy range, 1 to 2 reps in reserve, never to failure.
-  dose_line: 'Accessory sets are 8 to 10 reps with a rep or two left in the tank. Going to failure costs the next '
-    + 'main lift.',
+  // ⛔ 2026-09-18: the rows this step lists are HYP slots, so the line is p218's HYP line from its one owner
+  // (6 to 12 reps, 0 to 2 in reserve). The p86 "8 to 10 reps" and "costs the next main lift" (no page) came off.
+  dose_line: intentLine('HYP') ?? '',
   day_heading: 'Day {day}',
   also_days: 'also {days}',
   also_day: 'day {day}',

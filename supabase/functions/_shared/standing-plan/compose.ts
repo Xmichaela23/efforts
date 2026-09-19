@@ -23,7 +23,7 @@ import {
   type Level,
 } from '../endurance-library/index.ts';
 import { bandRouteName, executionHowTo, executionName, hipThrustStandIn, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
-  type ViadaIntent, type ViadaPattern } from '../strength-grid/index.ts';
+  type ViadaIntent, type ViadaPattern, rirBandFor } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
@@ -85,6 +85,7 @@ import {
   PLYO_FAMILIES,
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_MIX_IS_OURS,
+  P227_DRILL_LINE,
 } from './plyo.ts';
 /**
  * ⛔ THE SERVER'S CANONICALIZER, NOT THE CLIENT MIRROR, AND THE DIFFERENCE IS THE BUG.
@@ -179,8 +180,8 @@ import {
   type TestedLift,
   type WorkingNumber,
 } from './working-number.ts';
-import { rampFor, RAMP_NOTE, slotTakesRamp } from './warmup.ts';
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
+import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -212,6 +213,13 @@ export type StrengthExercise = {
   source_row?: string;
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
+  /**
+   * ⛔ p218's reserve BAND for the slot (book-language fix, pass 7) — HYP 0-2, DE/SKILL 3-4; absent on ME. The
+   * stamped target. `target_rir` above stays as the band's midpoint (ours) for readers that take one number.
+   * ⚠️ materialize-plan's row whitelist does not carry it yet; every judge reads the band off `slot_intent`
+   * through `strength-grid/intents.ts`, which it does carry.
+   */
+  target_rir_band?: { lo: number; hi: number };
   /**
    * ⛔⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT — **INCLUDING WHEN THERE ISN'T ONE** (widened 2026-09-01).
    *
@@ -1056,9 +1064,21 @@ function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
   return out;
 }
 
-/** ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226, and only the wording Michael approved (2026-09-13). */
+/** p247, cut (see the note where it is pushed). One constant so tests pin the words, not a fragment. */
+// ⚠️ Cut to the two sentences with no "you" — the block description runs through the voice gate
+// (`standing-plan-live.test.ts`), and p247's first sentence opens "you may notice that".
+export const HAIRCUT_LINE = 'A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction '
+  + 'can be gradually phased out in eight to ten weeks.';
+
+/**
+ * ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226's SKILL cell, whole (book-language fix, 2026-09-18). It read
+ * "medium weight, no fatigue, full rest": "full rest" for the page's "ample rest", and "emphasis is speed and
+ * quality" dropped. Checked against the page photo p226.jpg (local page folder): "SKILL: Medium weight,
+ * emphasis is speed and quality, no fatigue accumulation, ample rest".
+ * The page photos are the book (pass 6); this cell is read off p226.jpg.
+ */
 export const CARRY_ROW_WORDS: Partial<Record<ViadaIntent, string>> = {
-  SKILL: 'medium weight, no fatigue, full rest',
+  SKILL: 'medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest',
 };
 
 function exerciseForSlot(
@@ -1795,6 +1815,7 @@ function exerciseForSlot(
         weight: 'By feel',
         load_prescribed: false,
         ...(targetRir != null ? { target_rir: targetRir } : {}),
+        ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
         slot_intent: slot.intent,
         source_row: noteForWeek(slot, args.week),
         ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
@@ -1860,7 +1881,7 @@ function exerciseForSlot(
   // that dropping p247's lower-body reduction for a bike-heavy week was OUR reading of his p280
   // reason — an athlete-facing sentence whose whole content was that it had no page. The behaviour is
   // unchanged: p247 applies where p247's own layout holds, and says nothing where it does not.
-  if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text.includes('lower-body'))) {
+  if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text === HAIRCUT_LINE)) {
     notes.push({
       kind: 'source',
       // ⛔ IT NAMES THE DAYS (Michael, 2026-08-26). His own wording for this class of sentence is
@@ -1869,9 +1890,12 @@ function exerciseForSlot(
       // claim the athlete has to take on trust. This is the COMPENSATED break — p247's own layout —
       // so it is the one sentence here that reports a cost already paid.
       // Viada p247: a 3-4% reduction phased out over the first nine weeks. OURS — "three and a half" is the midpoint of 3-4 (see progression.ts)
-      text: `The hard run lands the day before the heavy leg session, so the lower-body weights `
-        + 'start about three and a half per cent under where the test put them. That comes back over '
-        + 'the first nine weeks.',
+      // ⛔ 2026-09-18 (no paraphrasing): p247's own words, cut — "For the first few weeks, you may notice that
+      // the ME lower session is slightly hindered by lingering fatigue. As such, a 3 to 4 percent reduction in
+      // working 1RM should be assumed here. As long as progression is maintained…, this reduction can be
+      // gradually phased out in eight to ten weeks". The engine applies 3.5 (OURS, progression.ts); the line
+      // prints the page's band.
+      text: HAIRCUT_LINE,
       cite: 'Viada p247',
     });
   }
@@ -1938,27 +1962,14 @@ function exerciseForSlot(
       weight,
       percent_1rm: pct,
       ...(targetRir != null ? { target_rir: targetRir } : {}),
+      ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
       // ⛔ WHAT THEY GOT, ON THE ROW (item 6). `reps` above is the BAND and stays "1-5" — every
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
       // on that shape, so the result travels as its own field rather than inside the string.
       ...(lastReps.length > 0 ? { last_reps: lastReps } : {}),
-      /**
-       * ⛔⛔ THE RAMP GOES IN FRONT OF THE WORK SETS — his Rule 2a, p140: *"your warm-up should begin
-       * with unloaded, rapid concentric back squats, working up in weight"*, and *"the first set of
-       * your skill work should also be the last set of your warm-up."*
-       *
-       * ⚠️ IT IS PREPENDED TO `set_plan`, TAGGED `warmup`, AND COUNTS AS NOTHING. `sets` above is
-       * unchanged and still reports the WORK sets only — every reader that counts (the earned-set
-       * ladder, the rep-band readers, the load ledger, p086's session ceiling) is anchored on that
-       * number and on the tag, so a ramp that inflated either would feed the progression evidence it
-       * is not.
-       *
-       * ⚠️ ONLY WHERE A WEIGHT IS PRESCRIBED AND THE SLOT EARNS ONE. A by-feel row has nothing to
-       * converge on, and `slotTakesRamp` keeps it off the HYP rows — a twelve-rep set is its own ramp.
-       */
+      // ⛔ 2026-09-18: no warm-up ramp in front of the work sets — its weights and reps were ours
+      // (`warmup.ts`). `set_plan` is the work sets only.
       set_plan: [
-        // OURS — `roundTo` default 5 lb, as above
-        ...(slotTakesRamp(slot.intent) ? rampFor(weight, args.roundTo ?? 5) : []),
         ...Array.from({ length: sets }, () => ({
           weight,
           // ⚠️ THE KEY IS OMITTED, NOT ZEROED. `plannedSetsFor` reads a non-positive rep count as
@@ -2054,7 +2065,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
         weight: 'By feel',
         load_prescribed: false,
         slot_intent: TEST_LIFT_INTENT,
-        notes: 'Last set as many reps as possible. It sets your numbers.',
+        notes: TEST_LAST_SET_LINE, // p215 step 8 — one owner, `strength/test-session.ts`
         ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       });
       continue;
@@ -2069,7 +2080,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
       // 2026-09-09, Michael's words (WORKORDER-kill-ours §B.5, p215): the last set is taken for max
       // reps and the block's numbers come off it. *"Test set —"* was a label for a row that already
       // says Test in its session name, and *"clean"* is the form rule, which lives on the set itself.
-      notes: 'Last set as many reps as possible. It sets your numbers.',
+      notes: TEST_LAST_SET_LINE, // p215 step 8 — one owner, `strength/test-session.ts`
       ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       set_plan: steps.map((s) => ({
         weight: s.weight,
@@ -2144,7 +2155,8 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
 function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
-    notes.push({ kind: 'source', text: PLYO_DOSE.stopRule, cite: PLYO_DOSE.stopRuleIsHis });
+    // ⛔ 2026-09-18 (pass 6): p227's own words (p227.jpg), one owner `plyo.ts`, replace the old paraphrase.
+    notes.push({ kind: 'source', text: P227_DRILL_LINE, cite: PLYO_DOSE.stopRuleIsHis });
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
   return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) })).map(({ family, name }) => ({
@@ -2154,8 +2166,10 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     // ⛔ ONE ROW, ONE DRILL, and the efforts sit in `reps` because a plyometric row shows reps and
     // nothing else (D-3452) — there is no load to record and no plate calculator to draw.
     sets: 1,
-    // the range's top is the row's recorded-efforts capacity; the logger records, never targets
-    reps: PLYO_DOSE.effortsPerDrill.hi,
+    // ⛔ 2026-09-18: no effort count on the row. "4" (the top of an OURS 3-4) printed as "1 × 4" on the plan
+    // and the drawer; p227 says each drill is performed "multiple times" and gives no figure. The logger
+    // records efforts after, never targets them. Empty, like a carry row.
+    reps: '',
     weight: 'Bodyweight',
     load_prescribed: false,
     /**
@@ -2167,8 +2181,10 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
      * absolute no-nos (p227).
      * ⚠️ THE BENEFIT PHRASE LEADS, as it does today — it is his table's own column and it stays.
      */
-    notes: `${PLYO_FAMILIES[family].benefit}. Repeat until it feels right and you are confident, `
-      + 'then move on. Full rest between. Tired or sloppy, stop.',
+    // ⛔ 2026-09-18: the row note was a paraphrase ("{benefit}. Repeat until it feels right… Full rest between.
+    // Tired or sloppy, stop."). Pass 6: p227's own words, read off p227.jpg (`plyo.ts`, one owner).
+    notes: P227_DRILL_LINE,
+
   }));
 }
 
@@ -2186,7 +2202,8 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
   return {
     day: dayNameFor(args, day.day),
     type: 'strength',
-    name: 'Plyometrics',
+    // ⛔ 2026-09-18: the page's name for the day — p246, p274 and p278 print "Plyo warm-up" (was "Plyometrics").
+    name: 'Plyo warm-up',
     // ⛔ 2026-09-09 (§B2): the stop rule is on every drill row already, in his approved words. Saying
     // it a fourth time at the session level is the wallpaper this order exists to remove.
     description: '',

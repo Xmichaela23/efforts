@@ -16,6 +16,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { ACCESSORY_FATIGUE_CUE, composeWeek, defaultCompetitionLifts, SET_END_CUE, SPEED_SET_END_CUE } from './index.ts';
 import { buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
+import { P227_DRILL_LINE } from './plyo.ts';
 import { PLYO_DOSE } from './frames.ts';
 import { FAMILIES } from '../endurance-library/source-rules.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
@@ -182,50 +183,29 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
   assert(plyo, 'the plyo day vanished');
   assertEquals(plyo!.description, '', 'the plyo day grew a session line back');
   const drills = plyo!.strength_exercises ?? [];
-  assert(drills.length > 0 && drills.every((d) => /Tired or sloppy, stop\.$/.test(String(d.notes))),
-    'the drills lost the approved stop rule the session line was deleted in favour of');
+  // ⛔ 2026-09-18 (pass 6): the drill note is p227's own words, read off p227.jpg.
+  assert(drills.length > 0 && drills.every((d) => String(d.notes) === P227_DRILL_LINE),
+    'a drill row lost p227\'s words');
   const test = week(1).sessions.filter((s) => (s.tags ?? []).includes('test_week'));
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {
     assertEquals(s.description, '', `${s.name} grew a session line back`);
-    assert((s.strength_exercises ?? []).every((e) => /It sets your numbers\.$/.test(String(e.notes))),
+    // p215 step 8, the one owner's line (`strength/test-session.ts`, 2026-09-18).
+    assert((s.strength_exercises ?? []).every((e) => String(e.notes) === 'Perform the maximum number of repetitions possible with this weight.'),
       `${s.name} lost the approved row note the session line was deleted in favour of`);
   }
 });
 
-Deno.test('⛔⛔ THE REASON IS ON THE BLOCK, ONCE — and never on a session', () => {
-  /**
-   * ⛔ p125, AND IT IS THIS CUSTOMER EXACTLY: *"A higher pain tolerance may be an excellent
-   * adaptation for endurance athletes… For strength athletes, however, it may be less clear; a
-   * higher tolerance may be of negligible benefit or even counterproductive to longer-term health."*
-   * A runner or rider who has trained themselves for years to push through discomfort now has the
-   * wrong instinct under a bar.
-   *
-   * ⚠️ ONCE. Said on every session for twelve weeks it stops being read, which is the whole reason
-   * the rule and the reason live on different surfaces.
-   */
+Deno.test('⛔⛔ THE p125 LINE IS ON THE BLOCK ONCE, IN THE PAGE\'S WORDS (pass 6, p125.jpg)', () => {
   const row = buildStandingPlanRow({
     compose: { ...BASE, week: 2, column: 'standard' } as never,
     weeks: 12,
     taperWeeks: [],
   } as never) as { description: string };
-  const hits = row.description.split(PAIN_TOLERANCE_NOTE).length - 1;
-  assertEquals(hits, 1, `the block reason appears ${hits} times in its own description`);
-
-  for (const s of week(2).sessions) {
-    assertEquals(s.description.includes(PAIN_TOLERANCE_NOTE), false,
-      `${s.name} repeats the block's reason`);
-  }
-
-  /**
-   * ⚠️ NO SECOND PERSON, and the block description's gate is stricter than the app-wide one
-   * (`standing-plan-live.test.ts`: "The", not "Your"). A first draft read "teaches you to push
-   * through discomfort" and was caught there.
-   */
+  assertEquals(row.description.split(PAIN_TOLERANCE_NOTE).length - 1, 1, row.description);
+  for (const s of week(2).sessions) assertEquals(s.description.includes(PAIN_TOLERANCE_NOTE), false, s.name);
+  assert(PAIN_TOLERANCE_NOTE.includes('may be of negligible benefit or even counterproductive to longer-term health'));
   assertEquals(voiceViolation(PAIN_TOLERANCE_NOTE), null);
-  assertEquals(/\byou\b|\byour\b/i.test(PAIN_TOLERANCE_NOTE), false);
-  // ⛔ AND IT STATES THE PAGE'S OWN CLAIM, not a softened one.
-  assert(/negligible benefit/.test(PAIN_TOLERANCE_NOTE));
 });
 
 Deno.test('⛔⛔ NO WORD NAMES TWO DIFFERENT SESSIONS — the wizard and the plan agree', () => {

@@ -176,14 +176,12 @@ Deno.test('the pretest set gets its own cue, and the previous program\'s AMRAP k
   assertEquals(BAR_SPEED_COPY.amrap, 'Grind it out. Stop before failure.');
 });
 
-Deno.test('the logger keys the pretest cue on the session\'s own tag, not a new stored field', async () => {
-  // ⚠️ The composer already tags that session `test_week`; a set-level flag would put a second answer
-  // to "which kind of set is this" into stored JSON.
+Deno.test('⛔ NONE OF THESE LINES REACHES THE LOGGER (book-language fix, 2026-09-18)', async () => {
+  // They are the previous program's bar-speed lines, on no page of the book. The logger no longer imports
+  // `barSpeedLineFor` and prints none of them. This file keeps pinning the table only as a record.
   const src = await Deno.readTextFile(
     new URL('../components/StrengthLogger.tsx', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  assert(/isPretest:\s*Array\.isArray\(scheduledWorkout\?\.tags\)/.test(code),
-    'the logger does not pass the pretest flag');
-  assert(/'test_week'/.test(code), 'the logger keys the pretest cue on something other than the tag');
+  assert(!/barSpeedLineFor|BAR_SPEED_COPY|BAR_SPEED_AMRAP_AFTER/.test(code), 'a bar-speed line is wired into the logger again');
 });

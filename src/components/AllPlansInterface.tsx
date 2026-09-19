@@ -1374,6 +1374,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               // The name the phone shows: the kit's own name for the row first ("Dumbbell Leg Curl" where
               // there is no machine), then the stored name (2026-09-16, same pick as `plainLiftList`).
               const name = String(ex?.execution_name || ex?.name || '').trim() || 'Exercise';
+              // ⛔ THE SERVER'S LINE, PRINTED AS SENT (book-language fix, 2026-09-18). materialize-plan stamps
+              // `display_line` on every strength step (`_shared/strength/strength-display-lines.ts`, the one
+              // owner — kind word, sets × reps, p218's reserve band). The composition below is only for a
+              // row that was never materialized.
+              if (typeof ex?.display_line === 'string' && ex.display_line.trim()) {
+                lines.push(`    - ${ex.display_line.trim()}`);
+                continue;
+              }
               // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): `name · words`, no dose.
               if (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim()) {
                 lines.push(`    - ${name} · ${ex.prescription_words.trim()}`);

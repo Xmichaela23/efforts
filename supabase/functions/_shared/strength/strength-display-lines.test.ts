@@ -36,8 +36,11 @@ Deno.test('a zero prints — the failed attempt is a result too', () => {
 Deno.test('the book word, the reserve, the adjusted weight in the athlete\'s unit', () => {
   assertEquals(
     formatStrengthExercise({ name: 'Back Squat', sets: 3, reps: 5, slot_intent: 'HYP', target_rir: 2, weight_display: '80 kg', adjusted: true, original_weight: 85 }, 'kg'),
-    'HYP · Back Squat 3×5 · 2 in reserve @ 80 kg (was 85 kg)',
+    'HYP · Back Squat 3×5 · 0 to 2 in reserve @ 80 kg (was 85 kg)',
   );
+  // ⛔ A HYP ROW PRINTS p218's BAND, 0 to 2, never the stamped midpoint (2026-09-18).
+  assertEquals(formatStrengthExercise({ name: 'Leg Press', sets: 3, reps: '6-12', slot_intent: 'HYP', target_rir: 1 }), 'HYP · Leg Press 3×6-12 · 0 to 2 in reserve');
+  assertEquals(formatStrengthExercise({ name: 'Bench Press', sets: 4, reps: '2-4', slot_intent: 'DE', target_rir: 3.5 }), 'DE · Bench Press 4×2-4 · 3 to 4 in reserve');
   // ME states no reserve target (p218) — none printed even if one arrived.
   assertEquals(formatStrengthExercise({ name: 'Deadlift', sets: 1, reps: '1-5', slot_intent: 'ME', target_rir: 1, weight_display: '315 lb' }), 'ME · Deadlift 1×1-5 @ 315 lb');
   assertEquals(formatStrengthExercise({ name: 'Front Squat', sets: 3, reps: 5, baseline_missing: true }), 'Front Squat 3×5 @ [Setup Required]');
@@ -60,8 +63,8 @@ Deno.test('a superset pair is one line, its sentence first', () => {
     { name: 'Drag Curl', sets: 3, reps: '6-12', slot_intent: 'HYP', target_rir: 1, superset_group: 'a' },
     { name: 'Row', sets: 3, reps: 8, weight_display: '100 lb' },
   ]), [
-    'Superset: Tate Press with Drag Curl — one set of each, rest, then again.',
-    'HYP · Tate Press + Drag Curl · superset · 3×6-12 · 1 in reserve',
+    'Superset · Tate Press with Drag Curl', // "one set of each, rest, then again" is on no page
+    'HYP · Tate Press + Drag Curl · superset · 3×6-12 · 0 to 2 in reserve', // p218
     'Row 3×8 @ 100 lb',
   ]);
 });

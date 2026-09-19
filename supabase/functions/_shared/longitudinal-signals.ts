@@ -1,3 +1,4 @@
+import { rirTargetFor, type RirTarget } from './strength-grid/intents.ts';
 /**
  * Longitudinal signals — multi-week pattern detection for the weekly coach.
  *
@@ -512,28 +513,36 @@ function parseStrengthExercisesArray(raw: unknown): any[] {
   return v;
 }
 
-function prescribedRirFromExercise(ex: any): number | null {
-  if (typeof ex?.target_rir === 'number' && !Number.isNaN(ex.target_rir)) return ex.target_rir;
-  if (typeof ex?.rir === 'number' && !Number.isNaN(ex.rir)) return ex.rir;
-  return null;
-}
-
 function normLiftKey(s: string): string {
   return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
 }
 
-function buildPrescribedRirByName(strengthExercises: any): Map<string, number> {
-  const m = new Map<string, number>();
+/**
+ * ⛔ THE PRESCRIBED RESERVE AS A BAND (book-language fix, pass 6, 2026-09-18).
+ *
+ * A planned row with a p218 intent is judged against p218's band — DE / SKILL 3–4, HYP 0–2 — read off the
+ * row's `slot_intent` through the one owner (`strength-grid/intents.ts`). The composer stamps `target_rir` as
+ * the band's midpoint (HYP 1), and this judge read that single number with ours tolerances, so a set logged at
+ * 0 RIR — inside p218's HYP band — counted as "below the planned reps in reserve".
+ * ⚠️ WHY THE INTENT AND NOT A NEW FIELD: materialize-plan copies planned rows through a whitelist that keeps
+ * `slot_intent` and would drop a new band field; this judge reads `planned_workouts.strength_exercises`.
+ * `band: false` marks a row with no intent (not a p218 row): it keeps its own number and the ours tolerances.
+ */
+type PrescribedRir = RirTarget;
+
+function buildPrescribedRirByName(strengthExercises: any): Map<string, PrescribedRir> {
+  const m = new Map<string, PrescribedRir>();
   for (const ex of parseStrengthExercisesArray(strengthExercises)) {
     const name = normLiftKey(String(ex?.name || ''));
     if (!name) continue;
-    const r = prescribedRirFromExercise(ex);
+    // The one rule (`strength-grid/intents.ts` rirTargetFor): p218's band by intent, none on ME, else the number.
+    const r = rirTargetFor(ex);
     if (r != null) m.set(name, r);
   }
   return m;
 }
 
-function detectStrengthRirGap(
+export function detectStrengthRirGap(
   facts: WorkoutFactRow[],
   plannedById: Map<string, PlannedRow>,
   out: LongitudinalSignal[],
@@ -560,11 +569,14 @@ function detectStrengthRirGap(
       const ar = ex.avg_rir;
       if (typeof ar !== 'number' || Number.isNaN(ar)) continue;
       compared++;
+      // A p218 row: below the band's bottom / above its top (p218). A row with no intent keeps the old rule:
       // OURS — `detectStrengthRirGap` RIR more than 0.9 under or 1.4 over the prescription; ≥ 2 below / ≥ 3 above to report: no outside source
-      if (ar < prescribed - 0.9) {
+      const isBelow = prescribed.band ? ar < prescribed.lo : ar < prescribed.lo - 0.9;
+      const isAbove = prescribed.band ? ar > prescribed.hi : ar > prescribed.hi + 1.4;
+      if (isBelow) {
         below++;
         if (belowLifts.length < 4) belowLifts.push(String(ex.name || ex.canonical || canonK || nameK));
-      } else if (ar > prescribed + 1.4) {
+      } else if (isAbove) {
         above++;
         if (aboveLifts.length < 4) aboveLifts.push(String(ex.name || ex.canonical || canonK || nameK));
       }

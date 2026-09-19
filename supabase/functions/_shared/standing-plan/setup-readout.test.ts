@@ -30,7 +30,7 @@ Deno.test('⛔ Build focus: the server\'s rows are the plan\'s pick rows, and ea
 Deno.test('⛔ Build focus: Ride + Strength at a home kit reads as the screen did', () => {
   const b = setupBlock(HOME).build_focus.cycling_base;
   assertEquals(b.subtitle, 'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan.');
-  assertEquals(b.dose_line, 'Accessory sets are 8 to 10 reps with a rep or two left in the tank. Going to failure costs the next main lift.');
+  assertEquals(b.dose_line, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.'); // p218 HYP, one owner
   assertEquals(b.groups.map((g) => [g.heading, g.rows.map((r) => r.label)]), [
     ['Day 1', ['Push isolation', 'Pull isolation']],
     ['Day 2', ['Hinge variation', 'Leg variation']],
@@ -62,7 +62,7 @@ Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the a
   assertEquals(s.plans.all_rounder.name, 'Run + Ride + Strength');
   assertEquals(s.plans.cycling_base.ftp_note, "If you're coming back from a riding break, make sure your FTP is current.");
   assertEquals(s.plans.strength_5k.confirm_line.replace('{weeks}', '12'),
-    'A 12-week block. Two cycles build, the third measures — the last set of that cycle is the test, so there is no separate retest week.');
+    'A 12-week block.');
 });
 
 Deno.test('⛔ Rides screen and runs screen — rows and words from the server', () => {

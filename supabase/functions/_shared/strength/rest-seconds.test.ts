@@ -114,10 +114,14 @@ Deno.test('⛔ THE ROW FIELDS — a stamp wins, warm-up rest only with a warm-up
   assertEquals(restFieldsForRow({ name: 'Hip Thrust', reps: '10-12' }), { rest_seconds: 75 });
   assertEquals(restFieldsForRow({ name: 'Hip Thrust', reps: '50 total' }), { rest_seconds: 60 });
   assertEquals(restFieldsForRow({ name: 'Plank', reps: 'AMRAP' }), { rest_seconds: 90 });
+  // ⛔ 2026-09-18: a row with a p218 intent carries the page's rule and NO seconds — the minutes were ours.
   assertEquals(
     restFieldsForRow({ name: 'Bench Press', reps: '1-5', slot_intent: 'ME', set_plan: [{ weight: 45, reps: 5, warmup: true }, { weight: 135 }] }),
-    { rest_seconds: 180, warmup_rest_seconds: WARMUP_REST_SEC, rest_cue: REST_BETWEEN_SETS_RULE.cue },
+    { rest_cue: REST_BETWEEN_SETS_RULE.cue },
   );
+  assertEquals(restFieldsForRow({ name: 'Leg Press', reps: '6-12', slot_intent: 'HYP' }), { rest_cue: REST_BETWEEN_SETS_RULE_HYP.cue });
+  // And none on a plyometric drill (p227: "ample rest", no number).
+  assertEquals(restFieldsForRow({ name: 'Pogo Hops', reps: '' }), {});
   // The first WORK set's reps, not the warm-up's.
   assertEquals(restFieldsForRow({ name: 'Back Squat', reps: 5, set_plan: [{ weight: 45, reps: 10, warmup: true }, { weight: 185, reps: 8 }] }).rest_seconds, 120);
   assertEquals(restFieldsForRow({ name: 'Bench Press', reps: 5, rest_seconds: 77, rest_cue: 'x' }), { rest_seconds: 77, rest_cue: 'x' });
@@ -135,8 +139,10 @@ Deno.test('⛔ EVERY COMPOSED STRENGTH ROW CARRIES ITS REST, AND THE NUMBER IS T
     assert(rows.length > 0, `week ${week} composed no strength rows`);
     for (const r of rows) {
       const { rest_seconds, warmup_rest_seconds, rest_cue, ...rest } = r;
-      assert(Number(rest_seconds) > 0, `week ${week}: ${String(r.name)} has no rest_seconds`);
-      assertEquals({ rest_seconds, warmup_rest_seconds, rest_cue }, { ...{ warmup_rest_seconds: undefined, rest_cue: undefined }, ...restFieldsForRow(rest) },
+      // ⛔ 2026-09-18: a composed row is a book row — no countdown seconds on it at all.
+      assertEquals(rest_seconds, undefined, `week ${week}: ${String(r.name)} carries rest seconds`);
+      assertEquals(warmup_rest_seconds, undefined, `week ${week}: ${String(r.name)} carries warm-up rest seconds`);
+      assertEquals({ rest_seconds, warmup_rest_seconds, rest_cue }, { ...{ rest_seconds: undefined, warmup_rest_seconds: undefined, rest_cue: undefined }, ...restFieldsForRow(rest) },
         `week ${week}: ${String(r.name)} carries a number the rule does not give`);
     }
   }

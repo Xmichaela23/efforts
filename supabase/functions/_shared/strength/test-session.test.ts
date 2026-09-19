@@ -19,13 +19,15 @@ Deno.test('⛔ THE LAUNCHER WITH A MAX ON FILE — the empty bar, then p215\'s t
   assertEquals(bench.sets.map((s) => s.reps ?? null), [null, 6, 5, null]);
   assertEquals(bench.sets.map((s) => s.set_type), ['warmup', 'working', 'working', 'working']);
   assertEquals(bench.sets[3].amrap, true);
-  assertEquals(bench.sets[1].set_hint, 'Step 1 — the first ramp set, as prescribed.');
-  assertEquals(bench.sets[2].set_hint, 'Step 2 — heavier, as prescribed.');
-  assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.');
+  // p215's own words (2026-09-18).
+  assertEquals(bench.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this feels about right.');
+  assertEquals(bench.sets[2].set_hint, 'Perform 5 repetitions with this weight.');
+  assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines).');
   // The press's empty bar is the bar, not 0.
   assertEquals(ohp.sets[0].weight, 45);
   assertEquals(weights(ohp), [45, 85, 95, 100]);
-  assertEquals(pull.sets.map((s) => [s.set_type, s.reps ?? null, !!s.rep_max_test]), [['warmup', 5, false], ['warmup', 3, false], ['working', null, true]]);
+  // 2026-09-18: the pull-up warm-ups (5 scap pulls, 3 easy pull-ups) and all three hints were ours and came off.
+  assertEquals(pull.sets.map((s) => [s.set_type, s.reps ?? null, !!s.rep_max_test, s.set_hint ?? null]), [['working', null, true, null]]);
 });
 
 Deno.test('⛔ THE LAUNCHER WITH NO MAX ON FILE — the anchor rows, not a 45/95 bar start', () => {
@@ -33,7 +35,7 @@ Deno.test('⛔ THE LAUNCHER WITH NO MAX ON FILE — the anchor rows, not a 45/95
   for (const r of [squat, dead]) {
     assertEquals(weights(r), [45, 0, 0, 0], `${r.name} was given a starting weight`);
     assertEquals(r.sets[1].pretest_anchor, true);
-    assertEquals(r.sets[1].set_hint, 'A weight for 8 to 10 reps near failure. Enter it here.');
+    assertEquals(r.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Enter this weight here.'); // p215, 2026-09-18
     assertEquals(r.sets.map((s) => s.reps ?? null), [null, 6, 5, null]);
     assertEquals(r.anchor_round_to, 5);
     assertEquals(r.notes, undefined);
@@ -52,11 +54,13 @@ Deno.test('⛔⛔ A PLAN\'S TEST ROW IS BUILT AS THE PLAN WROTE IT — its own w
   const bench = rows.find((r) => r.name === 'Bench Press')!;
   const planned = upper.strength_exercises.find((e) => e.name === 'Bench Press')!.set_plan as Array<{ weight: number }>;
   assertEquals(weights(bench), [45, ...planned.map((p) => p.weight)], 'the plan\'s step weights changed on the way to the logger');
-  assertEquals(bench.sets[bench.sets.length - 1].set_hint,
-    'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.');
-  assertEquals(bench.notes, 'Bench Press on file: 160 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat. Last set as many reps as possible. It sets your numbers.');
+  // p215 step 8 (2026-09-18) — the plan row's note and the set's hint are one line from one owner.
+  const P215_LAST = 'Perform the maximum number of repetitions possible with this weight.';
+  assertEquals(bench.sets[bench.sets.length - 1].set_hint, P215_LAST);
+  // 2026-09-18: "the last one is what you are trying to beat" is not how p215 works, and came off.
+  assertEquals(bench.notes, `Bench Press on file: 160 lb (typed in your baselines). ${P215_LAST}`);
   const ohp = rows.find((r) => r.name === 'Overhead Press')!;
-  assertEquals(ohp.notes, 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat. Last set as many reps as possible. It sets your numbers.');
+  assertEquals(ohp.notes, P215_LAST);
 
   // By feel (no seed) → the anchor rows.
   const noSeed = composeWeek({

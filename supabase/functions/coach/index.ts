@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
 import { COACH_PAYLOAD_VERSION } from '../_shared/coach-payload-version.ts';
+import { rirBandFor } from '../_shared/strength-grid/intents.ts';
 import { weekTimeLine } from '../_shared/week-time-line.ts';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import type {
@@ -2177,6 +2178,9 @@ Deno.serve(async (req) => {
       const rirByLift28d = new Map<string, number[]>();
       const bestWeightByLift = new Map<string, number>();
       const lastDateByLift = new Map<string, string>(); // as-of: newest session date per lift
+      // Pass 7 (book-language fix): the p218 intent on the lift's newest logged row, so the verdict judges
+      // the reserve against p218's band (`strength-grid/intents.ts`), not a single target number.
+      const intentByLift = new Map<string, { date: string; intent: string }>();
 
       const extractLiftRir = (workouts: any[], target: Map<string, number[]>) => {
         for (const w of workouts) {
@@ -2190,6 +2194,8 @@ Deno.serve(async (req) => {
             if (!canon || canon === 'unknown') continue;
             const wDate = String((w as any)?.date || '');
             if (wDate && wDate > (lastDateByLift.get(canon) ?? '')) lastDateByLift.set(canon, wDate);
+            const intent = String(ex?.slot_intent ?? '').toUpperCase();
+            if (intent && wDate >= (intentByLift.get(canon)?.date ?? '')) intentByLift.set(canon, { date: wDate, intent });
             const sets = Array.isArray(ex?.sets) ? ex.sets : [];
             for (const s of sets) {
               if (s.completed === false) continue;
@@ -2212,7 +2218,7 @@ Deno.serve(async (req) => {
 
       const avgArr = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
 
-      return { rirByLift7d, rirByLift28d, bestWeightByLift, lastDateByLift, avgArr };
+      return { rirByLift7d, rirByLift28d, bestWeightByLift, lastDateByLift, intentByLift, avgArr };
     })();
 
     // ⛔ THE CARD, not the raw config key. `planConfig?.strength_protocol` is null on every
@@ -2407,7 +2413,11 @@ Deno.serve(async (req) => {
             // ⚠️ NULL IS ALREADY A HANDLED VALUE HERE: `computeLiftVerdict` reads a null target as
             // "no reserve data" and returns trend words only (`weekly.ts:193-197`), which carry no
             // weight suggestion, so the adjust tap closes by construction.
-            target_rir: protocolUsesRir(strengthProfile) ? getTargetRir(strengthProfile, key) : null,
+            // ⛔ PASS 7 (book-language fix): a lift whose newest logged row carries a p218 intent is judged against
+            // p218's band (`target_rir_band`); ME carries "no RIR target" (p218), so no target at all.
+            target_rir: !protocolUsesRir(strengthProfile) || perLiftRir.intentByLift.get(key)?.intent === 'ME'
+              ? null : getTargetRir(strengthProfile, key),
+            target_rir_band: protocolUsesRir(strengthProfile) ? (rirBandFor(perLiftRir.intentByLift.get(key)?.intent) ?? null) : null,
             sessions_in_window: Number(v.sample_count ?? 0),
             best_weight: perLiftRir.bestWeightByLift.get(key) ?? null,
             anchor_1rm: anchor1rm,

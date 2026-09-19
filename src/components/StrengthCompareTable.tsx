@@ -219,7 +219,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                     {r.avg_rir.toFixed(1)}
                   </span>
                   <span className="text-label-secondary">/</span>
-                  <span className="font-semibold text-label-secondary">{r.target_rir}</span>
+                  <span className="font-semibold text-label-secondary">{r.target_rir_text ?? r.target_rir}</span>
                   <span className="text-label-secondary text-caption ml-1">RIR</span>
                 </div>
               )}

@@ -46,11 +46,12 @@ Deno.test('⛔⛔ AND IT IS NOT DEAD — every row the engine does NOT own still
   const line = advanceNudgeFor({ ...ROW, targetReps: '8-12', prior: [{ reps: 12, rir: 2 }, { reps: 12, rir: 2 }] });
   assert(line, 'the nudge was narrowed out of existence');
   // 2026-09-09: the line states the fact and instructs nothing. "Add weight" was our trigger, not the page's.
-  assert(line!.includes('top of the band with room to spare') && !line!.includes('Add weight'));
+  // 2026-09-18: "with room to spare" is on no page and came off; the logged fact is the whole line.
+  assert(line!.endsWith('— top of the band.') && !line!.includes('Add weight') && !line!.includes('room to spare'));
   assertEquals(advanceNudgeFor({ ...ROW, targetReps: '8-12', prior: [{ reps: 12, rir: 2 }], slotIntent: 'HYP' })
-    ?.includes('room to spare'), true);
+    ?.endsWith('— top of the band.'), true);
   assertEquals(advanceNudgeFor({ ...ROW, targetReps: '3-5', prior: [{ reps: 5, rir: 3 }], slotIntent: 'SKILL' })
-    ?.includes('room to spare'), true);
+    ?.endsWith('— top of the band.'), true);
 });
 
 Deno.test('⛔ THE OWNERSHIP TEST, DIRECTLY', () => {
@@ -98,7 +99,7 @@ const BAND = { targetReps: '8-10', loadPrescribed: false as const, prior: TOPPED
 
 Deno.test('⛔ THE ROW ON THE SCREENSHOT — an ab wheel rollout is not told to add weight', () => {
   const line = advanceNudgeFor({ ...BAND, movement: 'Ab Wheel Rollout' });
-  assertEquals(line, 'Last time: 10 · 10 · 10 — top of the band with room to spare.');
+  assertEquals(line, 'Last time: 10 · 10 · 10 — top of the band.');
   // ⛔ THE FACT SURVIVES. Suppressing the whole line was the other option and it loses something
   // real: the athlete finished the top of the band three sessions running.
   assert(line!.includes('10 · 10 · 10'), 'the observation was thrown away with the instruction');
@@ -120,13 +121,13 @@ Deno.test('⛔ NO IMPERATIVE REACHES ANY BODYWEIGHT ROW — the class, not the o
 Deno.test('⛔ A LOADED ROW IS COMPLETELY UNCHANGED — the ask is the whole point there', () => {
   // Dumbbell bench press was on the same screen and it is FINE: that row has a weight box.
   assertEquals(advanceNudgeFor({ ...BAND, movement: 'Dumbbell Bench Press' }),
-    'Last time: 10 · 10 · 10 — top of the band with room to spare.');
+    'Last time: 10 · 10 · 10 — top of the band.');
   assertEquals(advanceNudgeFor({ ...BAND, prior: [{ reps: 10 }, { reps: 10 }, { reps: 10 }], movement: 'Dumbbell Bench Press' }),
     'Last time: 10 · 10 · 10 — top of the band.');
   // ⛔ AND THE TWO GOT SWAPPED ONCE BEFORE: cable woodchopper answered "bodyweight" to the old regex
   // because "woodcHOPper" contains the `hop` stem. It is loaded and it keeps the ask.
-  assertEquals(/room to spare/i.test(advanceNudgeFor({ ...BAND, movement: 'Cable Woodchopper' }) ?? ''), true,
-    'the woodchopper collision came back');
+  // 2026-09-18: loaded and bodyweight rows now print the same line, so only its presence is pinned.
+  assertEquals(advanceNudgeFor({ ...BAND, movement: 'Cable Woodchopper' }), 'Last time: 10 · 10 · 10 — top of the band.');
 });
 
 Deno.test('⚠️ AN ABSENT MOVEMENT BEHAVES EXACTLY AS BEFORE', () => {
@@ -134,7 +135,7 @@ Deno.test('⚠️ AN ABSENT MOVEMENT BEHAVES EXACTLY AS BEFORE', () => {
   // additive, so no existing surface changed by being left alone.
   for (const movement of [undefined, null, '']) {
     assertEquals(advanceNudgeFor({ ...BAND, movement }),
-      'Last time: 10 · 10 · 10 — top of the band with room to spare.');
+      'Last time: 10 · 10 · 10 — top of the band.');
   }
 });
 

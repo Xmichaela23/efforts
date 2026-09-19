@@ -44,7 +44,7 @@ Deno.test('⛔ THE PAGE IS THE NARROWEST TRUE ONE, NOT THE PROGRAMME\'S FOR EVER
   assertEquals(by('Near-threshold Run'), 'Viada pp233-234');
   assertEquals(by('Anaerobic Ride'), 'Viada p237');
   assertEquals(by('Long Run'), 'Viada p235');
-  assertEquals(by('Plyometrics'), 'Viada p227');
+  assertEquals(by('Plyo warm-up'), 'Viada p227');
   // ⛔ AND THE LIFTING DAYS DO take the programme's page, because that is genuinely where they come
   // from — one table, one page. The per-MOVEMENT pages live on the movements.
   assertEquals(by('Upper body: Push'), FRAMES.all_rounder.cite);

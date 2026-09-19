@@ -20,7 +20,9 @@ import { useAppContext } from '@/contexts/AppContext';
 // list still read here, off `@shared/standing-plan/plyo`.
 import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
 type AlternativeOption = { name: string; display?: string };
-import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
+import { reserveTextFor, reserveIntegersFor, reserveSeedFor, intentRowLine, supersetLabel } from '@shared/strength/strength-display-lines';
+import { intentLine as bookIntentLine, intentMeaning, restRuleFor, RIR_NOTE, SETS_START_LOW_LINE } from '@shared/strength-grid/intents';
+import { WARM_UP_LINE } from '@shared/standing-plan/warmup';
 import {
   getExerciseConfig,
 } from '@/lib/exercise-config';
@@ -32,9 +34,6 @@ import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
   topSetIndex,
-  barSpeedLineFor,
-  STANDING_ACCESSORY_SET_CUE,
-  STANDING_ME_SET_CUE,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 // ⛔ SLICE b — the calibration sentences, shared with State and Performance. One signal, three
@@ -83,7 +82,7 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { pretestStepWeights } from '@shared/standing-plan/working-number';
 // The plyo name test, for how a plyo row is drawn. Rest lengths are the server's (`rest_seconds` on the row).
 import { isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
-import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
+import { PLYO_FAMILIES, PLYO_FAMILY_IDS, P227_DRILL_LINE, P227_SESSION_LINE, type PlyoFamily } from '@shared/standing-plan/plyo';
 import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 
 // ⛔ THE PLYO ROW IS A DRILL, NOT A SET (WORKORDER-plyo-screen-2026-09-02, p227). No weight, no rep
@@ -91,8 +90,9 @@ import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 // optimized for the day and the athlete develops confidence in it". The effort count is RECORDED after,
 // never targeted. Swap offers the other drills in the SAME family (the three buckets are the session's
 // structure), gated on equipment: ladder drills need an agility ladder.
-const PLYO_SESSION_NOTE = 'Drills are done separately, with full rest between efforts. The objective is quality: fatigue, poor form and imprecise movement defeat it. Each drill is repeated until the movement is crisp and you are confident in it, then you move on.';
-const PLYO_STOP_RULE = 'Stop when the movement stops being crisp.';
+// ⛔ 2026-09-18: the two plyo lines that stood here ("Drills are done separately, with full rest…" and "Stop
+// when the movement stops being crisp.") and the "For {benefit}." lead came off — paraphrases of p227, whose
+// words the SOURCE doc does not quote. What stays is the line about the box itself.
 const PLYO_LADDER_DRILLS = new Set(['ladder drills']);
 function plyoFamilyFor(name: string): PlyoFamily | null {
   const n = String(name || '').trim().toLowerCase();
@@ -582,16 +582,24 @@ const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: 
  *
  * The four that stood here carried clauses no page prints — a rest rule on ME, *"Muscle."*,
  * *"Getting tired is the point."*, *"Practice under load."* — and a percentage band on every row, on
- * a sheet the athlete opens to find out what the word means. What ships instead is the intent, its
- * reps and its stop rule, each traceable:
- *   ME    p218, p219    DE   p218, p219    SKILL  p219, p76, p143    HYP  p86, p218
+ * a sheet the athlete opens to find out what the word means.
+ * ⛔ 2026-09-18: the 2026-09-09 texts were themselves paraphrase ("stop short of failure", "Bar slows, set
+ * is over", "8 to 12 reps, 1 to 2 in reserve"). The sheet now prints the one owner's line — p218's
+ * numbers, and for SKILL the p76 and p143 quotes.
  * ⚠️ THE SPELLED-OUT NAMES STAY — p219's own abbreviations, and Michael asked for the words.
  */
-const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; text: string }> = {
-  ME: { name: 'Maximum effort', text: '1 to 5 reps, stop short of failure.' },
-  DE: { name: 'Dynamic effort', text: 'As fast as possible on every rep. Bar slows, set is over.' },
-  SKILL: { name: 'Skill', text: 'Form and consistency over speed. Weight heavy enough to be a challenge. Every rep either improves the movement or degrades it. Performed poorly, stop.' },
-  HYP: { name: 'Hypertrophy', text: '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.' },
+// ⛔ 2026-09-18: the lines are the one owner's (`strength-grid/intents.ts`) — p218's row, then the page's rest
+// rule for the intent (p78, or p84 for HYP), then p218's own sentence on the set band. The rest rule had no
+// other place on screen once the countdown came off a book row. The names are p219's own expansions.
+// Pass 6 (2026-09-18): p218's row and p219's whole paragraph (`intentMeaning`, off the page photos), p219's RIR
+// definition, the rest rule, the set rule.
+const setTypeLines = (k: 'ME' | 'DE' | 'SKILL' | 'HYP'): string[] =>
+  [...intentMeaning(k), RIR_NOTE, restRuleFor(k), SETS_START_LOW_LINE].filter((l): l is string => !!l);
+const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; lines: string[] }> = {
+  ME: { name: 'Maximum effort', lines: setTypeLines('ME') },
+  DE: { name: 'Dynamic effort', lines: setTypeLines('DE') },
+  SKILL: { name: 'Skill', lines: setTypeLines('SKILL') },
+  HYP: { name: 'Hypertrophy', lines: setTypeLines('HYP') },
 };
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
@@ -1186,6 +1194,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ...(r?.planned_name ? { planned_name: String(r.planned_name) } : {}),
     ...(typeof r?.target_reps === 'string' ? { target_reps: r.target_reps } : {}),
     ...(typeof r?.target_rir === 'number' ? { target_rir: r.target_rir } : {}),
+    ...(typeof r?.slot_intent === 'string' && r.slot_intent ? { slot_intent: r.slot_intent } : {}),
     ...(r?.notes ? { notes: String(r.notes) } : {}),
     ...(Number(r?.anchor_round_to) > 0 ? { anchor_round_to: Number(r.anchor_round_to) } : {}),
     expanded: true,
@@ -1864,47 +1873,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return roleForExercise(String(exercise?.name || '')) === 'accessory';
   };
 
-  /**
-   * The bar-speed cue for one set. Built and specced on 2026-07-27 (D-326 era) and rendered NOWHERE
-   * until now — `barSpeedLineFor` was reachable only from its own test. Same starvation the engine
-   * banner warns about: the thing existed, was correct, was pinned, and never once reached a screen.
-   *
-   * ⛔ `isValiditySet` IS DELIBERATELY NEVER PASSED. Its line — "Five at ninety-five. This one
-   * decides the number." — is TRUE only once `verdictFrom95Set` is wired, and it is not. Until then
-   * the plan advances on the calendar, so telling an athlete this set decides their working number
-   * would be a promise the engine does not keep. Same gate as `STRENGTH_ADVANCE_COPY`. When that
-   * lands, pass the flag here and the copy is already written.
-   *
-   * ⚠️ Deload comes from the SESSION NAME, which is the tell the deload pill above already uses —
-   * one signal, not a second derivation that could disagree with the pill on the same screen.
-   */
-  const barSpeedCueFor = (exercise: LoggedExercise, set: LoggedSet): string | null => {
-    // ⛔ THE FOUR MAIN LIFTS ONLY (2026-08-01). The first cut gated on "not assistance", which let
-    // the cue onto everything the block prescribes that is not an accessory — Michael's Box Jump
-    // read "Every rep at the same speed as the first", which is advice for a barbell set under a
-    // percentage of a training max, not for a jump. `isMainBarbellLift` is an explicit curated list and
-    // MISSES TO FALSE, so an unmapped lift gets no cue rather than the wrong one. Accessories get
-    // the section note above the block; plyos get nothing.
-    if (!isMainBarbellLift(exercise?.name || '')) return null;
-    if (equipmentForExercise(exercise?.name || '') === 'plyo') return null;
-    if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
-    return barSpeedLineFor({
-      isWarmup: set?.setType === 'warmup',
-      isAmrap: set?.amrap === true,
-      /**
-       * ⛔ THE STANDING PLAN'S PRETEST IS NOT THE PREVIOUS PROGRAM'S AMRAP, AND THEY SHARE A FLAG (2026-08-24).
-       * Both stamp `amrap: true`, so this screen showed *"Grind it out"* on a set whose entire job
-       * is a clean measurement. ⚠️ KEYED ON THE SESSION'S OWN TAG rather than on a new field: the
-       * composer already tags that session `test_week`, and adding a set-level flag would put a
-       * second answer to "which kind of set is this" into stored JSON.
-       */
-      isPretest: Array.isArray(scheduledWorkout?.tags)
-        && scheduledWorkout.tags.some((t: unknown) => String(t) === 'test_week'),
-      // server-word: get-week's `is_deload` (2026-09-17, WORKORDER Stage C), not a parse of the display name.
-      isDeload: (scheduledWorkout as any)?.is_deload === true,
-      // isValiditySet: intentionally omitted — see the note above.
-    });
-  };
+  // ⛔ 2026-09-18 (book-language fix): `barSpeedCueFor` is deleted. It printed the previous program's
+  // bar-speed lines ("Every rep explosive and controlled.", "Grind it out. Stop before failure.", "Light on
+  // purpose. Move it fast.", …) above sets on a main barbell lift. None is on a page of the book.
 
   const parseTimerInput = (raw: string): number | null => {
     if (!raw) return null;
@@ -2076,16 +2047,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   //
   // Returns null for any row with no `set_plan`, which is every row that is not a the previous program main lift.
   // Those keep the copy-the-one-weight behaviour exactly as before.
-  // ⛔ THE ALL-OUT SET HAD NO LABEL ON IT. `amrap: true` changed BEHAVIOUR — the reps box opens
-  // blank, Done skips the RIR strip — but nothing on screen said why, so the set looked like every
-  // other set with an empty box. The only visible signal was a "+" inside the plan's own text
-  // ("70×5+"), which is easy to miss and never explained. Michael, 2026-07-30: "they arent showing
-  // up in the logger or in the planned work out are you sure?" — he was right.
-  //
-  // ⚠️ THIS SET IS THE MEASUREMENT. Its rep count is what moves the training max (D-338), so of
-  // every set in the block it is the one that most needs to say what it is. Wording matches the
-  // baseline-test path's hint so the athlete meets one description of an all-out set, not two.
-  const AMRAP_SET_HINT = 'All-out set: as many CLEAN reps as you can at this weight. This count is what moves your training max. Stop on form break — never grind solo.';
+  // ⛔ 2026-09-18: the all-out set's label ("All-out set… This count is what moves your training max…") came
+  // off — the previous program's words, on no page. A test day's last set gets p215's own line from the
+  // server (`strength/test-session.ts`); any other `amrap` set carries the flag and no sentence.
 
   const plannedSetsFor = (source: any): Array<{ weight?: number; weight_in_unit?: number; reps?: number; amrap: boolean }> | null => {
     const sp = Array.isArray(source?.set_plan) ? source.set_plan : null;
@@ -2833,7 +2797,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               rir: undefined,
               completed: false,
               prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
-              ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
+              ...(plannedSet?.amrap ? { amrap: true } : null),
             };
 
             // Parse reps - handle strings like "20/side", "8-10", "5 min", "Max reps"
@@ -2938,7 +2902,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       barType: 'standard',
                       rir: undefined,
                       completed: false,
-                      ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
+                      ...(plannedSet?.amrap ? { amrap: true } : null),
                     };
                     // Parse reps - handle strings like "20/side", "8-10", "5 min"
                     const rawReps = exercise.reps;
@@ -3035,7 +2999,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   rir: undefined,
                   completed: false,
                   prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
-                  ...(plannedSet?.amrap ? { amrap: true, setHint: AMRAP_SET_HINT } : null),
+                  ...(plannedSet?.amrap ? { amrap: true } : null),
                 };
                 // Parse reps - handle strings like "20/side", "8-10", "5 min"
                 const rawReps = exercise.reps;
@@ -3893,7 +3857,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
      * reserve, not logging the work. The adjust strip below still opens, so an athlete who DOES want
      * to record one has the same tap they always had.
      */
-    const suggestedRir = rirLoggedSeed(exercise.target_rir);
+    // 2026-09-18: a p218 row saves no reserve on Done — the page gives a band, not a number in it.
+    const suggestedRir = reserveSeedFor(exercise);
     if (suggestedRir == null) {
       updateSet(exerciseId, setIndex, { completed: true });
       autoStartRestForSet(exerciseId, setIndex);
@@ -4613,10 +4578,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 This parsed the session name; a rename killed the pill with no error.
                 server-word: the server decides, this prints. */}
             {(scheduledWorkout as any)?.is_deload === true && (
-              <span
-                className="shrink-0 mt-1 text-caption font-semibold uppercase tracking-wide text-strength"
-                title="This is a deload week — lighter loads are intentional recovery, not a regression."
-              >
+              // ⛔ 2026-09-18: the tooltip ("lighter loads are intentional recovery…") came off — the page's deload is
+              // the TAPER/DELOAD column of the week (p246 / p274 / p278), a substitution, not "lighter loads".
+              <span className="shrink-0 mt-1 text-caption font-semibold uppercase tracking-wide text-strength">
                 Deload
               </span>
             )}
@@ -4867,12 +4831,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const cardGlow = isMainLiftCard || isMobilityMode ? [0.40, 0.05] : [0.22, 0.035];
           return (
           <React.Fragment key={exercise.id}>
+          {/* ⛔ THE WARM-UP'S ONE QUOTED SENTENCE (pp139-140, SOURCE Part C2), ONCE, above the session's first
+              ME / DE / SKILL row on a standing-plan lifting day (2026-09-18). The ramp of warm-up sets that used
+              to sit here was ours and came off; this is the page's own instruction, from `warmup.ts`. */}
+          {!isBaselineTestWorkout(scheduledWorkout || {})
+            && Array.isArray(scheduledWorkout?.tags)
+            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+            && ['ME', 'DE', 'SKILL'].includes(String((exercise as any)?.slot_intent || '').toUpperCase())
+            && exercises.findIndex((e) => ['ME', 'DE', 'SKILL'].includes(String((e as any)?.slot_intent || '').toUpperCase())) === exerciseIndex && (
+            <p className="mx-3 mb-1.5 mt-2 text-caption font-medium text-label-secondary leading-snug">
+              {WARM_UP_LINE}
+            </p>
+          )}
           {/* 2026-09-03 (Michael: supersets are the book's layout, p274). The first row of a pair opens the
-              block: one line saying how a superset is done — one set of each, then rest, then again — the
-              way Strong and Hevy bracket a pair. Swap still works on either half. */}
+              block with the pair's label. ⛔ 2026-09-18: "· one set of each, rest, then again" came off — no
+              page prints how a superset is done. The label is the plan's own (`supersetLabel`). */}
           {exercise.superset_group && exercises[exerciseIndex + 1]?.superset_group === exercise.superset_group && exercises[exerciseIndex - 1]?.superset_group !== exercise.superset_group && (
             <div className="mx-1 mt-3 mb-1 px-1.5 text-caption uppercase tracking-wider text-label-secondary">
-              Superset · {String((exercise.execution_name || exercise.name || '')).trim()} with {String((exercises[exerciseIndex + 1]?.execution_name || exercises[exerciseIndex + 1]?.name || '')).trim()} · one set of each, rest, then again
+              {supersetLabel(String((exercise.execution_name || exercise.name || '')).trim(), String((exercises[exerciseIndex + 1]?.execution_name || exercises[exerciseIndex + 1]?.name || '')).trim())}
             </div>
           )}
           {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE FOR THE WHOLE BLOCK, above the first
@@ -4915,9 +4891,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                a rep TOTAL with no weight — are rows the standing plan no longer builds. Off a
                standing-plan session this block now renders nothing rather than an unsourced line. */
             Array.isArray(scheduledWorkout?.tags)
-            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan') && (
+            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+            // ⛔ 2026-09-18: the HYP line from its one owner (p218: 6 to 12, 0 to 2), and only over a HYP row.
+            && String((exercise as any)?.slot_intent || '').toUpperCase() === 'HYP' && (
             <p className="mx-3 mb-1.5 mt-2 text-caption font-medium text-label-secondary leading-snug">
-              {STANDING_ACCESSORY_SET_CUE}
+              {bookIntentLine('HYP')}
             </p>
             )
           )}
@@ -5514,7 +5492,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     // ⚠️ NO `loadPrescribed` ARGUMENT SINCE 2026-09-09 — the direction clause it
                     // selected ("Assistance if you need it…") was ours and is deleted; the Assist/+
                     // column labels itself.
-                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'))
+                    ? bookIntentLine('ME') // p218 — one owner, `strength-grid/intents.ts`
                     : slotIntent === 'DE'
                       ? 'suppressed'
                       : null;
@@ -5529,22 +5507,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                    * Viada block the first time.
                    */
                   const cardCueRaw = standingCue === 'suppressed' ? null : standingCue;
-                  // 2026-09-03 (Michael: "make sure the entire app understands the language of the book"): the
-                  // book's word for the set leads the line — ME / DE / SKILL / HYP with its reps and reserve
-                  // (p218's table). Same word on the plan card (strengthFormatter). DE says "move the bar fast"
-                  // because that is the whole point of the set (p218).
+                  // The book's word for the set leads the line — ME / DE / SKILL / HYP with its reps and reserve
+                  // (p218). ⛔ ONE OWNER since 2026-09-18: the plan's own row line (`intentRowLine`, server
+                  // shared code). "· move the bar fast" / "· move fast" came off — no page's words.
                   const bookWord = (slotIntent === 'ME' || slotIntent === 'DE' || slotIntent === 'SKILL' || slotIntent === 'HYP') ? slotIntent : null;
-                  const intentLine = (() => {
-                    if (!bookWord || bookWord === 'ME' || !exercise?.target_reps) return null;
-                    const reps = String(exercise.target_reps).replace(/\+$/, '');
-                    const rir = exercise?.target_rir != null ? ` · ${formatRirTarget(exercise.target_rir)} in reserve` : '';
-                    // 2026-09-08 (Michael, on a dumbbell reverse lunge: "move the bar fast?"): the words
-                    // follow the load. A barbell row (displayFormat 'total') keeps the bar; a dumbbell,
-                    // kettlebell, band or bodyweight row says "move fast". Same rule as the plan card.
-                    const barLoaded = getExerciseConfig(exercise.name)?.displayFormat === 'total';
-                    const speed = bookWord === 'DE' ? (barLoaded ? ' · move the bar fast' : ' · move fast') : '';
-                    return `${bookWord} · ${reps} reps${rir}${speed}`;
-                  })();
+                  const intentLine = bookWord ? intentRowLine({ ...exercise, slot_intent: bookWord }) : null;
                   const cardCue = cardCueRaw && bookWord === 'ME' ? `ME · ${cardCueRaw}` : cardCueRaw;
                   /**
                    * ⛔ THE ADVANCE NUDGE — extracted to `@/lib/advance-nudge` on 2026-08-26, in the
@@ -5678,16 +5645,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         </div>
                       )}
                       {exIsPlyo && (() => {
-                        const fam = plyoFamilyFor(exercise.name);
+                        // Pass 6 (2026-09-18): p227's own words (p227.jpg, `plyo.ts`) — the session line once,
+                        // above the first drill; the drill line on every drill card.
                         const firstPlyoIdx = exercises.findIndex((e) => isPlyometric(e.name) || equipmentForExercise(e.name) === 'plyo');
                         return (
                           <div className="px-1.5 pb-1.5">
                             {firstPlyoIdx === exerciseIndex && (
-                              <p className="text-caption text-label-secondary leading-snug mb-1.5">{PLYO_SESSION_NOTE}</p>
+                              <p className="text-caption text-label-secondary leading-snug mb-1.5">{P227_SESSION_LINE}</p>
                             )}
-                            <p className="text-caption text-label-secondary leading-snug">
-                              {fam ? `For ${fam.benefit}. ` : ''}{PLYO_STOP_RULE} Efforts are a record, not a target.
-                            </p>
+                            <p className="text-caption text-label-secondary leading-snug">{P227_DRILL_LINE} Efforts are a record, not a target.</p>
                           </div>
                         );
                       })()}
@@ -5979,7 +5945,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             >
                               {hasValue
                                 ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
-                                : <span className={targetRir != null ? 'text-strength font-medium' : 'text-label-secondary'}>{formatRirTarget(targetRir)}</span>}
+                                : <span className={reserveTextFor(exercise) ? 'text-strength font-medium' : 'text-label-secondary'}>{reserveTextFor(exercise) ?? '—'}</span>}
                             </button>
                           );
                         };
@@ -6013,10 +5979,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                          * suppression is deliberate (a per-set line read as "50 on this set"), and
                          * the reserve is not worth reinstating it for. Noted, not built.
                          */
-                        const rirHint = (!set.amrap && exercise.rir_tracked !== false
-                          && typeof exercise.target_rir === 'number')
-                          ? `${formatRirTarget(exercise.target_rir)} in reserve`
-                          : null;
+                        // 2026-09-18: the band p218 gives (HYP 0 to 2), from the one formatter the plan uses.
+                        const rirText = (!set.amrap && exercise.rir_tracked !== false) ? reserveTextFor(exercise) : null;
+                        const rirHint = rirText ? `${rirText} in reserve` : null;
                         // An AMRAP with no target prints nothing (2026-09-10, audit H-S17): the "5" had no source.
                         const repHint = set.amrap
                           ? (exercise.target_reps ? `AMRAP · ${String(exercise.target_reps).replace(/\+$/, '')} minimum` : null)
@@ -6026,7 +5991,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — its words are the target line.
                         const targetHint = exIsPlyo ? null : (exercise.prescription_words
                           ?? ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null));
-                        const cue = barSpeedCueFor(exercise, set);
+                        const cue: string | null = null; // the bar-speed lines are gone (2026-09-18)
                         const platesOpen = !isDurationBased && !exIsBodyweight && exBarLoaded
                           && expandedPlates[`${exercise.id}-${setIndex}`];
 
@@ -6049,7 +6014,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     under WCAG 2.2's 4.5:1 (2026-09-18). The step is now weight:
                                     warm-up medium, working set semibold, both full colour. */}
                                 <span className={`text-caption uppercase tracking-wide text-strength ${isWarmup ? 'font-medium' : 'font-semibold'}`}>
-                                  {isWarmup ? 'Warmup' : 'Working set — add when ready'}
+                                  {/* 2026-09-18: "— add when ready" came off (on no page). */}
+                                  {isWarmup ? 'Warmup' : 'Working set'}
                                 </span>
                                 {set.setHint && <span className="text-caption text-label-secondary italic">{set.setHint}</span>}
                               </div>
@@ -6337,7 +6303,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   <div className="flex items-center justify-between">
                                     {[0, 1, 2, 3, 4, 5].map((r) => {
                                       const isCap = r === 5;  // 5 = "5+"
-                                      const isSuggested = targetRir != null && (rirSuggestedIntegers(targetRir).includes(r) || (targetRir >= 5 && isCap));
+                                      // 2026-09-18: every whole number in the row's band is lit (HYP 0, 1, 2 — p218).
+                                      const isSuggested = reserveIntegersFor(exercise).includes(r) || (targetRir != null && targetRir >= 5 && isCap);
                                       return (
                                         <button
                                           key={r}
@@ -6858,7 +6825,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <SheetHeader>
             <SheetTitle className="text-center">{setTypeFor ? `${setTypeFor} · ${SET_TYPE_INFO[setTypeFor].name}` : ''}</SheetTitle>
           </SheetHeader>
-          <div className="py-4 text-body leading-relaxed text-label">{setTypeFor ? SET_TYPE_INFO[setTypeFor].text : ''}</div>
+          <div className="py-4 text-body leading-relaxed text-label space-y-3">{setTypeFor ? SET_TYPE_INFO[setTypeFor].lines.map((l) => <p key={l}>{l}</p>) : null}</div>
           <button onClick={() => setSetTypeFor(null)} className="w-full py-3 text-label-secondary hover:text-white">Close</button>
         </SheetContent>
       </Sheet>
