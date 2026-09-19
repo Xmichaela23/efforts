@@ -20,7 +20,7 @@ const run = (band: string) => ({ type: 'run', training_plan_id: PLAN, tags: ['st
 const swim = () => ({ type: 'swim', training_plan_id: PLAN, tags: ['sport:swim'] });
 
 // ⛔ p143's own words (2026-09-18, book-language pass 2).
-const LEAD = 'Leave at least 6 to 8 hours and one full meal before the resistance training session.';
+const LEAD = 'Leave 6 to 8 hours, with a meal, before the lift.';
 const SHORT = 'If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it.';
 const EASY = 'Doing low-intensity conditioning after these muscles have been worked may give greater benefits at a given volume.';
 const SKILL = 'The skill movements go in the first session because you may be fresher then, but this is not a strict rule.';
@@ -62,11 +62,11 @@ Deno.test('a day with no frame tag (test week, plyometrics) counts as working th
   assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL' }]), ride('vt1_or_easier')]), { lead: `${EASY} ${SKILL}` });
 });
 
-Deno.test('the plyo warm-up day: listed first, so no hours; an easy session keeps its sentence', () => {
+Deno.test('the plyo warm-up day: listed first, and no line with a hard or an easy session', () => {
   const plyo = lift([], ['standing_plan', 'plyo']);
   assertEquals(spacingLineFor([plyo, run('near')]), null);
   assertEquals(liftGoesFirst([plyo, run('near')]) != null, true);
-  assertEquals(spacingLineFor([plyo, ride('vt1_or_easier')]), { lead: EASY });
+  assertEquals(spacingLineFor([plyo, run('vt1_or_easier')]), null);
 });
 
 Deno.test('a swim day: the lead only', () => {

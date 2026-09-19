@@ -37,8 +37,8 @@
  * (and the short-session sentence where it applies), and the chevron is not drawn.
  * ⛔ SINCE 2026-09-19 (Michael approved) THE HOURS ARE ONLY FOR A DAY THE RIDE OR RUN GOES FIRST: rule 6's 6-to-8 hours is
  * about a morning session with the lift later. Where `easy` or `order` holds the lift goes first, and the day's line is
- * that sentence alone; no day carries a closer now. The plyo warm-up is listed first too (day-order rule 0), so its day
- * gets no hours either, and no line unless the ride or run is easy.
+ * that sentence alone; no day carries a closer now. The plyo warm-up day gets no line at all: the plyo is the run's
+ * warm-up, done right before it.
  */
 
 export type SpacingRow = {
@@ -94,7 +94,7 @@ const isUpperDay = (lift: SpacingRow): boolean => tagValue(lift, 'frame') != nul
 export const isPlyoWarmUp = (row: SpacingRow | null | undefined): boolean => tagsOf(row).includes('plyo');
 
 // Viada p143 rule 6, reworded (Michael approved the words 2026-09-19): "Allow at least 6 to 8 hours with one full meal before the resistance training session."
-const LEAD = 'Leave at least 6 to 8 hours and one full meal before the resistance training session.';
+const LEAD = 'Leave 6 to 8 hours, with a meal, before the lift.';
 // Viada p143 rule 6, reworded (Michael approved the words 2026-09-19): "If the morning session is a VT1 session lasting less than an hour, 4 to 6
 // hours may be sufficient, as long as you consume calories and monitor hydration after this session."
 const SHORT_VT1 = 'If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it.';
@@ -133,18 +133,20 @@ function readDay<T extends SpacingRow>(rows: readonly T[]) {
   const easy = runOrRide && vt1 && !upper;
   const skill = runOrRide && !upper && (intents.has('SKILL') || intents.has('DE'));
   // ⛔ ONE ANSWER TO "WHICH COMES FIRST" (2026-09-19): the day's order (`liftGoesFirst`) and the sentence both read it.
-  const liftFirst = isPlyoWarmUp(lift) || easy || skill;
-  return { lift, endurance, sport, vt1, mins: minutesOf(endurance), easy, skill, liftFirst };
+  const warmUp = isPlyoWarmUp(lift);
+  const liftFirst = warmUp || easy || skill;
+  return { lift, endurance, sport, vt1, mins: minutesOf(endurance), easy, skill, liftFirst, warmUp };
 }
 
 export function spacingLineFor(rows: readonly SpacingRow[]): SpacingLine | null {
   const day = readDay(rows);
   if (!day) return null;
-  const { sport, vt1, mins, easy, skill, liftFirst } = day;
+  const { sport, vt1, mins, easy, skill, liftFirst, warmUp } = day;
+  // ⛔ THE PLYO WARM-UP DAY GETS NO LINE (Michael approved 2026-09-19): the plyo is the run's warm-up, done right before it.
+  if (warmUp) return null;
   if (sport !== 'run' && sport !== 'ride') return { lead: LEAD };
   // ⛔ THE HOURS ARE FOR A MORNING RIDE OR RUN WITH THE LIFT LATER (p143 rule 6, Michael approved 2026-09-19). When the
   // lift goes first the day gets only the sentence that puts it first, and no chevron.
-  // A plyo warm-up goes first with no page sentence of its own (neither rule 5 nor rule 6 holds): the day gets no line.
   if (liftFirst) {
     const lead = [easy ? EASY_LAST : null, skill ? SKILL_FIRST : null].filter(Boolean).join(' ');
     return lead ? { lead } : null;

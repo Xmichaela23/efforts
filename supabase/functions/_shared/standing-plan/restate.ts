@@ -26,6 +26,7 @@ import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
 import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 // ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
 import { originOf } from '../session-swap/swap.ts';
+import { PLYO_FAMILIES } from './plyo.ts';
 
 /** ⚠️ DB shape, deliberately loose — a materialized calendar row as this reader sees it. */
 export type PlannedRowish = {
@@ -178,6 +179,8 @@ function isDone(row: PlannedRowish): boolean {
   return status === 'completed' || status === 'skipped';
 }
 
+const PLYO_DRILL_NAMES = new Set(Object.values(PLYO_FAMILIES).flatMap((f) => f.drills.map((d) => d.toLowerCase())));
+
 export function restateFromTest(args: {
   composed: ComposedWeek[];
   planned: PlannedRowish[] | null | undefined;
@@ -321,6 +324,9 @@ export function restateFromTest(args: {
       if ((fr.execution_name ?? null) !== (er.execution_name ?? null)) shape.execution_name = fr.execution_name;
       if ((fr.how_to ?? null) !== (er.how_to ?? null)) shape.how_to = fr.how_to;
       if (JSON.stringify(fr.swap_options ?? null) !== JSON.stringify(er.swap_options ?? null)) shape.swap_options = fr.swap_options;
+      // ⛔ A PLYO DRILL'S NOTE IS SHAPE TOO (2026-09-19): the composer's `plyoDrillNote` is its only writer, so a row built
+      // before the approved words ("…Full rest between. Tired or sloppy, stop.") gets them on the next rebuild.
+      if (PLYO_DRILL_NAMES.has(nameOf(fresh)) && typeof fr.notes === 'string' && fr.notes !== er.notes) shape.notes = fr.notes;
       if (shapeOnly) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;

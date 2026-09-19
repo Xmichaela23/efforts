@@ -63,8 +63,9 @@ import { localDateInTz } from './local-date.ts';
 // 20 (2026-09-19): an endurance swap is a `plan_adjustments` row, the list the lift swap already uses
 //   (`_shared/session-swap/plan-adjustments.ts`), and the rewrite composes it in — a chosen workout, a sport and a machine
 //   survive every rewrite; "Just today" is a one-date row; swaps made before are read from their tags on the first rewrite.
+// 21 (2026-09-19): the rewrite carries each plyo drill's approved note ("Benefit: … ") onto rows built before it.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 20;
+export const PLAN_WRITER_VERSION = 21;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
