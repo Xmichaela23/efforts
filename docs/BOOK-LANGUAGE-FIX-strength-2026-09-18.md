@@ -11,11 +11,14 @@ Committed, **not pushed, not deployed, not verified on a device.**
 | 3 | `de27b04bd` | lines on no page removed |
 | 4 | `c4d3a048a` | section 3 strength items |
 | 5 | `1f24f2d6d` | reverse check: what the book gives that no screen showed |
+| 6 | `58d671de6` | the page photos are the book: the pages' own words restored; State judges the reserve band |
 
-**The word rule as applied.** Book words = text inside quotation marks in `docs/SOURCE-viada-hybrid-athlete.md`,
-or the photos `book-sources/p210–p215`. SOURCE tables and summaries gave numbers only. One exception, stated
-where it is made: the carry row (below) prints p226's cell, read off the page photo in the local page folder,
-because the plan names that exact fix and a carry row with no words would render as a barbell SKILL row.
+**The word rule as applied.** Passes 1–5: book words = text inside quotation marks in
+`docs/SOURCE-viada-hybrid-athlete.md`, or the photos `book-sources/p210–p215`. **Pass 6 (Michael's ruling, via
+the coordinator): the page photos in `/Users/michaelambp/Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`
+are the book.** Every line removed in passes 1–5 only for want of a SOURCE quote was checked against its page;
+where the page prints words they are back, cut, never reworded, cited in the code. Sections (a) and (b) show
+passes 1–5; the pass 6 section below shows what changed after them.
 
 **Where each prescription now lives (one owner each).**
 - ME / DE / SKILL / HYP line, reserve band, rest rule, set rule → `supabase/functions/_shared/strength-grid/intents.ts` (`intentLine`, `rirBandText`, `restRuleFor`, `SETS_START_LOW_LINE`).
@@ -188,6 +191,44 @@ Screens: L = logger (`src/components/StrengthLogger.tsx`), T = Today card (`src/
 
 ---
 
+## Pass 6 — restored from the page photos (`58d671de6`)
+
+Photos read this pass: `p078`, `p084`, `p125`, `p139`, `p140`, `p218`, `p219`, `p226`, `p227`, `p274`, `p275`.
+
+### Restored or replaced lines, before (after pass 5) → after
+
+| screen | before | after | photo |
+|---|---|---|---|
+| Today card, set-type sheet, logger ME card — ME | `1 to 5 reps, 90 to 100%, 1 to 3 sets.` | `1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.` | p218 row; p219 ME paragraph |
+| same — DE | `2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.` | `2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.` | p218; p219 |
+| same — SKILL | `3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep either improves movement quality or degrades it! Perfect practice makes perfect… if you're performing the movement poorly, STOP.` | `3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.` (the p76 and p143 quotes move to the set-type sheet) | p218; p219 |
+| same, plus the accessory header and the plan builder's build-focus line — HYP | `6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.` | `6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.` | p218; p219 |
+| Logger set-type sheet | the card line, rest rule, set rule | p218's row, then p219's whole paragraph for the intent (DE also gets p218's own dynamic-effort paragraph; SKILL keeps p76 and p143), then p219's RIR definition, the rest rule, the set rule | p218, p219 |
+| Logger set-type sheet — RIR | (nothing) | `RIR refers to "reps in reserve (before failure)." It's important to note, therefore, that 0 RIR is not failure but refers to a set where you'd still complete the final repetition (even though it would be very slow).` | p219 |
+| Logger row line | `DE · 2-4 reps · 3 to 4 in reserve` / `SKILL · 3-5 reps · 3 to 4 in reserve` / `HYP · 6-12 reps · 0 to 2 in reserve` | the same, then ` · maximum velocity` / ` · controlled eccentric, fast concentric` / ` · controlled eccentric, controlled concentric` | p218 |
+| Logger, above the first ME/DE/SKILL row | `The first set of your skill work should also be the last set of your warm-up.` | `A good warm-up is meant to prepare your body to do work, not be a stimulus. With skill development work, every warm-up set should have equal focus and quality to the work sets. The first set of your skill work should also be the last set of your warm-up.` | p139 Rule 1; p140 Rule 2a and pull-quote |
+| Logger plyo cards | `Efforts are a record, not a target.` | above the first drill: `What is important here is that these drills are all done separately. Each drill should be performed multiple times with ample rest, with a full focus on technique and balance, as well as consistent quality.`; on every drill: `Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.` then `Efforts are a record, not a target.` | p227 (the page ends "…no-no's here!"; cut at "no-no's" because the plan description's voice gate bars "!") |
+| Planned sheet and Today — plyo drill rows | no note | the p227 drill line above | p227 |
+| Plan description — plyo | (nothing) | the p227 drill line above | p227 |
+| Plan description — pain tolerance | (nothing) | `A higher pain tolerance may be an excellent adaptation for endurance athletes because the ability to manage increasingly uncomfortable sensations during various endurance-dependent events may be directly related to their overall performance in their sport. For strength athletes, however, it may be less clear; a higher tolerance may be of negligible benefit or even counterproductive to longer-term health.` | p125 |
+| Planned sheet — carry | (unchanged) `medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest` | no longer an exception: p226 is the book | p226 |
+
+### Checked, and nothing returns — the page gives no words or numbers for it
+
+- **Warm-up sets.** p139–140 describe the warm-up (RAMP; "working up in weight"; "gradually heavier squats until the work set") and give no loads, percentages or rep counts. The ramp stays off.
+- **Rest timers.** p78 and p84 give a rule and no minutes. The only rest number on p140 is "a 6- to 8-minute rest" inside a post-activation example (heavy single, then 80 percent sets of 5, then vertical jumps), a protocol the app does not build. Countdowns stay off.
+- **How a superset is done.** p274 prints the word "superset" in its slot names only; p140 says skills "can be layered in supersets to the benefit of both" and gives no instruction for doing one. Nothing added.
+- **Deload / taper.** p274 prints the TAPER/DELOAD column heading and the column's rows; no sentence. The logger tooltip and the Adjust strength clause stay off.
+- **"Bar slows, set is over", "move the bar fast".** Not on p218 or p219. p219 DE says "Velocity and consistent bar path are the major objectives", which is now printed.
+
+### The reserve the engine judges against
+
+- `_shared/longitudinal-signals.ts` (`detectStrengthRirGap`, the State line "Recent sets are landing below the planned reps in reserve"): a planned row with a p218 intent is judged against p218's band, read from the row's `slot_intent` through `strength-grid/intents.ts` `rirBandFor`. Below means under the band's bottom and above means over its top. HYP 0–2: a logged 0 is in the band. DE/SKILL 3–4: a logged 2.5 is below. A row with no intent keeps its own number and the old tolerances (ours). Pinned by `_shared/longitudinal-rir-band.test.ts`.
+- **Why the band is not a new stamped field.** `materialize-plan` copies planned rows through a whitelist that keeps `slot_intent` and drops unknown fields. The judge reads `planned_workouts.strength_exercises`, so the intent is the field that reaches it. A stamped band field would need a whitelist line in `materialize-plan/index.ts`, which is the run/ride/export agent's file.
+- **Still reading the single stamped number** (`compose.ts` `targetRirForIntent`: HYP 1, DE/SKILL 3.5, ours): `_shared/athlete-snapshot/body-response.ts:166-205` (session observations such as "RIR vs target 1"), `daily-ledger.ts:114, 232`, `response-model/weekly.ts:335`, and `analyze-strength-workout/index.ts:540`. Each compares against one number. Moving them to the band is the same change, one reader at a time. Not done in this pass.
+
+---
+
 ## (c) Server functions that import changed shared code (deploy later; nothing deployed)
 
 Changed shared files: `_shared/strength-grid/intents.ts`, `_shared/strength/strength-display-lines.ts`,
@@ -200,7 +241,8 @@ Changed shared files: `_shared/strength-grid/intents.ts`, `_shared/strength/stre
 `get-arc-context`, `get-week`, `import-strava-history`, `ingest-phone-workout`, `learn-fitness-profile`,
 `materialize-plan`, `planning-context`, `post-import-athlete-pipeline`, `refresh-goal-race-projections`,
 `rematerialize-standing-block`, `strava-webhook`, `strength-test-session`, `swap-list`, `swap-session`,
-`workout-detail` (29). The phone changes need a client build.
+`workout-detail` (29). Pass 6 adds `_shared/longitudinal-signals.ts` and `_shared/standing-plan/plyo.ts`; every
+function that imports them is already in this list. The phone changes need a client build.
 
 ⚠️ Rows already written to the database keep their old `rest_seconds`, warm-up sets, notes and carry words
 until the plan is rebuilt (Adjust > Rebuild upcoming sessions, or the server refresh).
@@ -209,7 +251,8 @@ until the plan is rebuilt (Adjust > Rebuild upcoming sessions, or the server ref
 
 ## (d) Not done, and why
 
-1. **Lines removed because the SOURCE doc does not quote the page.** The page photos for these pages are in
+1. **Superseded by pass 6** (the page photos are the book; see the pass 6 section). Kept as the pass 1–5 record:
+   **Lines removed because the SOURCE doc does not quote the page.** The page photos for these pages are in
    `/Users/michaelambp/Efforts_Local_Folder/book-sources/viada-hybrid-athlete/` (outside the rule's p210–p215):
    - p218 tempo clauses (DE "maximum velocity", SKILL "controlled eccentric, fast concentric", HYP tempo) and
      p219's meaning of each intent, including ME's "stopped short of failure". Not read this session.
@@ -219,12 +262,12 @@ until the plan is rebuilt (Adjust > Rebuild upcoming sessions, or the server ref
      from it. Fatigue, poor form, and imprecise movements are all absolute no-no's here!"* Adding that to the
      SOURCE doc in quotation marks would let the plyo row carry it.
    - p139-140 RAMP and "unloaded, rapid concentric" warm-up. p125 (pain tolerance). Not read this session.
-2. **The carry row is the one exception** to the rule: its words come from `p226.jpg`, not from a SOURCE quote.
+2. **Superseded by pass 6.** Pass 1–5 record: **the carry row was the one exception** to the rule: its words come from `p226.jpg`, not from a SOURCE quote.
    Reverting it means the row has no words, and it then renders as a barbell SKILL row (kind word and p218's
    SKILL line) — which needs a new field through `materialize-plan`'s whitelist.
 3. **`By feel`** on unpriced rows is on no page. The phone prints what `materialize-plan` stamps
    (`materialize-plan/index.ts:2879, 3313`); change needed there (run/ride/export agent's file).
-4. **State's "below the planned reps in reserve" signal** still grades HYP against the stamped midpoint 1
+4. **Superseded by pass 6** for the State signal (now judged against the band). Pass 1–5 record: **State's "below the planned reps in reserve" signal** graded HYP against the stamped midpoint 1
    (`_shared/longitudinal-signals.ts:564`, ours tolerances 0.9 / 1.4). The composer still stamps
    `target_rir` 1 on HYP and 3.5 on DE/SKILL (`compose.ts` `targetRirForIntent`, ours) for the engine; no
    screen prints it any more.
@@ -245,8 +288,8 @@ until the plan is rebuilt (Adjust > Rebuild upcoming sessions, or the server ref
    reach a screen).
 10. **Changes needed in run/ride/export files:** item 3 only. One test in `supabase/functions/materialize-plan/`
     (`me-has-no-reserve.test.ts`) was re-pinned to the logger's new Done seed; no code in that folder changed.
-11. **Tests.** Deno: strength, standing-plan, strength-grid, session-detail, materialize-plan and `src/lib` suites
-    pass (1882) except `src/lib/wizard-day-lock.lint.test.ts` (2 failures, the same on the untouched base).
+11. **Tests.** Deno: strength, standing-plan, strength-grid, session-detail, materialize-plan, the new longitudinal band
+    test and `src/lib` suites pass (1885 after pass 6) except `src/lib/wizard-day-lock.lint.test.ts` (2 failures, the same on the untouched base).
     `npx tsc --noEmit -p tsconfig.app.json`: 305 errors, the same count as the base; the
     `StrengthLogger.tsx` TS2339 (`warmup`) error pre-exists. `npx vitest run` collects the Deno files and fails
     all 562 on URL imports; none of the touched tests are vitest tests.
