@@ -25,7 +25,9 @@ import { fetchAthleteTimezone, resolveAthleteTimezone } from './athlete-timezone
 import { localDateInTz } from './local-date.ts';
 
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 1;
+// 2 (2026-09-18): the book-language fix, endurance half — warm-up boxes line by line, the page's words on steps,
+// p235's long run and p278's Standard rides as printed. Rows written by 1 are rewritten on the next refresh.
+export const PLAN_WRITER_VERSION = 2;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
