@@ -1881,7 +1881,11 @@ function exerciseForSlot(
   // that dropping p247's lower-body reduction for a bike-heavy week was OUR reading of his p280
   // reason — an athlete-facing sentence whose whole content was that it had no page. The behaviour is
   // unchanged: p247 applies where p247's own layout holds, and says nothing where it does not.
-  if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text === HAIRCUT_LINE)) {
+  // ⛔ ONLY ON THE PAGE'S OWN PROGRAM (2026-09-18, round 3). p247 is the Run + Strength page (`strength_5k`, Strength +
+  // 5K, pp246-247); its sentence printed on the Run + Ride + Strength description too. The line prints where its page
+  // applies and nowhere else.
+  if (isLower && haircut < 1 && args.frame === 'strength_5k'
+    && !notes.some((n) => n.cite === 'Viada p247' && n.text === HAIRCUT_LINE)) {
     notes.push({
       kind: 'source',
       // ⛔ IT NAMES THE DAYS (Michael, 2026-08-26). His own wording for this class of sentence is
@@ -3130,13 +3134,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             });
           }
         }
-        if (testWeek && !notes.some((n) => n.text.includes('by feel this week'))) {
-          notes.push({
-            kind: 'source',
-            text: 'The other lifting days run by feel this week — the numbers arrive once the test is done.',
-            cite: 'Viada p215',
-          });
-        }
+        // ⛔ "The other lifting days run by feel this week — the numbers arrive once the test is done." CAME OFF
+        // (2026-09-18, round 3): "by feel" is on no page — p215 gives the test and nothing for the other days — and
+        // where the book gives no words the plan prints nothing.
         /**
          * ⛔ A DROPPED SLOT IS SAID, NOT ABSORBED (2026-08-30). `buildStandingPlanRow` turns a
          * `warning` note into a `placement_compromises` entry, which is the channel the builder

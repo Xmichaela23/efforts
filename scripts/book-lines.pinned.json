@@ -186,7 +186,8 @@
    "{} (race tempo)"
   ],
   "supabase/functions/_shared/standing-plan/setup-copy.ts": [
-   "You get stronger. Four lifting days, four runs. The long run stays under 100 minutes.",
+   "Four lifting days, four runs. Mileage will be dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes.",
+   "If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you switch the program to the deload version.",
    "the months progress beyond adjustment of 1RM and threshold as you improve.",
    "from your logged sets",
    "The 20-minute FTP test is scheduled into week one.",
@@ -196,7 +197,6 @@
    "Nothing on file. The threshold time trial is scheduled into week one.",
    "Swim pace (per 100)",
    "These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the",
-   "Pick how long the long run is. The easy run is {minutes} minutes.",
    "Easy session",
    "Easy session {n}"
   ],

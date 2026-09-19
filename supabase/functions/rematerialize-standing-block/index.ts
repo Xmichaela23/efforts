@@ -34,6 +34,8 @@ import { resolveUser } from '../_shared/require-user.ts';
 import { athleteToday, isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
+import { DELOAD_LINE } from '../_shared/standing-plan/setup-copy.ts';
+import type { FrameId } from '../_shared/standing-plan/frames.ts';
 import {
   composeBlock,
   earnedMeSets,
@@ -321,6 +323,8 @@ Deno.serve(async (req: Request) => {
       next_week: nextWeek,
       next_is_deload: taperWeeks.includes(nextWeek),
       can_deload: nextWeek <= weeks,
+      // The line under the button: this program's own page, or null (`DELOAD_LINE`, one owner).
+      deload_line: DELOAD_LINE[sp.frame as FrameId] ?? null,
     };
 
     const composeBase = {

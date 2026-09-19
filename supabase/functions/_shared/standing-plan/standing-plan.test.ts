@@ -323,7 +323,8 @@ Deno.test('the test week is still a whole week', () => {
   for (const e of thu.strength_exercises!) {
     assertEquals(e.load_prescribed, false, `${e.name} was given a weight before the test ran`);
   }
-  assert(wk.notes.some((n) => n.text.includes('by feel this week')));
+  // ⛔ No "by feel" sentence (2026-09-18, round 3): on no page, so the week prints nothing for it.
+  assert(!wk.notes.some((n) => /by feel/i.test(n.text)));
   // And the endurance week is intact.
   assertEquals(wk.sessions.filter((s) => s.type === 'run').length, 4);
 });

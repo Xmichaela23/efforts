@@ -20,33 +20,61 @@ export const SECTION_COPY = {
 
 /** Each program card: name, description and requirements line. */
 export const PROGRAM_COPY = {
+  // Viada p275, cut: "This program can be used as an "all-year" program for an athlete who's interested in multiple
+  // different sports, ranging from road running to trail running…".
+  // ⛔ OFF 2026-09-18 (round 3): "Strength, running and riding run together, year-round, with a pivot to a race or a
+  // single sport when one comes up." — a paraphrase of p275.
   run_ride_strength: {
     label: 'Run + Ride + Strength',
-    blurb: 'Strength, running and riding run together, year-round, with a pivot to a race or a single sport when one comes up.',
+    blurb: 'This program can be used as an “all-year” program for an athlete who’s interested in multiple different sports.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
       + 'week one.',
   },
-  // Viada p246: four lifting days and four runs. Viada p247: the long run goes up to 90 to 100 minutes.
+  // Viada p246: four lifting days and four runs (the week table's count). Viada p247, Running Notes, cut: "Mileage will be
+  // dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes here…".
   // ⛔ OFF 2026-09-18 (book-language pass 3): "Your speed and mileage hold.", "Twelve weeks", "comfortable running a full
   // hour" and "about three hours of running and seven to nine hours of training in all" — on no page.
+  // ⛔ OFF 2026-09-18 (round 3): "You get stronger." (no page) and "The long run stays under 100 minutes." (a rewording
+  // of p247's "runs up to 90 to 100 minutes").
   run_strength: {
     label: 'Run + Strength',
-    blurb: 'You get stronger. Four lifting days, four runs. The long run stays under 100 minutes.',
+    blurb: 'Four lifting days, four runs. Mileage will be dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
-  // Viada p278: three lifting days and seven rides in the Standard column. OURS — `PROGRAM_COPY` the six-ride option (`fewerRidesDropsSlot`).
+  // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
   // Viada p280: "These programs are included as training options for intermediate to advanced cyclists" — cut.
+  // ⛔ OFF 2026-09-18 (round 3): "Six or seven rides" — p278 prints seven; the six-ride choice is the builder's
+  // (`RIDES_COPY.count_chip`), not the page's.
   // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
   // strength progress together." (no page).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Training options for intermediate to advanced cyclists. Six or seven rides, three lifting days.',
+    blurb: 'Training options for intermediate to advanced cyclists. Seven rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
   },
 } as const;
+
+// ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⛔ THE LINE UNDER THE DELOAD BUTTON, PER PROGRAM — each program's own page, or nothing (2026-09-18, round 3).
+ * The screen printed p245's sentence ("If performance begins to suffer, particularly if the ME lifts underperform 2
+ * weeks in a row, consider running a single deload week.") on every program; p245 is the Hypertrophy + 5K page, which
+ * no program here is built from.
+ * - strength_5k — Viada p247 (Strength + 5K), main text, whole sentence.
+ * - all_rounder — p274/p275 print no sentence on when to deload: nothing.
+ * - cycling_base — p278/p280/p281 print no sentence on when to deload Base (p280's taper/deload sentence is the Crit
+ *   program's): nothing.
+ */
+export const DELOAD_LINE: Record<FrameId, string | null> = {
+  // Viada p247
+  strength_5k: 'If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you switch the program to the deload version.',
+  all_rounder: null,
+  cycling_base: null,
+};
 
 // ── Build this plan? and Know your numbers? ───────────────────────────────────────────────────
 
@@ -172,9 +200,14 @@ export const RIDES_COPY = {
 const WORD: Record<number, string> = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven' };
 
 export const RUNS_COPY = {
-  commitment: '{lifting} lifting days a week. {runs} runs fit around them.',
+  // Viada p246: the week table's count of lifting days and runs — the same line the program card prints.
+  // ⛔ OFF 2026-09-18 (round 3): "{lifting} lifting days a week. {runs} runs fit around them." — the words were ours.
+  commitment: '{lifting} lifting days, {runs} runs.',
   // ⛔ "The two hard runs rotate." came off 2026-09-18 (book-language pass 3): p246–p247 print no rotation.
-  sub: 'Pick how long the long run is. The easy run is {minutes} minutes.',
+  // ⛔ "The easy run is {minutes} minutes." came off 2026-09-18 (round 3): p235 prints "25 to 30 minutes" for VT1
+  // level 1 and the plan builds the run at 27:00, so the sentence said a length the week does not hold. What is
+  // left operates the screen.
+  sub: 'Pick how long the long run is.',
   row: 'Day {day} · {label}',
   length_label: 'Length',
   length_varies: 'length varies week to week',
@@ -191,7 +224,7 @@ export function runsCommitmentLine(frameId: FrameId): string | null {
   const runs = (WORD[slots.length] ?? String(slots.length)).toLowerCase();
   return fill(RUNS_COPY.commitment, {
     lifting: WORD[lifting] ?? String(lifting),
-    runs: runs.replace(/^./, (c) => c.toUpperCase()),
+    runs,
   });
 }
 

@@ -176,13 +176,13 @@ export default function StateAdjustLens({ mainLifts }: {
   // ⛔ WHICH WEEK, AND WHETHER IT CAN — THE BLOCK'S ANSWER (2026-09-15). The screen worked out "next week"
   // as `current + 1`, gated it on `≤ weeks`, and carried its own `|| 12` beside the server's. The dry run
   // returns `next_week`, `next_is_deload` and `can_deload`; this prints them.
-  type Deload = { nextWeek: number; nextIsDeload: boolean; canDeload: boolean; taperWeeks: number[] };
+  type Deload = { nextWeek: number; nextIsDeload: boolean; canDeload: boolean; taperWeeks: number[]; line: string | null };
   const [deload, setDeload] = useState<Deload | null>(null);
   const [deloadBusy, setDeloadBusy] = useState(false);
   const [deloadNote, setDeloadNote] = useState<string | null>(null);
   const readDeload = (d: any): Deload | null =>
     d?.success && typeof d.next_week === 'number'
-      ? { nextWeek: d.next_week, nextIsDeload: d.next_is_deload === true, canDeload: d.can_deload === true, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [] }
+      ? { nextWeek: d.next_week, nextIsDeload: d.next_is_deload === true, canDeload: d.can_deload === true, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [], line: typeof d.deload_line === 'string' ? d.deload_line : null }
       : null;
   useEffect(() => {
     let cancelled = false;
@@ -427,10 +427,10 @@ export default function StateAdjustLens({ mainLifts }: {
     ...(deload?.canDeload && nextWeek != null ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
       <>
         <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
-        {/* ⛔ p245's own words (2026-09-18, book-language pass 2, audit T4). The paragraph that stood here was ours:
-            "skill and speed sets" for the page's DE, "drop a level" for a column that also removes sessions, and p247's
-            "two weeks out" stated for every program. Each program's deload column is built by the plan itself. */}
-        <p className="text-footnote text-label-secondary mt-2 leading-snug">If performance begins to suffer, particularly if the ME lifts underperform 2 weeks in a row, consider running a single deload week.</p>
+        {/* ⛔ THE PROGRAM'S OWN PAGE, OR NOTHING (2026-09-18, round 3). p245's sentence printed here for every program, and
+            p245 is the Hypertrophy + 5K page. The server sends each program's own words (`DELOAD_LINE`, setup-copy.ts):
+            p247 on Run + Strength, nothing where the program's page has none. */}
+        {deload.line && <p className="text-footnote text-label-secondary mt-2 leading-snug">{deload.line}</p>}
         {deload.taperWeeks.length > 0 && <p className="text-caption text-label-secondary mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
         {deloadNote && <p className="text-footnote text-label-secondary mt-1.5">{deloadNote}</p>}
       </>

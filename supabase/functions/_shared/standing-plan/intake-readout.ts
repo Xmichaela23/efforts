@@ -81,9 +81,13 @@ export type IntakeRow = {
  * stood over the MLSS row, which p231 puts in zone 4, above threshold; neither sentence was a page's words, and a row
  * keyed on the sport cannot know which page its session is on. What is left operates the app.
  */
-export const HARD_ROW_LINE: Record<SlotSport, string> = {
-  run: 'Choose the workout on the day.',
-  ride: 'Choose the workout on the day.',
+/**
+ * ⛔ "Choose the workout on the day." CAME OFF BOTH ROWS (2026-09-18, round 3): on no page. No page gives words for
+ * this row, so it prints nothing (Michael, 2026-09-18: "If the book gives no words for something, print nothing").
+ */
+export const HARD_ROW_LINE: Record<SlotSport, string | null> = {
+  run: null,
+  ride: null,
 };
 
 export type EnduranceIntakeReadout = {

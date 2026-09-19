@@ -62,28 +62,17 @@ Deno.test('the history line counts the frame\'s own slots plus the advanced tier
 });
 
 /**
- * ⛔ THE HARD ROW'S LINE (Michael, 2026-09-11) — the sentence that stands where the shape list used
- * to. Pinned character-exact in both sports, because the phone prints it verbatim and a drift here
- * is a drift on the screen with nothing to catch it.
+ * ⛔ THE HARD ROW PRINTS NO LINE (2026-09-18, round 3). "Choose the workout on the day." was on no page, and where
+ * the book gives no words the row prints nothing.
  */
-Deno.test('a hard row carries its sport\'s approved line, and no other row carries one', () => {
+Deno.test('no row carries a hard line — no page gives one', () => {
   const r = enduranceIntakeReadout({
     frame: 'all_rounder',
     answers: { hard1: 'run', hard2: 'run', hard3: 'run', easy: 'ride', long: 'ride' },
     baselines: BASELINES,
   });
-  assertEquals(r.rows.hard1!.hard_line, 'Choose the workout on the day.');
-  // p274's day 2 is a ride whatever was tapped, so it reads the ride's line.
-  assertEquals(r.rows.hard2!.hard_line, 'Choose the workout on the day.');
-  assertEquals(r.rows.hard3!.hard_line, 'Choose the workout on the day.');
-  assertEquals(r.rows.easy!.hard_line, null);
-  assertEquals(r.rows.long!.hard_line, null);
-  // Every line is the object's own — nothing is composed per row.
-  for (const key of ['hard1', 'hard2', 'hard3'] as const) {
-    assert(Object.values(HARD_ROW_LINE).includes(r.rows[key]!.hard_line!));
-  }
-  // ⛔ AND BOTH PASS THE VOICE GATE. "Choose" is not one of the four imperatives it bans.
-  for (const line of Object.values(HARD_ROW_LINE)) assertEquals(voiceViolation(line), null);
+  for (const key of ['hard1', 'hard2', 'hard3', 'easy', 'long'] as const) assertEquals(r.rows[key]!.hard_line, null);
+  assertEquals(Object.values(HARD_ROW_LINE).every((l) => l === null), true);
 });
 
 Deno.test('an unanswered hard row carries no line — the sentence follows the sport', () => {
@@ -109,7 +98,8 @@ Deno.test('the hard shape is the engine\'s on every frame', () => {
     });
     for (const s of frameSlots(frame)) {
       if (s.role !== 'hard') continue;
-      assert(r.rows[s.key]!.hard_line, `${frame} ${s.key} has a line`);
+      // No page gives this row words (2026-09-18, round 3), so it prints none.
+      assertEquals(r.rows[s.key]!.hard_line, null, `${frame} ${s.key} has a line`);
     }
   }
 });

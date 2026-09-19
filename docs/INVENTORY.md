@@ -572,7 +572,7 @@ no-deploy.**
 | `protocol-id.ts` | `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `rematerialize-standing-block` |
 | `restate.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `session-vocabulary.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` · `swap-session` |
-| `setup-copy.ts` | `generate-strength-plan` · `get-arc-context` |
+| `setup-copy.ts` | `generate-strength-plan` · `get-arc-context` · `rematerialize-standing-block` |
 | `setup-readout.ts` | `get-arc-context` |
 | `spacing-line.ts` | `get-week` |
 | `sport-slots.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `rematerialize-standing-block` · `swap-list` |
