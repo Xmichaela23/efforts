@@ -63,8 +63,11 @@
       "3": "fail",
       "4": "fail",
       "5": "fail",
-      "6": "fail"
+      "6": "fail",
+      "7": "fail",
+      "7-pin": "fail"
     },
+    "bookLines": "scripts/book-lines.pinned.json",
     "scopes": {
       "rule1": [
         "src/components/**/*.tsx",
@@ -111,6 +114,26 @@
         "src/components/UnifiedWorkoutView.tsx",
         "src/components/context/ViadaWeekCard.tsx",
         "src/lib/derive-workout-title.ts"
+      ],
+      "rule7": [
+        "supabase/functions/_shared/strength-grid/intents.ts",
+        "supabase/functions/_shared/strength/strength-display-lines.ts",
+        "supabase/functions/_shared/strength/test-session.ts",
+        "supabase/functions/_shared/standing-plan/family-lines.ts",
+        "supabase/functions/_shared/standing-plan/warmup.ts",
+        "supabase/functions/_shared/standing-plan/plyo.ts",
+        "supabase/functions/_shared/standing-plan/setup-copy.ts",
+        "supabase/functions/_shared/standing-plan/session-vocabulary.ts",
+        "supabase/functions/_shared/standing-plan/spacing-line.ts",
+        "supabase/functions/_shared/standing-plan/sport-slots.ts",
+        "supabase/functions/_shared/standing-plan/week-conflicts.ts",
+        "supabase/functions/_shared/endurance-library/source-rules.ts",
+        "supabase/functions/_shared/endurance-library/step-words.ts",
+        "supabase/functions/_shared/baseline-test-rows.ts",
+        "supabase/functions/_shared/planned-step-lines.ts",
+        "src/lib/today-lines.ts",
+        "src/lib/strength-focus-copy.ts",
+        "src/lib/standing-plan-copy.ts"
       ]
     },
     "parked": [

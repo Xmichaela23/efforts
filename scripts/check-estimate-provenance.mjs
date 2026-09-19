@@ -23,6 +23,7 @@
  *   rule 4 (d) a provider-field chain longer than sent → computed
  *   rule 5 (e) a composer string printing a number with no source
  *   rule 6 (f) a status word or label chosen on the phone (src/components, JSX)
+ *   rule 7 (g) a workout instruction with no book page beside it, or not the pinned book words
  * Each rule is warn or fail in config.truth.severity. Hits inside config.truth.parked (the race
  * path, WORKORDER §3a) are counted and never fail.
  *
@@ -31,7 +32,7 @@
  * Exit:   0 = no hit on a FAIL rule, 1 = a FAIL rule has hits, 2 = tool/config error.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
 import ts from 'typescript';
@@ -306,8 +307,10 @@ const RULE_LABEL = {
   4: 'rule 4 (d) · chain longer than sent → computed',
   5: 'rule 5 (e) · composer prints a number with no source',
   6: 'rule 6 (f) · status word chosen on the phone',
+  7: 'rule 7 (g) · instruction with no book page',
+  '7-pin': 'rule 7 (g) · instruction not the pinned book words',
 };
-const RULE_ORDER = ['0', '1', '2', '2-ledger', '3', '4', '5', '6'];
+const RULE_ORDER = ['0', '1', '2', '2-ledger', '3', '4', '5', '6', '7', '7-pin'];
 
 function flagValue(name) { const i = rawArgs.indexOf(name); return i >= 0 ? rawArgs[i + 1] : null; }
 const ONLY_RULE = flagValue('--rule');
@@ -929,6 +932,113 @@ function rule6() {
   }
 }
 
+// ---- rule 7 (g): every workout instruction prints the book's own words, with its page beside it ----
+/**
+ * ⛔ THE BOOK-LANGUAGE RULE (Michael, 2026-09-18): "No paraphrasing: quote the book's words. If a line must be
+ * shorter, cut the book's words down — never reword them. If the book gives no words for something, print
+ * nothing." docs/AUDIT-book-language-2026-09-18.md found 107 lines off the page and 105 on no page.
+ *
+ * In the files that write instructions (config.truth.scopes.rule7), a string that reads as a training
+ * instruction — reps, reserve, sets, rest, warm-up, cool-down, targets and their words, cues, tests — must:
+ *   rule 7      have a page (`p218`) cited in its own statement or the comment directly above it — the way rule 2
+ *               needs a source, or, for a row in a table, on the row's own opening line or the comment above it
+ *               or in the row's own `cite:` field (a neighbouring line's citation does not count);
+ *   rule 7-pin  be word for word one of the lines pinned in config.truth.bookLines (scripts/book-lines.pinned.json).
+ *               A reworded line, or a new one, is not in the pins and fails. A pinned line that no longer exists
+ *               fails too, so a rewording shows on both sides.
+ * The pins are rewritten only with `--write-book-pins`, and only after Michael has approved the words.
+ */
+const INSTRUCTION_WORDS = /\b(reps?|RIR|reserve|sets?|rest|warm[- ]?up|cool[- ]?down|recover(?:y|ies)?|easy|pace|FTP|VT1|VT2|effort|cadence|tempo|velocity|failure|fatigue|eccentric|concentric|intervals?|strides?|sprints?|jog|lunges?|talk test|deload|taper|drills?|load|percent|RPE|zone|all[- ]out|threshold|minutes?|min)\b|%/i;
+const BOOK_PAGE = /\bpp?\s?\d{2,3}\b/;
+// A string that reads like an instruction but is not one (a session NAME, a label, text that never prints) says so
+// beside it: `// not-instruction: <reason>`. The reason is required.
+const NOT_INSTRUCTION = /not-instruction\s*:\s*\S/;
+const BOOK_PINS_PATH = resolve(REPO, TRUTH.bookLines || 'scripts/book-lines.pinned.json');
+const WRITE_BOOK_PINS = argv.has('--write-book-pins');
+function instructionStrings(rel) {
+  const { lines } = source(rel);
+  const sf = astOf(rel);
+  const out = [];
+  const visit = (n) => {
+    if (ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) return;
+    if (ts.isCallExpression(n) && /^(console\.\w+|Deno\.test|it|test|describe|assert\w*)$/.test(n.expression.getText(sf))) return;
+    if (ts.isThrowStatement(n)) return;
+    let text = null;
+    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
+      if (!(n.parent && (ts.isPropertyAssignment(n.parent) || ts.isPropertySignature?.(n.parent)) && n.parent.name === n)
+        && !(n.parent && ts.isElementAccessExpression(n.parent)) && !(n.parent && ts.isLiteralTypeNode(n.parent))) text = n.text;
+    } else if (ts.isTemplateExpression(n)) {
+      text = [n.head.text, ...n.templateSpans.map((t) => `{}${t.literal.text}`)].join('');
+    } else if (ts.isJsxText(n)) {
+      text = n.getText(sf).replace(/\s+/g, ' ').trim();
+    }
+    if (text !== null) {
+      const t = text.trim();
+      // a sentence-like instruction: two or more words, instruction vocabulary, not an id / key / path
+      if (t.length >= 8 && /\s/.test(t) && INSTRUCTION_WORDS.test(t) && !/^[\w:.\/{}-]+$/.test(t)) {
+        const li = lineOf(sf, n);
+        // the citation may sit above the whole statement a multi-line string belongs to
+        let top = n;
+        while (top.parent && !ts.isSourceFile(top.parent) && !ts.isBlock(top.parent) && !ts.isObjectLiteralExpression(top.parent)
+          && !ts.isArrayLiteralExpression(top.parent)) top = top.parent;
+        const from = lineOf(sf, top);
+        const to = sf.getLineAndCharacterOfPosition(top.getEnd()).line;
+        // what may carry the page: the statement itself, its own leading comments, the rest of its last line
+        const lead = (ts.getLeadingCommentRanges(sf.text, top.getFullStart()) || []).map((c) => sf.text.slice(c.pos, c.end)).join('\n');
+        // …and, for a row in a table, the row's own header: up to two enclosing object/array literals, each with the
+        // comments above it and its opening line (`run_mlss: { // p231`). Not the whole file, not a neighbour.
+        const heads = [];
+        let lvl = 0;
+        for (let a = top.parent; a && !ts.isSourceFile(a) && lvl < 2; a = a.parent) {
+          if (!ts.isObjectLiteralExpression(a) && !ts.isArrayLiteralExpression(a)) continue;
+          lvl++;
+          const holder = a.parent && !ts.isSourceFile(a.parent) ? a.parent : a;
+          const hl = (ts.getLeadingCommentRanges(sf.text, holder.getFullStart()) || []).map((c) => sf.text.slice(c.pos, c.end)).join('\n');
+          heads.push(hl, lines[lineOf(sf, a)] || '');
+          // a small row (≤ 25 lines) may carry its page as a sibling field: `cite: 'Viada p218'`
+          const span = sf.getLineAndCharacterOfPosition(a.getEnd()).line - lineOf(sf, a);
+          if (span <= 25) { const m = a.getText(sf).match(/\bcite\w*\s*:\s*[^\n]*/g); if (m) heads.push(...m); }
+        }
+        const own = `${lead}\n${top.getText(sf)}\n${lines[to] || ''}\n${lines[li] || ''}\n${heads.join('\n')}`;
+        if (!/console\.|throw new Error/.test(lines[li])) out.push({ text: t, line: li, from, to, own });
+      }
+      if (!ts.isTemplateExpression(n)) return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return out;
+}
+function rule7() {
+  let pins = {};
+  try { pins = JSON.parse(readFileSync(BOOK_PINS_PATH, 'utf8')); } catch { pins = {}; }
+  const pinned = pins.lines || {};
+  const written = {};
+  for (const rel of filesIn(TRUTH.scopes?.rule7)) {
+    const parked = isParkedPath(rel);
+    const { lines } = source(rel);
+    const found = instructionStrings(rel);
+    written[rel] = [...new Set(found.map((f) => f.text))];
+    const want = new Set(pinned[rel] || []);
+    for (const f of found) {
+      if (!BOOK_PAGE.test(f.own) && !NOT_INSTRUCTION.test(f.own)) push(7, rel, f.line + 1, JSON.stringify(f.text.slice(0, 90)), parked);
+      if (!WRITE_BOOK_PINS && !want.has(f.text)) push('7-pin', rel, f.line + 1, `not pinned: ${JSON.stringify(f.text.slice(0, 90))}`, parked);
+    }
+    if (!WRITE_BOOK_PINS) {
+      const have = new Set(found.map((f) => f.text));
+      for (const t of want) if (!have.has(t)) push('7-pin', rel, 1, `pinned line gone: ${JSON.stringify(t.slice(0, 90))}`, parked);
+    }
+  }
+  if (!WRITE_BOOK_PINS) for (const rel of Object.keys(pinned)) {
+    if (!(rel in written)) push('7-pin', rel, 1, 'pinned file no longer in scope', false);
+  }
+  if (WRITE_BOOK_PINS) {
+    const out = { _doc: 'Rule 7 pins — the book\'s words as approved. Rewrite ONLY with --write-book-pins after Michael approves the words. docs/AUDIT-book-language-2026-09-18.md', lines: written };
+    writeFileSync(BOOK_PINS_PATH, JSON.stringify(out, null, 1) + '\n');
+    console.log(`[provenance] rule 7 pins written: ${Object.values(written).reduce((a, l) => a + l.length, 0)} lines in ${Object.keys(written).length} files`);
+  }
+}
+
 // ---- run ----
 if (ruleOn(1)) { rule1(); rulePlannedDerivedDistance(); }
 if (ruleOn(2)) rule2();
@@ -936,6 +1046,7 @@ if (ruleOn(3)) rule3();
 if (ruleOn(4)) rule4();
 if (ruleOn(5)) rule5();
 if (ruleOn(6)) rule6();
+if (ruleOn(7)) rule7();
 
 // Rule 0 (D-237): fresh undeclared fallbacks join the same report; ticketed exceptions are counted.
 let knownCount = 0;
