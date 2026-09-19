@@ -2843,13 +2843,10 @@ export function expandTokensForRow(
             ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
               ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
             /**
-             * ⛔ "By feel" IS STAMPED HERE, NOT PICKED ON THE PHONE (2026-09-17, WORKORDER Stage C). Two surfaces
-             * held the literal as a fallback (`SessionDeck`, `strengthFormatter`), so a row with no priced weight
-             * got its word from whichever file drew it. An auto-regulated row (`load_prescribed: false`, p226) is
-             * the design — the absence of a number is deliberate, and this names it without inventing one.
+             * ⛔ NO "By feel" (2026-09-18, book-language pass 3). It was stamped here on every row with no priced weight
+             * (2026-09-17, Stage C) and printed as the row's weight — no page prints it. An auto-regulated row
+             * (`load_prescribed: false`, p226) carries no weight and no word for one: the absence is the prescription.
              */
-            ...(finalWeightDisplay || typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim() || finalWeight
-              ? {} : { weight_display: 'By feel' }),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
@@ -3277,13 +3274,10 @@ export function expandTokensForRow(
             ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
               ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
             /**
-             * ⛔ "By feel" IS STAMPED HERE, NOT PICKED ON THE PHONE (2026-09-17, WORKORDER Stage C). Two surfaces
-             * held the literal as a fallback (`SessionDeck`, `strengthFormatter`), so a row with no priced weight
-             * got its word from whichever file drew it. An auto-regulated row (`load_prescribed: false`, p226) is
-             * the design — the absence of a number is deliberate, and this names it without inventing one.
+             * ⛔ NO "By feel" (2026-09-18, book-language pass 3). It was stamped here on every row with no priced weight
+             * (2026-09-17, Stage C) and printed as the row's weight — no page prints it. An auto-regulated row
+             * (`load_prescribed: false`, p226) carries no weight and no word for one: the absence is the prescription.
              */
-            ...(finalWeightDisplay || typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim() || finalWeight
-              ? {} : { weight_display: 'By feel' }),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
