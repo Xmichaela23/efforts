@@ -30,22 +30,25 @@ export type WarmupSet = { weight: number; reps: number; warmup: true };
 export const WARMUP_REPS = 5;
 export const WARMUP_EMPTY_BAR_SETS = 2;
 // FIELD — StrongLifts (above): "add 25-45lb/10-20kg per set"; the calculator allows no jump "larger than 45lb".
+// Michael, 2026-09-18: the step is the largest the pages allow, so the fewest warm-up sets.
 export const WARMUP_MAX_JUMP = { lb: 45, kg: 20 } as const;
+// FIELD — StrongLifts (above): "add 25-45lb/10-20kg per set until you reach your work weight" — the smallest jump,
+// onto the work weight included. A rung closer than this to the work weight is left out (a 95 lb squat:
+// 45 × 5, 45 × 5, then work — Michael's example, 2026-09-18).
+export const WARMUP_MIN_JUMP = { lb: 25, kg: 10 } as const;
 /**
  * The bar the empty-bar sets use, in the athlete's unit: 45 lb, or 20 kg on a metric account (the bar table's
  * `standard` and `standard_kg`, sourced there — Strong, IWF).
  */
 export const WARMUP_BAR = { lb: BAR_TYPES.standard.load, kg: BAR_TYPES.standard_kg.load } as const;
-// OURS — `WARMUP_FLOOR_START` 135 lb / 60 kg for deadlift and row: StrongLifts gives "65-135lb so the weight can rest on
-// the floor"; with full-size plates (45 lb / 20 kg, the app knows no bumper plates) the bar sits on the floor only at
-// bar + two plates, 135 lb / 60 kg — the smallest reading of the range those plates allow. Ledger row in STATE-SOURCES.
-export const WARMUP_FLOOR_START = { lb: 135, kg: 60 } as const;
+// OURS — `WARMUP_FLOOR_START` 65 lb / 30 kg for deadlift and row: StrongLifts gives "start with 65-135lb" (30–60 kg);
+// Michael, 2026-09-18: the lowest weight in that range the athlete's plates allow. The logger's plate table
+// (StrengthLogger `PLATES_BY_UNIT`) holds 10 lb and 5 kg plates, so the bar plus one of each a side — 65 lb / 30 kg —
+// is the lowest. The pick inside the published range is ours. Ledger row in STATE-SOURCES.
+export const WARMUP_FLOOR_START = { lb: 65, kg: 30 } as const;
 // OURS — `WARMUP_FLOOR_START_SETS` one set at the floor start on deadlift and row: StrongLifts' "two sets … with the
 // empty bar" names the empty bar, and the floor start is not one. Ledger row in STATE-SOURCES.
 export const WARMUP_FLOOR_START_SETS = 1;
-// OURS — `WARMUP_ROUND` warm-up weights land on 5 lb / 2.5 kg (the smallest pair of 2.5 lb / 1.25 kg plates); the fewest
-// sets that keep every jump within the maximum, evenly stepped. Ledger row in STATE-SOURCES.
-export const WARMUP_ROUND = { lb: 5, kg: 2.5 } as const;
 
 /**
  * Deadlift and row start off the floor (StrongLifts: "On Deadlifts and Barbell Rows"). OURS — the name test: any
@@ -66,9 +69,12 @@ export function warmupStartsOnFloor(name: string): boolean {
  * @param workWeightLb the first work set's weight, in pounds as stored.
  * @param metric       a metric account: the 20 kg bar, the kg jumps and the kg rounding, stored back as pounds.
  *
- * Empty-bar lifts: 2 × 5 at the bar. Deadlift and row: 1 × 5 at 135 lb / 60 kg. Then 5-rep sets, evenly stepped,
- * no jump over 45 lb / 20 kg (the last jump, onto the work weight, included), and no warm-up set at or above the
- * work weight. Nothing when the work weight is at or under the start.
+ * Empty-bar lifts: 2 × 5 at the bar. Deadlift and row: 1 × 5 at 65 lb / 30 kg. Then 5-rep sets, each 45 lb / 20 kg
+ * above the last (the largest jump StrongLifts allows, so the fewest sets), kept only while the work weight is still at
+ * least 25 lb / 10 kg above it (StrongLifts' smallest jump). No warm-up set at or above the work weight; nothing when
+ * the work weight is at or under the start.
+ * ⚠️ The jump onto the work weight can therefore be up to 45 + 24 lb (20 + 9.x kg): StrongLifts' own example
+ * (45 → 95) jumps 50 lb, and Michael's 95 lb squat (45, 45, then work) needs it.
  */
 export function warmupSetsFor(name: string, workWeightLb: number | null | undefined, metric = false): WarmupSet[] {
   const lb = Number(workWeightLb);
@@ -79,19 +85,8 @@ export function warmupSetsFor(name: string, workWeightLb: number | null | undefi
   const start = floor ? WARMUP_FLOOR_START[u] : WARMUP_BAR[u];
   // ⛔ No warm-up set at or above the work weight.
   if (!(work > start + 1e-9)) return [];
-  const step = WARMUP_ROUND[u];
-  const maxJump = WARMUP_MAX_JUMP[u];
-  const snap = (x: number) => Math.round(x / step) * step;
-  const gap = work - start;
-  let rungs: number[] = [];
-  // The fewest jumps that keep every jump within the maximum once the weights land on plates.
-  for (let jumps = Math.max(1, Math.ceil(gap / maxJump - 1e-9)); jumps <= 60; jumps++) {
-    const mids: number[] = [];
-    for (let k = 1; k < jumps; k++) mids.push(snap(start + (k * gap) / jumps));
-    const ladder = [start, ...mids, work];
-    const ok = ladder.every((w, i) => i === 0 || (w > ladder[i - 1] + 1e-9 && w - ladder[i - 1] <= maxJump + 1e-9));
-    if (ok) { rungs = mids; break; }
-  }
+  const rungs: number[] = [];
+  for (let w = start + WARMUP_MAX_JUMP[u]; work - w >= WARMUP_MIN_JUMP[u] - 1e-9; w += WARMUP_MAX_JUMP[u]) rungs.push(w);
   const toLb = (x: number) => (metric ? x / KG_PER_LB : x);
   const startSets = floor ? WARMUP_FLOOR_START_SETS : WARMUP_EMPTY_BAR_SETS;
   return [

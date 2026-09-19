@@ -189,24 +189,34 @@ Deno.test('StrongLifts warm-up: squat 100 kg on a metric account — the 20 kg b
   assertEquals(kgs('Back Squat', 100), '5x20 5x20 5x40 5x60 5x80');
 });
 
-Deno.test('StrongLifts warm-up: deadlift 315 lb — one set at 135 off the floor, then 45 lb steps', () => {
-  assertEquals(lbs('Deadlift', 315), '5x135 5x180 5x225 5x270');
+Deno.test('StrongLifts warm-up: deadlift and row start at 65 lb, the lowest of "65-135lb" the plates allow', () => {
+  assertEquals(lbs('Deadlift', 315), '5x65 5x110 5x155 5x200 5x245 5x290');
+  assertEquals(kgs('Deadlift', 140), '5x30 5x50 5x70 5x90 5x110 5x130');
   assert(warmupStartsOnFloor('Barbell Row') && warmupStartsOnFloor('Trap Bar Deadlift'));
   assert(!warmupStartsOnFloor('Romanian Deadlift') && !warmupStartsOnFloor('Bench Press') && !warmupStartsOnFloor('Upright Row'));
 });
 
-Deno.test('StrongLifts warm-up: no jump over 45 lb / 20 kg, no set at or above the work weight, nothing at the bar', () => {
+Deno.test('StrongLifts warm-up: Michael\'s five checks (2026-09-18)', () => {
+  assertEquals(lbs('Back Squat', 95), '5x45 5x45');
+  assertEquals(lbs('Back Squat', 100), '5x45 5x45');
+  assertEquals(lbs('Back Squat', 300), '5x45 5x45 5x90 5x135 5x180 5x225 5x270');
+  assertEquals(lbs('Deadlift', 170), '5x65 5x110');
+  assertEquals(lbs('Deadlift', 400), '5x65 5x110 5x155 5x200 5x245 5x290 5x335');
+});
+
+Deno.test('StrongLifts warm-up: 45 lb steps, the work weight at least 25 lb above the last, none at or above it', () => {
   for (const name of ['Back Squat', 'Bench Press', 'Deadlift', 'Barbell Row']) {
     for (let w = 50; w <= 600; w += 5) {
       const sets = warmupSetsFor(name, w);
-      const ladder = [...sets.map((s) => s.weight), w];
-      for (let i = 1; i < ladder.length; i++) {
-        assert(ladder[i] - ladder[i - 1] <= 45, `${name} ${w}: jump ${ladder[i - 1]} -> ${ladder[i]}`);
-      }
+      const ws = sets.map((s) => s.weight);
+      for (let i = 1; i < ws.length; i++) assert(ws[i] - ws[i - 1] === 0 || ws[i] - ws[i - 1] === 45, `${name} ${w}: step ${ws[i - 1]} -> ${ws[i]}`);
+      if (ws.length) assert(w - ws[ws.length - 1] <= 45 + 24, `${name} ${w}: last jump`);
+      const rungs = ws.filter((x, i) => i > 0 && x !== ws[0]);
+      assert(rungs.every((x) => w - x >= 25), `${name} ${w}: a rung inside 25 lb of the work weight`);
       assert(sets.every((s) => s.weight < w && s.reps === 5 && s.warmup === true), `${name} ${w}`);
     }
   }
   assertEquals(warmupSetsFor('Bench Press', 45), []);
-  assertEquals(warmupSetsFor('Deadlift', 135), []);
+  assertEquals(warmupSetsFor('Deadlift', 65), []);
   assertEquals(warmupSetsFor('Back Squat', null), []);
 });
