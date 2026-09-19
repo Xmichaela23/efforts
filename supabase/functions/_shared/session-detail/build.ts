@@ -11,7 +11,7 @@ import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { plannedDurationFields } from '../planned-duration-label.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { offPrescriptionLine } from './off-prescription.ts';
-import { isCeilingOnly } from '../ride-power.ts';
+import { isCeilingOnly, oneSidedPowerText } from '../ride-power.ts';
 import { driftReachesLine } from '../run-pace.ts';
 import { planShare } from './swim-plan-share.ts';
 import { poolLabel } from '../swim/pool-label.ts';
@@ -614,10 +614,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           if (hasRange) return fmtPaceRange(Number(lower), Number(upper));
           // D-089: cycling — use the power range as the planned subtitle.
           // Approved 2026-09-15: the zone rows' house style for an open bound — "202 W and up".
-          if (floorOnlyPower) return `${Math.round(Number(pwLower))} W and up`;
+          // p237's floor and p239's ceiling: the one owner's words (`oneSidedPowerText`, 2026-09-18 round 3).
+          if (floorOnlyPower) return oneSidedPowerText(pwLower, null);
           // A single target prints once — "151 W", the not-done row's shape below (2026-09-18).
-          // p239's easy step, 0 up to the ceiling: "under 126 W" (approved by Michael, 2026-09-18).
-          if (isCeilingOnly(pwLower, pwUpper)) return `under ${Math.round(Number(pwUpper))} W`;
+          if (isCeilingOnly(pwLower, pwUpper)) return oneSidedPowerText(pwLower, pwUpper);
           if (hasPowerRange) return Math.round(Number(pwLower)) === Math.round(Number(pwUpper))
             ? `${Math.round(Number(pwLower))} W`
             : `${Math.round(Number(pwLower))}-${Math.round(Number(pwUpper))} W`;
@@ -717,10 +717,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         planned_label: String(iv?.planned_label ?? ''),
         planned_duration_s: fin(iv?.planned?.duration_s),
         planned_pace_display: isCeilingOnly(pr?.lower, pr?.upper)
-          ? `under ${Math.round(prHi)} W`
+          ? oneSidedPowerText(pr?.lower, pr?.upper)
           : Number.isFinite(prLo) && prLo > 0
           ? (pr?.upper == null
-            ? `${Math.round(prLo)} W and up`
+            ? oneSidedPowerText(prLo, null)
             : `${Math.round(prLo)}${Number.isFinite(prHi) && prHi !== prLo ? `-${Math.round(prHi)}` : ''} W`)
           : (tp != null ? fmtPaceRange(tp, tp) : null),
         executed: { duration_s: null, distance_m: null, avg_hr: null, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null, power_watts: null },

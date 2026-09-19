@@ -28,7 +28,9 @@ import { localDateInTz } from './local-date.ts';
 // 2 (2026-09-18): one name per movement (83 spellings merged), every movement filed by its page, the pull-up leads the primary pull cell.
 // 3 (2026-09-18): the book-language fix — every instruction the page's own words; warm-up boxes line by line, the page's
 // words on steps, p235's long run and p278's Standard rides as printed; p218's reserve band on HYP/DE/SKILL rows.
-export const PLAN_WRITER_VERSION = 3;
+// 4 (2026-09-18): book-language round 3 — no "By feel" weight, p210's strides, the test day's p215 lines, one band rule
+// for a single percentage, the p247 sentence on Run + Strength only, no "by feel this week" note.
+export const PLAN_WRITER_VERSION = 4;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

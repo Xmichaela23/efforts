@@ -16,8 +16,7 @@
 // (forum.intervals.icu/t/uploading-planned-workouts-to-intervals-icu/63624):
 //   category WORKOUT · start_date_local `YYYY-MM-DDT00:00:00` · type · name · description · external_id
 
-import { FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts';
-import { isCeilingOnly } from '../ride-power.ts';
+import { oneSidedPowerText } from '../ride-power.ts';
 
 export class IntervalsSerializeError extends Error {
   constructor(message: string) {
@@ -84,17 +83,20 @@ function stepLine(step: any, index: number, ftp: number): string {
   const cue = cueLabel || CUE_BY_KIND[kind] || '';
 
   const lo = Number(step?.powerRange?.lower);
-  // ⛔ A FLOOR WITH NO CEILING GOES OUT WITH THE PAGE'S OWN TOP (2026-09-16, p237 "start at 110%, progress to
-  // 125-130%") — the same number the Garmin sender fills in. Without it the whole ride was refused.
-  const floorOnly = step?.powerRange != null && step.powerRange.upper == null && Number.isFinite(lo) && lo > 0;
-  const hi = floorOnly ? Math.max(lo, ftp * FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP) : Number(step?.powerRange?.upper);
+  const hi = Number(step?.powerRange?.upper);
+  /**
+   * ⛔ A ONE-SIDED STEP GOES OUT AS THE PAGE'S WORDS, WITH NO TARGET (2026-09-18, round 3, audit items 16 and 17).
+   * p237's floor ("253 W and up") went out with a 130%-of-FTP ceiling filled in, and p239's easy step ("under 173 W")
+   * with nothing. A target here is one number or a range ERG holds; neither is a floor or a ceiling. So both go as
+   * freeride (ERG off) under a text line carrying the same words the screen prints (`oneSidedPowerText`).
+   */
+  const oneSided = step?.powerRange != null
+    ? oneSidedPowerText(step.powerRange.lower, step.powerRange.upper ?? null)
+    : null;
+  if (oneSided) heading = heading ? `${heading}\n${oneSided}` : oneSided;
   let target: string;
-  if (step?.powerRange == null) {
-    // The plan gives this step no power (e.g. a sprint by feel): ERG off.
-    target = 'freeride';
-  } else if (isCeilingOnly(step.powerRange.lower, step.powerRange.upper)) {
-    // ⛔ p239's EASY STEP (0 up to 75% of FTP) GOES OUT WITH NO TARGET (Michael, 2026-09-18). A range that starts at
-    // 0 would be refused here, and on Zwift ERG would hold a number the page never printed. Garmin keeps the range.
+  if (step?.powerRange == null || oneSided) {
+    // The plan gives this step no power (e.g. a sprint by feel), or a floor or ceiling only: ERG off.
     target = 'freeride';
   } else if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi >= lo) {
     const pLo = Math.round((lo / ftp) * 100);

@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals, assertThrows } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { serializeRide, formatDuration, IntervalsSerializeError } from './serialize.ts';
 
 // Step shapes copied from rides built by the deployed create-goal chain on a throwaway account (2026-09-12, FTP 210).
@@ -70,11 +70,24 @@ Deno.test('a step labelled with the page\'s numbers goes out with the words abov
   assertEquals(ev.description, 'high intensity. Push yourself at a 9/10 effort\n- 3m freeride');
 });
 
-/** ⛔ p239's easy step (0 up to 75% of FTP) goes to Intervals.icu / Zwift with no target (Michael, 2026-09-18). */
-Deno.test('a ceiling-only easy step goes out as freeride', () => {
+/**
+ * ⛔ p239's easy step (0 up to 75% of FTP) goes to Intervals.icu / Zwift with no target (Michael, 2026-09-18), under the
+ * same words the screen prints (2026-09-18, round 3: `oneSidedPowerText`).
+ */
+Deno.test('a ceiling-only easy step goes out as freeride, with the screen\'s words above it', () => {
   const ev = serializeRide({
     id: 'j', date: '2026-09-15', type: 'ride', name: 'Easy', description: 'Easy ride below 75%.',
     computed: { anchors, steps: [{ kind: 'work', seconds: 3600, powerRange: { lower: 0, upper: 158 } }] },
   });
-  assertEquals(ev.description, 'Easy ride below 75%.\n\n- 1h freeride');
+  assertEquals(ev.description, 'Easy ride below 75%.\n\nunder 158 W\n- 1h freeride');
+});
+
+/** ⛔ p237's floor goes as its words and ERG off, no ceiling filled in (2026-09-18, round 3, audit item 16). */
+Deno.test('a floor-only anaerobic step goes out as freeride under "N W and up", with no 130% ceiling', () => {
+  const ev = serializeRide({
+    id: 'f', date: '2026-09-15', type: 'ride', name: 'Anaerobic',
+    computed: { anchors, steps: [{ kind: 'work', seconds: 45, powerRange: { lower: 253 } }] },
+  });
+  assert(ev.description.includes('253 W and up\n- 45s freeride'), ev.description);
+  assert(!/\d+-\d+%/.test(ev.description), ev.description);
 });

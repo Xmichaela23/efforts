@@ -176,11 +176,13 @@ Deno.test('the VO2 ride\'s warm-up is p238\'s three lines, the middle one at 95%
   const { row, v3, lines } = built('ride_vo2', 1, 'long_vo2');
   assertEquals(lines.slice(0, 3), [
     '15:00 warm-up · 15-minute easy spin',
-    '5:00 warm-up · 214–261 W · 5 minutes @ 95%',
+    // One band rule (2026-09-18, round 3): a single number at or below 100% never runs over FTP — 95% is 214–250 W at
+    // FTP 250, the same range sweet spot's 95% prints.
+    '5:00 warm-up · 214–250 W · 5 minutes @ 95%',
     '5:00 warm-up · 5-minute easy spin',
   ]);
   const ev = serializeRide({ ...row, computed: { steps: v3, anchors: { ftp_w: 250 } } } as any);
-  assert(ev.description.includes('5 minutes @ 95%\n- Warmup 5m 86-104%'), ev.description);
+  assert(ev.description.includes('5 minutes @ 95%\n- Warmup 5m 86-100%'), ev.description);
   assert(!/55-70%/.test(ev.description), ev.description);
 });
 
@@ -235,4 +237,20 @@ Deno.test('the page\'s percentages in a ride\'s line are never read as its warm-
   assertEquals(v3[0].kind, 'warmup');
   assertEquals(v3[0].powerRange, undefined);
   assertEquals(lines[0], '12:30 warm-up · 10- to 15-minute easy spin');
+});
+
+/**
+ * ⛔ p237's FLOOR REACHES THE WATCH AS ITS WORDS, WITH NO POWER TARGET (2026-09-18, round 3, audit item 16). A Garmin
+ * power target is a low/high pair; the 130%-of-FTP ceiling that filled the high is gone, and the step carries the
+ * screen's own "N W and up".
+ */
+Deno.test('an anaerobic floor goes to Garmin as "N W and up" with no power target', () => {
+  const g = garminSteps({
+    type: 'ride', name: 'Anaerobic', user_ftp: 230,
+    computed: { steps: [{ id: 'a', kind: 'work', duration_s: 45, powerRange: { lower: 253 } }] },
+  });
+  const work = g.find((s: any) => s.durationValue === 45);
+  assert(work, JSON.stringify(g));
+  assert(work.targetType !== 'POWER', JSON.stringify(work));
+  assert(String(work.description ?? '').includes('253 W and up'), JSON.stringify(work));
 });

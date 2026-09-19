@@ -8,7 +8,6 @@ const plannedMinutesOf = (workout: unknown): number | null => {
   const secs = plannedDurationSecondsOf(workout);
   return secs == null ? null : Math.max(1, Math.round(secs / 60));
 };
-import { plainLiftList } from '@/utils/strengthFormatter';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
@@ -316,18 +315,6 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
     return Array.isArray(serverLines) ? serverLines.filter((l: unknown) => typeof l === 'string' && l) : [];
   })();
 
-  /** The same rows `strengthItems` reads — server steps first, authored exercises otherwise — as a plain list. */
-  const plainLiftRows = (() => {
-    if (!isStrength || !plainLift) return [] as ReturnType<typeof plainLiftList>;
-    try {
-      const compD = parseComputed(workout);
-      const cSteps: any[] = Array.isArray(compD?.steps) ? compD.steps : [];
-      const comp = cSteps.filter((st) => String((st as any)?.kind || '').toLowerCase() === 'strength').map((st: any) => st?.strength).filter(Boolean);
-      const ex: any[] = comp.length ? comp : (Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : []);
-      return plainLiftList(ex, 'imperial');
-    } catch { return [] as ReturnType<typeof plainLiftList>; }
-  })();
-
   /**
    * ⛔ THE LINES ARE THE SERVER'S (2026-09-16) — `computed.step_lines`, grouped once by materialize-plan
    * (`_shared/planned-step-lines.ts`). The phone grouping that stood here matched only a work + recovery pair
@@ -428,19 +415,13 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </ul>
         )}
         {/* ⛔ THE PLAIN LIST REPLACES BOTH the subtitle line and the formatted bullets. The header
-            above already carries the name and time; the subtitle and bullets are where the repeated
-            reserve phrases, the cues and `(was 85 lb)` lived. */}
-        {!hideLines && isStrength && plainLift && plainLiftRows.length > 0 ? (
+            above already carries the name and time.
+            ⛔ ITS LINES ARE THE SERVER'S (2026-09-18, round 3, audit item 11): `computed.strength_lines`, the same lines
+            the planned sheet prints. The phone's own list (`plainLiftList`, which printed a stored "By feel") is gone. */}
+        {!hideLines && isStrength && plainLift && strengthItems.length > 0 ? (
           <div className="mt-1 text-subhead text-label font-normal tracking-normal">
-            {plainLiftRows.map((row, idx) => (
-              <React.Fragment key={idx}>
-                {row.heading ? (
-                  <div className="text-caption uppercase tracking-[0.08em] text-label-secondary" style={{ marginTop: idx === 0 ? 0 : 10, marginBottom: 2 }}>
-                    {row.heading}
-                  </div>
-                ) : null}
-                <div className="tabular-nums" style={{ lineHeight: 1.45 }}>{row.text}</div>
-              </React.Fragment>
+            {strengthItems.map((ln, idx) => (
+              <div key={idx} className="tabular-nums" style={{ lineHeight: 1.45 }}>{ln}</div>
             ))}
           </div>
         ) : null}

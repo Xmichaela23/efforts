@@ -27,13 +27,19 @@ export const INTENT_TITLE: Record<string, string> = {
   SKILL: 'Skill',
 };
 
-const INTENT_LABEL_RE = /^(\s*(?:Strength\s*[—–-]\s*)?)(ME|DE|HYP|SKILL):/;
+/**
+ * ⛔ BOTH SPELLINGS THE PAGES PRINT (2026-09-18, round 3, audit item 29): p246/p274 title a day `ME: Upper`, p278 `ME
+ * Upper` (no colon). The pattern needed the colon, so a Ride + Strength heavy day went to the calendar, Garmin,
+ * plans.csv and State as "ME Upper" while a Run + Strength one went as "Maximum Effort: Upper". One title for both:
+ * the colon form, or the abbreviation followed by the body part the frames print (Upper, Lower, Full).
+ */
+const INTENT_LABEL_RE = /^(\s*(?:Strength\s*[—–-]\s*)?)(ME|DE|HYP|SKILL)(:|\s+(?=(?:Upper|Lower|Full)\b))/;
 
 /** `"DE: Lower"` → `"Dynamic Effort: Lower"`. Anything else comes back as it was; null and empty come back ''. */
 export function intentTitle(name: string | null | undefined): string {
   return String(name ?? '').replace(
     INTENT_LABEL_RE,
-    (_m, prefix: string, key: string) => `${prefix}${INTENT_TITLE[key]}:`,
+    (_m, prefix: string, key: string, sep: string) => `${prefix}${INTENT_TITLE[key]}:${sep === ':' ? '' : ' '}`,
   );
 }
 
@@ -42,7 +48,7 @@ export function intentTitle(name: string | null | undefined): string {
  * `"DE: Upper"` → `"Dynamic Effort day, upper body"`. Only the forms the frames mint (`ME` / `DE` / `Test` with
  * `Upper` / `Lower`) are spelled; anything else comes back through `intentTitle`.
  */
-const SPELLED_RE = /^\s*(?:Strength\s*[—–-]\s*)?(ME|DE|Test):\s*(Upper|Lower)\s*$/i;
+const SPELLED_RE = /^\s*(?:Strength\s*[—–-]\s*)?(ME|DE|Test)(?::\s*|\s+)(Upper|Lower)\s*$/i;  // p246 "ME: Upper" and p278 "ME Upper"
 const BODY: Record<string, string> = { upper: 'upper body', lower: 'lower body' };
 export function spelledIntentTitle(name: string | null | undefined): string {
   const m = SPELLED_RE.exec(String(name ?? ''));

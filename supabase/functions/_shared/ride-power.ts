@@ -134,6 +134,22 @@ export function isCeilingOnly(lowerW: number | null | undefined, upperW: number 
 }
 
 /**
+ * ⛔⛔ THE WORDS FOR A ONE-SIDED RIDE STEP — ONE OWNER, EVERY SCREEN AND EVERY SEND (2026-09-18, round 3, audit items
+ * 16 and 17). p237's anaerobic work is a floor ("best done by feel with a power floor rather than a specific power
+ * target"): "253 W and up". p239's easy ride is a ceiling ("easy ride below 75%"): "under 173 W". The screen printed
+ * these while Garmin and Intervals.icu/Zwift sent a 130%-of-FTP ceiling on the floor (a number p237 prints only as
+ * the progressive option's top) and Zwift sent no target at all on the easy ride. Now the Planned tab, the session
+ * detail, the Garmin step and the Intervals.icu step all print these words; a device target is sent only where the
+ * device can hold the page's own shape (Garmin's 0-to-ceiling range). Null on a two-sided step.
+ */
+export function oneSidedPowerText(lowerW: number | null | undefined, upperW: number | null | undefined): string | null {
+  if (isCeilingOnly(lowerW, upperW)) return `under ${Math.round(Number(upperW))} W`;
+  const lo = Number(lowerW);
+  if (upperW == null && Number.isFinite(lo) && lo > 0) return `${Math.round(lo)} W and up`;
+  return null;
+}
+
+/**
  * Share of the stream's samples (zeros kept — coasting is 0 W) at or above the floor and, when there is a ceiling,
  * at or under it; the caller multiplies by the interval's seconds. A floor with no ceiling (p237) counts every
  * sample at or above the floor. The Execution score's numerator for one interval (Garmin, "Workout Execution

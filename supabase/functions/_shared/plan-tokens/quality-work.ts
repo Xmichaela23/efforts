@@ -160,14 +160,9 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
  */
 export const SINGLE_PERCENT_BAND = 0.10;
 
-/**
- * ⛔ THE CEILING A FLOOR-ONLY STEP LEAVES THE APP WITH — p237: *"start at 110% and progress to
- * 125-130% by the end"*. The plan keeps the ceiling off (see the `floor` rule below); a Garmin step's
- * power target is a low/high pair and Intervals.icu's workout text takes `lo-hi%`, so the page's own top fills
- * the high in both senders. ⚠️ PERCENT OF FTP, not a multiple of the floor. Defined once (2026-09-16): it lived in
- * the Garmin sender only, and the Intervals writer refused the whole ride (`unreadable power range {"lower":185}`).
- */
-export const FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP = 1.30;
+// ⛔ `FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP` (130% of FTP, filled in as the ceiling of p237's floor on the Garmin and
+// Intervals.icu sends) IS DELETED (2026-09-18, round 3, audit item 16): the sends print the floor's words and hold no
+// ceiling, the same as the screen (`ride-power.ts oneSidedPowerText`).
 
 /**
  * ⛔ THE RIDE TYPE'S OWN RULE FOR A STEP'S RANGE (2026-09-18, Michael approved). Decided here, where a percentage
@@ -207,8 +202,14 @@ export function wattsAt(
   // p237 — a floor and no ceiling. The caller offers the rule to work steps only.
   if (rule === 'floor') return { lower: Math.round(lo * f) };
   if (lo === hi) {
-    // pp238–239 — never over threshold. A printed surge above 100% keeps its own band.
-    const top = rule === 'under_threshold' && lo <= 1 ? Math.min(lo * (1 + SINGLE_PERCENT_BAND), 1) : lo * (1 + SINGLE_PERCENT_BAND);
+    /**
+     * ⛔ ONE BAND RULE FOR EVERY SINGLE PERCENTAGE (2026-09-18, round 3, audit item 26). The same 95% printed 197–240 W
+     * on the VO2 warm-up (p238) and 197–230 W on sweet spot, because the cap at FTP applied only under the sweet-spot
+     * rule. Now a single number at or below 100% never runs over FTP wherever it is printed; a printed surge above
+     * 100% keeps its own band. The cap is pp238–239's "as close to threshold as possible without exceeding it";
+     * OURS — applying it to every single number at or below 100%, not only sweet spot, so one percentage is one range.
+     */
+    const top = lo <= 1 ? Math.min(lo * (1 + SINGLE_PERCENT_BAND), 1) : lo * (1 + SINGLE_PERCENT_BAND);
     return {
       lower: Math.round(lo * f * (1 - SINGLE_PERCENT_BAND)),
       upper: Math.round(top * f),

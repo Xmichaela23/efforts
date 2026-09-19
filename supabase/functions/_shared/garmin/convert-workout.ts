@@ -4,7 +4,8 @@
 import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // ⛔ ONE BAND AROUND A SINGLE PERCENTAGE, DEFINED ONCE (2026-09-15) — see the note on the constant.
 // The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
-import { SINGLE_PERCENT_BAND, FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP } from '../plan-tokens/quality-work.ts'
+import { SINGLE_PERCENT_BAND } from '../plan-tokens/quality-work.ts'
+import { oneSidedPowerText } from '../ride-power.ts'
 import { judgedPowerRange } from '../ride-power.ts'
 
 
@@ -226,19 +227,15 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         let low = parseW((cs as any)?.power_range?.lower ?? (cs as any)?.powerRange?.lower ?? (cs as any)?.target_low)
         let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.powerRange?.upper ?? (cs as any)?.target_high)
         /**
-         * ⛔⛔ A FLOOR WITH NO CEILING STILL HAS TO REACH THE WATCH (2026-09-15, p237). A Garmin step's
-         * custom power target is a LOW/HIGH pair; there is no open-ended form, and without a high this
-         * fell through to the centre branch below and sent floor ×0.95 to floor ×1.05 — NARROWER than
-         * the prescription it started from, which is the "score that lies" class on a watch screen.
-         * ⛔ THE CEILING SENT IS 130% OF FTP — p237's own top ("start at 110%, progress to 125-130%").
-         * It is a percentage of FTP, NOT 1.30 × the floor: at an FTP of 168 a 120% step goes as
-         * 202 → 218 W. `floor × 1.30` would send 262 W, which is 156% of FTP, a number p237 never prints.
-         * ⚠️ WITH NO FTP TO READ there is no honest ceiling, so the step goes with no power target at
-         * all rather than one worked out from the floor.
+         * ⛔⛔ A ONE-SIDED STEP CARRIES THE PAGE'S WORDS ON THE WATCH STEP (2026-09-18, round 3, audit items 16 and 17),
+         * the same words the screen prints (`oneSidedPowerText`). A Garmin power target is a low/high pair with no
+         * open-ended form, so p237's floor ("253 W and up") goes with NO power target — the 130%-of-FTP ceiling that
+         * was filled in is a number p237 prints only as the progressive option's top. p239's ceiling ("under 173 W")
+         * keeps its 0-to-ceiling target, which is the page's own shape, and carries the words too.
          */
-        if (typeof low === 'number' && high == null && userFTP) {
-          high = Math.max(low, Math.round(userFTP * FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP))
-        }
+        const oneSided = typeof low === 'number' ? oneSidedPowerText(low, high ?? null) : null
+        if (oneSided) step.description = step.description ? `${step.description} · ${oneSided}` : oneSided
+        if (typeof low === 'number' && high == null) return
         if (typeof low === 'number' && typeof high === 'number') {
           // A single target (low == high) goes as SINGLE_PERCENT_BAND either side — the score's own rule
           // (`ride-power.ts judgedPowerRange`), never a zero-width range on the watch (2026-09-18).
