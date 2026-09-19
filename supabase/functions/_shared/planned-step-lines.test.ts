@@ -68,11 +68,11 @@ Deno.test('the approved ladder lines, word for word (2026-09-17)', () => {
     '10:00 warm-up · HR 138–144 · ref 10:56–12:22/mi',
     'Set 1',
     '3:00, 2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
-    'jog after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi',
+    'after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi',
     '2:00 @ 10:56–12:22/mi between sets',
     'Set 2',
     '2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
-    'jog after each: 1:20, 40 s, 30 s @ 15:01–16:55/mi',
+    'after each: 1:20, 40 s, 30 s @ 15:01–16:55/mi',
     '8:00 cool-down · HR 138–144 · ref 10:56–12:22/mi',
   ]);
 });

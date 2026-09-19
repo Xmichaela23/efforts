@@ -263,7 +263,7 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
  *
  *   Set 1
  *   3:00, 2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi
- *   jog after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi
+ *   after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi
  *   2:00 @ 10:56–12:22/mi between sets
  *   Set 2
  *   …
@@ -319,7 +319,9 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
           setNo++;
           out.push(`Set ${setNo}`);
           out.push(`${block.work.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.work[0], opts)}`);
-          out.push(`jog after each: ${block.rec.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.rec[0], opts)}`);
+          // ⛔ "after each", not "jog after each" (2026-09-18, book-language): the page gives these a percentage
+          // ("2 minutes @ 60%"), never the word jog.
+          out.push(`after each: ${block.rec.map((s) => lengthText(s, opts)).join(', ')}${targetText(block.rec[0], opts)}`);
           k += block.covered;
           // The lone recovery that separates one set from the next.
           if (k < seg.length && isRecovery(seg[k]) && setBlockAt(seg, k + 1, opts)) {
