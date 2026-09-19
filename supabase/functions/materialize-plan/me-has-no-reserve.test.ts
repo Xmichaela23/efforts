@@ -64,9 +64,11 @@ Deno.test('⛔ THE LOGGER NO LONGER INVENTS A 3 WHEN THE ROW STATES NOTHING', as
    */
   const src = await Deno.readTextFile(
     new URL('../../../src/components/StrengthLogger.tsx', import.meta.url).pathname);
-  assertEquals(/rirLoggedSeed\(exercise\.target_rir\)\s*\?\?\s*3/.test(src), false,
+  assertEquals(/reserveSeedFor\(exercise\)\s*\?\?\s*3/.test(src), false,
     'the fabricated-3 fallback came back');
-  assert(/const suggestedRir = rirLoggedSeed\(exercise\.target_rir\);/.test(src),
+  // 2026-09-18 (book-language fix): the seed is `reserveSeedFor` — null on every p218 row, the row's own
+  // number otherwise (`_shared/strength/strength-display-lines.ts`).
+  assert(/const suggestedRir = reserveSeedFor\(exercise\);/.test(src),
     'the Done handler stopped reading the row target');
   assert(/if \(suggestedRir == null\)/.test(src),
     'the no-target branch is gone — a target-less row will log a reserve nobody stated');

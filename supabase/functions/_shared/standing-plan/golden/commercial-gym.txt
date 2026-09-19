@@ -27,9 +27,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to
-      -      Pogo Hops                      1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -42,7 +42,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -50,7 +50,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Saturday] run      Long Run — 90 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
@@ -59,7 +59,7 @@ WEEK 02  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -68,7 +68,7 @@ WEEK 02  column=standard
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 45wx5 175wx5 235wx3 285wx2 315x
+      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -76,9 +76,9 @@ WEEK 02  column=standard
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | how-to
-      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      A-Skip                         1x           @ Bodyweight    | how-to
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -91,7 +91,7 @@ WEEK 02  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -99,7 +99,7 @@ WEEK 02  column=standard
   [Saturday] run      Long Run — 91 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -107,7 +107,7 @@ WEEK 03  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -116,7 +116,7 @@ WEEK 03  column=standard
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 45wx5 175wx5 235wx3 285wx2 315x
+      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -124,9 +124,9 @@ WEEK 03  column=standard
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | how-to
-      -      Lunge Hops                     1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      B-Skip                         1x           @ Bodyweight    | how-to
+      -      Lunge Hops                     1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -139,7 +139,7 @@ WEEK 03  column=standard
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -147,7 +147,7 @@ WEEK 03  column=standard
   [Saturday] run      Long Run — 85 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -155,7 +155,7 @@ WEEK 04  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -164,7 +164,7 @@ WEEK 04  column=standard
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 45wx5 175wx5 235wx3 285wx2 315x
+      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -172,9 +172,9 @@ WEEK 04  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | how-to
-      -      Single-Leg Hops                1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      Bounding                       1x           @ Bodyweight    | how-to
+      -      Single-Leg Hops                1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -187,7 +187,7 @@ WEEK 04  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -195,7 +195,7 @@ WEEK 04  column=standard
   [Saturday] run      Long Run — 89 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -203,7 +203,7 @@ WEEK 05  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -212,7 +212,7 @@ WEEK 05  column=standard
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 45wx5 175wx5 235wx3 285wx2 315x
+      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -220,9 +220,9 @@ WEEK 05  column=standard
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to
-      -      Skater Hops                    1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
+      -      Skater Hops                    1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -235,7 +235,7 @@ WEEK 05  column=standard
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -243,7 +243,7 @@ WEEK 05  column=standard
   [Saturday] run      Long Run — 68 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -251,7 +251,7 @@ WEEK 06  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -260,7 +260,7 @@ WEEK 06  column=standard
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 45wx5 175wx5 235wx3 285wx2 315x
+      ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -268,9 +268,9 @@ WEEK 06  column=standard
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | how-to
-      -      Pogo Hops                      1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      A-Skip                         1x           @ Bodyweight    | how-to
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -283,7 +283,7 @@ WEEK 06  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -291,7 +291,7 @@ WEEK 06  column=standard
   [Saturday] run      Long Run — 80 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -299,7 +299,7 @@ WEEK 07  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -308,7 +308,7 @@ WEEK 07  column=standard
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 45wx5 175wx5 240wx3 290wx2 320x
+      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -316,9 +316,9 @@ WEEK 07  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | how-to
-      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      B-Skip                         1x           @ Bodyweight    | how-to
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -331,7 +331,7 @@ WEEK 07  column=standard
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -339,7 +339,7 @@ WEEK 07  column=standard
   [Saturday] run      Long Run — 78 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -347,7 +347,7 @@ WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -356,7 +356,7 @@ WEEK 08  column=standard
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 45wx5 175wx5 240wx3 290wx2 320x
+      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -364,9 +364,9 @@ WEEK 08  column=standard
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | how-to
-      -      Lunge Hops                     1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      Bounding                       1x           @ Bodyweight    | how-to
+      -      Lunge Hops                     1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -379,7 +379,7 @@ WEEK 08  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -387,7 +387,7 @@ WEEK 08  column=standard
   [Saturday] run      Long Run — 98 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -395,7 +395,7 @@ WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -404,7 +404,7 @@ WEEK 09  column=standard
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 45wx5 175wx5 240wx3 290wx2 320x
+      ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -412,9 +412,9 @@ WEEK 09  column=standard
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | how-to
-      -      Single-Leg Hops                1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
+      -      Single-Leg Hops                1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -427,7 +427,7 @@ WEEK 09  column=standard
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -435,7 +435,7 @@ WEEK 09  column=standard
   [Saturday] run      Long Run — 97 min
   NOTES
       [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -443,7 +443,7 @@ WEEK 10  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -452,7 +452,7 @@ WEEK 10  column=standard
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 45wx5 180wx5 245wx3 295wx2 325x
+      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -460,9 +460,9 @@ WEEK 10  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | how-to
-      -      Skater Hops                    1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      A-Skip                         1x           @ Bodyweight    | how-to
+      -      Skater Hops                    1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -475,14 +475,14 @@ WEEK 10  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 82 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -490,7 +490,7 @@ WEEK 11  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -499,7 +499,7 @@ WEEK 11  column=standard
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 45wx5 180wx5 245wx3 295wx2 325x
+      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -507,9 +507,9 @@ WEEK 11  column=standard
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | how-to
-      -      Pogo Hops                      1x4          @ Bodyweight    | how-to
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | how-to
+      -      B-Skip                         1x           @ Bodyweight    | how-to
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -522,14 +522,14 @@ WEEK 11  column=standard
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
@@ -537,7 +537,7 @@ WEEK 12  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 45wx5 115wx5 155wx3 185wx2 205x
+      ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tricep Pushdown                3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -546,7 +546,7 @@ WEEK 12  column=standard
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 45wx5 180wx5 245wx3 295wx2 325x
+      ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -554,9 +554,9 @@ WEEK 12  column=standard
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | how-to
-      -      Rebound Jumps                  1x4          @ Bodyweight    | how-to
-      -      Hopscotch                      1x4          @ Bodyweight    | how-to
+      -      Bounding                       1x           @ Bodyweight    | how-to
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to
+      -      Hopscotch                      1x           @ Bodyweight    | how-to
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -569,13 +569,13 @@ WEEK 12  column=standard
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 45wx5 150wx5 205wx3 245wx2 270x
+      ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 87 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)

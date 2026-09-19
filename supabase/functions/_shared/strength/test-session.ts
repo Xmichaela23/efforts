@@ -114,11 +114,9 @@ export const TEST_LAST_SET_LINE = 'Perform the maximum number of repetitions pos
 const TEST_LAST_SET_HINT = TEST_LAST_SET_LINE;
 // OURS — `ANCHOR_HINT` "8 to 10 reps near failure": a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count
 const ANCHOR_HINT = 'A weight for 8 to 10 reps near failure. Enter it here.';
-const PULLUP_SCAP_HINT = 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.';
-// OURS — `PULLUP_EASY_HINT` 2–3 easy pull-ups and ~2 min rest: moved from the logger, no source
-const PULLUP_EASY_HINT = '2–3 easy pull-ups, then rest ~2 min before the test set.';
-const PULLUP_TEST_HINT =
-  'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.';
+// ⛔ 2026-09-18: the pull-up test's three hints (scap pulls; "2–3 easy pull-ups, then rest ~2 min"; "ONE
+// all-out set: strict, full range, no kipping…") and its two warm-up sets (5 scap pulls, 3 easy pull-ups)
+// came off — no page gives a pull-up test, and every count was ours. The one set that records the count stays.
 
 /**
  * ⛔ p215's own words per step (2026-09-18). "Step 1 — the first ramp set, as prescribed." was ours.
@@ -172,10 +170,7 @@ function pullUpRow(name: string): TestSessionRow {
   return {
     name,
     sets: [
-      // OURS — 5 scap pulls and 3 easy pull-ups; the logger carried these counts with no source.
-      { weight: 0, reps: 5, set_type: 'warmup', set_hint: PULLUP_SCAP_HINT },
-      { weight: 0, reps: 3, set_type: 'warmup', set_hint: PULLUP_EASY_HINT },
-      { weight: 0, set_type: 'working', rep_max_test: true, set_hint: PULLUP_TEST_HINT },
+      { weight: 0, set_type: 'working', rep_max_test: true },
     ],
   };
 }

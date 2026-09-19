@@ -26,7 +26,8 @@ Deno.test('⛔ THE LAUNCHER WITH A MAX ON FILE — the empty bar, then p215\'s t
   // The press's empty bar is the bar, not 0.
   assertEquals(ohp.sets[0].weight, 45);
   assertEquals(weights(ohp), [45, 85, 95, 100]);
-  assertEquals(pull.sets.map((s) => [s.set_type, s.reps ?? null, !!s.rep_max_test]), [['warmup', 5, false], ['warmup', 3, false], ['working', null, true]]);
+  // 2026-09-18: the pull-up warm-ups (5 scap pulls, 3 easy pull-ups) and all three hints were ours and came off.
+  assertEquals(pull.sets.map((s) => [s.set_type, s.reps ?? null, !!s.rep_max_test, s.set_hint ?? null]), [['working', null, true, null]]);
 });
 
 Deno.test('⛔ THE LAUNCHER WITH NO MAX ON FILE — the anchor rows, not a 45/95 bar start', () => {

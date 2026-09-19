@@ -90,8 +90,9 @@ import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 // optimized for the day and the athlete develops confidence in it". The effort count is RECORDED after,
 // never targeted. Swap offers the other drills in the SAME family (the three buckets are the session's
 // structure), gated on equipment: ladder drills need an agility ladder.
-const PLYO_SESSION_NOTE = 'Drills are done separately, with full rest between efforts. The objective is quality: fatigue, poor form and imprecise movement defeat it. Each drill is repeated until the movement is crisp and you are confident in it, then you move on.';
-const PLYO_STOP_RULE = 'Stop when the movement stops being crisp.';
+// ⛔ 2026-09-18: the two plyo lines that stood here ("Drills are done separately, with full rest…" and "Stop
+// when the movement stops being crisp.") and the "For {benefit}." lead came off — paraphrases of p227, whose
+// words the SOURCE doc does not quote. What stays is the line about the box itself.
 const PLYO_LADDER_DRILLS = new Set(['ladder drills']);
 function plyoFamilyFor(name: string): PlyoFamily | null {
   const n = String(name || '').trim().toLowerCase();
@@ -5668,20 +5669,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </span>
                         </div>
                       )}
-                      {exIsPlyo && (() => {
-                        const fam = plyoFamilyFor(exercise.name);
-                        const firstPlyoIdx = exercises.findIndex((e) => isPlyometric(e.name) || equipmentForExercise(e.name) === 'plyo');
-                        return (
-                          <div className="px-1.5 pb-1.5">
-                            {firstPlyoIdx === exerciseIndex && (
-                              <p className="text-caption text-label-secondary leading-snug mb-1.5">{PLYO_SESSION_NOTE}</p>
-                            )}
-                            <p className="text-caption text-label-secondary leading-snug">
-                              {fam ? `For ${fam.benefit}. ` : ''}{PLYO_STOP_RULE} Efforts are a record, not a target.
-                            </p>
-                          </div>
-                        );
-                      })()}
+                      {exIsPlyo && (
+                        <div className="px-1.5 pb-1.5">
+                          <p className="text-caption text-label-secondary leading-snug">Efforts are a record, not a target.</p>
+                        </div>
+                      )}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
                         <span className={labelCls}>{exIsPlyo ? '' : 'Set'}</span>
                         <span className={labelCls}>{exIsPlyo ? '' : 'Previous'}</span>
@@ -6039,7 +6031,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     under WCAG 2.2's 4.5:1 (2026-09-18). The step is now weight:
                                     warm-up medium, working set semibold, both full colour. */}
                                 <span className={`text-caption uppercase tracking-wide text-strength ${isWarmup ? 'font-medium' : 'font-semibold'}`}>
-                                  {isWarmup ? 'Warmup' : 'Working set — add when ready'}
+                                  {/* 2026-09-18: "— add when ready" came off (on no page). */}
+                                  {isWarmup ? 'Warmup' : 'Working set'}
                                 </span>
                                 {set.setHint && <span className="text-caption text-label-secondary italic">{set.setHint}</span>}
                               </div>

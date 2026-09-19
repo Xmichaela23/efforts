@@ -179,7 +179,6 @@ import {
   type TestedLift,
   type WorkingNumber,
 } from './working-number.ts';
-import { rampFor, RAMP_NOTE, slotTakesRamp } from './warmup.ts';
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
 import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
 
@@ -1942,23 +1941,9 @@ function exerciseForSlot(
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
       // on that shape, so the result travels as its own field rather than inside the string.
       ...(lastReps.length > 0 ? { last_reps: lastReps } : {}),
-      /**
-       * ⛔⛔ THE RAMP GOES IN FRONT OF THE WORK SETS — his Rule 2a, p140: *"your warm-up should begin
-       * with unloaded, rapid concentric back squats, working up in weight"*, and *"the first set of
-       * your skill work should also be the last set of your warm-up."*
-       *
-       * ⚠️ IT IS PREPENDED TO `set_plan`, TAGGED `warmup`, AND COUNTS AS NOTHING. `sets` above is
-       * unchanged and still reports the WORK sets only — every reader that counts (the earned-set
-       * ladder, the rep-band readers, the load ledger, p086's session ceiling) is anchored on that
-       * number and on the tag, so a ramp that inflated either would feed the progression evidence it
-       * is not.
-       *
-       * ⚠️ ONLY WHERE A WEIGHT IS PRESCRIBED AND THE SLOT EARNS ONE. A by-feel row has nothing to
-       * converge on, and `slotTakesRamp` keeps it off the HYP rows — a twelve-rep set is its own ramp.
-       */
+      // ⛔ 2026-09-18: no warm-up ramp in front of the work sets — its weights and reps were ours
+      // (`warmup.ts`). `set_plan` is the work sets only.
       set_plan: [
-        // OURS — `roundTo` default 5 lb, as above
-        ...(slotTakesRamp(slot.intent) ? rampFor(weight, args.roundTo ?? 5) : []),
         ...Array.from({ length: sets }, () => ({
           weight,
           // ⚠️ THE KEY IS OMITTED, NOT ZEROED. `plannedSetsFor` reads a non-positive rep count as
@@ -2154,8 +2139,10 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     // ⛔ ONE ROW, ONE DRILL, and the efforts sit in `reps` because a plyometric row shows reps and
     // nothing else (D-3452) — there is no load to record and no plate calculator to draw.
     sets: 1,
-    // the range's top is the row's recorded-efforts capacity; the logger records, never targets
-    reps: PLYO_DOSE.effortsPerDrill.hi,
+    // ⛔ 2026-09-18: no effort count on the row. "4" (the top of an OURS 3-4) printed as "1 × 4" on the plan
+    // and the drawer; p227 says each drill is performed "multiple times" and gives no figure. The logger
+    // records efforts after, never targets them. Empty, like a carry row.
+    reps: '',
     weight: 'Bodyweight',
     load_prescribed: false,
     /**

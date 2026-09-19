@@ -46,7 +46,7 @@ Deno.test('⛔ NO GENERIC ROW SURVIVES — every plyo row names a drill from his
         assert(!/^plyometric drills$/i.test(r.name), 'the placeholder row is back');
         // ⛔ ONE ROW, ONE DRILL. `sets: 3` on a row called "drills" is the placeholder in disguise.
         assertEquals(r.sets, 1, `${r.name}: a plyo row prescribes one drill`);
-        assertEquals(r.reps, PLYO_DOSE.effortsPerDrill.hi); // a range now (2026-09-02); the row carries the top as capacity
+        assertEquals(r.reps, ''); // 2026-09-18: no count — p227 gives none; the 3-4 was ours
         assertEquals(r.load_prescribed, false);
       }
     }

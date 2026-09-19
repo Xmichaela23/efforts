@@ -119,15 +119,8 @@ export function advanceNudgeFor(args: {
    * what happened and instructs nothing"*, three paragraphs up, written for the engine-owned case.
    * The reps are the athlete's own logged work, so the sentence needs no page.
    */
-  if (isBodyweightLogged(args.movement ?? '')) {
-    return reserveLogged
-      ? `Last time: ${reps} — top of the band with room to spare.`
-      : `Last time: ${reps} — top of the band.`;
-  }
-
-  // 2026-09-09: "add weight" at the top of the band was our trigger, not the page's (p86: the reserve is
-  // the rule; p111: overload is not more weight every session). The fact stays; the instruction is gone.
-  return reserveLogged
-    ? `Last time: ${reps} — top of the band with room to spare.`
-    : `Last time: ${reps} — top of the band.`;
+  // ⛔ 2026-09-18: "with room to spare" came off — ours, on no page ("recovery to spare" on p218 is about
+  // sets). The logged fact stays, the same on every row.
+  void reserveLogged;
+  return `Last time: ${reps} — top of the band.`;
 }

@@ -105,7 +105,7 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
   const bookWord = BOOK_WORDS.has(intent) ? intent : null;
   const rirText = reserveTextFor(exercise);
   const parts: string[] = [bookWord ? `${bookWord} · ${name}` : name];
-  if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
+  if (sets > 0 && reps != null && String(reps).trim()) parts.push(`${sets}×${reps}`);
   if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);
 
   const weightDisplay = exercise?.weight_display;
