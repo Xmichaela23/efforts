@@ -629,6 +629,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'dumbbell curls': [['dumbbells']],
   'hammer curls': [['dumbbells']],
   'cable curls': [['cable'], ['bands']],
+  'cable curl': [['cable'], ['bands']], // one entry with `cable curls` since 2026-09-18 (SAME_MOVEMENT)
   'tricep extensions': [['dumbbells'], ['barbell'], ['bands']],
   'bent over reverse flye': [['dumbbells']],
   'rear delt fly': [['dumbbells'], ['cable'], ['bands']],
@@ -642,6 +643,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // Prone on the floor. Light plates are optional, never required.
   'prone y t w raise': ALWAYS,
   'ytw raises': ALWAYS,
+  'ytw raise': ALWAYS, // one entry with `ytw raises` / `prone y t w raise` since 2026-09-18 (SAME_MOVEMENT)
   'lateral raise': [['dumbbells'], ['cable'], ['bands']],
   'dumbbell lateral raise': [['dumbbells']],
   'band lateral raise': [['bands']],
@@ -679,6 +681,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'single leg squat': ALWAYS,
   'pistol squats': ALWAYS,
   'lunges': ALWAYS,
+  'lunge': ALWAYS, // one entry with `lunges` since 2026-09-18 (SAME_MOVEMENT)
   'walking lunge': ALWAYS,
   'lateral lunge': ALWAYS,
   // ⚠️ `box` IS MENTION-ONLY — no chip produces it, so a route through it could never be satisfied.
@@ -697,6 +700,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'single arm row': [['dumbbells']],
   'light db row': [['dumbbells']],
   'kettlebell rows': [['kettlebell']],
+  'kettlebell row': [['kettlebell']], // one entry with `kettlebell rows` since 2026-09-18 (SAME_MOVEMENT)
   'band row': [['bands']],
   'resistance band row': [['bands']],
   'band pull apart': [['bands']],

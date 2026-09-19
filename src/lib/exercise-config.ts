@@ -94,22 +94,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // PRIMARY COMPOUNDS — exact keys so "squat" / "deadlift" never fuzzy-match accessories first
   // ============================================================================
 
-  squat: {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    notes: 'Barbell back squat — use squat 1RM directly.',
-  },
   'back squat': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-  },
-  'barbell back squat': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 1.0,
@@ -124,13 +109,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
     notes: 'Conventional deadlift — use deadlift / trap bar 1RM from baselines.',
-  },
-  'conventional deadlift': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
   },
   'trap bar deadlift': {
     pattern: 'hip_dominant',
@@ -167,14 +145,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
     ratioIsTotal: true,
     notes: 'Hold dumbbells at sides.'
-  },
-  'walking lunges': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.50,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    ratioIsTotal: true
   },
   'reverse lunge': {
     pattern: 'knee_dominant',
@@ -222,13 +192,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   
   // Step-ups: Heavily technique dependent
   'step up': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.40,
-    displayFormat: 'perHand',
-    isUnilateral: true
-  },
-  'step ups': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 0.40,
@@ -297,14 +260,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     confidence: 'high'
   },
-  'rdl': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.75,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high'
-  },
   
   // Single Leg RDL: Unilateral, heavily stability-limited
   // Uses ONE dumbbell (contralateral hold), so displayFormat is 'total' not 'perHand'
@@ -316,13 +271,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',  // One DB held opposite working leg
     isUnilateral: true,
     notes: 'Hold dumbbell on opposite side of working leg.'
-  },
-  'single leg romanian deadlift': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: true
   },
   
   // Glute Bridge: Bodyweight or light load
@@ -381,23 +329,8 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Barbell bench press. Use bench 1RM baseline directly.'
   },
-  'bench': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false
-  },
   
   // Dumbbell Bench Press: Each DB ~37-40% of barbell bench (stability demand)
-  'dumbbell bench press': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.80, // Total DB load = 80% of barbell
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    ratioIsTotal: true  // 0.80 = total, divide by 2 for each hand
-  },
   'db bench press': {
     pattern: 'horizontal_push',
     primaryRef: 'bench',
@@ -415,23 +348,8 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false
   },
-  'incline bench': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.85,
-    displayFormat: 'total',
-    isUnilateral: false
-  },
   
   // Dumbbell Incline: Total ~70% of flat barbell
-  'dumbbell incline press': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.70,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    ratioIsTotal: true
-  },
   
   // Close Grip Bench: ~90% of regular bench
   'close grip bench press': {
@@ -453,23 +371,9 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Total load (bodyweight + added). Shows added weight if ≥10 lb, otherwise "Bodyweight".'
   },
-  'dip': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.90,
-    displayFormat: 'total',
-    isUnilateral: false
-  },
   
   // Chest Fly: Isolation, much lower
   'chest fly': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.35,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
-  'dumbbell fly': {
     pattern: 'horizontal_push',
     primaryRef: 'bench',
     ratio: 0.35,
@@ -491,41 +395,9 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     confidence: 'medium'
   },
-  'barbell rows': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.80,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'medium'
-  },
-  'bent over row': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.80,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'medium'
-  },
   
   // Dumbbell Row: Each DB ~40-45% of bench (per hand)
   // ratio is per-hand weight, not total
-  'dumbbell row': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    confidence: 'high'
-  },
-  'dumbbell rows': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    confidence: 'high'
-  },
   
   // Generic "rows" alias (for abbreviated instructions)
   'rows': {
@@ -588,13 +460,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'perHand',
     isUnilateral: false
   },
-  'rear delt flyes': {
-    pattern: 'horizontal_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
   // ⛔ THE ONE THAT ADDS RANGE RATHER THAN MORE OF THE SAME (Michael: *"Face Pull variants aren't
   // it — Chest Supported Row would be the one"*). Face pulls and pull-aparts are both light,
   // high-rep rear-delt work; this is a loaded row, so the pool spans a real load range instead of
@@ -613,28 +478,12 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     confidence: 'medium'
   },
-  'chest supported rows': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    confidence: 'medium'
-  },
 
   // ============================================================================
   // SHOULDERS (Overhead Press Reference)
   // ============================================================================
   
   // Dumbbell Shoulder Press: Total ~70% of barbell OHP
-  'dumbbell shoulder press': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 0.70,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    ratioIsTotal: true  // 0.70 = total, divide by 2 for each hand
-  },
   'db shoulder press': {
     pattern: 'vertical_push',
     primaryRef: 'overhead',
@@ -645,48 +494,10 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   
   // Standing/Seated Shoulder Press (OHP): Uses overhead 1RM directly
-  'shoulder press': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high'
-  },
-  'overhead press': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high'
-  },
-  'standing barbell overhead press': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high'
-  },
   
   // Lateral Raise: Very light, isolation
   // ~20-25% of OHP per dumbbell
   'lateral raise': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 0.25,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
-  'lateral raises': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 0.25,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
-  'dumbbell lateral raise': {
     pattern: 'vertical_push',
     primaryRef: 'overhead',
     ratio: 0.25,
@@ -721,20 +532,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // "one movement, two names, two patterns". Shoulder/rear-delt work is scapular PULLING; there is
   // no press in it, and the whole family (face pull, band face pull, cable face pull, rear delt fly,
   // band pull apart, ytw raise) now sits together.
-  'reverse fly': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'overhead',
-    ratio: 0.20,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
-  'reverse flye': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'overhead',
-    ratio: 0.20,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
   
   // YTW Raises: Prehab, very light
   // ⛔ PATTERN CORRECTED vertical_push → horizontal_pull (2026-08-03). A prone Y-T-W raise is
@@ -755,21 +552,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // ⚠️ `primaryRef` STAYS `overhead`, and that is not a contradiction: primaryRef is the LOADING
   // reference and pattern is the SLOT. `barbell row` is primaryRef 'bench' at pattern horizontal_pull
   // for the same reason. See MovementPattern's docblock.
-  'ytw raises': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'overhead',
-    ratio: 0.15,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    notes: 'Light dumbbells or plates for scapular health.'
-  },
-  'ytw raise': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'overhead',
-    ratio: 0.15,
-    displayFormat: 'perHand',
-    isUnilateral: false
-  },
   
   // ============================================================================
   // EXPLOSIVE/PLYOMETRIC (Bodyweight)
@@ -930,13 +712,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false
   },
-  'calf raises': {
-    pattern: 'calf',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
   'single leg calf raise': {
     pattern: 'calf',
     primaryRef: null,
@@ -965,35 +740,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Bodyweight. Add weight when 3x12 is easy.'
   },
-  'pull ups': {
-    pattern: 'vertical_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
-  'pullup': {
-    pattern: 'vertical_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
-  'pullups': {
-    pattern: 'vertical_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
   'chin up': {
-    pattern: 'vertical_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
-  'chin ups': {
     pattern: 'vertical_pull',
     primaryRef: null,
     ratio: 0.0,
@@ -1036,27 +783,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
     notes: 'Standard → Diamond → Decline → Archer for progression.'
-  },
-  'push ups': {
-    pattern: 'horizontal_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
-  'pushup': {
-    pattern: 'horizontal_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
-  },
-  'pushups': {
-    pattern: 'horizontal_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
   },
   'diamond push up': {
     pattern: 'horizontal_push',
@@ -1109,13 +835,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
     notes: 'Elevate feet to progress toward HSPU.'
-  },
-  'pike push ups': {
-    pattern: 'vertical_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false
   },
   
   // ============================================================================
@@ -1376,14 +1095,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // Kettlebell/dumbbell swings: ~20-25% of deadlift for explosive work
   // ============================================================================
   
-  'kettlebell swing': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: false,
-    notes: 'Explosive hip hinge. Weight should allow powerful hip snap.'
-  },
   'kettlebell swings': {
     pattern: 'hip_dominant',
     primaryRef: 'deadlift',
@@ -1413,33 +1124,12 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false
   },
-  'kb swings': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: false
-  },
-  'db swings': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: false
-  },
   
   // ============================================================================
   // STEP-UPS (Squat Reference) - additional aliases
   // ============================================================================
   
   'box step up': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.40,
-    displayFormat: 'perHand',
-    isUnilateral: true
-  },
-  'box step ups': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 0.40,
@@ -1548,15 +1238,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
 
   // ── MAIN LIFTS THAT HAD NO ENTRY (the `press` → `leg press` class) ───────────────────────────
   // Sibling: `overhead press` (overhead × 1.0, total) / `bench press` (bench × 1.0, total).
-  press: {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high',
-    notes: "the barbell overhead press under its other name. Without this key it fuzzy-matched `leg press` at 1.5x squat.",
-  },
   'military press': {
     pattern: 'vertical_push',
     primaryRef: 'overhead',
@@ -1575,28 +1256,11 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     confidence: 'medium',
   },
-  'barbell bench press': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high',
-  },
 
   // ── PRESS VARIANTS that the new `press` key would otherwise have captured ────────────────────
   // ⚠️ THESE TWO ARE HERE BECAUSE OF THE KEY ABOVE. Both resolved to nothing before; adding `press`
   // made them fuzzy-match it and inherit a BARBELL total. They are dumbbell/kettlebell movements, so
   // they get the `dumbbell shoulder press` sibling (overhead × 0.7 total, shown per hand) instead.
-  'dumbbell press': {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 0.7,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-    ratioIsTotal: true,
-    confidence: 'medium',
-  },
   'kettlebell press': {
     pattern: 'vertical_push',
     primaryRef: 'overhead',
@@ -1619,36 +1283,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
     confidence: 'medium',
   },
-  'light db row': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    // ⚠️ SAME RATIO AS `dumbbell row`, DELIBERATELY. "Light" is a prescription cue in the protocol
-    // text, and this file has no precedent for a light-modifier ratio. Inventing one (0.3?) would be
-    // exactly the guess this section avoids. The athlete's logged weight carries the difference.
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    confidence: 'low',
-  },
-  'single arm row': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    confidence: 'medium',
-    notes: 'In the add-picker list with no entry. Explicit so the new bare `row` key cannot capture it as a two-handed total.',
-  },
   // Sibling: `barbell row` (bench × 0.8, total) — a machine/cable row is one stack, one total load.
-  row: {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.8,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'medium',
-    notes: 'Bare "Row" — the same slot it already fuzzy-matched (`barbell row`), now reached exactly.',
-  },
   'cable row': {
     pattern: 'horizontal_pull',
     primaryRef: 'bench',
@@ -1658,14 +1293,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     confidence: 'medium',
   },
   // Sibling: `lat pulldown` (bench × 0.65, total) — the same movement, spelled with a space.
-  'lat pull down': {
-    pattern: 'vertical_pull',
-    primaryRef: 'bench',
-    ratio: 0.65,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'medium',
-  },
   'explosive lat pull down': {
     pattern: 'vertical_pull',
     primaryRef: 'bench',
@@ -1707,24 +1334,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     confidence: 'medium',
   },
   // Sibling: the existing `kb/db swings` (deadlift × 0.25, total). ONE bell, TWO hands.
-  'db swing': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'low',
-    notes: 'One bell, two hands — a total load, not per hand.',
-  },
   'kb swing': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.25,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'low',
-  },
-  'kb db swing': {
     pattern: 'hip_dominant',
     primaryRef: 'deadlift',
     ratio: 0.25,
@@ -1759,15 +1369,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     ratio: 0.5,
     displayFormat: 'total',
     isUnilateral: true,
-    confidence: 'medium',
-  },
-  'dumbbell walking lunge': {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.5,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    ratioIsTotal: true,
     confidence: 'medium',
   },
   'sandbag lunge': {
@@ -1808,7 +1409,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     confidence: 'low',
   },
   // This IS a Y-T-W raise, spelled out. Copied from `ytw raise` exactly.
-  'prone y t w raise': {
+  'ytw raise': {
     pattern: 'horizontal_pull',
     primaryRef: 'overhead',
     ratio: 0.15,
@@ -1928,13 +1529,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // `chinup`; `pullup` has had an entry all along and `chinup` did not, so the same lookup that
   // priced a pull-up correctly returned NULL for a chin-up. Copied from `chin up` exactly — this is
   // the same movement reached by the other of the app's two keyings, not a new opinion.
-  chinup: {
-    pattern: 'vertical_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
   'nordic hamstring curl': {
     pattern: 'hip_dominant',
     primaryRef: null,
@@ -1992,13 +1586,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // offers no alternatives and is offered as none (the loop compares patterns, and null never equals
   // a real one). Zero ripple, and it leaves the taxonomy question open rather than answering it
   // wrongly. Precedent for a null pattern already exists (`kb/db swings`).
-  'plank hold': {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
   'plank with shoulder tap': {
     pattern: 'core',
     primaryRef: null,
@@ -2061,20 +1648,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'perHand',
     isUnilateral: false,
     notes: 'Two implements, one per hand (Q-180).',
-  },
-  'farmer carry': {
-    pattern: null,
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
-  'farmer walk': {
-    pattern: null,
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'perHand',
-    isUnilateral: false,
   },
   'suitcase carry': {
     pattern: null,
@@ -2155,37 +1728,15 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // `isUnilateral: true` on a bilateral hold — and the real cost is that the day Copenhagen Plank
   // gains a ratio, every "Planks" in the athlete's log inherits it. He has this in plans AND logs.
   // Copied from `plank` exactly.
-  planks: {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
 
   // ⛔ `Nordic Curls` RESOLVED TO NOTHING AT ALL. `nordic hamstring curl` exists, but neither name is
   // a substring of the other, so the fuzzy pass returns null and the movement falls through to the
   // legacy weight path — the D-322 "Pull Up @ 110 lb" class. In his plans AND logs.
   // ⚠️ The SERVER keys it `nordic_curls`, separately from `nordic_hamstring_curl`, so the two names
   // are already tracked apart upstream; this entry only makes the client resolve the same movement.
-  'nordic curls': {
-    pattern: 'hip_dominant',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
 
   // `Tricep Dips` had no key and landed on `dips` by luck of overlap. Same movement, so the values
   // were right — pinning it means they stay right rather than depending on the fuzzy scoring.
-  'tricep dips': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.9,
-    displayFormat: 'total',
-    isUnilateral: false,
-    notes: 'Total load (bodyweight + added), same as `dips`.',
-  },
 
   // ⛔ `DB Thruster` RESOLVED TO NOTHING. A thruster is a front squat into an overhead press, and the
   // PRESS is the limiting half — so it takes the vertical-push slot and `db push press`'s ratio
@@ -2207,14 +1758,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // returned null. Two vocabularies disagreeing about one logged session — the same defect class as
   // the Y-T-W / reverse-fly / squat-jump collisions. See the note on MAIN_BARBELL_LIFTS in
   // `exercise-role.ts`, which is the other half of closing it.
-  ohp: {
-    pattern: 'vertical_push',
-    primaryRef: 'overhead',
-    ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-    confidence: 'high',
-  },
 
 
   // ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -2250,20 +1793,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
   },
-  'calf raises (bilateral)': {
-    pattern: 'calf',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
-  'chest flyes': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.35,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
   chinups: {
     pattern: 'vertical_pull',
     primaryRef: null,
@@ -2276,13 +1805,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     primaryRef: null,
     ratio: 0.0,
     displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
-  'dumbbell flyes': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.35,
-    displayFormat: 'perHand',
     isUnilateral: false,
   },
   'farmer walks': {
@@ -2299,25 +1821,11 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
   },
-  'leg curls': {
-    pattern: 'hip_dominant',
-    primaryRef: 'deadlift',
-    ratio: 0.3,
-    displayFormat: 'total',
-    isUnilateral: false,
-  },
   'leg extensions': {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 0.35,
     displayFormat: 'total',
-    isUnilateral: false,
-  },
-  'nordic curl': {
-    pattern: 'hip_dominant',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
     isUnilateral: false,
   },
   'plank with shoulder taps': {
@@ -2345,13 +1853,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     pattern: 'knee_dominant',
     primaryRef: 'squat',
     ratio: 1.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-  },
-  'tricep dip': {
-    pattern: 'horizontal_push',
-    primaryRef: 'bench',
-    ratio: 0.9,
     displayFormat: 'total',
     isUnilateral: false,
   },
@@ -2388,13 +1889,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
   },
   // was borrowing `rows` at 0.85 TOTAL; one bell is per hand
-  'kettlebell rows': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'bench',
-    ratio: 0.45,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-  },
   // was borrowing `glute bridge` at 0.4x deadlift; a march is unloaded
   'glute bridge march': {
     pattern: 'hip_dominant',
@@ -2404,14 +1898,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
   },
   // bare 'Lunges' — see the flagged calls
-  lunges: {
-    pattern: 'knee_dominant',
-    primaryRef: 'squat',
-    ratio: 0.5,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-    ratioIsTotal: true,
-  },
 
   // ── LOADED ISOLATION: an implement, but no derivable percentage ───────────────────────────────
   // ⛔ SIBLING IS `rear delt fly` — ref null, ratio 0, a loaded display. This file has no configured
@@ -2422,49 +1908,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     pattern: 'horizontal_pull',
     primaryRef: null,
     ratio: 0.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-  },
-  'dumbbell curls': {
-    pattern: 'horizontal_pull',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.22,
-    confidence: 'low',
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
-  'hammer curls': {
-    pattern: 'horizontal_pull',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.24,
-    confidence: 'low',
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
-  'cable curls': {
-    pattern: 'horizontal_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'total',
-    isUnilateral: false,
-  },
-  'tricep extensions': {
-    pattern: 'horizontal_push',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.21,
-    confidence: 'low',
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
-  'tricep pushdown': {
-    pattern: 'horizontal_push',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.56,
-    confidence: 'low',
     displayFormat: 'total',
     isUnilateral: false,
   },
@@ -2890,27 +2333,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // `turkish_getup` from "Turkish Get ups", `ab_rollout` from "Ab Wheel Rollout", and the
   // parenthetical stripped out of "Core Work (5 min - your choice)". Those keys reach
   // `per_lift.canonical_name` and the State row, so they must resolve here too. Byte-copies.
-  'core work 5 min your choice': {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
-  'turkish getup': {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'total',
-    isUnilateral: true,
-  },
-  'ab rollout': {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
 
   // ── THE PREVIOUS PROGRAM FOREVER ASSISTANCE CATALOG (pp.24-32). Added 2026-08-13, slice 1 of the per-day
   // assistance picker work order. ⛔ EVERY MOVEMENT THE PICKER CAN OFFER MUST RESOLVE `exact` OR
@@ -2955,13 +2377,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
     notes: 'One dumbbell, one side at a time. No ratio — obliques have no main-lift reference.',
   },
-  'dumbbell side bend': {
-    pattern: 'core',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'perHand',
-    isUnilateral: true,
-  },
 
   // ── The catalog's DISPLAY spellings, which the fold does not reach. Byte-copies of the entry each
   // one names; they exist so the picker's own words resolve exactly rather than fuzzily.
@@ -2984,24 +2399,8 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
   },
-  'triceps extension': {
-    pattern: 'horizontal_push',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.21,
-    confidence: 'low',
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
   // the standard word for the movement (p.29). Fuzzy-matched to the right entry, which is luck, not
   // a rule — `fitsRole` and the swap sheet both read the resolved config, so it has to be exact.
-  'reverse hyper': {
-    pattern: 'hip_dominant',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
   /**
    * ⛔⛔ THE LOADED BENCH REVERSE HYPER, AND IT DID NOT EXIST (2026-08-30). Both reverse-hyper entries
    * were `bodyweight`, so the app had no way to prescribe the version the field sources teach —
@@ -3068,13 +2467,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   },
   // Borrowed `reverse flye` — the same movement, so the prescription was right by luck. Pinned rather
   // than left to luck, which is the rule `tricep dips` established above.
-  'bent over reverse flye': {
-    pattern: 'horizontal_pull',
-    primaryRef: 'overhead',
-    ratio: 0.20,
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
   'bent over reverse flyes': {
     pattern: 'horizontal_pull',
     primaryRef: 'overhead',
@@ -3106,13 +2498,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: true,
   },
-  'scaption (bodyweight shoulder raises)': {
-    pattern: 'vertical_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
   'scaption': {
     pattern: 'vertical_push',
     primaryRef: null,
@@ -3125,20 +2510,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // `reverse flyes bodyweight` are two different keys to this file. The second is what the SERVER
   // emits: `canonicalize()` drops the parentheses and returns `reverse_flyes_bodyweight`, which
   // reaches `per_lift.canonical_name` and the State row. Both spellings, one prescription.
-  'reverse flyes bodyweight': {
-    pattern: 'horizontal_pull',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
-  'scaption bodyweight shoulder raise': {
-    pattern: 'vertical_push',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
   'scaption bodyweight shoulder raises': {
     pattern: 'vertical_push',
     primaryRef: null,
@@ -3332,6 +2703,100 @@ export interface ConfigResolution {
 }
 
 /**
+ * ⛔ ONE NAME FOR ONE MOVEMENT (Michael, 2026-09-18). Each spelling below was its own catalogue entry; it is now the
+ * entry it names, so a stored row, a log or a hand-typed name that uses it still resolves — to one config, one ratio,
+ * one place in the grid. Two of the merged spellings carried different numbers: `reverse fly` / `reverse flye` /
+ * `bent over reverse flye` were priced at 0.20 of the overhead press, `rear delt fly` by feel; the merged entry is
+ * `rear delt fly`'s, by feel, as the composer prescribes accessories. `rows` (0.85) is left as it is: the name does
+ * not say which row.
+ */
+export const SAME_MOVEMENT: Record<string, string> = {
+  "ab rollout": "ab wheel rollout",
+  "barbell back squat": "back squat",
+  "barbell bench press": "bench press",
+  "barbell rows": "barbell row",
+  "bench": "bench press",
+  "bent over reverse flye": "rear delt fly",
+  "bent over row": "barbell row",
+  "box step ups": "box step up",
+  "cable curls": "cable curl",
+  "calf raises": "calf raise",
+  "calf raises (bilateral)": "calf raise",
+  "chest flyes": "chest fly",
+  "chest supported rows": "chest supported row",
+  "chin ups": "chin up",
+  "chinup": "chin up",
+  "conventional deadlift": "deadlift",
+  "core work 5 min your choice": "core work (5 min - your choice)",
+  "db swing": "dumbbell swing",
+  "db swings": "dumbbell swing",
+  "dip": "dips",
+  "dumbbell bench press": "db bench press",
+  "dumbbell curls": "dumbbell curl",
+  "dumbbell fly": "chest fly",
+  "dumbbell flyes": "chest fly",
+  "dumbbell incline press": "db incline press",
+  "dumbbell lateral raise": "lateral raise",
+  "dumbbell press": "db shoulder press",
+  "dumbbell row": "db row",
+  "dumbbell rows": "db row",
+  "dumbbell shoulder press": "db shoulder press",
+  "dumbbell side bend": "db side bend",
+  "dumbbell walking lunge": "walking lunge",
+  "farmer carry": "farmers carry",
+  "farmer walk": "farmers carry",
+  "hammer curls": "hammer curl",
+  "incline bench": "incline bench press",
+  "kb db swing": "dumbbell swing",
+  "kb swings": "kb swing",
+  "kettlebell rows": "kettlebell row",
+  "kettlebell swing": "kb swing",
+  "lat pull down": "lat pulldown",
+  "lateral raises": "lateral raise",
+  "leg curls": "leg curl",
+  "light db row": "db row",
+  "lunges": "lunge",
+  "nordic curl": "nordic hamstring curl",
+  "nordic curls": "nordic hamstring curl",
+  "ohp": "military press",
+  "overhead press": "military press",
+  "pike push ups": "pike push up",
+  "plank hold": "plank",
+  "planks": "plank",
+  "press": "military press",
+  "pull ups": "pull up",
+  "pullup": "pull up",
+  "pullups": "pull up",
+  "push ups": "push up",
+  "pushup": "push up",
+  "pushups": "push up",
+  "rdl": "romanian deadlift",
+  "rear delt flyes": "rear delt fly",
+  "reverse fly": "rear delt fly",
+  "reverse flye": "rear delt fly",
+  "reverse flyes bodyweight": "reverse flyes (bodyweight)",
+  "reverse hyper": "reverse hyperextension",
+  "row": "barbell row",
+  "scaption (bodyweight shoulder raises)": "scaption",
+  "scaption bodyweight shoulder raise": "scaption",
+  "shoulder press": "military press",
+  "single arm row": "db row",
+  "single leg romanian deadlift": "single leg rdl",
+  "squat": "back squat",
+  "standing barbell overhead press": "military press",
+  "step ups": "step up",
+  "tricep dip": "dips",
+  "tricep dips": "dips",
+  "tricep extensions": "tricep extension",
+  "tricep pushdown": "triceps pushdown",
+  "triceps extension": "tricep extension",
+  "turkish getup": "turkish get ups",
+  "walking lunges": "walking lunge",
+  "prone y t w raise": "ytw raise",
+  "ytw raises": "ytw raise",
+};
+
+/**
  * Resolve an exercise to its config AND report how.
  *
  * ⚠️ `exact` and `folded` are both trustworthy — folded is just punctuation/spacing-insensitive
@@ -3339,6 +2804,11 @@ export interface ConfigResolution {
  */
 export function resolveExerciseConfig(exerciseName: string): ConfigResolution {
   const normalized = String(exerciseName ?? '').toLowerCase().trim();
+
+  const same = SAME_MOVEMENT[normalized] ?? SAME_MOVEMENT[foldExerciseName(exerciseName)];
+  if (same && EXERCISE_CONFIG[same]) {
+    return { config: EXERCISE_CONFIG[same], via: 'exact', matchedKey: same };
+  }
 
   // Exact match first
   if (EXERCISE_CONFIG[normalized]) {
@@ -3358,7 +2828,13 @@ export function resolveExerciseConfig(exerciseName: string): ConfigResolution {
   let best: ExerciseConfig | null = null;
   let bestKey: string | null = null;
   let bestScore = -1;
-  for (const [key, config] of Object.entries(EXERCISE_CONFIG)) {
+  // ⚠️ THE MERGED SPELLINGS STILL CATCH FUZZY NAMES (2026-09-18) — `press` is how "Some Press" reaches the overhead
+  // press rather than the leg press, so an alias scores here exactly as its old entry did, and answers with the one entry.
+  const fuzzyKeys: Array<[string, ExerciseConfig, string]> = [
+    ...Object.entries(EXERCISE_CONFIG).map(([k, c]) => [k, c, k] as [string, ExerciseConfig, string]),
+    ...Object.entries(SAME_MOVEMENT).filter(([, c]) => EXERCISE_CONFIG[c]).map(([a, c]) => [a, EXERCISE_CONFIG[c], c] as [string, ExerciseConfig, string]),
+  ];
+  for (const [key, config, answerKey] of fuzzyKeys) {
     const fkey = foldExerciseName(key);
     let score = -1;
     if (folded.includes(fkey)) score = fkey.length;
@@ -3366,7 +2842,7 @@ export function resolveExerciseConfig(exerciseName: string): ConfigResolution {
     if (score > bestScore) {
       bestScore = score;
       best = config;
-      bestKey = key;
+      bestKey = answerKey;
     }
   }
   return bestScore > 0

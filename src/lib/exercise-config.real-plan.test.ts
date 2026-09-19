@@ -13,26 +13,28 @@
  * from the library would have passed on all six.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { EXERCISE_CONFIG, getExerciseConfig, resolveExerciseConfig } from './exercise-config.ts';
+import { SAME_MOVEMENT, EXERCISE_CONFIG, getExerciseConfig, resolveExerciseConfig } from './exercise-config.ts';
+// ⛔ One name for one movement since 2026-09-18: a merged spelling reads the one entry it names (SAME_MOVEMENT).
+const CFG = (k: string) => EXERCISE_CONFIG[SAME_MOVEMENT[k] ?? k];
 import { isMainBarbellLift, lookupExerciseType } from './exercise-role.ts';
 import { equipmentForExercise } from './strength-logging-mode.ts';
 
 const keyOf = (cfg: unknown) => Object.entries(EXERCISE_CONFIG).find(([, v]) => v === cfg)?.[0] ?? null;
 /** Every real name must land on ITSELF, not on a neighbour. */
-const resolvesToItself = (name: string, key: string) => assertEquals(keyOf(getExerciseConfig(name)), key, `${name} should resolve to '${key}'`);
+const resolvesToItself = (name: string, key: string) => assertEquals(keyOf(getExerciseConfig(name)), SAME_MOVEMENT[key] ?? key, `${name} should resolve to '${key}'`);
 
 Deno.test('⛔ SINGLE LEG HIP THRUST no longer inherits the BILATERAL hip thrust', () => {
   // It had no key, so it matched `hip thrust`: deadlift × 0.9, a loaded barbell, isUnilateral false.
   // Both `assistance-menu.ts` and `strength-logging-mode.ts` have carried this bug in their headers
   // — one for the prescription, one for the screenshot where the logger drew a 45 lb bar over it.
   resolvesToItself('Single Leg Hip Thrust', 'single leg hip thrust');
-  const c = EXERCISE_CONFIG['single leg hip thrust'];
+  const c = CFG('single leg hip thrust');
   assertEquals(c.isUnilateral, true, 'it is a SINGLE leg movement');
   assertEquals(c.pattern, 'hip_dominant', 'a hip thrust is hip extension, single-legged or not');
 
   // ⛔ RATIO INHERITED, NOT HALVED-BY-EYE. `single leg romanian deadlift` is the structural twin:
   // same reference lift, same pattern, same displayFormat, same isUnilateral.
-  const twin = EXERCISE_CONFIG['single leg romanian deadlift'];
+  const twin = CFG('single leg romanian deadlift');
   assertEquals(c.ratio, twin.ratio);
   assertEquals(c.primaryRef, twin.primaryRef);
   assertEquals(c.displayFormat, twin.displayFormat);
@@ -43,7 +45,7 @@ Deno.test('⛔ SINGLE LEG HIP THRUST no longer inherits the BILATERAL hip thrust
   assertEquals(equipmentForExercise('Single Leg Hip Thrust'), 'goblet');
 
   // And it is no longer priced off the two-legged 0.9.
-  assert(c.ratio < EXERCISE_CONFIG['hip thrust'].ratio);
+  assert(c.ratio < CFG('hip thrust').ratio);
 });
 
 Deno.test('⛔ PLANKS resolved to a COPENHAGEN PLANK — the fuzzy fallback scores by length', () => {
@@ -51,11 +53,11 @@ Deno.test('⛔ PLANKS resolved to a COPENHAGEN PLANK — the fuzzy fallback scor
   // Both are core holds so nothing caught it; the visible cost was `isUnilateral: true` on a
   // bilateral hold, and the latent cost was inheriting any ratio Copenhagen Plank ever gains.
   resolvesToItself('Planks', 'planks');
-  assertEquals(EXERCISE_CONFIG['planks'].isUnilateral, false, 'a plank is bilateral');
+  assertEquals(CFG('planks').isUnilateral, false, 'a plank is bilateral');
   // Copied from `plank` exactly — same movement, not a new opinion.
-  assertEquals(JSON.stringify(EXERCISE_CONFIG['planks']), JSON.stringify(EXERCISE_CONFIG['plank']));
+  assertEquals(JSON.stringify(CFG('planks')), JSON.stringify(CFG('plank')));
   // The Copenhagen entry is untouched and still unilateral.
-  assertEquals(EXERCISE_CONFIG['copenhagen plank'].isUnilateral, true);
+  assertEquals(CFG('copenhagen plank').isUnilateral, true);
 });
 
 Deno.test('⛔ THE THREE THAT RESOLVED TO NOTHING AT ALL', () => {
@@ -64,12 +66,12 @@ Deno.test('⛔ THE THREE THAT RESOLVED TO NOTHING AT ALL', () => {
     resolvesToItself(name, key);
   }
   // A thruster is a front squat into a press, and the PRESS is the limiting half.
-  const th = EXERCISE_CONFIG['db thruster'];
+  const th = CFG('db thruster');
   assertEquals(th.pattern, 'vertical_push');
-  assertEquals(th.ratio, EXERCISE_CONFIG['db push press'].ratio, 'inherited from db push press');
+  assertEquals(th.ratio, CFG('db push press').ratio, 'inherited from db push press');
   assertEquals(th.ratioIsTotal, true, 'the ratio is a TOTAL — without this the prescription doubles');
   // Nordic curls copy the movement the library already knew under a longer name.
-  assertEquals(EXERCISE_CONFIG['nordic curls'].displayFormat, EXERCISE_CONFIG['nordic hamstring curl'].displayFormat);
+  assertEquals(CFG('nordic curls').displayFormat, CFG('nordic hamstring curl').displayFormat);
 });
 
 Deno.test('⛔ `ohp` IS A MAIN LIFT, BECAUSE THE SERVER ALREADY SAYS SO', () => {
@@ -78,14 +80,14 @@ Deno.test('⛔ `ohp` IS A MAIN LIFT, BECAUSE THE SERVER ALREADY SAYS SO', () => 
   // no. One session, two vocabularies, two answers. Now one.
   assert(isMainBarbellLift('ohp'), 'the two readers must agree');
   assertEquals(lookupExerciseType('ohp'), 'barbell_main');
-  assertEquals(EXERCISE_CONFIG['ohp'].primaryRef, 'overhead');
-  assertEquals(EXERCISE_CONFIG['ohp'].ratio, EXERCISE_CONFIG['overhead press'].ratio);
+  assertEquals(CFG('ohp').primaryRef, 'overhead');
+  assertEquals(CFG('ohp').ratio, CFG('overhead press').ratio);
 });
 
 Deno.test('TRICEP DIPS is pinned rather than left to fuzzy luck', () => {
   resolvesToItself('Tricep Dips', 'tricep dips');
   // Same movement as `dips`, so the values were already right — pinning keeps them right.
-  const t = EXERCISE_CONFIG['tricep dips'], d = EXERCISE_CONFIG['dips'];
+  const t = CFG('tricep dips'), d = CFG('dips');
   assertEquals([t.pattern, t.primaryRef, t.ratio, t.displayFormat], [d.pattern, d.primaryRef, d.ratio, d.displayFormat]);
 });
 

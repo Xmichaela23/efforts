@@ -18,7 +18,9 @@
  * read as missing. A test that under-reports the thing it is testing is worse than no test.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { EXERCISE_CONFIG, getExerciseConfig } from './exercise-config.ts';
+import { SAME_MOVEMENT, EXERCISE_CONFIG, getExerciseConfig } from './exercise-config.ts';
+// ⛔ One name for one movement since 2026-09-18: a merged spelling reads the one entry it names (SAME_MOVEMENT).
+const CFG = (k: string) => EXERCISE_CONFIG[SAME_MOVEMENT[k] ?? k];
 import { EXERCISE_TYPE_CAPABILITIES, lookupExerciseType } from './exercise-role.ts';
 import { equipmentForExercise, isDurationLogged, loggingModeForExercise } from './strength-logging-mode.ts';
 
@@ -192,8 +194,8 @@ Deno.test('⛔ RATIOS ARE INHERITED FROM SIBLINGS, NOT INVENTED', () => {
     ['cable face pull', 'ytw raise'],
   ];
   for (const [variant, sibling] of inherits) {
-    const v = EXERCISE_CONFIG[variant];
-    const s = EXERCISE_CONFIG[sibling];
+    const v = CFG(variant);
+    const s = CFG(sibling);
     assert(v, `missing entry: ${variant}`);
     assert(s, `missing sibling: ${sibling}`);
     assertEquals(v.ratio, s.ratio, `${variant} must inherit ${sibling}'s ratio (${s.ratio}), got ${v.ratio}`);
@@ -206,7 +208,7 @@ Deno.test('⛔ ratioIsTotal TRAVELS WITH THE RATIO — dropping it doubles the p
   // A perHand variant that inherited the ratio without the flag would prescribe twice the weight.
   for (const key of ['db floor press', 'db push press', 'dumbbell press', 'kettlebell press',
                      'db romanian deadlift', 'dumbbell walking lunge']) {
-    const c = EXERCISE_CONFIG[key];
+    const c = CFG(key);
     assert(c, `missing entry: ${key}`);
     assertEquals(c.displayFormat, 'perHand', `${key} should display per hand`);
     assertEquals(c.ratioIsTotal, true, `${key} carries a TOTAL ratio and must say so`);
@@ -227,11 +229,11 @@ Deno.test('CARRIES: loaded, timed, and split per-hand vs total the way equipment
   const perHand = ['farmers carry', 'farmer carry', 'farmer walk', 'suitcase carry'];
   const total = ['sled push', 'sled pull', 'backpack carry'];
   for (const k of perHand) {
-    assertEquals(EXERCISE_CONFIG[k]?.displayFormat, 'perHand', `${k} is two implements / one per hand`);
+    assertEquals(CFG(k)?.displayFormat, 'perHand', `${k} is two implements / one per hand`);
     assertEquals(equipmentForExercise(k), 'dumbbell', `${k} is already drawn as a dumbbell movement`);
   }
   for (const k of total) {
-    assertEquals(EXERCISE_CONFIG[k]?.displayFormat, 'total', `${k} is ONE implement — a single total load`);
+    assertEquals(CFG(k)?.displayFormat, 'total', `${k} is ONE implement — a single total load`);
   }
   // And every one of them is measured against the clock or a distance, never in reps.
   for (const k of [...perHand, ...total]) {
@@ -247,7 +249,7 @@ Deno.test('⛔ HOLDS AND CARRIES CARRY NO SWAP SLOT — they substitute for noth
   for (const k of ['dead hang', 'wall sit', 'wall angel', 'foot doming',
                    'farmers carry', 'farmer carry', 'farmer walk', 'suitcase carry',
                    'backpack carry', 'sled push', 'sled pull']) {
-    const c = EXERCISE_CONFIG[k];
+    const c = CFG(k);
     assert(c, `missing entry: ${k}`);
     assertEquals(c.pattern ?? null, null, `${k} must carry no swap slot`);
   }
@@ -332,7 +334,7 @@ Deno.test('ADDITIVE — no config key was removed, and the picker list only grew
   for (const k of ['squat', 'deadlift', 'bench press', 'overhead press', 'hip thrust',
                    'walking lunge', 'step up', 'dumbbell row', 'lat pulldown', 'face pull',
                    'plank', 'box jump', 'pull up', 'leg press']) {
-    assert(EXERCISE_CONFIG[k], `pre-existing config key went missing: ${k}`);
+    assert(CFG(k), `pre-existing config key went missing: ${k}`);
   }
   const list = await pickerList();
   for (const k of ['Deadlift', 'Squat', 'Bench Press', 'Face Pulls', "Farmer's Carry", 'TRX Fallout',
