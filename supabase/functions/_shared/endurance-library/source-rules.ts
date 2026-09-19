@@ -412,6 +412,23 @@ export type PrintedRide = {
 };
 
 /**
+ * ⛔⛔ p235's LONG RUN AS PRINTED, PER LEVEL (2026-09-18, book-language pass 5, audit item 21). The shape builder
+ * sized the inserted sets off an average share of the session (`insertShare`) and a band, so level 2 built 3–7 reps
+ * of 2:15 @ 115% with no recovery where the page prints 2 sets of 2 rounds of 1:30 @ 115% / 30 s @ VT1; the race-pace
+ * finish lost its 95% interval in the middle; the fartlek counts and lengths were off at every level.
+ *
+ * `inserts` are the page's sets, each `rounds` rounds of `round`, placed inside the easy running; `finish` is the
+ * race-pace finish. ⚠️ THE EASY RUNNING FILLS THE REST OF THE SESSION the composer sized (the athlete's long-run
+ * length, p247 "runs up to 90 to 100 minutes"), so only the page's own pieces are fixed. ⚠️ WHERE THE INSERTS GO is
+ * the page's "added at any point" / "during the session" / "in the middle": the easy running is split evenly around
+ * them — OURS, the placement is the athlete's on the day.
+ */
+export type PrintedLongRun = {
+  inserts?: { count: number; rounds: number; round: PrintedSegment[] };
+  finish?: PrintedSegment;
+};
+
+/**
  * One segment of a printed round. `role` is the page's own reading: a percentage the family counts
  * as work is `work`; a prescribed effort under the family's floor (MLSS's VT1 minute inside the
  * round) is `float`; the page's "easy jog" / "easy spin" / "recovery" is `recovery`.
@@ -545,6 +562,8 @@ export type Archetype = {
    * The printed structure is therefore carried here verbatim and built as it reads.
    */
   printedByLevel?: Partial<Record<Level, PrintedRide>>;
+  /** p235's long run as printed — see `PrintedLongRun`. Overrides the shape builder at the levels it carries. */
+  printedLongRunByLevel?: Partial<Record<Level, PrintedLongRun>>;
   /** Seconds of easy recovery between ladder rounds, where the source states one. */
   ladderRoundRest?: number;
   /**
@@ -1171,6 +1190,19 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 30, hi: 240 },
         work: pct(0.95, 1.15),
         recovery: { kind: 'stated', band: { lo: 30, hi: 60 }, intensity: vt1 },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18). L1 "45-minute VT1 run with 2 sets added at any point. The sets are 2 rounds
+         * of 30 seconds @ 100% 30 seconds @ 90%"; L2 "1-hour VT1 run with 2 sets added at any point. The sets are 2
+         * rounds of 1 minute, 30 seconds @ 115% 30 seconds @ VT1"; L3 "1.5-hour VT1 run with 3 sets added at any
+         * point. Sets are either 3 rounds of 1 minute @ 115% 30 seconds @ VT1 or 2 rounds of 4 minutes @ 95% 1 minute
+         * @ VT1" — the first of the two.
+         */
+        printedLongRunByLevel: {
+          // ⚠️ The 30 s @ 90% is the easier half of the round, a `float` (`StepRole`): the page prints no rest in it.
+          1: { inserts: { count: 2, rounds: 2, round: [W(30, 1.00), { seconds: 30, role: 'float', intensity: pct(0.90) }] } },
+          2: { inserts: { count: 2, rounds: 2, round: [W(90, 1.15), { seconds: 30, role: 'recovery', intensity: vt1 }] } },
+          3: { inserts: { count: 3, rounds: 3, round: [W(60, 1.15), { seconds: 30, role: 'recovery', intensity: vt1 }] } },
+        },
         // Computed from his three level examples: the inserted sets take 8%, 12% and 13% of the
         // session. The mean is what sizes them here.
         insertShare: 0.11,
@@ -1189,6 +1221,16 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 5 * 60, hi: 15 * 60 },
         work: { kind: 'race_pace' },
         recovery: { kind: 'open' },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18). L1 "30 minutes @ VT1 5 minutes @ race pace finish"; L2 "60 minutes @ VT1
+         * with single 5 minutes @ 95% interval in the middle 10 minutes @ race pace finish"; L3 "90 to 120 minutes @ VT1
+         * with single 10 minutes @ 95% interval in the middle 15 minutes @ race pace finish".
+         */
+        printedLongRunByLevel: {
+          1: { finish: { seconds: 5 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+          2: { inserts: { count: 1, rounds: 1, round: [W(5 * 60, 0.95)] }, finish: { seconds: 10 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+          3: { inserts: { count: 1, rounds: 1, round: [W(10 * 60, 0.95)] }, finish: { seconds: 15 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+        },
         cite: 'Viada p235',
       },
       {
@@ -1204,6 +1246,16 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 180, hi: 240 },
         work: pct(0.85),
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18): no fartlek at level 1; L2 "1.5-hour VT1 fartlek, with target of 6 x 3
+         * minutes @ 85% during the session"; L3 "2- to 2.5-hour VT1 fartlek, with target of 6 x 4 minutes @ 85% during
+         * the session".
+         */
+        levels: [2, 3],
+        printedLongRunByLevel: {
+          2: { inserts: { count: 6, rounds: 1, round: [W(3 * 60, 0.85)] } },
+          3: { inserts: { count: 6, rounds: 1, round: [W(4 * 60, 0.85)] } },
+        },
         // Computed from his level 2 and level 3 fartleks: the targeted efforts take 20% and 18% of
         // the session.
         insertShare: 0.19,

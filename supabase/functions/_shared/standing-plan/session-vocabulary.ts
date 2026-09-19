@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, wrapperToken } from '../endurance-library/index.ts';
 
@@ -520,10 +520,34 @@ export function translateEnduranceSession(
        * The insert-only path this replaces carried p235's sets and silently dropped the race-pace
        * finish, which is the same session shape asked a different way.
        */
-      work = [
-        `longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`,
-        ...embeddedBlockTokens(session),
-      ];
+      /**
+       * ⛔⛔ BLOCK BY BLOCK, IN ORDER (2026-09-18, book-language pass 5). p235's long run is built as printed now
+       * (`printedLongRunByLevel`): easy running, a set, easy running, a set … and a race-pace finish. Each easy stretch
+       * travels as its own `longrun_` token and each set as its round, so the watch plays them where the page puts
+       * them. The old form — one long-run token for the whole session plus the extra blocks — counted the extra
+       * blocks twice.
+       */
+      work = [];
+      for (const block of session.blocks) {
+        if (block.addOn) continue; // strides carry their own token
+        const steps = block.steps.filter((st) => st.seconds != null && (st.seconds as number) > 0);
+        if (steps.length === 0) continue;
+        const kind0 = (steps[0].intensity as { kind?: string } | null)?.kind;
+        if (steps.length === 1 && block.repeat === 1 && (kind0 === 'vt1' || steps[0].role === 'work' && kind0 === 'easy')) {
+          work.push(`longrun_${minutes(steps[0].seconds as number)}min_easypace`);
+          continue;
+        }
+        const compound = compoundRoundToken(block as never);
+        if (compound) { work.push(compound); continue; }
+        if (steps.length === 1) {
+          const i2 = steps[0].intensity as { kind: string; hi?: number } | null | undefined;
+          const at = i2 && i2.kind === 'pct_threshold' && typeof i2.hi === 'number'
+            ? String(Math.round(i2.hi * 100))
+            : (i2?.kind === 'race_pace' ? 'racepace' : i2?.kind === 'vt1' ? 'vt1' : null);
+          if (at != null) work.push(`round_${Math.max(1, block.repeat)}x_${Math.round(steps[0].seconds as number)}s${at}`);
+        }
+      }
+      if (work.length === 0) work = [`longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`];
       break;
     }
 
@@ -875,6 +899,9 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   if (session.family === 'ride_anaerobic') parts.push(RIDE_ANAEROBIC_DRAWER_NOTE);
   // ⛔ p231 — the hills note, after the MLSS line, in the drawer only. One owner: `family-lines.ts`.
   if (session.family === 'run_mlss') parts.push(RUN_MLSS_DRAWER_NOTE);
+  // ⛔ p235's own sentences for the easy and the long run, in the drawer after the line (pass 5, 2026-09-18).
+  if (session.family === 'run_vt1') parts.push(RUN_VT1_DRAWER_NOTE);
+  if (session.family === 'run_lsd') parts.push(RUN_LSD_DRAWER_NOTE);
   // ⛔ "Go by heart rate. Pace varies with fatigue, hydration and weather." CAME OFF (2026-09-18, book-language
   // pass 1, audit item 13). p235 tells the athlete to use the talk test, which the VT1 line already says; the drawer
   // printed both instructions for the same run.

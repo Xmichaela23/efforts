@@ -136,7 +136,7 @@ Deno.test('each named family gets its line, and only that line — the page\'s o
   assertEquals(enduranceLinesFor(ride('ride_anaerobic', 'above')), [
     'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
   ]);
-  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'As close as possible to threshold without exceeding it.');
+  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.');
   assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.');
   assertEquals(
     enduranceLinesFor(run('run_lsd', 'vt1_or_easier'))[0],
@@ -146,11 +146,12 @@ Deno.test('each named family gets its line, and only that line — the page\'s o
 
 Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p233 for near-threshold (2026-09-18)', () => {
   assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
-  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Workouts that maximize time near-threshold while controlling fatigue.');
+  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
 });
 
 Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {
-  assertEquals(enduranceLinesFor(ride('ride_vo2', 'above')), []);
+  // ⚠️ The VO2 ride has p238's line since 2026-09-18 (book-language pass 5); p236's sprints print no intent sentence.
+  assertEquals(enduranceLinesFor(ride('ride_sprints', 'above')), []);
   assertEquals(enduranceLinesFor(run('run_sprint_power', 'above')), []);
 });
 

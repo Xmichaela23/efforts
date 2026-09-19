@@ -112,8 +112,8 @@ const built = (family: string, level: 1 | 2 | 3, archetype: string, opts?: { rac
 
 Deno.test('each family line is the page\'s own words (p231, p233, p235, p237, p238, p239)', () => {
   assertEquals(familyLineFor('run_mlss'), 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
-  assertEquals(familyLineFor('run_near_threshold'), 'Workouts that maximize time near-threshold while controlling fatigue.');
-  assertEquals(familyLineFor('ride_sweet_spot'), 'As close as possible to threshold without exceeding it.');
+  assertEquals(familyLineFor('run_near_threshold'), 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
+  assertEquals(familyLineFor('ride_sweet_spot'), 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.');
   assertEquals(familyLineFor('ride_endurance', 'steady'), 'Easy ride below 75%.');
   assert(familyLineFor('ride_anaerobic', 'progressive_repeats')!.endsWith('Each set should start at 110% and progress up to 125–130% by the end.'));
   // The flat anaerobic rides do not carry the progressive option's sentence.
@@ -128,9 +128,9 @@ Deno.test('a rest the page names prints the page\'s word and no pace: MLSS "reco
 
 Deno.test('the ride sprint prints p236\'s "max effort" and its recovery word, and sends them to Intervals.icu', () => {
   const { row, v3, lines } = built('ride_sprints', 1, 'max_effort');
-  assert(lines.some((l) => /max effort/.test(l) && /recovery between/.test(l)), lines.join(' | '));
+  assert(lines.some((l) => /max effort sprints where you try to beat your last effort/.test(l) && /recovery between/.test(l)), lines.join(' | '));
   const ev = serializeRide({ ...row, computed: { steps: v3, anchors: { ftp_w: 250 } } } as any);
-  assert(ev.description.includes('- max effort 2m freeride'), ev.description);
+  assert(ev.description.includes('- max effort sprints where you try to beat your last effort 2m freeride'), ev.description);
 });
 
 Deno.test('the level 1 swim is p241\'s: 200 m, three 50s, two 600s, in the page\'s words', () => {
@@ -201,4 +201,31 @@ Deno.test('a run\'s session note reaches the watch, as a ride\'s does', () => {
   const { row, v3 } = built('run_vt1', 1, 'continuous');
   const g = convertWorkoutToGarmin({ ...row, computed: { steps: v3 } } as any);
   assert(/talk test/.test(String((g as any).description)), JSON.stringify((g as any).description));
+});
+
+// ── Pass 5: what the page gives that the app did not show ────────────────────────────────────────
+
+Deno.test('p235\'s long run with inserted sets builds the page\'s sets: level 2 is 2 sets of 2 rounds of 1:30 @ 115% / 30 s', () => {
+  const { row } = built('run_lsd', 2, 'long_with_inserts');
+  const sets = (row.steps_preset as string[]).filter((t) => t.startsWith('round_'));
+  assertEquals(sets, ['round_2x_90s115-r30svt1', 'round_2x_90s115-r30svt1']);
+});
+
+Deno.test('p235\'s race-pace finish carries its 95% interval in the middle at levels 2 and 3', () => {
+  const t2 = built('run_lsd', 2, 'race_pace_finish').row.steps_preset as string[];
+  assert(t2.includes('round_1x_300s95') && t2[t2.length - 1] === 'round_1x_600sracepace', JSON.stringify(t2));
+});
+
+Deno.test('p235\'s fartlek is 6 efforts, not offered at level 1', () => {
+  const t2 = built('run_lsd', 2, 'fartlek').row.steps_preset as string[];
+  assertEquals(t2.filter((t) => t === 'round_1x_180s85').length, 6);
+  let threw = false;
+  try { built('run_lsd', 1, 'fartlek'); } catch { threw = true; }
+  assert(threw, 'a level-1 fartlek was built; p235 prints none');
+});
+
+Deno.test('the VO2 ride prints p238\'s line; the easy and long runs print p235\'s own second sentences', () => {
+  assert(String(familyLineFor('ride_vo2')).startsWith('These workouts are intended to push your maximum aerobic intake'));
+  assert(String(built('run_vt1', 1, 'continuous').row.description).includes('may vary slightly depending on current level of fatigue'));
+  assert(String(built('run_lsd', 2, 'hike').row.description).includes('can be modified extensively'));
 });

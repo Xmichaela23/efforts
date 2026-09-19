@@ -80,13 +80,14 @@ export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = 
     tempo: { between: 'easy spin', allOut: 'all-out sprint' },
   },
   ride_sprints: {
-    // p236: "3 max effort 2- to 3-minute sprints …; 5 to 6 minutes of recovery between sprints".
-    max_effort: { allOut: 'max effort', between: 'recovery' },
+    // p236: "3 max effort 2- to 3-minute sprints where you try to beat your last effort; 5 to 6 minutes of recovery
+    // between sprints" — the sprint's words with its length cut (pass 5: "where you try to beat your last effort" added).
+    max_effort: { allOut: 'max effort sprints where you try to beat your last effort', between: 'recovery' },
     // p236: "accelerate as fast as possible up to speed before settling into an easy pace. 6- to 10-minute easy spin as
     // a recovery between reps."
     standing_start: { allOut: 'accelerate as fast as possible up to speed', between: 'easy spin as a recovery' },
-    // p236: "flying 30-second surges to max effort, with 2 to 3 minutes recovery between".
-    flying_surge: { allOut: 'max effort', between: 'recovery' },
+    // p236: "flying 30-second surges to max effort, with 2 to 3 minutes recovery between" — length cut.
+    flying_surge: { allOut: 'flying surges to max effort', between: 'recovery' },
   },
   ride_endurance: {
     // p239: "5-minute easy spin between sets"; "45 minutes @ VT1 with 10-second all-out sprint every 9 minutes".

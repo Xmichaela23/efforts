@@ -36,10 +36,10 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   // p231: "Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized
   // fatigue." It printed p233's near-threshold sentence until 2026-09-18 (audit item 14).
   run_mlss: 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.',
-  // p233: "Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer
-  // below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling
-  // fatigue." — cut to its first and last words.
-  run_near_threshold: 'Workouts that maximize time near-threshold while controlling fatigue.',
+  // p233, whole (pass 5, 2026-09-18: it was cut to its first and last words): "Workouts that maximize time
+  // near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are
+  // designed to maximize total time spent at this intensity while controlling fatigue."
+  run_near_threshold: 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.',
   // p235: "Any workout that is intended to maximize training time may be a combination of zones, though primarily below
   // VT1. … Unlike VT1 workouts, these sessions can include rest periods or pauses in the hike/jog sessions with little
   // negative impact." Cut around the word VT1, which never prints on screen (Today's standing rule, pinned in
@@ -47,8 +47,14 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   run_lsd: 'Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.',
   // p235, whole sentence.
   run_vt1: 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.',
-  // p238: "These workouts are intended to push you as close as possible to threshold without exceeding it" — cut.
-  ride_sweet_spot: 'As close as possible to threshold without exceeding it.',
+  // p238, whole sentence (pass 5, 2026-09-18: the rest of the page's sentence added back — "plenty of time in the
+  // zone with far less fatigue" is what the session is for).
+  ride_sweet_spot: 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.',
+  // p238 (pass 5, 2026-09-18 — the VO2 ride printed no line): "These workouts are intended to push your maximum aerobic
+  // intake; therefore, they're a little more metabolically taxing than the previous workouts. While the anaerobic
+  // sessions had a greater focus on "more power is generally better," these should be more carefully controlled." —
+  // cut to its first and last clauses.
+  ride_vo2: 'These workouts are intended to push your maximum aerobic intake; these should be more carefully controlled.',
 };
 
 /**
@@ -85,6 +91,19 @@ export function sprintEveryMinutesFromTokens(tokens: unknown): number | null {
  */
 export const RIDE_ENDURANCE_DRAWER_NOTE =
   'You won\'t regret spending several minutes on every long ride practicing pedal stroke and working on position.';
+
+/**
+ * ⛔ THE EASY RUN'S SECOND SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235: "The precise percentage
+ * of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration
+ * status, and environmental conditions." It replaces the paraphrase "Pace varies with fatigue, hydration and weather."
+ */
+export const RUN_VT1_DRAWER_NOTE = 'The precise percentage of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration status, and environmental conditions.';
+
+/**
+ * ⛔ THE LONG RUN'S LAST SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235: "These workouts can be
+ * modified extensively depending on your needs and the training conditions."
+ */
+export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively depending on your needs and the training conditions.';
 
 /**
  * ⛔ THE MLSS HILLS NOTE, IN THE DRAWER AFTER THE LINE. p231: "Note that athletes may perform any of these work

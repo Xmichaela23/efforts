@@ -41,7 +41,7 @@ import {
   WRAPPERS,
   type Archetype,
 } from './source-rules.ts';
-import type { PrintedIntervals, PrintedRide } from './source-rules.ts';
+import type { PrintedIntervals, PrintedLongRun, PrintedRide } from './source-rules.ts';
 import { anchorFor, resolveEnduranceAnchors, UNKNOWN_ANCHORS, type EnduranceAnchors, type EnduranceBaselines } from './anchors.ts';
 import type {
   AnchorReport,
@@ -734,6 +734,53 @@ function buildPrintedRide(ctx: BuildContext, p: PrintedRide): Block[] {
   return blocks;
 }
 
+/**
+ * ⛔⛔ p235's LONG RUN AS PRINTED (2026-09-18, book-language pass 5) — see `PrintedLongRun`. The page's own sets and
+ * finish, verbatim; the easy running fills the rest of the session, split evenly around the sets (OURS placement:
+ * "added at any point", "during the session", "in the middle").
+ */
+function buildPrintedLongRun(ctx: BuildContext, p: PrintedLongRun): Block[] {
+  const { sport, anchor } = ctx;
+  const count = p.inserts?.count ?? 0;
+  const rounds = p.inserts?.rounds ?? 0;
+  const round = p.inserts?.round ?? [];
+  const perRound = round.reduce((t, seg) => t + seg.seconds, 0);
+  const insertSeconds = count * rounds * perRound;
+  const finishSeconds = p.finish?.seconds ?? 0;
+  const easyTotal = boundEasyBout(ctx, Math.max(0, ctx.target - insertSeconds - finishSeconds), ctx.archetype.id);
+  // OURS — the easy running split evenly around the sets: the page places them "at any point".
+  const pieces = count + 1;
+  const piece = Math.round(easyTotal / pieces);
+  /**
+   * ⚠️ THE EASY RUNNING IS ONE RUN CUT BY THE SETS AND THE FINISH, so its pieces are `float` — the easy running that
+   * sits between efforts (`StepRole`), as the VT1 riding between p239's sprints is. As `work` each piece would read as
+   * its own bout under p107's 10-minute floor, which the page's one continuous run is not; p107's two-hour cap binds
+   * their sum (`boundEasyBout` above).
+   */
+  const easyRole: Step['role'] = 'float';
+  const easyBlock = (seconds: number): Block => ({
+    repeat: 1, label: 'Steady easy', steps: [step(easyRole, 'Easy', seconds, { kind: 'vt1' }, sport, anchor)], restBetween: null,
+  });
+  const blocks: Block[] = [easyBlock(piece)];
+  for (let i = 0; i < count; i += 1) {
+    blocks.push({
+      repeat: rounds,
+      label: `Set ${i + 1} of ${count}`,
+      steps: round.map((seg) => step(seg.role, seg.label ?? (seg.role === 'recovery' ? 'Recovery' : 'Set'), seg.seconds, seg.intensity, sport, anchor)),
+      restBetween: null,
+    });
+    // The last easy piece takes the rounding, so the session is exactly its target.
+    blocks.push(easyBlock(i === count - 1 ? Math.max(0, easyTotal - piece * count) : piece));
+  }
+  if (p.finish) {
+    blocks.push({
+      repeat: 1, label: 'Race-pace finish',
+      steps: [step('work', 'Finish', p.finish.seconds, p.finish.intensity, sport, anchor)], restBetween: null,
+    });
+  }
+  return blocks.filter((b) => b.steps.every((st) => (st.seconds ?? 0) > 0));
+}
+
 function buildContinuousWithFinish(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
   const finishSeconds = Math.round(lerp(a.repBand, levelT(ctx.level)));
@@ -946,10 +993,17 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       case 'continuous_with_inserts': {
         // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE — see `Archetype.printedByLevel`.
         const printed = archetype.printedByLevel?.[req.level];
-        blocks = printed ? buildPrintedRide(ctx, printed) : buildContinuousWithInserts(ctx);
+        const printedRun = archetype.printedLongRunByLevel?.[req.level];
+        blocks = printed ? buildPrintedRide(ctx, printed)
+          : printedRun ? buildPrintedLongRun(ctx, printedRun)
+          : buildContinuousWithInserts(ctx);
         break;
       }
-      case 'continuous_with_finish': blocks = buildContinuousWithFinish(ctx); break;
+      case 'continuous_with_finish': {
+        const printedRun = archetype.printedLongRunByLevel?.[req.level];
+        blocks = printedRun ? buildPrintedLongRun(ctx, printedRun) : buildContinuousWithFinish(ctx);
+        break;
+      }
       case 'descending': blocks = buildDescending(ctx); break;
     }
 
