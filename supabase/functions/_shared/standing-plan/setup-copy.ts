@@ -116,11 +116,11 @@ export const NUMBERS_COPY = {
   ftp_test: 'The 20-minute FTP test is scheduled into week one.',
   // Viada p212 — the 20-minute test.
   ftp_none: 'Nothing on file. The 20-minute FTP test is scheduled into week one.',
-  run_title: 'Run threshold',
+  run_title: 'Run threshold',  // not-instruction: a row heading, not an instruction
   source_run_typed: 'typed in Baselines',
   source_run_learned: 'from your runs',
-  run_test: 'The threshold time trial is scheduled into week one.',
-  run_none: 'Nothing on file. The threshold time trial is scheduled into week one.',
+  run_test: 'The threshold time trial is scheduled into week one.',  // p210 — the test is the page's "time trial"; the sentence says what the app scheduled
+  run_none: 'Nothing on file. The threshold time trial is scheduled into week one.',  // p210 — the test is the page's "time trial"; the sentence says what the app scheduled
   // FIELD — "per 100" is the swim pace unit (time per 100 m or 100 yd), a definition, not a prescription.
   swim_title: 'Swim pace (per 100)',  // not-instruction: a row heading, not an instruction
   source_swim: 'on file',
@@ -130,6 +130,7 @@ export const NUMBERS_COPY = {
 // ── Build focus ───────────────────────────────────────────────────────────────────────────────
 
 export const BUILD_FOCUS_COPY = {
+  // not-instruction: says what this screen lists and how to change it (app operation), not a training instruction; "hypertrophy" is p219's word
   subtitle: 'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the '
     + 'day or adjust now for the plan.',
   // ⛔ 2026-09-18: the rows this step lists are HYP slots, so the line is p218's HYP line from its one owner
@@ -177,7 +178,7 @@ export const RUNS_COPY = {
   row: 'Day {day} · {label}',
   length_label: 'Length',
   length_varies: 'length varies week to week',
-  row_label: { long: 'Long session', easy: 'Easy session', easy_n: 'Easy session {n}', hard_n: 'Hard session {n}' },
+  row_label: { long: 'Long session', easy: 'Easy session', easy_n: 'Easy session {n}', hard_n: 'Hard session {n}' },  // not-instruction: row labels (names), not instructions
 } as const;
 
 /** The runs screen's top line, counted off the frame: lifting days and runs, in words. Null on a week that is not all runs. */

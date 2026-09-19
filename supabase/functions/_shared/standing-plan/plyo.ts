@@ -69,7 +69,7 @@ export const PLYO_FAMILIES: Record<PlyoFamilyId, PlyoFamily> = {
   ground_contact: {
     id: 'ground_contact',
     benefit: 'general speed and explosiveness',
-    drills: ['Single-Leg Hops', 'Rebound Jumps', 'Skater Hops', 'Lunge Hops', 'Pogo Hops'],
+    drills: ['Single-Leg Hops', 'Rebound Jumps', 'Skater Hops', 'Lunge Hops', 'Pogo Hops'],  // p227 — the drill names as printed
     /**
      * ⛔ IN-PLACE FIRST, ON TWO FEET — p89's *"static plyometrics"*. Pogo hops and rebound jumps are
      * both two-footed and both stay on the spot; the lunge hop adds a split stance, the single-leg
@@ -115,6 +115,7 @@ export const PLYO_FAMILY_IDS: PlyoFamilyId[] = ['bounding', 'ground_contact', 'f
  */
 export const PLYO_FAMILIES_PER_DAY: PlyoFamilyId[] = ['bounding', 'ground_contact', 'footspeed'];
 
+// not-instruction: never prints — compose.ts:2160 pushes it as a kind 'ours' note; 'ours' notes land only in config.standing_plan_notes, which nothing in src renders
 export const PLYO_FAMILY_MIX_IS_OURS =
   'The plyometric day takes one drill from each of the three families the source names. He caps a '
   + 'day at three or four drills and puts the warm-up at one to three skills; taking one from each '

@@ -453,9 +453,9 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
    * heading word. Without them both fell through to "Ride", the easy ride's name. Held for Michael.
    */
   ride_vo2: 'VO2 Ride',
-  ride_sprints: 'Sprint Ride',
+  ride_sprints: 'Sprint Ride',  // not-instruction: session name; no page names it; Michael's call
   ride_endurance: 'Ride',
-  swim_endurance: 'Easy Swim',
+  swim_endurance: 'Easy Swim',  // not-instruction: session name; no page names it; Michael's call
 };
 
 /**
@@ -849,7 +849,7 @@ export function translateEnduranceSession(
      */
     cite: (archCite || famRules?.cite || '').split('—')[0].trim(),
     type: sport,
-    name: raceTempo ? `${label} (race tempo)` : label,
+    name: raceTempo ? `${label} (race tempo)` : label,  // p246 — the taper column prints "NT (race tempo)"
     description: describeSession(session, raceTempo),
     duration: totalMin,
     // ⛔ THE ADD-ON SITS BETWEEN THE SESSION AND THE COOLDOWN — p109 puts the strides after the run,
