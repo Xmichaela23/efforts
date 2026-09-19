@@ -627,12 +627,16 @@ export const FAMILIES: Record<FamilyId, {
    * told NOT to do ("more carefully controlled").
    * ⛔ EVERY WORK STEP, INCLUDING p237's 90% SUSTAINED MIDDLE (Michael, 2026-09-18 — "the numbers are
    * guidelines" covers the whole family). Only a RECOVERY the page prints a number for (the 50% half) keeps its band.
+   * ⛔ THE SCREEN AND THE WATCH SHOW A TOP, THE SCORE DOES NOT (round 5, 2026-09-18, Michael's ruling): floor to 130% of
+   * FTP (p237 "progress up to 125–130% by the end", `quality-work.ts ANAEROBIC_TOP_PCT_OF_FTP`); at or above the floor
+   * is in range.
    * ⚠️ ABSENT ON EVERY OTHER FAMILY, including `ride_vo2`, on p238's own instruction.
    */
   floorOnly?: true;
   /**
    * ⛔ NEVER OVER THRESHOLD (2026-09-18) — pp238–239 sweet spot: *"as close to threshold as possible without
-   * exceeding it"*. A single number at or below 100% is capped at FTP; see `wattsAt`'s `under_threshold`.
+   * exceeding it"*. A step at or below 100% tops out at FTP (a 95% step is 85.5–100%); see `wattsAt`'s
+   * `under_threshold`. Round 5 (2026-09-18): this is the only ride type with the FTP top.
    */
   underThreshold?: true;
   /** The family's stated intent, in his words where he gives one. */

@@ -39,6 +39,10 @@ Deno.test('a ride: watts, the floor-only "and up", a spin prints its watts, and 
   assertEquals(plannedStepLines([work, spin, work, spin, work, spin], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 @ 80–110 W between']);
   const bare: PlannedStep = { kind: 'recovery', seconds: 270 };
   assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 between']);
+  // Round 5 (2026-09-18): p237's floor saves its shown top (130% of FTP) and prints floor to top; "and up" above is a
+  // step saved with no top at all.
+  const topped: PlannedStep = { kind: 'work', seconds: 30, powerRange: { lower: 202, shown_upper: 273 } };
+  assertEquals(plannedStepLines([topped, bare, topped, bare, topped, bare], { sport: 'ride' }), ['3 × 30 s @ 202–273 W, 4:30 between']);
 });
 
 Deno.test('a step that repeats nothing prints on its own line', () => {

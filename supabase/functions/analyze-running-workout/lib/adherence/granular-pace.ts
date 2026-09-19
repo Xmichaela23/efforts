@@ -1,9 +1,9 @@
 /**
  * Granular pace adherence: prescribed range, interval/steady-state analysis,
- * and sample-level helpers. Uses getPaceToleranceForSegment from garmin-execution.
+ * and sample-level helpers. A single pace is widened by the one owner, `singleTargetBand`.
  */
 
-import { getPaceToleranceForSegment } from './garmin-execution.ts';
+import { singleTargetBand } from '../../../_shared/plan-tokens/quality-work.ts';
 import { completedMovingSeconds } from '../../../_shared/moving-seconds.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
 import { paceToGAP, computeSampleGrades, hasUsableElevation, enrichSamplesWithGAP } from '../../../_shared/gap.ts';
@@ -195,14 +195,9 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
     };
   }
 
-  const expandSinglePaceToRange = (singlePace: number): { lower: number; upper: number } => {
-    const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
-    const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-    return {
-      lower: Math.round(singlePace * (1 - tolerance)),
-      upper: Math.round(singlePace * (1 + tolerance))
-    };
-  };
+  // A single pace gets the one owner's band (TrainingPeaks ±10%, `singleTargetBand`, round 5, 2026-09-18) — it was our
+  // per-segment ±5 / 7 / 8 / 10 / 15% (`getPaceToleranceForSegment`, OURS, deleted).
+  const expandSinglePaceToRange = (singlePace: number): { lower: number; upper: number } => singleTargetBand(singlePace);
 
   let targetLower: number | null = interval.target_pace?.lower ||
     interval.pace_range?.lower ||
@@ -247,11 +242,9 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   }
 
   if (targetLower >= targetUpper) {
-    const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
-    const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-    const center = targetLower;
-    targetLower = Math.round(center * (1 - tolerance));
-    targetUpper = Math.round(center * (1 + tolerance));
+    const expanded = expandSinglePaceToRange(targetLower);
+    targetLower = expanded.lower;
+    targetUpper = expanded.upper;
     console.warn(`⚠️ [FIX] Invalid range, expanded to ${targetLower}-${targetUpper}`);
   }
 

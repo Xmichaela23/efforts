@@ -161,83 +161,109 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
 export const SINGLE_PERCENT_BAND = 0.10;
 
 /**
- * ⛔⛔ THE ONE BAND AROUND A SINGLE TARGET NUMBER — WATTS AND RUN PACE (round 4, 2026-09-18, Michael approved).
- * FIELD — TrainingPeaks help, "Workout Builder" (help.trainingpeaks.com, article 115001844087): "the range on your
- * device will show +/- 10% from the interval target … to avoid triggering device alerts/beeps". Every place that
- * turns one number into a range reads this function: the plan's watts (`wattsAt`), the plan's run pace
- * (`materialize-plan toV3Step`, which replaced our ±2% work / ±6% other steps), the ride score
- * (`ride-power.ts judgedPowerRange`), the Garmin send (power and pace, `garmin/convert-workout.ts`) and the
- * analyzers' token fallback (`token-parser.ts`, which replaced our ±5% / ±10%). A run pace is banded in seconds per
- * mile, the unit the plan writes it in.
+ * ⛔⛔ THE ONE OWNER OF A STEP'S RANGE — WATTS AND RUN PACE (round 4, 2026-09-18; the page tops, round 5, 2026-09-18,
+ * Michael's ruling). Every ride and run step has a top, except an all-out step (p236, p229–231), which carries no
+ * target anywhere. The top is:
+ *   · a single printed number: that number ±`SINGLE_PERCENT_BAND`. FIELD — TrainingPeaks help, "Workout Builder"
+ *     (help.trainingpeaks.com, article 115001844087): "the range on your device will show +/- 10% from the interval
+ *     target … to avoid triggering device alerts/beeps".
+ *   · a printed range (p238 VO2 "110 to 120%"): the range's own top.
+ *   · a page's own top, where the step's ride type prints one (`top`): it wins over the ±10% band where the two
+ *     disagree — sweet spot's 95% runs 85.5–100% of FTP, not 85.5–104.5%. The ride tops are below
+ *     (`EASY_RIDE_CEILING_PCT_OF_FTP`, `SWEET_SPOT_TOP_PCT_OF_FTP`, `ANAEROBIC_TOP_PCT_OF_FTP`) and `wattsAt` applies
+ *     them by the ride type's rule; an easy run's top is the easy pace range's own (p235, `materialize-plan
+ *     stampRunPrescription`).
+ * Read by: the plan's watts (`wattsAt`), the plan's run pace (`materialize-plan toV3Step`), the ride score
+ * (`ride-power.ts judgedPowerRange`), the Garmin send (`garmin/convert-workout.ts`), the analyzers' token fallback
+ * (`token-parser.ts`) and the run analyzer's single-pace widening (`analyze-running-workout`). A run pace is banded in
+ * seconds per mile, the unit the plan writes it in.
  *
- * `capAt`: the top never passes this number — the FTP cap on a single percentage at or below 100% (`wattsAt`, OURS).
+ * `top`: the page's top, in the same unit as `value`; the upper end never passes it.
  * `round: false` keeps the raw ends, for a caller that converts them further (a pace to a speed in m/s).
  */
 export function singleTargetBand(
   value: number,
-  opts: { capAt?: number | null; round?: boolean } = {},
+  opts: { top?: number | null; round?: boolean } = {},
 ): { lower: number; upper: number } {
   const r = opts.round === false ? (x: number) => x : Math.round;
-  const top = value * (1 + SINGLE_PERCENT_BAND);
+  const band = value * (1 + SINGLE_PERCENT_BAND);
   return {
     lower: r(value * (1 - SINGLE_PERCENT_BAND)),
-    upper: r(opts.capAt != null && Number.isFinite(opts.capAt) ? Math.min(top, opts.capAt) : top),
+    upper: r(opts.top != null && Number.isFinite(opts.top) ? Math.min(band, opts.top) : band),
   };
 }
 
-// ⛔ `FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP` (130% of FTP, filled in as the ceiling of p237's floor on the Garmin and
-// Intervals.icu sends) IS DELETED (2026-09-18, round 3, audit item 16): the sends print the floor's words and hold no
-// ceiling, the same as the screen (`ride-power.ts oneSidedPowerText`).
+// ⛔ `FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP` WAS DELETED IN ROUND 3 (the sends held no ceiling on p237's floor). Round 5
+// (2026-09-18, Michael's ruling) puts p237's own top back as `ANAEROBIC_TOP_PCT_OF_FTP`, on the screen and the watch
+// only; the score still counts everything at or above the floor.
 
 /**
- * ⛔ THE RIDE TYPE'S OWN RULE FOR A STEP'S RANGE (2026-09-18, Michael approved). Decided here, where a percentage
- * becomes watts, and read by every reader off the saved step: the Planned tab, the Performance rows, Execution, the
- * off-prescription line, the Garmin send and the Intervals.icu send.
+ * ⛔ THE RIDE TYPE'S OWN RULE FOR A STEP'S RANGE (2026-09-18, Michael approved; the tops, round 5). Decided here, where
+ * a percentage becomes watts, and read by every reader off the saved step: the Planned tab, Today, the Performance
+ * rows, Execution, the off-prescription line, the Garmin send and the Intervals.icu send.
  *   · `floor` — p237 anaerobic: *"best done by feel with a power FLOOR rather than a specific power target — the
- *     numbers are guidelines"*. EVERY work step is a floor ("N W and up"); recoveries keep their range.
- *   · `under_threshold` — pp238–239 sweet spot: *"as close to threshold as possible without exceeding it"*. A single
- *     number at or below 100% runs from −`SINGLE_PERCENT_BAND` up to the lower of +`SINGLE_PERCENT_BAND` and FTP;
- *     a printed surge above 100% (the 105% on the minute) keeps its own ±`SINGLE_PERCENT_BAND`.
+ *     numbers are guidelines"*. EVERY work step is a floor; its top on the screen and the watch is
+ *     `ANAEROBIC_TOP_PCT_OF_FTP` (p237 "progress up to 125–130% by the end"), saved as `shown_upper`, and the score
+ *     has no top: at or above the floor is in range. Recoveries keep their band.
+ *   · `under_threshold` — pp238–239 sweet spot: *"as close to threshold as possible without exceeding it"*. A step at
+ *     or below 100% tops out at `SWEET_SPOT_TOP_PCT_OF_FTP`; a printed surge above 100% (the 105% on the minute) is
+ *     the page's own number and keeps its ±`SINGLE_PERCENT_BAND`.
+ *   · `easy` — p239 endurance: *"easy ride below 75%"*: 0 up to `EASY_RIDE_CEILING_PCT_OF_FTP`.
  *   · none — VO2 (p238, *"more carefully controlled"*) and everything else: a printed range as printed, a single
  *     number ±`SINGLE_PERCENT_BAND`.
- * The endurance ceiling (p239) is `EASY_RIDE_CEILING_PCT_OF_FTP`; sprints (p236) carry no target.
+ * Sprints (p236) carry no target: the caller writes no range.
  */
-export type RidePowerRule = 'floor' | 'under_threshold' | null;
+export type RidePowerRule = 'floor' | 'under_threshold' | 'easy' | null;
 
 /** Viada p239 — *"easy ride below 75%"*. An easy endurance step is 0 up to this share of FTP, and nothing under it. */
 export const EASY_RIDE_CEILING_PCT_OF_FTP = 0.75;
 
+/** Viada pp238–239 — sweet spot *"as close to threshold as possible without exceeding it"*: the top is FTP. */
+export const SWEET_SPOT_TOP_PCT_OF_FTP = 1.0;
+
 /**
- * Percent of FTP as watts. Undefined without an FTP — the step then carries no target, as it always did.
+ * Viada p237 — anaerobic *"Each set should start at 110% and progress up to 125–130% by the end"*: the top of the
+ * anaerobic work on the screen and the watch. The score has no top (p237 "by feel with a power floor").
+ */
+export const ANAEROBIC_TOP_PCT_OF_FTP = 1.3;
+
+/**
+ * A step's power range. `upper` absent = the score has no top (p237's floor); `shown_upper` is then the top the
+ * screens print and the sends carry. `ride-power.ts shownPowerRange` reads the two for every screen and send.
+ */
+export type PowerRange = { lower: number; upper?: number; shown_upper?: number };
+
+/**
+ * Percent of FTP as watts, by the ride type's rule — the owner above, for rides. Undefined without an FTP — the step
+ * then carries no target, as it always did.
  *
- * ⛔ A SINGLE PERCENTAGE GETS `SINGLE_PERCENT_BAND` EITHER SIDE. Both ends equal is the caller saying
- * "the page printed one number here", which is the whole of the rule's trigger.
- * ⛔ AND THE `floor` RULE LEAVES THE CEILING OFF — p237, `FAMILIES.ride_anaerobic.floorOnly`.
- * An ABSENT `upper` is the app's existing way of saying "no ceiling": `analyze-cycling-workout` already
- * reads a missing upper as Infinity, and the zone rows already print an absent bound as "176 bpm and up".
+ * ⛔ A SINGLE PERCENTAGE (both ends equal — the caller saying "the page printed one number here") GETS
+ * `SINGLE_PERCENT_BAND` EITHER SIDE, UNDER THE RIDE TYPE'S TOP.
+ * ⛔ THE `floor` RULE SAVES NO `upper` — p237, `FAMILIES.ride_anaerobic.floorOnly`. An ABSENT `upper` is the app's
+ * existing way of saying "no ceiling" to the score: `analyze-cycling-workout` reads it as Infinity. The screen and the
+ * watch read `shown_upper`.
+ * ⛔ THE "NEVER OVER FTP AT OR BELOW 100%" EXTENSION TO EVERY RIDE TYPE IS GONE (round 5, 2026-09-18, Michael): the
+ * FTP top is sweet spot's alone. The VO2 warm-up's 95% (p238) is ±10%.
  */
 export function wattsAt(
   lo: number,
   hi: number,
   ftp: number | null | undefined,
   rule?: RidePowerRule,
-): { lower: number; upper?: number } | undefined {
+): PowerRange | undefined {
   const f = Number(ftp);
   if (!Number.isFinite(f) || f <= 0) return undefined;
-  // p237 — a floor and no ceiling. The caller offers the rule to work steps only.
-  if (rule === 'floor') return { lower: Math.round(lo * f) };
-  if (lo === hi) {
-    /**
-     * ⛔ ONE BAND RULE FOR EVERY SINGLE PERCENTAGE (2026-09-18, round 3, audit item 26). The same 95% printed 197–240 W
-     * on the VO2 warm-up (p238) and 197–230 W on sweet spot, because the cap at FTP applied only under the sweet-spot
-     * rule. Now a single number at or below 100% never runs over FTP wherever it is printed; a printed surge above
-     * 100% keeps its own band. The cap is pp238–239's "as close to threshold as possible without exceeding it";
-     * OURS — applying it to every single number at or below 100%, not only sweet spot, so one percentage is one range.
-     */
-    // OURS — `wattsAt` the FTP cap on every single percentage at or below 100% (pp238–239 extended); ledger row in docs/STATE-SOURCES.md
-    return singleTargetBand(lo * f, { capAt: lo <= 1 ? f : null });
+  // p239 — "easy ride below 75%": 0 up to 75% of FTP.
+  if (rule === 'easy') return { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * f) };
+  // p237 — a floor; the score has no top, the screen and the watch show p237's 130%. The caller offers the rule to
+  // work steps only.
+  if (rule === 'floor') {
+    return { lower: Math.round(lo * f), shown_upper: Math.round(Math.max(lo, ANAEROBIC_TOP_PCT_OF_FTP) * f) };
   }
-  return { lower: Math.round(lo * f), upper: Math.round(hi * f) };
+  // pp238–239 — sweet spot never over FTP, for a step the page prints at or below 100%.
+  const top = rule === 'under_threshold' && lo <= SWEET_SPOT_TOP_PCT_OF_FTP ? SWEET_SPOT_TOP_PCT_OF_FTP * f : null;
+  if (lo === hi) return singleTargetBand(lo * f, { top });
+  return { lower: Math.round(lo * f), upper: Math.round(top != null ? Math.min(hi * f, top) : hi * f) };
 }
 
 /**
@@ -248,7 +274,7 @@ export function wattsAt(
 export type StepPlace = 'between' | 'in_round' | 'all_out' | 'race_pace';
 export type RunStep = { kind: 'work' | 'recovery'; duration_s: number; pace_sec_per_mi?: number; place?: StepPlace };
 /** ⚠️ `upper` IS OPTIONAL: a floor-only step has no ceiling to carry. See `wattsAt`. */
-export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: { lower: number; upper?: number }; place?: StepPlace };
+export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: PowerRange; place?: StepPlace };
 
 /**
  * The work as running steps — what `expandRunToken` pushes for these two shapes, id aside.
@@ -394,9 +420,11 @@ export function paceWord(secPerMi: number, units?: 'imperial' | 'metric' | null)
  * ⛔ AND `202 W and up` WHERE THERE IS NO CEILING (2026-09-15, approved) — the house style the zone
  * rows already print ("176 bpm and up", `save-baselines/zones.ts`).
  */
-export function wattWord(range: { lower: number; upper?: number }): string {
-  if (range.upper == null) return `${range.lower} W and up`;
-  return range.lower === range.upper ? `${range.lower} W` : `${range.lower}–${range.upper} W`;
+export function wattWord(range: PowerRange): string {
+  // p237's floor prints its shown top (round 5, 2026-09-18); "and up" only where a range carries no top at all.
+  const upper = range.upper ?? range.shown_upper;
+  if (upper == null) return `${range.lower} W and up`;
+  return range.lower === upper ? `${range.lower} W` : `${range.lower}–${upper} W`;
 }
 
 /** `130%`, `85–95%` — what a step says when the athlete has no pace or FTP to price it with. */

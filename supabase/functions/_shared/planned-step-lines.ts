@@ -17,10 +17,10 @@
  * round; a lone recovery after a block of rounds that then repeats is the rest between sets. A step that
  * repeats nothing prints on its own line.
  */
-import { oneSidedPowerText } from './ride-power.ts';
+import { oneSidedPowerText, shownPowerRange } from './ride-power.ts';
 import { clock as clockOf, displayFormat, M_PER_MI } from './display-format.ts';
 
-type Range = { lower?: number; upper?: number };
+type Range = { lower?: number; upper?: number; shown_upper?: number };
 export type PlannedStep = {
   kind?: string;
   label?: string;
@@ -113,13 +113,14 @@ function paceText(s: PlannedStep, opts: StepLineOptions): string | undefined {
 }
 
 function powerText(s: PlannedStep): string | undefined {
-  const r = s?.powerRange;
-  if (!(r && typeof r.lower === 'number')) return undefined;
+  if (!(s?.powerRange && typeof s.powerRange.lower === 'number')) return undefined;
+  // p237's floor prints its shown top, 130% of FTP (round 5, `shownPowerRange`); the score has none.
+  const r = shownPowerRange(s.powerRange)!;
   const lo = Math.round(r.lower);
-  // p237's floor ("N W and up") and p239's ceiling ("under N W") — the words every send prints too (`oneSidedPowerText`).
-  const oneSided = oneSidedPowerText(r.lower, typeof r.upper === 'number' ? r.upper : null);
+  // p239's ceiling ("under N W") — the words every send prints too (`oneSidedPowerText`).
+  const oneSided = oneSidedPowerText(r.lower, r.upper);
   if (oneSided) return oneSided;
-  const hi = Math.round(r.upper);
+  const hi = Math.round(Number(r.upper));
   return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
 }
 
@@ -146,7 +147,7 @@ function lengthText(s: PlannedStep, opts: StepLineOptions): string {
   return String(s?.label || '').trim() || 'interval';
 }
 
-/** " @ 5:39–5:53/mi", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy". */
+/** " @ 5:39–5:53/mi", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202–273 W", " easy". */
 function targetText(s: PlannedStep, opts: StepLineOptions): string {
   const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s);
   if (hr) return ` @ ${hr}${pace ? ` · ref ${pace}` : ''}`;

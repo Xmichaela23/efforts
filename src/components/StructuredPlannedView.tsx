@@ -268,8 +268,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const powRange = (() => {
           if (!(st?.powerRange && typeof st.powerRange.lower === 'number')) return undefined;
           const lo = Math.round(st.powerRange.lower);
-          if (typeof st.powerRange.upper !== 'number') return `${lo} W and up`;
-          const hi = Math.round(st.powerRange.upper);
+          // p237's floor prints its shown top, 130% of FTP (round 5, 2026-09-18); the score has none.
+          const top = typeof st.powerRange.upper === 'number' ? st.powerRange.upper
+            : typeof st.powerRange.shown_upper === 'number' ? st.powerRange.shown_upper : null;
+          if (top == null) return `${lo} W and up`;
+          const hi = Math.round(top);
           return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
         })();
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;

@@ -103,7 +103,8 @@ function refRide(tok: string, ftp: number | undefined, rule?: RidePowerRule): an
   /** A WORK step: p237 a floor, no ceiling; pp238–239 never over FTP; else the band. */
   const workAt = (pct: number) => {
     if (!ftp) return undefined;
-    if (rule === 'floor') return { lower: Math.round(pct * ftp) };
+    // Round 5 (2026-09-18): the floor's shown top is 130% of FTP (p237); the score still has none (no `upper`).
+    if (rule === 'floor') return { lower: Math.round(pct * ftp), shown_upper: Math.round(Math.max(pct, 1.3) * ftp) };
     if (rule === 'under_threshold' && pct <= 1) {
       return { lower: Math.round(pct * ftp * (1 - BAND)), upper: Math.round(Math.min(pct * (1 + BAND), 1) * ftp) };
     }
@@ -208,13 +209,13 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
     '8 × 4 min at 8:20/mi, 1:15 between',
   );
   /**
-   * ⛔ p237 anaerobic: the sandwich, in watts. EVERY work step is a floor with no ceiling (2026-09-18) —
-   * the 120% surge and the 90% sustained middle alike.
+   * ⛔ p237 anaerobic: the sandwich, in watts. EVERY work step is a floor (2026-09-18) — the 120% surge and the 90%
+   * sustained middle alike — and prints floor to 130% of FTP (round 5, 2026-09-18; 273 W at FTP 210).
    */
   const anaerobic = { ...ride, rule: ridePowerRuleOf('ride_anaerobic') };
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', anaerobic),
-    '8 rounds: 30 s at 252 W and up, 2:30 at 189 W and up; 4 min between',
+    '8 rounds: 30 s at 252–273 W, 2:30 at 189–273 W; 4 min between',
   );
   /**
    * ⛔ pp238–239 sweet spot: never over threshold. 95% of 210 is 180–210 W (−10%, capped at FTP); the 105% surge on

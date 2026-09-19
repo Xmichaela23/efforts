@@ -6,7 +6,7 @@ import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
 import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
-import { getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
+import { singleTargetBand } from '../_shared/plan-tokens/quality-work.ts';
 import { executionFromEasyHr, executionFromSections } from '../_shared/execution-score.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
@@ -670,143 +670,37 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     console.log(`🔍 [INTERVAL SOURCE] ${intervalSource} (${computedIntervals.length} intervals)`);
     
     // Enrich intervals with pace ranges from planned workout
+    /**
+     * ⛔⛔ THE SAVED RANGE IS THE RANGE (round 5, 2026-09-18, Michael's ruling: one owner for every step's top). This
+     * block re-widened any saved pace range it judged "too tight" and widened a single pace by our own per-segment
+     * tolerances (±5 / 7 / 8 / 10 / 15%, `getPaceToleranceForSegment`, OURS, no source) — a second band beside the
+     * plan's. The plan writes every range through the one owner (`singleTargetBand`, TrainingPeaks ±10%, or the page's
+     * own range), so a saved range is read as saved; a single pace (race day's one pace, a zero-width range, a planned
+     * target with no range) gets the owner's ±10%. `getPaceToleranceForSegment` is deleted.
+     */
+    const bandOf = (pace: number) => singleTargetBand(pace);
     const intervalsToAnalyze = computedIntervals.map(interval => {
-      // Find matching step in planned workout to get pace_range
       const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
-      
-      // ✅ CRITICAL FIX: Always check and expand ranges, even if interval already has pace_range
-      // This ensures we use the expanded range for adherence calculation
-      if (plannedStep?.pace_range) {
-        // Check if we need to expand the range (whether from plannedStep or existing interval)
-        const rangeToCheck = interval.pace_range || plannedStep.pace_range;
-        const rangeWidth = rangeToCheck.upper - rangeToCheck.lower;
-        const midpoint = (rangeToCheck.lower + rangeToCheck.upper) / 2;
-        const actualTolerance = rangeWidth / midpoint;
-        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        
-        // If range is too tight (less than 60% of expected tolerance), expand it
-        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
-          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
-          const centerPace = plannedPaceFromInterval || 
-                             plannedPaceFromStep || 
-                             midpoint;
-          
-          console.log(`🔍 [CENTER DEBUG] Recalculating range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
-          
-          const lower = Math.round(centerPace * (1 - tolerance));
-          const upper = Math.round(centerPace * (1 + tolerance));
-          console.log(`⚠️ [FIX] Recalculated too-tight range ${rangeToCheck.lower}-${rangeToCheck.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
-          return {
-            ...interval,
-            pace_range: { lower, upper },
-            target_pace: { lower, upper }
-          };
+      const range = interval.pace_range || plannedStep?.pace_range;
+      if (range && Number(range.lower) > 0 && Number(range.upper) > 0) {
+        if (Number(range.lower) === Number(range.upper)) {
+          const b = bandOf(Number(range.lower));
+          return { ...interval, pace_range: b, target_pace: b };
         }
-        
-        // Check for zero-width range
-        if (rangeToCheck.lower === rangeToCheck.upper && rangeToCheck.lower > 0) {
-          const singlePace = rangeToCheck.lower;
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          const lower = Math.round(singlePace * (1 - tolerance));
-          const upper = Math.round(singlePace * (1 + tolerance));
-          console.log(`⚠️ [FIX] Expanded zero-width range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
-          return {
-            ...interval,
-            pace_range: { lower, upper },
-            target_pace: { lower, upper }
-          };
+        if (!interval.pace_range && !interval.target_pace) {
+          return { ...interval, pace_range: range, target_pace: { lower: range.lower, upper: range.upper } };
         }
+        return interval;
       }
-      
-      // Add pace_range to interval if not already present
-      if (plannedStep?.pace_range && !interval.pace_range && !interval.target_pace) {
-        // ✅ FIX: Check for zero-width range
-        if (plannedStep.pace_range.lower === plannedStep.pace_range.upper && plannedStep.pace_range.lower > 0) {
-          const singlePace = plannedStep.pace_range.lower;
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          const lower = Math.round(singlePace * (1 - tolerance));
-          const upper = Math.round(singlePace * (1 + tolerance));
-          console.log(`⚠️ [FIX] Expanded zero-width range ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
-          return {
-            ...interval,
-            pace_range: { lower, upper },
-            target_pace: { lower, upper }
-          };
-        }
-        
-        // ✅ FIX: Check for asymmetric/too-tight ranges (e.g., 2% tolerance when should be 6-8%)
-        // Detect if range is too tight by checking if it's less than expected tolerance
-        const rangeWidth = plannedStep.pace_range.upper - plannedStep.pace_range.lower;
-        const midpoint = (plannedStep.pace_range.lower + plannedStep.pace_range.upper) / 2;
-        const actualTolerance = rangeWidth / midpoint;
-        const expectedTolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        
-        // If actual tolerance is less than 60% of expected, recalculate with proper tolerance
-        // This catches cases where materialize-plan used 2% but should have used 6-8% for tempo
-        // ✅ CRITICAL: Use planned.target_pace_s_per_mi as center (workout-specific pace) instead of midpoint (baseline)
-        if (actualTolerance < expectedTolerance * 0.6 && midpoint > 0) {
-          const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-          // Priority: Use planned target pace (workout-specific) over range midpoint (baseline)
-          // Check multiple possible locations for the planned pace
-          const plannedPaceFromInterval = interval.planned?.target_pace_s_per_mi;
-          const plannedPaceFromStep = plannedStep?.pace_sec_per_mi;
-          const centerPace = plannedPaceFromInterval || 
-                             plannedPaceFromStep || 
-                             midpoint;
-          
-          console.log(`🔍 [CENTER DEBUG] Recalculating range - interval.planned.target_pace_s_per_mi=${plannedPaceFromInterval}, plannedStep.pace_sec_per_mi=${plannedPaceFromStep}, midpoint=${midpoint}, using centerPace=${centerPace}`);
-          
-          const lower = Math.round(centerPace * (1 - tolerance));
-          const upper = Math.round(centerPace * (1 + tolerance));
-          console.log(`⚠️ [FIX] Recalculated too-tight range ${plannedStep.pace_range.lower}-${plannedStep.pace_range.upper}s/mi (${(actualTolerance*100).toFixed(1)}% tolerance) to ${lower}-${upper}s/mi (${(tolerance*100).toFixed(1)}% tolerance) centered on ${centerPace}s/mi`);
-          return {
-            ...interval,
-            pace_range: { lower, upper },
-            target_pace: { lower, upper }
-          };
-        }
-        
-        return {
-          ...interval,
-          pace_range: plannedStep.pace_range,
-          target_pace: {
-            lower: plannedStep.pace_range.lower,
-            upper: plannedStep.pace_range.upper
-          }
-        };
+      const singlePace = Number(interval.planned?.target_pace_s_per_mi);
+      if (singlePace > 0 && !interval.pace_range?.lower && !interval.target_pace?.lower) {
+        const b = bandOf(singlePace);
+        return { ...interval, pace_range: b, target_pace: b };
       }
-      
-      // ✅ FIX: If interval has planned.target_pace_s_per_mi but no range, create range with appropriate tolerance
-      const singlePace = interval.planned?.target_pace_s_per_mi;
-      if (singlePace && !interval.pace_range?.lower && !interval.target_pace?.lower) {
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        const lower = Math.round(singlePace * (1 - tolerance));
-        const upper = Math.round(singlePace * (1 + tolerance));
-        return {
-          ...interval,
-          pace_range: { lower, upper },
-          target_pace: { lower, upper }
-        };
-      }
-      
-      // Note: Range expansion for existing pace_range is now handled at the top of this function
-      
-      // ✅ FIX: Check target_pace object for zero width
       if (interval.target_pace?.lower === interval.target_pace?.upper && interval.target_pace?.lower > 0) {
-        const singlePace = interval.target_pace.lower;
-        const tolerance = getPaceToleranceForSegment(interval, plannedStep, plannedWorkout);
-        const lower = Math.round(singlePace * (1 - tolerance));
-        const upper = Math.round(singlePace * (1 + tolerance));
-        console.log(`⚠️ [FIX] Expanded zero-width target_pace ${singlePace}-${singlePace} to ${lower}-${upper}s/mi`);
-        return {
-          ...interval,
-          pace_range: { lower, upper },
-          target_pace: { lower, upper }
-        };
+        const b = bandOf(interval.target_pace.lower);
+        return { ...interval, pace_range: b, target_pace: b };
       }
-      
       return interval;
     });
     
@@ -949,17 +843,13 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         if (!nr) return false;
         const { fast, slow } = nr;
 
-        // Point target: use tight absolute tolerance (seconds) to avoid false positives.
-        // This matches the UI expectation for targets like "9:52/mi".
-        // OURS — `POINT_EPS_SEC` 5 s around a point target, `RANGE_EPS_PCT` 1% around a range (GPS and rounding noise); no page, kept as found
-        const POINT_EPS_SEC = 5;
+        // ⛔ THE SAVED RANGE, OR THE OWNER'S ±10% AROUND ONE PACE (round 5, 2026-09-18, `singleTargetBand`,
+        // TrainingPeaks). Replaces our 5 s around a point target and 1% around a range (OURS).
         if (Math.abs(slow - fast) <= 0.5) {
-          return Math.abs(a - fast) <= POINT_EPS_SEC;
+          const b = singleTargetBand(fast);
+          return a >= b.lower && a <= b.upper;
         }
-
-        // Range target: allow a tiny buffer (1%) for GPS/rounding noise.
-        const RANGE_EPS_PCT = 0.01;
-        return a >= fast * (1 - RANGE_EPS_PCT) && a <= slow * (1 + RANGE_EPS_PCT);
+        return a >= fast && a <= slow;
       };
 
       if (firstRange && lastRange) {
@@ -3814,10 +3704,13 @@ function generateAdherenceSummary(
   };
 
   // Analyze pace deviations for each work interval
-  // For recovery/easy runs, use percentage-based tolerance to avoid false positives
-  // Thresholds: ≤2% = on_target, 2-5% = slight (no warning), 5-10% = aggressive, >10% = blown
-  // OURS — `RECOVERY_TOLERANCE_PCT` 5% on easy / recovery reps; no page, kept as found
-  const RECOVERY_TOLERANCE_PCT = 0.05; // 5% threshold for recovery/easy runs to trigger warning
+  /**
+   * ⛔ JUDGED AGAINST THE SAVED RANGE, EASY RUNS AND INTERVALS ALIKE (round 5, 2026-09-18, one owner for every step's
+   * top). An easy or recovery rep was flagged only past 5% of the range's midpoint (`RECOVERY_TOLERANCE_PCT`, OURS) —
+   * a second top inside the easy pace range's own — and a point target was widened 5 s each side (OURS). Now faster
+   * than the range's fast end is fast and slower than its slow end is slow; a single pace gets the owner's ±10%
+   * (`singleTargetBand`, TrainingPeaks).
+   */
   
   interface Deviation {
     interval: number;
@@ -3841,42 +3734,18 @@ function generateAdherenceSummary(
       // Calculate percentage deviation from target midpoint
       // Note: faster pace = lower seconds, so negative deltaPct = faster
       const deltaPct = (targetMid - actualPaceSecPerMi) / targetMid;
-      const absDeltaPct = Math.abs(deltaPct);
       
       let direction: 'fast' | 'slow' | 'ok' = 'ok';
       let delta = 0;
-      
-      // For recovery/easy runs: use percentage threshold to avoid false positives
-      // For interval workouts: use absolute comparison (any deviation matters)
-      if (finalIsEasyOrRecoveryRun || isRecoveryContext) {
-        // Recovery/easy: only flag if deviation >= 5% of target
-        if (deltaPct > RECOVERY_TOLERANCE_PCT) {
-          // Positive deltaPct means actual is faster than target (lower seconds)
-          direction = 'fast';
-          delta = targetLower - actualPaceSecPerMi;
-        } else if (deltaPct < -RECOVERY_TOLERANCE_PCT) {
-          // Negative deltaPct means actual is slower than target
-          direction = 'slow';
-          delta = actualPaceSecPerMi - targetUpper;
-        }
-        // Otherwise: within 5% tolerance = 'ok' (no warning)
-      } else {
-        // Interval workouts: still use absolute comparison, but apply a small tolerance
-        // for ultra-tight targets (e.g. 11:08-11:08) to avoid false "off target"
-        // from rounding/GPS noise.
-        const rangeWidth = Math.abs(targetUpper - targetLower);
-        // OURS — a range 3 s wide or less is widened 5 s each side; no page, kept as found
-        const epsSec = rangeWidth <= 3 ? 5 : 0; // only widen point targets
-        const lo = targetLower - epsSec;
-        const hi = targetUpper + epsSec;
-
-        if (actualPaceSecPerMi < lo) {
-          direction = 'fast';
-          delta = targetLower - actualPaceSecPerMi;
-        } else if (actualPaceSecPerMi > hi) {
-          direction = 'slow';
-          delta = actualPaceSecPerMi - targetUpper;
-        }
+      const judged = targetLower === targetUpper
+        ? singleTargetBand(targetLower)
+        : { lower: Math.min(targetLower, targetUpper), upper: Math.max(targetLower, targetUpper) };
+      if (actualPaceSecPerMi < judged.lower) {
+        direction = 'fast';
+        delta = judged.lower - actualPaceSecPerMi;
+      } else if (actualPaceSecPerMi > judged.upper) {
+        direction = 'slow';
+        delta = actualPaceSecPerMi - judged.upper;
       }
       
       console.log(`🎯 [PACE DEVIATION] Interval ${interval.interval_number || deviations.length + 1}: actual=${fmtPace(actualPaceSecPerMi)}, target=${fmtPace(targetLower)}-${fmtPace(targetUpper)}, deltaPct=${(deltaPct * 100).toFixed(1)}%, direction=${direction}, isRecovery=${finalIsEasyOrRecoveryRun || isRecoveryContext}`);

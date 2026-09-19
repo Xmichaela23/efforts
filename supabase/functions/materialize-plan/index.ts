@@ -2274,7 +2274,8 @@ function expandBikeToken(
    * `resolveCurrentFtp` (or the plan's snapshot of it), which returns the athlete's ACCEPTED FTP first
    * (`ride_ftp_accepted`). Pinned in `easy-ride-ceiling.test.ts`.
    */
-  const easyRange = () => (ftp ? { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * ftp) } : undefined);
+  // Through the one owner (`wattsAt`, rule `easy`: 0 up to `EASY_RIDE_CEILING_PCT_OF_FTP`, p239), round 5.
+  const easyRange = () => wattsAt(0, EASY_RIDE_CEILING_PCT_OF_FTP, ftp, 'easy');
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
     if (!ftp) return undefined;
@@ -2385,8 +2386,9 @@ function expandBikeToken(
   /**
    * ⛔ p237's PROGRESSIVE REPEATS — *"6-10 x 1 min @ 110-115%+, start at 110% and progress to
    * 125-130% by the end"*. The `+` is the page's own open ceiling, so the step carries the 110% FLOOR
-   * and nothing above it (`FAMILIES.ride_anaerobic.floorOnly`). It used to carry 110-120%, which put
-   * every repeat inside a ceiling the page does not print.
+   * and no top for the score (`FAMILIES.ride_anaerobic.floorOnly`); the screen and the watch show p237's 130% as the
+   * top (`shown_upper`, round 5, 2026-09-18). It used to carry 110-120%, which put every repeat inside a ceiling the
+   * page does not print.
    * ⚠️ `bike_vo2_` IS THIS FAMILY'S TOKEN, NOT VO2'S — see the note in `session-vocabulary.ts`.
    */
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
@@ -4096,8 +4098,9 @@ export function toV3Step(st: any, row?: any): any {
       /**
        * ⛔ A SINGLE PACE GETS THE ONE BAND (round 4, 2026-09-18, Michael approved): FIELD — TrainingPeaks' ±10% of the
        * interval target, `singleTargetBand` in `_shared/plan-tokens/quality-work.ts`, the same band the watts get.
-       * Replaces our ±2% on work steps and ±6% on the rest (OURS, no source). A step with its own range (the easy
-       * pace range, below) keeps it.
+       * Replaces our ±2% on work steps and ±6% on the rest (OURS, no source). A step with its own range keeps it: an
+       * easy, VT1 or long-run step carries the easy pace range, whose own top is the easy run's top (p235, round 5).
+       * An all-out step (p229–231) carries no pace, so it reaches here with none and gets no range.
        */
       out.pace_range = singleTargetBand(st.pace_sec_per_mi);
     }
@@ -4119,7 +4122,13 @@ export function toV3Step(st: any, row?: any): any {
     const lo = Math.round(st.power_range.lower);
     const up = typeof st.power_range.upper === 'number' ? Math.round(st.power_range.upper) : null;
     out.powerTarget = up == null ? `${lo} W` : `${Math.round((lo + up) / 2)} W`;
-    out.powerRange = up == null ? { lower: lo } : { lower: lo, upper: up };
+    /**
+     * ⛔ p237's SHOWN TOP RIDES THROUGH (round 5, 2026-09-18). A floor step saves no `upper` (the score has no top) and
+     * a `shown_upper` (130% of FTP, `ANAEROBIC_TOP_PCT_OF_FTP`) that the screens print and the sends carry. This
+     * object is a whitelist, so the field is carried by name.
+     */
+    const shown = up == null && typeof st.power_range.shown_upper === 'number' ? Math.round(st.power_range.shown_upper) : null;
+    out.powerRange = up == null ? { lower: lo, ...(shown != null ? { shown_upper: shown } : {}) } : { lower: lo, upper: up };
   }
   if (typeof st?.label === 'string') out.label = st.label;
   if (st?.equipment) out.equipment = st.equipment;

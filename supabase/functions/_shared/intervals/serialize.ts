@@ -16,7 +16,7 @@
 // (forum.intervals.icu/t/uploading-planned-workouts-to-intervals-icu/63624):
 //   category WORKOUT · start_date_local `YYYY-MM-DDT00:00:00` · type · name · description · external_id
 
-import { oneSidedPowerText } from '../ride-power.ts';
+import { oneSidedPowerText, shownPowerRange } from '../ride-power.ts';
 
 export class IntervalsSerializeError extends Error {
   constructor(message: string) {
@@ -82,16 +82,21 @@ function stepLine(step: any, index: number, ftp: number): string {
   }
   const cue = cueLabel || CUE_BY_KIND[kind] || '';
 
-  const lo = Number(step?.powerRange?.lower);
-  const hi = Number(step?.powerRange?.upper);
+  /**
+   * ⛔ p237's FLOOR GOES AS FLOOR TO 130% OF FTP (round 5, 2026-09-18, Michael's ruling: every step has a top except
+   * sprints) — the range the screen prints (`shownPowerRange`: the saved `shown_upper` where the score has no top).
+   */
+  const shown = step?.powerRange != null ? shownPowerRange(step.powerRange) : null;
+  const lo = Number(shown?.lower);
+  const hi = Number(shown?.upper);
   /**
    * ⛔ A ONE-SIDED STEP GOES OUT AS THE PAGE'S WORDS, WITH NO TARGET (2026-09-18, round 3, audit items 16 and 17).
-   * p237's floor ("253 W and up") went out with a 130%-of-FTP ceiling filled in, and p239's easy step ("under 173 W")
-   * with nothing. A target here is one number or a range ERG holds; neither is a floor or a ceiling. So both go as
-   * freeride (ERG off) under a text line carrying the same words the screen prints (`oneSidedPowerText`).
+   * p239's easy step ("under 173 W"): a target here is one number or a range ERG holds, and a range starting at 0 is
+   * refused, so it goes as freeride (ERG off) under a text line carrying the same words the screen prints
+   * (`oneSidedPowerText`). A floor with no top at all (a step saved before round 5) goes the same way.
    */
   const oneSided = step?.powerRange != null
-    ? oneSidedPowerText(step.powerRange.lower, step.powerRange.upper ?? null)
+    ? oneSidedPowerText(shown?.lower, shown?.upper ?? null)
     : null;
   if (oneSided) heading = heading ? `${heading}\n${oneSided}` : oneSided;
   let target: string;

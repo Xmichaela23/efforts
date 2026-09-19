@@ -127,6 +127,24 @@ export function judgedPowerRange(
   return { lower: lo, upper: hi };
 }
 
+/**
+ * ⛔⛔ THE RANGE A SCREEN PRINTS AND A SEND CARRIES (round 5, 2026-09-18, Michael's ruling: every ride step has a top
+ * except sprints). p237's anaerobic floor saves no `upper` — the score counts everything at or above the floor — and a
+ * `shown_upper` (130% of FTP, `plan-tokens/quality-work.ts ANAEROBIC_TOP_PCT_OF_FTP`, p237 "progress up to 125–130%
+ * by the end"). Every screen and send reads the range through here; every scorer keeps reading `upper` alone.
+ * A step saved before round 5 has no `shown_upper` and reads as before.
+ */
+export function shownPowerRange(
+  range: { lower?: unknown; upper?: unknown; shown_upper?: unknown } | null | undefined,
+): { lower: number; upper: number | null } | null {
+  const lo = Number(range?.lower);
+  if (range == null || !Number.isFinite(lo)) return null;
+  const up = range.upper != null && Number.isFinite(Number(range.upper)) ? Number(range.upper)
+    : range.shown_upper != null && Number.isFinite(Number(range.shown_upper)) ? Number(range.shown_upper)
+    : null;
+  return { lower: lo, upper: up };
+}
+
 /** p239's easy step: a floor of exactly zero under a real ceiling ("easy ride below 75%"). */
 export function isCeilingOnly(lowerW: number | null | undefined, upperW: number | null | undefined): boolean {
   const hi = Number(upperW);
@@ -135,8 +153,9 @@ export function isCeilingOnly(lowerW: number | null | undefined, upperW: number 
 
 /**
  * ⛔⛔ THE WORDS FOR A ONE-SIDED RIDE STEP — ONE OWNER, EVERY SCREEN AND EVERY SEND (2026-09-18, round 3, audit items
- * 16 and 17). p237's anaerobic work is a floor ("best done by feel with a power floor rather than a specific power
- * target"): "253 W and up". p239's easy ride is a ceiling ("easy ride below 75%"): "under 173 W". The screen printed
+ * 16 and 17). p239's easy ride is a ceiling ("easy ride below 75%"): "under 173 W". "253 W and up" prints only for a
+ * floor with no top at all: since round 5 (2026-09-18) p237's floor carries a shown top (`shownPowerRange`), and the
+ * screens and sends pass it here, so it prints as a range. The screen printed
  * these while Garmin and Intervals.icu/Zwift sent a 130%-of-FTP ceiling on the floor (a number p237 prints only as
  * the progressive option's top) and Zwift sent no target at all on the easy ride. Now the Planned tab, the session
  * detail, the Garmin step and the Intervals.icu step all print these words; a device target is sent only where the

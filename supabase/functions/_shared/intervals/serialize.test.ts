@@ -82,8 +82,12 @@ Deno.test('a ceiling-only easy step goes out as freeride, with the screen\'s wor
   assertEquals(ev.description, 'Easy ride below 75%.\n\nunder 158 W\n- 1h freeride');
 });
 
-/** ⛔ p237's floor goes as its words and ERG off, no ceiling filled in (2026-09-18, round 3, audit item 16). */
-Deno.test('a floor-only anaerobic step goes out as freeride under "N W and up", with no 130% ceiling', () => {
+/**
+ * ⛔ A floor saved with no top at all (a step written before round 5) goes as its words and ERG off (2026-09-18, round 3,
+ * audit item 16). Since round 5 the plan saves p237's shown top and the step goes as floor to 130% — pinned in
+ * `plan-tokens/single-target-band.test.ts`.
+ */
+Deno.test('a floor saved with no shown top goes out as freeride under "N W and up"', () => {
   const ev = serializeRide({
     id: 'f', date: '2026-09-15', type: 'ride', name: 'Anaerobic',
     computed: { anchors, steps: [{ kind: 'work', seconds: 45, powerRange: { lower: 253 } }] },

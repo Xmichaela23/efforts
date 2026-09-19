@@ -6,7 +6,7 @@ import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
 import { singleTargetBand } from '../plan-tokens/quality-work.ts'
 import { oneSidedPowerText } from '../ride-power.ts'
-import { judgedPowerRange } from '../ride-power.ts'
+import { judgedPowerRange, shownPowerRange } from '../ride-power.ts'
 
 
 export type PlannedWorkout = {
@@ -215,14 +215,20 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           }
           return undefined
         }
-        let low = parseW((cs as any)?.power_range?.lower ?? (cs as any)?.powerRange?.lower ?? (cs as any)?.target_low)
-        let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.powerRange?.upper ?? (cs as any)?.target_high)
+        /**
+         * ⛔ p237's FLOOR GOES AS FLOOR TO 130% OF FTP (round 5, 2026-09-18, Michael's ruling: every step has a top except
+         * sprints). The saved step has no `upper` (the score has no top) and a `shown_upper`; `shownPowerRange` reads the
+         * two, the same range the screen prints.
+         */
+        const savedRange = (cs as any)?.power_range ?? (cs as any)?.powerRange
+        const shown = shownPowerRange(savedRange)
+        let low = shown ? shown.lower : parseW(savedRange?.lower ?? (cs as any)?.target_low)
+        let high = shown ? (shown.upper ?? undefined) : parseW(savedRange?.upper ?? (cs as any)?.target_high)
         /**
          * ⛔⛔ A ONE-SIDED STEP CARRIES THE PAGE'S WORDS ON THE WATCH STEP (2026-09-18, round 3, audit items 16 and 17),
-         * the same words the screen prints (`oneSidedPowerText`). A Garmin power target is a low/high pair with no
-         * open-ended form, so p237's floor ("253 W and up") goes with NO power target — the 130%-of-FTP ceiling that
-         * was filled in is a number p237 prints only as the progressive option's top. p239's ceiling ("under 173 W")
-         * keeps its 0-to-ceiling target, which is the page's own shape, and carries the words too.
+         * the same words the screen prints (`oneSidedPowerText`). p239's ceiling ("under 173 W") keeps its 0-to-ceiling
+         * target, which is the page's own shape, and carries the words too. A floor with no top at all (a step saved
+         * before round 5) still goes with its words and no power target.
          */
         const oneSided = typeof low === 'number' ? oneSidedPowerText(low, high ?? null) : null
         if (oneSided) step.description = step.description ? `${step.description} · ${oneSided}` : oneSided
