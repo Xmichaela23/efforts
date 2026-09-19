@@ -50,7 +50,9 @@ import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
 import { SWIM_ENDURANCE_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
-import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
+import { barLbForExercise, calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
+// Round 4 (2026-09-18): the warm-up sets in front of a standing-plan barbell lift — FIELD, StrongLifts (see the file).
+import { warmupSetsFor } from '../_shared/standing-plan/warmup.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
@@ -1276,7 +1278,16 @@ function stampAthleteUnit(strength: any, metric: boolean): void {
   }
 }
 
-export function carrySetPlan(ex: any, finalWeight: number | null | undefined): any[] | undefined {
+export function carrySetPlan(
+  ex: any,
+  finalWeight: number | null | undefined,
+  /**
+   * ⛔ THE WARM-UP SETS (round 4, 2026-09-18, StrongLifts — `standing-plan/warmup.ts warmupSetsFor`, one owner). Passed
+   * for a standing-plan row that is not a test day; the sets go in front of the work sets when the lift is a barbell
+   * lift with a work weight. `metric`: the 20 kg bar and the kg jumps. Absent: the set plan is carried as before.
+   */
+  warmups?: { name: string; metric: boolean } | null,
+): any[] | undefined {
   const authored = Array.isArray(ex?.set_plan) ? ex.set_plan : null;
   if (!authored || authored.length === 0) return undefined;
   const authoredTop = Number(authored[authored.length - 1]?.weight);
@@ -1284,7 +1295,8 @@ export function carrySetPlan(ex: any, finalWeight: number | null | undefined): a
   const scale = Number.isFinite(authoredTop) && authoredTop > 0 && Number.isFinite(top) && top > 0
     ? top / authoredTop
     : 1;
-  return authored.map((s: any) => {
+  // ⛔ A standing row's warm-up sets are rebuilt from the work weight, never scaled (an empty bar stays the bar).
+  const carried = (warmups ? authored.filter((s: any) => s?.warmup !== true) : authored).map((s: any) => {
     const w = Number(s?.weight);
     // OURS — `carrySetPlan` rounds a rescaled set DOWN to 5 lb, never under 5 (compose rounds to nearest). No source.
     const scaled = Number.isFinite(w) && w > 0
@@ -1292,6 +1304,9 @@ export function carrySetPlan(ex: any, finalWeight: number | null | undefined): a
       : w;
     return { weight: scaled, reps: s?.reps, ...(s?.amrap ? { amrap: true } : null), ...(s?.warmup ? { warmup: true } : null) };
   });
+  if (!warmups || barLbForExercise(warmups.name) == null) return carried;
+  const firstWork = Number(carried[0]?.weight);
+  return [...warmupSetsFor(warmups.name, firstWork, warmups.metric), ...carried];
 }
 
 // Map percentage intensity to band resistance level
@@ -2537,6 +2552,12 @@ export function expandTokensForRow(
   // A row the standing-plan composer built — it names the row for the athlete's kit itself (`execution_name`).
   const isStandingPlanRow = Array.isArray((row as any)?.tags)
     && (row as any).tags.some((t: any) => String(t).toLowerCase() === 'standing_plan');
+  // ⛔ THE WARM-UP SETS GO ON A STANDING-PLAN LIFTING DAY'S BARBELL ROWS, NOT ON A TEST DAY (p215 has its own warm-up
+  // steps) — round 4, 2026-09-18, `carrySetPlan`.
+  const standingWarmups = (liftName: string) =>
+    isStandingPlanRow && !isTestSession({ name: (row as any)?.name, tags: (row as any)?.tags } as never)
+      ? { name: String(liftName ?? ''), metric: !!(baselines as any)?.isMetric }
+      : null;
   // OURS — 1.05 / 0.85 ceilings, see `resolveStrengthPercentForLift`.
   const strengthMaxPct = isStrengthPrimary ? 1.05 : 0.85;
   const discipline = String(row?.type||'').toLowerCase();
@@ -2861,7 +2882,7 @@ export function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight, standingWarmups(name)), rir_tracked: tracksRir,
             /**
              * ⛔ THE EXECUTION LABEL, CARRIED — DISPLAY ONLY (2026-08-31). The composer sets
              * `execution_name` when the athlete's kit reaches a movement on its FREE-WEIGHT route and
@@ -3296,7 +3317,7 @@ export function expandTokensForRow(
               finalWeightDisplay = modalityCfg.displayFormat === 'band' ? 'Band' : 'Bodyweight';
             }
           }
-          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+          const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight, standingWarmups(name)), rir_tracked: tracksRir,
             /**
              * ⛔ THE EXECUTION LABEL, CARRIED — DISPLAY ONLY (2026-08-31). The composer sets
              * `execution_name` when the athlete's kit reaches a movement on its FREE-WEIGHT route and

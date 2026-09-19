@@ -70,3 +70,24 @@ Deno.test('the warm-up tag survives the carry and scales with the ramp', () => {
   assertEquals(moved.map((s: any) => s.weight), [65, 80, 95, 105, 120, 140]);
   assertEquals(moved.filter((s: any) => s.warmup).length, 3);
 });
+
+// ── Round 4 (2026-09-18): StrongLifts' warm-up sets go in front of a standing-plan barbell lift ────────────────
+Deno.test('a standing-plan barbell row gets its warm-up sets in front of the work sets, built from the final weight', () => {
+  const ex = { name: 'Back Squat', set_plan: [{ weight: 225, reps: 3 }, { weight: 225, reps: 3 }, { weight: 225, reps: 3 }] };
+  const out = carrySetPlan(ex, 225, { name: 'Back Squat', metric: false })!;
+  assertEquals(out.map((s: any) => `${s.warmup ? 'w' : ''}${s.weight}x${s.reps}`).join(' '),
+    'w45x5 w45x5 w90x5 w135x5 w180x5 225x3 225x3 225x3');
+});
+
+Deno.test('an old stored ramp is replaced, not scaled — the empty bar stays the bar', () => {
+  const ex = { name: 'Deadlift', set_plan: [{ weight: 45, reps: 5, warmup: true }, { weight: 165, reps: 5, warmup: true }, { weight: 300, reps: 3 }] };
+  const out = carrySetPlan(ex, 315, { name: 'Deadlift', metric: false })!;
+  assertEquals(out.map((s: any) => `${s.warmup ? 'w' : ''}${s.weight}x${s.reps}`).join(' '), 'w135x5 w180x5 w225x5 w270x5 315x3');
+});
+
+Deno.test('no warm-up sets on a lift with no bar, and none without the standing-plan flag', () => {
+  const db = { name: 'Seated DB Press', set_plan: [{ weight: 50, reps: 8 }] };
+  assertEquals(carrySetPlan(db, 50, { name: 'Seated DB Press', metric: false }), [{ weight: 50, reps: 8 }]);
+  const bb = { name: 'Back Squat', set_plan: [{ weight: 225, reps: 3 }] };
+  assertEquals(carrySetPlan(bb, 225), [{ weight: 225, reps: 3 }]);
+});

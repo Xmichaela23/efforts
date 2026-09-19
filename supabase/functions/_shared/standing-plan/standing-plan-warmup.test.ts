@@ -15,7 +15,7 @@ import { voiceViolation } from '../state-trend/week-accent.ts';
 import { viadaCategoryOf } from '../strength-grid/index.ts';
 import { defaultViadaPicks, pickOptionLabel, pickOptions, VIADA_PICK_KEYS } from './accessory-picks.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
-import { DEFAULT_BAR_LB } from './warmup.ts';
+import { DEFAULT_BAR_LB, warmupSetsFor, warmupStartsOnFloor } from './warmup.ts';
 import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 const BASE = {
@@ -39,11 +39,11 @@ function rows(w: ReturnType<typeof composeWeek>): Row[] {
   return w.sessions.flatMap((s) => ((s as { strength_exercises?: Row[] }).strength_exercises ?? []));
 }
 
-Deno.test('⛔⛔ NO WARM-UP RAMP IS PRESCRIBED — its weights and reps were ours (2026-09-18)', () => {
+Deno.test('⛔⛔ THE COMPOSER WRITES WORK SETS ONLY — the warm-up sets are built at materialize (round 4)', () => {
   /**
-   * The ramp (empty bar × 5, then 55% × 5, 75% × 3, 90% × 2 of the work weight) came off in the
-   * book-language fix: p139-140 ask for a warm-up that works up in weight and give no percentages and no
-   * rep counts, and every number in the ramp was labelled OURS. A row carries its work sets only.
+   * The OURS ramp (empty bar × 5, then 55% × 5, 75% × 3, 90% × 2) came off on 2026-09-18. StrongLifts' warm-up comes
+   * back in round 4, built once by `warmupSetsFor` where the athlete's unit is known (`materialize-plan
+   * carrySetPlan`). The composer's rows still carry their work sets only, so every count stays anchored on them.
    */
   for (const w of [week(), week({ workingNumbers: undefined })]) {
     for (const r of rows(w)) {
@@ -174,4 +174,39 @@ Deno.test('⛔ AN ADDITION IS MARKED, AND THE MECHANISM MARKS ANY FUTURE ONE', (
   assert(/added/.test(label), `the mark does not say what it means: ${label}`);
   assertEquals(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(label), false, 'the mark carries an emoji');
   assertEquals(/sorry|unfortunate|note that|please/i.test(label), false, 'the mark apologises');
+});
+
+// ── Round 4 (2026-09-18): StrongLifts' warm-up sets ──────────────────────────────────────────────
+const KG = 0.45359237;
+const lbs = (name: string, w: number) => warmupSetsFor(name, w).map((s) => `${s.reps}x${s.weight}`).join(' ');
+const kgs = (name: string, kg: number) => warmupSetsFor(name, kg / KG, true).map((s) => `${s.reps}x${Math.round(s.weight * KG * 100) / 100}`).join(' ');
+
+Deno.test('StrongLifts warm-up: squat 225 lb — 2 × 5 at the bar, then 45 lb steps, none at the work weight', () => {
+  assertEquals(lbs('Back Squat', 225), '5x45 5x45 5x90 5x135 5x180');
+});
+
+Deno.test('StrongLifts warm-up: squat 100 kg on a metric account — the 20 kg bar and 20 kg steps', () => {
+  assertEquals(kgs('Back Squat', 100), '5x20 5x20 5x40 5x60 5x80');
+});
+
+Deno.test('StrongLifts warm-up: deadlift 315 lb — one set at 135 off the floor, then 45 lb steps', () => {
+  assertEquals(lbs('Deadlift', 315), '5x135 5x180 5x225 5x270');
+  assert(warmupStartsOnFloor('Barbell Row') && warmupStartsOnFloor('Trap Bar Deadlift'));
+  assert(!warmupStartsOnFloor('Romanian Deadlift') && !warmupStartsOnFloor('Bench Press') && !warmupStartsOnFloor('Upright Row'));
+});
+
+Deno.test('StrongLifts warm-up: no jump over 45 lb / 20 kg, no set at or above the work weight, nothing at the bar', () => {
+  for (const name of ['Back Squat', 'Bench Press', 'Deadlift', 'Barbell Row']) {
+    for (let w = 50; w <= 600; w += 5) {
+      const sets = warmupSetsFor(name, w);
+      const ladder = [...sets.map((s) => s.weight), w];
+      for (let i = 1; i < ladder.length; i++) {
+        assert(ladder[i] - ladder[i - 1] <= 45, `${name} ${w}: jump ${ladder[i - 1]} -> ${ladder[i]}`);
+      }
+      assert(sets.every((s) => s.weight < w && s.reps === 5 && s.warmup === true), `${name} ${w}`);
+    }
+  }
+  assertEquals(warmupSetsFor('Bench Press', 45), []);
+  assertEquals(warmupSetsFor('Deadlift', 135), []);
+  assertEquals(warmupSetsFor('Back Squat', null), []);
 });
