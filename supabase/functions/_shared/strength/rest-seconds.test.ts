@@ -115,11 +115,14 @@ Deno.test('⛔ THE ROW FIELDS — a stamp wins, warm-up rest only with a warm-up
   assertEquals(restFieldsForRow({ name: 'Hip Thrust', reps: '50 total' }), { rest_seconds: 60 });
   assertEquals(restFieldsForRow({ name: 'Plank', reps: 'AMRAP' }), { rest_seconds: 90 });
   // ⛔ 2026-09-18: a row with a p218 intent carries the page's rule and NO seconds — the minutes were ours.
+  // Round 4: its timer counts up (`rest_count_up`), with NSCA's range on ME ("2–5 min") and HYP ("60 s") only.
   assertEquals(
     restFieldsForRow({ name: 'Bench Press', reps: '1-5', slot_intent: 'ME', set_plan: [{ weight: 45, reps: 5, warmup: true }, { weight: 135 }] }),
-    { rest_cue: REST_BETWEEN_SETS_RULE.cue },
+    { rest_cue: REST_BETWEEN_SETS_RULE.cue, rest_count_up: true, rest_range: '2–5 min' },
   );
-  assertEquals(restFieldsForRow({ name: 'Leg Press', reps: '6-12', slot_intent: 'HYP' }), { rest_cue: REST_BETWEEN_SETS_RULE_HYP.cue });
+  assertEquals(restFieldsForRow({ name: 'Leg Press', reps: '6-12', slot_intent: 'HYP' }), { rest_cue: REST_BETWEEN_SETS_RULE_HYP.cue, rest_count_up: true, rest_range: '60 s' });
+  assertEquals(restFieldsForRow({ name: 'Bench Press', reps: '2-4', slot_intent: 'DE' }), { rest_cue: REST_BETWEEN_SETS_RULE.cue, rest_count_up: true });
+  assertEquals(restFieldsForRow({ name: 'Farmers Carry', reps: '3-5', slot_intent: 'SKILL' }), { rest_cue: REST_BETWEEN_SETS_RULE.cue, rest_count_up: true });
   // And none on a plyometric drill (p227: "ample rest", no number).
   assertEquals(restFieldsForRow({ name: 'Pogo Hops', reps: '' }), {});
   // The first WORK set's reps, not the warm-up's.
@@ -138,11 +141,11 @@ Deno.test('⛔ EVERY COMPOSED STRENGTH ROW CARRIES ITS REST, AND THE NUMBER IS T
     const rows = w.sessions.flatMap((s) => s.strength_exercises ?? []);
     assert(rows.length > 0, `week ${week} composed no strength rows`);
     for (const r of rows) {
-      const { rest_seconds, warmup_rest_seconds, rest_cue, ...rest } = r;
+      const { rest_seconds, warmup_rest_seconds, rest_cue, rest_count_up, rest_range, ...rest } = r;
       // ⛔ 2026-09-18: a composed row is a book row — no countdown seconds on it at all.
       assertEquals(rest_seconds, undefined, `week ${week}: ${String(r.name)} carries rest seconds`);
       assertEquals(warmup_rest_seconds, undefined, `week ${week}: ${String(r.name)} carries warm-up rest seconds`);
-      assertEquals({ rest_seconds, warmup_rest_seconds, rest_cue }, { ...{ rest_seconds: undefined, warmup_rest_seconds: undefined, rest_cue: undefined }, ...restFieldsForRow(rest) },
+      assertEquals({ rest_seconds, warmup_rest_seconds, rest_cue, rest_count_up, rest_range }, { ...{ rest_seconds: undefined, warmup_rest_seconds: undefined, rest_cue: undefined, rest_count_up: undefined, rest_range: undefined }, ...restFieldsForRow(rest) },
         `week ${week}: ${String(r.name)} carries a number the rule does not give`);
     }
   }

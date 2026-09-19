@@ -372,6 +372,31 @@ export function intentMeaning(intent: string | null | undefined): string[] {
 export const SETS_START_LOW_LINE = 'Sets should always remain on the lower end when starting a program, increasing only '
   + 'if an athlete is finding that they are progressing well and seem to have recovery to spare!';
 
+/**
+ * ⛔ THE RANGE BESIDE THE REST TIMER (round 4, 2026-09-18, Michael approved). The timer on a plan row counts UP from
+ * 0:00 — it has no starting or target number — and the book's rest sentence (p78 / p84, `restRuleFor`) prints
+ * beside it for every intent. Beside it too, a range, for the two intents a field source covers:
+ *   FIELD — NSCA Trainer Tips: Hypertrophy (2016),
+ *   https://www.nsca.com/contentassets/d27e2ba7e56949229d3eb1aaef7ddcfa/trainertips_hypertrophy_201601.pdf —
+ *   hypertrophy: "multiple sets with moderate loads (6-12 reps, 65-85% 1RM) and rest periods (60 seconds)",
+ *   compared to "heavy loads (1-5 reps, >85% 1RM) with long rest periods (2-5 minutes)".
+ * ME (p218's 1-5 heavy sets) takes the heavy range and HYP (6-12) the hypertrophy one. DE and SKILL get no range:
+ * the NSCA page does not cover them, so their timer carries the book's sentence only.
+ * Ledger: docs/STATE-SOURCES.md, row "Rest timer on a plan row".
+ */
+export const REST_RANGE_LABEL: Partial<Record<'ME' | 'HYP', string>> = {
+  // device-instruction: the label beside the count-up rest timer; FIELD — NSCA Trainer Tips: Hypertrophy (2016), heavy loads "long rest periods (2-5 minutes)"; no book page gives minutes
+  ME: '2–5 min',
+  // device-instruction: the label beside the count-up rest timer; FIELD — NSCA Trainer Tips: Hypertrophy (2016), hypertrophy "rest periods (60 seconds)"; no book page gives minutes
+  HYP: '60 s',
+};
+
+/** The range beside the rest timer for an intent (`REST_RANGE_LABEL`), or null — DE, SKILL and anything else. */
+export function restRangeLabelFor(intent: string | null | undefined): string | null {
+  const k = String(intent ?? '').toUpperCase();
+  return k === 'ME' || k === 'HYP' ? REST_RANGE_LABEL[k] ?? null : null;
+}
+
 /** The page's rest rule for an intent: p84 for HYP, p78 for the other three. Null for anything else. */
 export function restRuleFor(intent: string | null | undefined): string | null {
   const k = String(intent ?? '').toUpperCase();

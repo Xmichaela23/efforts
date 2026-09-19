@@ -19,7 +19,7 @@
  * separate behaviour change and is not made here.
  */
 import { isMainBarbellLift } from '../../../../src/lib/exercise-role.ts';
-import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '../strength-grid/intents.ts';
+import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP, restRangeLabelFor } from '../strength-grid/intents.ts';
 
 /**
  * Plyometric / explosive movement — needs full neural recovery between sets.
@@ -150,6 +150,13 @@ export type RestFields = {
   warmup_rest_seconds?: number;
   /** The sentence beside the countdown. Present only when the row declares a slot intent. */
   rest_cue?: string;
+  /**
+   * ⛔ A PLAN ROW'S TIMER COUNTS UP FROM 0:00 (round 4, 2026-09-18, Michael approved) — no starting or target number.
+   * Present only on a row with a p218 intent.
+   */
+  rest_count_up?: true;
+  /** The range beside the count-up timer: ME "2–5 min", HYP "60 s" (NSCA, `REST_RANGE_LABEL`). Absent on DE / SKILL. */
+  rest_range?: string;
 };
 
 const positive = (v: unknown): number | null => {
@@ -185,7 +192,7 @@ export function restFieldsForRow(row: Record<string, unknown>): RestFields {
   const bucket = restBucketForIntent(intent);
   const out: RestFields = {};
   /**
-   * ⛔⛔ NO COUNTDOWN ON A BOOK ROW (book-language fix, 2026-09-18). A row with a p218 intent took 3:00 /
+   * ⛔⛔ NO COUNTDOWN ON A BOOK ROW (book-language fix, 2026-09-18; a count-up timer came back in round 4, below). A row with a p218 intent took 3:00 /
    * 2:00 / 1:30 (and 1:00 after a warm-up set) — every number ours; p78 and p84 give a rule and no minutes.
    * Michael's rule: rest is a training instruction, and what the book does not say comes off. The row
    * carries the page's rule (`rest_cue`) and no seconds, so the logger starts no timer on it.
@@ -204,5 +211,15 @@ export function restFieldsForRow(row: Record<string, unknown>): RestFields {
     ? row.rest_cue
     : (bucket ? restCueForBucket(bucket) : null);
   if (cue) out.rest_cue = cue;
+  /**
+   * ⛔ THE TIMER COMES BACK ON A BOOK ROW, COUNTING UP (round 4, 2026-09-18, Michael approved). Still no seconds — the
+   * page gives a rule and no minutes — so the logger counts up from 0:00 beside the page's sentence, with NSCA's range
+   * where one covers the intent (FIELD — NSCA Trainer Tips: Hypertrophy (2016); `REST_RANGE_LABEL`).
+   */
+  if (bucket) {
+    out.rest_count_up = true;
+    const range = restRangeLabelFor(intent);
+    if (range) out.rest_range = range;
+  }
   return out;
 }

@@ -257,7 +257,9 @@
    "fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as discussed in Chapter 4)",
    "because some fatigue of all motor units is practically necessary to ensure maximum tension in all these",
    "Sets should always remain on the lower end when starting a program, increasing only",
-   "if an athlete is finding that they are progressing well and seem to have recovery to spare!"
+   "if an athlete is finding that they are progressing well and seem to have recovery to spare!",
+   "2–5 min",
+   "60 s"
   ],
   "supabase/functions/_shared/strength/strength-display-lines.ts": [
    "{} · {} reps{}{}",

@@ -262,6 +262,9 @@ interface LoggedExercise {
   rest_seconds?: number;
   warmup_rest_seconds?: number;
   rest_cue?: string;
+  /** Round 4 (2026-09-18): a plan row's rest timer counts up from 0:00, with NSCA's range beside it on ME / HYP. */
+  rest_count_up?: boolean;
+  rest_range?: string;
   /** 2026-09-10 (audit H-S02): on a test row with no max on file, the increment the anchor's steps round to. */
   anchor_round_to?: number;
   // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
@@ -569,10 +572,13 @@ const slotIntentOf = (ex: unknown): string | null =>
  * on every set; the composer and materialize-plan now put `rest_seconds`, `warmup_rest_seconds` and
  * `rest_cue` on the row, and this copies them onto the logged exercise. Absent → no countdown.
  */
-const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: number; rest_cue?: string } => ({
+const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: number; rest_cue?: string; rest_count_up?: boolean; rest_range?: string } => ({
   ...(Number(row?.rest_seconds) > 0 ? { rest_seconds: Number(row.rest_seconds) } : {}),
   ...(Number(row?.warmup_rest_seconds) > 0 ? { warmup_rest_seconds: Number(row.warmup_rest_seconds) } : {}),
   ...(typeof row?.rest_cue === 'string' && row.rest_cue.trim() ? { rest_cue: row.rest_cue } : {}),
+  // Round 4 (2026-09-18): the server's count-up flag and range (`_shared/strength/rest-seconds.ts restFieldsForRow`).
+  ...(row?.rest_count_up === true ? { rest_count_up: true } : {}),
+  ...(typeof row?.rest_range === 'string' && row.rest_range.trim() ? { rest_range: row.rest_range } : {}),
 });
 
 /**
@@ -746,6 +752,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Mood removed per request; keep RPE only
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
+  /**
+   * ⛔ THE COUNT-UP REST ON A PLAN ROW (round 4, 2026-09-18, Michael approved). The server gives a book row no seconds
+   * (p78 / p84 give a rule and no minutes) and `rest_count_up: true`; the timer counts up from 0:00 from the wall
+   * clock, so time away from the app still counts. Any set marked done ends it. Rendered in the same pill as the
+   * countdown, with the row's range (`rest_range`, NSCA) and the page's sentence (`rest_cue`) beside it.
+   */
+  const [restUp, setRestUp] = useState<{ key: string; exId: string; startedAt: number } | null>(null);
+  const [restUpNow, setRestUpNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!restUp) return;
+    setRestUpNow(Date.now());
+    const id = window.setInterval(() => setRestUpNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [restUp]);
   // Rest rows the user has Skipped — hides that set's rest row until the set is re-completed.
   const [restDismissed, setRestDismissed] = useState<Set<string>>(new Set());
   // Mirror live timers into a ref so the app-state listener reads current values (not a stale closure).
@@ -3623,6 +3643,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const ex = exercises.find((e) => e.id === exerciseId);
       const set = ex?.sets[setIndex];
       if (!ex || !set) return;
+      // Round 4: a set marked done ends the count-up that was running (the athlete has started the next set).
+      setRestUp(null);
       // 2026-09-03 (Michael: the superset "launched the timer when one exercise is done"): in a pair the
       // rest comes AFTER the pair. Done on the first exercise starts nothing — the athlete moves to the
       // second; done on the second starts the timer. Hevy and Strong behave the same on grouped sets.
@@ -3634,6 +3656,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (set.duration_seconds !== undefined) return;          // no rest after a duration hold
       if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
       const restKey = `${exerciseId}-${setIndex}`;
+      // ⛔ A PLAN ROW COUNTS UP (round 4, 2026-09-18). Not after a warm-up set: FIELD — StrongLifts, "There's no rest
+      // between warmup sets – the weight is light" (stronglifts.com/stronglifts-5x5/workout-program/).
+      if (ex.rest_count_up) {
+        if (set.setType === 'warmup') return;
+        setRestUp({ key: restKey, exId: exerciseId, startedAt: Date.now() });
+        hapticLight();
+        return;
+      }
       // ⛔ THE ROW'S OWN NUMBER (2026-09-10, audit H-S07). The server stamps `rest_seconds` and, on a row with a
       // ramp, `warmup_rest_seconds`. A row with neither (an exercise added here, a workout with no plan) gets
       // no countdown.
@@ -4492,6 +4522,39 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {(() => {
           const restEntries = Object.entries(timers)
             .filter(([k, t]) => !k.includes('-set-') && t?.running && (t.seconds ?? 0) > 0);
+          // ⛔ THE COUNT-UP (round 4): the same pill, counting from 0:00, with the range and the page's sentence.
+          if (restEntries.length === 0 && restUp) {
+            const upEx = exercises.find((e) => e.id === restUp.exId);
+            /* guard: device — the rest timer counting up on the phone, off the device clock */
+            const up = Math.max(0, Math.floor((restUpNow - restUp.startedAt) / 1000));
+            const upDisplay = `${Math.floor(up / 60)}:${String(up % 60).padStart(2, '0')}`;
+            const upCue = upEx?.rest_cue ?? null;
+            const upRange = upEx?.rest_range ?? null;
+            return (
+              <div className={`pointer-events-none bg-strength/20 border border-strength/50 text-[#FFE6D5] shadow-lg backdrop-blur-md ${
+                upCue ? 'max-w-[19rem] px-3.5 py-2 rounded-2xl' : 'flex items-center gap-2 px-3 py-1.5 rounded-full'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-caption uppercase tracking-wide text-strength">Rest</span>
+                  <span className="text-body font-semibold tabular-nums leading-none">{upDisplay}</span>
+                  {upRange && <span className="text-caption tabular-nums text-[#FFE6D5]/85">{upRange}</span>}
+                  <button
+                    type="button"
+                    onClick={() => setRestUp(null)}
+                    className="pointer-events-auto ml-1 px-2 h-6 rounded-full bg-white/[0.12] hover:bg-white/[0.20] text-label hover:text-white flex items-center justify-center text-caption font-medium"
+                    aria-label="Skip rest"
+                  >
+                    Skip
+                  </button>
+                </div>
+                {upCue && (
+                  <div className="pt-1.5">
+                    <p className="text-caption leading-snug text-[#FFE6D5]/85">{upCue}</p>
+                  </div>
+                )}
+              </div>
+            );
+          }
           if (restEntries.length === 0) return null;
           // Prefer the shortest remaining time (the most "active" rest right now).
           restEntries.sort(([, a], [, b]) => (a.seconds ?? 0) - (b.seconds ?? 0));

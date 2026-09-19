@@ -955,7 +955,9 @@ function rule6() {
  *                                      ("On Zwift or a smart trainer, turn ERG off."). No page is required, and the
  *                                      line IS found and pinned word for word even when it carries none of the
  *                                      instruction words, so a reworded device line still fails (round 4,
- *                                      2026-09-18). The marker counts on the string's own statement: the comment
+ *                                      2026-09-18). The rest timer's range label ("2–5 min", "60 s") is marked
+ *                                      the same way; it has no book page, and its field source (NSCA) is named in
+ *                                      the reason. The marker counts on the string's own statement: the comment
  *                                      directly above it, its own line, or the end of its statement.
  */
 const INSTRUCTION_WORDS = /\b(reps?|RIR|reserve|sets?|rest|warm[- ]?up|cool[- ]?down|recover(?:y|ies)?|easy|pace|FTP|VT1|VT2|effort|cadence|tempo|velocity|failure|fatigue|eccentric|concentric|intervals?|strides?|sprints?|jog|lunges?|talk test|deload|taper|drills?|load|percent|RPE|zone|all[- ]out|threshold|minutes?|min)\b|%/i;
