@@ -45,6 +45,7 @@ import { doneLines, weekBarTotals } from './week-totals.ts';
 import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 import { emptyDayLine } from '../_shared/empty-day-line.ts';
+import { planRestDates } from '../_shared/plan-overview.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
 import { P275_WARMUP_LINE } from '../_shared/standing-plan/plyo.ts';
@@ -1767,24 +1768,34 @@ Deno.serve(async (req)=>{
       // ⛔ The athlete's day, not UTC (2026-09-18): at 6 pm Pacific today is not yet a past day on Today.
       const todayISO = await athleteToday(supabase, userId);
       const { data: allPlans } = await supabase.from('plans')
-        .select('config,status').eq('user_id', userId).eq('status', 'active');
-      const starts = (Array.isArray(allPlans) ? allPlans : [])
+        .select('id,config,status,duration_weeks,sessions_by_week').eq('user_id', userId).eq('status', 'active');
+      const activePlans = Array.isArray(allPlans) ? allPlans : [];
+      const starts = activePlans
         .map((p: any) => String(p?.config?.user_selected_start_date || p?.config?.start_date || '').slice(0, 10))
         .filter((d: string) => isISO(d) && d > todayISO)
         .sort();
       const upcomingPlanStartsOn = starts[0] ?? null;
-      const datesWithPlan = new Set(
-        itemsWithPlannedWorkout
-          .filter((it: any) => it?.planned_workout?.training_plan_id || it?.training_plan_id)
-          .map((it: any) => String(it?.date ?? '').slice(0, 10)),
-      );
+      // ⛔ A REST DAY IS A DAY THE PLAN PUTS NO SESSION ON (2026-09-19) — `planRestDates`, the rule the Plan screen's
+      // `rest_days` lists. Before, any empty day in a window holding a plan row was "Rest", including days before the
+      // plan opens and after it ends, which the Plan screen does not count.
+      const restDates = new Set<string>();
+      if (activePlans.length > 0) {
+        const { data: planRows } = await supabase.from('planned_workouts')
+          .select('training_plan_id,week_number,date,type')
+          .eq('user_id', userId)
+          .in('training_plan_id', activePlans.map((p: any) => p.id));
+        for (const plan of activePlans) {
+          const rows = (Array.isArray(planRows) ? planRows : []).filter((r: any) => r?.training_plan_id === plan.id);
+          for (const d of planRestDates(plan, rows)) if (d >= fromISO && d <= toISO) restDates.add(d);
+        }
+      }
       // ⛔ ONLY A DAY WITH NOTHING ON IT GETS A LINE (2026-09-19): a day with a session never prints "Rest", and the
       // phone no longer has to decide which days are empty.
       const datesWithItems = new Set((itemsWithPlannedWorkout as any[]).map((it: any) => String(it?.date ?? '').slice(0, 10)));
       const lines: Record<string, string> = {};
       for (let d = fromISO; d <= toISO; d = addDays(d, 1)) {
         if (datesWithItems.has(d)) continue;
-        lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: datesWithPlan.has(d) || !!trainingPlanContext, upcomingPlanStartsOn });
+        lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: restDates.has(d), upcomingPlanStartsOn });
       }
       (responseData as any).empty_day_lines = lines;
     } catch (e) {

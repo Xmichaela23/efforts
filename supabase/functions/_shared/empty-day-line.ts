@@ -26,7 +26,7 @@ export type EmptyDayInput = {
   date: string;
   /** The athlete's today, ISO. */
   today: string;
-  /** True when a training plan covers this day. */
+  /** True when an active plan puts no session on this day — `planRestDates` (plan-overview.ts), the Plan screen's rest days. */
   hasPlan: boolean;
   /** The start date of a plan that is active but has not opened yet, ISO — else null. */
   upcomingPlanStartsOn?: string | null;

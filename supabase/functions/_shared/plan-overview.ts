@@ -219,6 +219,36 @@ function restDaysOf(plan: PlanRowLike, w: number, sessions: Json[]): PlanWeekTot
     .map((d) => ({ day: d, date: dates[d] ?? null, line: REST_DAY_LINE }));
 }
 
+/** Plan week `w`'s sessions: its materialized rows, else the plan blob's authored week. */
+function weekSessions(plan: PlanRowLike, rows: PlannedRowLike[], w: number): { sessions: Json[]; fromRows: boolean } {
+  const weekRows = rows.filter((r) => Number(r?.week_number) === w);
+  if (weekRows.length > 0) return { sessions: weekRows, fromRows: true };
+  const blob = plan?.sessions_by_week && typeof plan.sessions_by_week === 'object' ? plan.sessions_by_week : {};
+  const blobWeek = blob[String(w)] ?? blob[w];
+  return { sessions: Array.isArray(blobWeek) ? blobWeek : [], fromRows: false };
+}
+
+function planSpan(plan: PlanRowLike, rows: PlannedRowLike[]): number {
+  const blob = plan?.sessions_by_week && typeof plan.sessions_by_week === 'object' ? plan.sessions_by_week : {};
+  const lastRowWeek = rows.reduce((m, r) => Math.max(m, Number(r?.week_number) || 0), 0);
+  const lastBlobWeek = Object.keys(blob).reduce((m, k) => Math.max(m, Number(k) || 0), 0);
+  return planTotalWeeks(plan) ?? Math.max(lastRowWeek, lastBlobWeek);
+}
+
+/**
+ * ⛔ THE PLAN'S REST DAYS BY DATE (2026-09-19). The same days the Plan screen lists under each week (`rest_days`),
+ * for get-week: Today and the calendar print "Rest" on exactly these dates and decide nothing of their own.
+ */
+export function planRestDates(plan: PlanRowLike, rows: PlannedRowLike[] | null | undefined): Set<string> {
+  const all = Array.isArray(rows) ? rows : [];
+  const out = new Set<string>();
+  const span = planSpan(plan, all);
+  for (let w = 1; w <= span; w += 1) {
+    for (const r of restDaysOf(plan, w, weekSessions(plan, all, w).sessions)) if (r.date) out.add(r.date);
+  }
+  return out;
+}
+
 export function buildPlanOverview(args: {
   plan: PlanRowLike;
   rows: PlannedRowLike[] | null | undefined;
@@ -226,20 +256,14 @@ export function buildPlanOverview(args: {
 }): PlanOverview {
   const { plan, asOfIso } = args;
   const rows = Array.isArray(args.rows) ? args.rows : [];
-  const blob = plan?.sessions_by_week && typeof plan.sessions_by_week === 'object' ? plan.sessions_by_week : {};
   const summaries = plan?.config?.weekly_summaries && typeof plan.config.weekly_summaries === 'object' ? plan.config.weekly_summaries : {};
 
-  const lastRowWeek = rows.reduce((m, r) => Math.max(m, Number(r?.week_number) || 0), 0);
-  const lastBlobWeek = Object.keys(blob).reduce((m, k) => Math.max(m, Number(k) || 0), 0);
   const totalWeeks = planTotalWeeks(plan);
-  const span = totalWeeks ?? Math.max(lastRowWeek, lastBlobWeek);
+  const span = planSpan(plan, rows);
 
   const weeks: PlanWeekTotals[] = [];
   for (let w = 1; w <= span; w += 1) {
-    const weekRows = rows.filter((r) => Number(r?.week_number) === w);
-    const fromRows = weekRows.length > 0;
-    const blobWeek = blob[String(w)] ?? blob[w];
-    const sessions: Json[] = fromRows ? weekRows : (Array.isArray(blobWeek) ? blobWeek : []);
+    const { sessions, fromRows } = weekSessions(plan, rows, w);
     let minutes = 0;
     let training = 0;
     let count = 0;
