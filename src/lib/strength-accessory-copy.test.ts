@@ -24,7 +24,7 @@ Deno.test('⛔ THE PHONE\'S OWN ACCESSORY / ME / DE CUES ARE GONE AND MAY NOT CO
 });
 
 Deno.test('the accessory line is p218\'s HYP numbers, from the one owner', () => {
-  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
+  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.');
   assert(!Object.values(BAR_SPEED_COPY).includes(intentLine('HYP')!));
 });
 

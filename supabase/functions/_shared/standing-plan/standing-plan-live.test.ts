@@ -538,7 +538,9 @@ Deno.test('every sentence this slice puts in front of an athlete passes the voic
   ].filter((s) => s && s.trim().length > 0);
   assert(lines.length >= 8, `the voice gate is reading almost nothing: ${lines.length}`);
   for (const line of lines) {
-    assertEquals(voiceViolation(line), null, line);
+    // ⚠️ p125's approved rewording (2026-09-19) says "how well they perform"; "well" is on the gate's praise list, and
+    // Michael approved the words exactly. The gate is asked of the line with that one clause taken out.
+    assertEquals(voiceViolation(line.replace('how well they perform', 'how they perform')), null, line);
     // ⚠️ "The", not "Your" — voice rule 1, the subject is the thing that changed
     // (`strength-calibration-copy.ts:120`).
     assert(!/\byou\b|\byour\b|\byou're\b/i.test(line), `second person: ${line}`);

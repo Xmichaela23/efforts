@@ -98,48 +98,48 @@ function inAthletesUnit(rows: TestSessionRow[], metric: boolean, standingDay = f
 }
 
 /**
+ * ⛔ SINCE 2026-09-19 EACH LINE BELOW IS A REWORDING OF p215 that Michael approved word for word
+ * (docs/AUDIT-author-sentences-2026-09-19.md, #48–53); the page's words stay quoted in each comment.
  * ⛔⛔ THE TEST DAY'S WORDS ARE p215's, CUT, NEVER REWORDED (book-language fix, 2026-09-18). Page photo:
  * `book-sources/p215.png`. ONE OWNER: the plan's test rows (`compose.ts`) import the last-set line from here.
  *
- * p215 step 1: "Perform a regular warm-up in your chosen lift, slowly working your way up to a starting
+ * p215 step 1, reworded (Michael approved the words 2026-09-19): "Perform a regular warm-up in your chosen lift, slowly working your way up to a starting
  * weight of 75 percent or so of your predicted max; perform 6 reps." — the first clause, on the empty bar.
  * It replaces "Empty bar — a few easy reps to groove the movement." ("easy"; p140 says rapid).
  */
 const EMPTY_BAR_HINT =
-  'Perform a regular warm-up in your chosen lift, slowly working your way up to a starting weight of 75 percent or so of your predicted max.';
+  'Warm up as usual in the chosen lift, building slowly to a starting weight of about 75 percent of your predicted max.';
 /**
- * p215 step 8: "Perform the maximum number of repetitions possible with this weight, and enter the number
+ * p215 step 8, reworded (Michael approved the words 2026-09-19): "Perform the maximum number of repetitions possible with this weight, and enter the number
  * of repetitions here:" — cut after "weight". It replaces four wordings of the same set (this file, the plan
  * row's note, the logger's "All-out set… training max", and a "clean reps" line); "clean" and "stop when
  * form breaks" are not on p215.
  */
-export const TEST_LAST_SET_LINE = 'Perform the maximum number of repetitions possible with this weight.';
+export const TEST_LAST_SET_LINE = 'Do as many reps as you can with this weight.';
 const TEST_LAST_SET_HINT = TEST_LAST_SET_LINE;
 /**
  * ⛔ THE STARTING WEIGHT WITH NO MAX ON FILE — p215 steps 1 and 2, cut (2026-09-18). "A weight for 8 to 10
  * reps near failure" squeezed the page's "comfortably 8, approaching failure at 10" into one band.
- * p215: "…it's a weight where you can comfortably perform 8 repetitions but are approaching failure if you
- * had to push to 10." and step 2 "Enter this weight here:".
+ * p215, reworded (Michael approved the words 2026-09-19): "…it's a weight where you can comfortably perform 8 repetitions but are
+ * approaching failure if you had to push to 10." and step 2 "Enter this weight here:". The first sentence is also
+ * step 1's, so both read `P215_EIGHT_OF_TEN`.
  */
-const ANCHOR_HINT =
-  'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. '
-  + 'Enter this weight here.';
+const P215_EIGHT_OF_TEN = 'A weight you could lift 8 times comfortably, but near failure if pushed to 10.';  // p215, reworded
+const ANCHOR_HINT = `${P215_EIGHT_OF_TEN} Type this weight in.`;  // p215, reworded
 // ⛔ 2026-09-18: the pull-up test's three hints (scap pulls; "2–3 easy pull-ups, then rest ~2 min"; "ONE
 // all-out set: strict, full range, no kipping…") and its two warm-up sets (5 scap pulls, 3 easy pull-ups)
 // came off — no page gives a pull-up test, and every count was ours. The one set that records the count stays.
 
 /**
- * ⛔ p215's own words per step (2026-09-18). "Step 1 — the first ramp set, as prescribed." was ours.
+ * ⛔ p215 per step, reworded (Michael approved the words 2026-09-19); the page's words (2026-09-18). "Step 1 — the first ramp set, as prescribed." was ours.
  * Step 1 (75% × 6): "(This may be a guess, but it's a weight where you can comfortably perform 8
  * repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this
  * feels about right.)" — cut at the front. Step 2: "Perform 5 repetitions with this weight D." — the
  * letter cut; the rep count is the row's own, which is p215's 5.
  */
-const P215_STEP_ONE =
-  "A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. "
-  + 'Use this set of 6 to confirm that this feels about right.';
+const P215_STEP_ONE = `${P215_EIGHT_OF_TEN} This set of 6 checks that the weight feels about right.`;  // p215, reworded
 const stepHint = (i: number, reps?: number): string =>
-  i === 0 ? P215_STEP_ONE : `Perform ${Number(reps) > 0 ? reps : 5} repetitions with this weight.`;
+  i === 0 ? P215_STEP_ONE : `Do ${Number(reps) > 0 ? reps : 5} reps with this weight.`;  // p215, reworded
 
 /**
  * The number on file, as app state. ⛔ 2026-09-18: "The steps below are a share of that number; the last one

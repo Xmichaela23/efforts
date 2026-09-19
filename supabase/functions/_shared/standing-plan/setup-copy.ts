@@ -20,17 +20,17 @@ export const SECTION_COPY = {
 
 /** Each program card: name, description and requirements line. */
 export const PROGRAM_COPY = {
-  // Viada p275, cut: "This program can be used as an "all-year" program for an athlete who's interested in multiple
+  // Viada p275, reworded (Michael approved the words 2026-09-19); the page: "This program can be used as an "all-year" program for an athlete who's interested in multiple
   // different sports, ranging from road running to trail running…".
   // ⛔ OFF 2026-09-18 (round 3): "Strength, running and riding run together, year-round, with a pivot to a race or a
   // single sport when one comes up." — a paraphrase of p275.
   run_ride_strength: {
     label: 'Run + Ride + Strength',
-    blurb: 'This program can be used as an “all-year” program for an athlete who’s interested in multiple different sports.',
+    blurb: 'This program can run all year for an athlete interested in several sports.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
       + 'week one.',
   },
-  // Viada p246: four lifting days and four runs (the week table's count). Viada p247, Running Notes, cut: "Mileage will be
+  // Viada p246: four lifting days and four runs (the week table's count). Viada p247, Running Notes, reworded (Michael approved the words 2026-09-19); the page: "Mileage will be
   // dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes here…".
   // ⛔ OFF 2026-09-18 (book-language pass 3): "Your speed and mileage hold.", "Twelve weeks", "comfortable running a full
   // hour" and "about three hours of running and seven to nine hours of training in all" — on no page.
@@ -38,11 +38,12 @@ export const PROGRAM_COPY = {
   // of p247's "runs up to 90 to 100 minutes").
   run_strength: {
     label: 'Run + Strength',
-    blurb: 'Four lifting days, four runs. Mileage will be dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes.',
+    blurb: 'Four lifting days, four runs. Mileage depends on experience level, and more proficient runners may run up to 90 to 100 minutes.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
-  // Viada p280: "These programs are included as training options for intermediate to advanced cyclists" — cut.
+  // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
+  // advanced cyclists".
   // ⛔ OFF 2026-09-18 (round 3): "Six or seven rides" — p278 prints seven; the six-ride choice is the builder's
   // (`RIDES_COPY.count_chip`), not the page's.
   // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
@@ -50,7 +51,7 @@ export const PROGRAM_COPY = {
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Training options for intermediate to advanced cyclists. Seven rides, three lifting days.',
+    blurb: 'Options for intermediate and advanced cyclists. Seven rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
@@ -70,8 +71,9 @@ export const PROGRAM_COPY = {
  *   program's): nothing.
  */
 export const DELOAD_LINE: Record<FrameId, string | null> = {
-  // Viada p247
-  strength_5k: 'If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you switch the program to the deload version.',
+  // Viada p247, reworded (Michael approved the words 2026-09-19); the page: "If a powerlifting meet or 5K approaches, I recommend that, 2 weeks
+  // out, you switch the program to the deload version."
+  strength_5k: 'If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.',
   all_rounder: null,
   cycling_base: null,
 };
@@ -86,11 +88,11 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   all_rounder: {
     name: 'Run + Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
-    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." was a paraphrase; p275's own words (All
-    // Rounder notes): "few changes are needed as the months progress beyond adjustment of 1RM and threshold as
+    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." was a paraphrase. p275 (All Rounder notes),
+    // reworded (Michael approved the words 2026-09-19); the page: "few changes are needed as the months progress beyond adjustment of 1RM and threshold as
     // you improve."
-    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. Few changes are needed as '
-      + 'the months progress beyond adjustment of 1RM and threshold as you improve.',
+    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. Little needs to change month '
+      + 'to month beyond updating 1RM and threshold as you improve.',
     ftp_note: null,
   },
   strength_5k: {
@@ -185,14 +187,14 @@ export const RIDES_COPY = {
   count_chip: { 6: 'Six rides', 7: 'Seven rides' } as Record<number, string>,
   row: 'Day {day} · {name}',
   /**
-   * Viada p281, the Base program's cycling note, cut: "Over a 1-month cycle, the Tuesday and Friday endurance rides
+   * Viada p281, the Base program's cycling note, reworded (Michael approved the words 2026-09-19); the page: "Over a 1-month cycle, the Tuesday and Friday endurance rides
    * should be the same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise
    * progress, increasing the volume gradually over the entire base season every 1 to 2 weeks." The weekday names are
    * cut (the athlete's week may not start on Monday). It replaces "If easy rides are kept conversational, use your own
    * judgement to go longer." (2026-09-18, book-language pass 4) — p281 prescribes the progression; it prints no amount,
    * so the rides are built at their printed level and the sentence is the page's.
    */
-  easy_line: 'Over a 1-month cycle, the endurance rides should be the same duration, but each cycle can increase the overall duration. The long ride can likewise progress, increasing the volume gradually over the entire base season every 1 to 2 weeks.',
+  easy_line: 'Within a 1-month cycle the endurance rides stay the same length, but each new cycle can add to the overall duration. The long ride can progress the same way, adding volume gradually every 1 to 2 weeks across the whole base season.',
 } as const;
 
 // ── Run + Strength runs screen ────────────────────────────────────────────────────────────────

@@ -17,19 +17,19 @@ WEEK 01  column=standard  ⟵ TEST WEEK
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Test: Upper   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Bench Press                    3x6, 5, max  @ 195           | how-to · plan 170x6 185x5 195+x1 · note: Perform the maximum number of repetitions possible with this weight.
-      ME     Overhead Press                 3x6, 5, max  @ 125           | how-to · plan 110x6 120x5 125+x1 · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Bench Press                    3x6, 5, max  @ 195           | how-to · plan 170x6 185x5 195+x1 · note: Do as many reps as you can with this weight.
+      ME     Overhead Press                 3x6, 5, max  @ 125           | how-to · plan 110x6 120x5 125+x1 · note: Do as many reps as you can with this weight.
   [Monday] run      Surge and Float — 36 min
   [Tuesday] STRENGTH Test: Lower   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Back Squat                     3x6, 5, max  @ 260           | how-to · plan 225x6 250x5 260+x1 · note: Perform the maximum number of repetitions possible with this weight.
-      ME     Deadlift                       3x6, 5, max  @ 315           | how-to · plan 275x6 305x5 315+x1 · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Back Squat                     3x6, 5, max  @ 260           | how-to · plan 225x6 250x5 260+x1 · note: Do as many reps as you can with this weight.
+      ME     Deadlift                       3x6, 5, max  @ 315           | how-to · plan 275x6 305x5 315+x1 · note: Do as many reps as you can with this weight.
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Short Threshold Repeats — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -51,9 +51,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 02  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -76,9 +76,9 @@ WEEK 02  column=standard
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Race-Specific Repeats — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -98,11 +98,11 @@ WEEK 02  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 03  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -125,9 +125,9 @@ WEEK 03  column=standard
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Sub-Threshold Repeats — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -147,11 +147,11 @@ WEEK 03  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 04  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -174,9 +174,9 @@ WEEK 04  column=standard
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Long Sub-Threshold Repeats — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -196,11 +196,11 @@ WEEK 04  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 05  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -223,9 +223,9 @@ WEEK 05  column=standard
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Threshold with a Surge — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -245,11 +245,11 @@ WEEK 05  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 06  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -272,9 +272,9 @@ WEEK 06  column=standard
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Surge into Steady — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -294,11 +294,11 @@ WEEK 06  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 07  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -321,9 +321,9 @@ WEEK 07  column=standard
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Short Threshold Repeats — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -343,11 +343,11 @@ WEEK 07  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -370,9 +370,9 @@ WEEK 08  column=standard
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Race-Specific Repeats — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -392,11 +392,11 @@ WEEK 08  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -419,9 +419,9 @@ WEEK 09  column=standard
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Sub-Threshold Repeats — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -441,11 +441,11 @@ WEEK 09  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
-      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 10  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -468,9 +468,9 @@ WEEK 10  column=standard
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Long Sub-Threshold Repeats — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -491,9 +491,9 @@ WEEK 10  column=standard
   [Saturday] run      Long Run — 82 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 11  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -516,9 +516,9 @@ WEEK 11  column=standard
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Threshold with a Surge — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -539,9 +539,9 @@ WEEK 11  column=standard
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 12  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -564,9 +564,9 @@ WEEK 12  column=standard
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
+      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
+      -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.
   [Wednesday] run      Surge into Steady — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -587,6 +587,6 @@ WEEK 12  column=standard
   [Saturday] run      Long Run — 87 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)

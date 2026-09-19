@@ -60,44 +60,46 @@ export function sendDescription(row: { tags?: unknown; description?: unknown } |
  * the book's words; if a line must be shorter, cut the book's words down, never reword them"). Read off the page
  * photographs (book-sources/viada-hybrid-athlete/p231.jpg … p239.jpg). Where a line is shorter than the page, words
  * were dropped and the order kept; the full sentence is quoted beside it.
- * ⚠️ ONE EXCEPTION: `run_mlss` is a rewording of p231 that Michael approved word for word (2026-09-19).
+ * ⛔ SUPERSEDED 2026-09-19: every line below is now a rewording of its page that Michael approved word for word (the
+ * author-sentence audit, docs/AUDIT-author-sentences-2026-09-19.md). The page's own words stay quoted in each comment.
  */
 export const FAMILY_LINE: Readonly<Record<string, string>> = {
-  // p237: "With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor
+  // p237, reworded (Michael approved the words 2026-09-19); the page: "With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor
   // rather than a specific power target, so use the following numbers as guidelines." (whole sentence)
-  ride_anaerobic: 'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
+  ride_anaerobic: 'These sessions build anaerobic repeatability and are best ridden by feel, with a power floor instead of a set power target; treat the numbers below as guidelines.',
   // p239: "60- to 100-minute easy ride below 75%" — the length is the row's own, so it is cut.
   ride_endurance: 'Easy ride below 75%.',
   // p231, reworded (Michael approved the words 2026-09-19): "The objective is accruing maximum time with equalized
   // fatigue." and "Note that athletes may perform any of these work intervals on hills and adjust pace accordingly to
   // maintain target intensity." One line, both sentences; the separate hills note is gone.
   run_mlss: 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.',
-  // p233, whole (pass 5, 2026-09-18: it was cut to its first and last words): "Workouts that maximize time
+  // p233, reworded (Michael approved the words 2026-09-19); the page: "Workouts that maximize time
   // near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are
   // designed to maximize total time spent at this intensity while controlling fatigue."
-  run_near_threshold: 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.',
-  // p235: "Any workout that is intended to maximize training time may be a combination of zones, though primarily below
+  run_near_threshold: 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.',
+  // p235, reworded (Michael approved the words 2026-09-19); the page: "Any workout that is intended to maximize training time may be a combination of zones, though primarily below
   // VT1. … Unlike VT1 workouts, these sessions can include rest periods or pauses in the hike/jog sessions with little
   // negative impact." Cut around the word VT1, which never prints on screen (Today's standing rule, pinned in
   // `today-lines.test.ts`). "Easy the whole way" came off: the long run with inserted sets is not easy the whole way.
-  run_lsd: 'Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.',
-  // p235, whole sentence.
-  run_vt1: 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.',
-  // p238, whole sentence (pass 5, 2026-09-18: the rest of the page's sentence added back — "plenty of time in the
-  // zone with far less fatigue" is what the session is for).
-  ride_sweet_spot: 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.',
-  // p238 (pass 5, 2026-09-18 — the VO2 ride printed no line): "These workouts are intended to push your maximum aerobic
+  run_lsd: 'A session meant to maximize training time can mix zones. Hike/jog sessions can include rests or pauses with little negative effect.',
+  // p235, reworded (Michael approved the words 2026-09-19); the page: "You're encouraged to practice your "talk test" at least twice per run if you're
+  // unsure—once after 5 minutes of running and the other after 20 minutes."
+  run_vt1: 'If you\'re unsure, the "talk test" is worth doing at least twice per run: once after 5 minutes of running and once after 20.',
+  // p238, reworded (Michael approved the words 2026-09-19); the page: "These workouts are intended to push you as close as possible to threshold without
+  // exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above."
+  ride_sweet_spot: 'These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.',
+  // p238, reworded (Michael approved the words 2026-09-19); the page: "These workouts are intended to push your maximum aerobic
   // intake; therefore, they're a little more metabolically taxing than the previous workouts. While the anaerobic
   // sessions had a greater focus on "more power is generally better," these should be more carefully controlled." —
   // cut to its first and last clauses.
-  ride_vo2: 'These workouts are intended to push your maximum aerobic intake; these should be more carefully controlled.',
+  ride_vo2: 'These sessions are meant to push your maximum aerobic intake; they need more careful control.',
 };
 
 /**
- * p237, printed under each progressive option: "Each set should start at 110% and progress up to 125–130% by the
+ * p237, printed under each progressive option, reworded (Michael approved the words 2026-09-19); the page: "Each set should start at 110% and progress up to 125–130% by the
  * end." It belongs to that option only (`progressive_repeats`); the one-to-one and sandwich rides are flat.
  */
-export const RIDE_ANAEROBIC_PROGRESSIVE_LINE = 'Each set should start at 110% and progress up to 125–130% by the end.';
+export const RIDE_ANAEROBIC_PROGRESSIVE_LINE = 'Each set should begin at 110% and rise to 125–130% by the end.';
 
 /**
  * ⛔ THE ENDURANCE RIDE WITH WORK (p239): "45 minutes @ VT1 with 10-second all-out sprint every 9 minutes" — cut to the
@@ -122,24 +124,25 @@ export function sprintEveryMinutesFromTokens(tokens: unknown): number | null {
 }
 
 /**
- * ⛔ THE PEDALLING NOTE LIVES IN THE DRAWER, UNDER THE LINE — not on Today (2026-09-10). p239, whole sentence. "(smooth
+ * ⛔ THE PEDALLING NOTE LIVES IN THE DRAWER, UNDER THE LINE — not on Today (2026-09-10). p239, reworded (Michael approved the words 2026-09-19); the page: "You won't regret
+ * spending several minutes on every long ride practicing pedal stroke and working on position." "(smooth
  * circles, not stomping)" was on no page and came off 2026-09-18.
  */
 export const RIDE_ENDURANCE_DRAWER_NOTE =
-  'You won\'t regret spending several minutes on every long ride practicing pedal stroke and working on position.';
+  'Several minutes of pedal stroke and position practice on every long ride is time well spent.';
 
 /**
- * ⛔ THE EASY RUN'S SECOND SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235: "The precise percentage
+ * ⛔ THE EASY RUN'S SECOND SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235, reworded (Michael approved the words 2026-09-19); the page: "The precise percentage
  * of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration
  * status, and environmental conditions." It replaces the paraphrase "Pace varies with fatigue, hydration and weather."
  */
-export const RUN_VT1_DRAWER_NOTE = 'The precise percentage of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration status, and environmental conditions.';
+export const RUN_VT1_DRAWER_NOTE = 'The exact percentage of threshold to stay at here can shift slightly with current fatigue, hydration, and environmental conditions.';
 
 /**
- * ⛔ THE LONG RUN'S LAST SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235: "These workouts can be
+ * ⛔ THE LONG RUN'S LAST SENTENCE, IN THE DRAWER AFTER THE LINE (pass 5, 2026-09-18). p235, reworded (Michael approved the words 2026-09-19); the page: "These workouts can be
  * modified extensively depending on your needs and the training conditions."
  */
-export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively depending on your needs and the training conditions.';
+export const RUN_LSD_DRAWER_NOTE = 'These sessions can be changed a great deal to suit your needs and the training conditions.';
 
 /**
  * ⛔ THE ERG LINE ON THE ANAEROBIC RIDE, IN THE SESSION NOTE AFTER THE FAMILY LINE (Michael approved these exact words,
@@ -152,10 +155,10 @@ export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively d
 export const RIDE_ANAEROBIC_DRAWER_NOTE = 'On Zwift or a smart trainer, turn ERG off.';
 
 /**
- * p247: "If within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25
+ * p247, reworded (Michael approved the words 2026-09-19); the page: "If within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25
  * percent." — the race-tempo row's sentence; the condition is cut because the row exists only for that case.
  */
-export const RACE_TEMPO_LINE = 'Increase the pace here to race pace, but extend recovery periods by 25 percent.';
+export const RACE_TEMPO_LINE = 'Raise the pace here to race pace, but lengthen recovery periods by 25 percent.';
 
 /**
  * The approved line for a family (and, for the endurance ride, its archetype), or null.

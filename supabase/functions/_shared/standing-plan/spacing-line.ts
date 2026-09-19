@@ -14,6 +14,8 @@
  *     plyometrics) and which intents its rows carry (ME / DE / SKILL / HYP, `slot_intent`);
  *   · the endurance session — run, ride or swim (`sport:`), and how hard (`band:`).
  *
+ * ⛔ SINCE 2026-09-19 THE FOUR SENTENCES ARE REWORDINGS Michael approved (docs/AUDIT-author-sentences-2026-09-19.md, #15–18);
+ * the page's words below are what they reword.
  * THE SENTENCES ARE THE PAGE'S OWN WORDS (2026-09-18, book-language pass 2 — no paraphrasing), read off
  * book-sources/viada-hybrid-athlete/p143.jpg; each is cut from the page's sentence (words dropped, order kept):
  *   lead    "Allow at least 6 to 8 hours with one full meal before the resistance training session."
@@ -84,14 +86,17 @@ const intentsOf = (row: SpacingRow): Set<string> => {
  */
 const isUpperDay = (lift: SpacingRow): boolean => tagValue(lift, 'frame') != null && tagValue(lift, 'lower') == null;
 
-// Viada p143 rule 6.
-const LEAD = 'Allow at least 6 to 8 hours with one full meal before the resistance training session.';
-// Viada p143 rule 6.
-const SHORT_VT1 = 'If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long as you consume calories and monitor hydration after this session.';
-// Viada p143 rule 5.
-const EASY_LAST = 'Performing low-intensity conditioning after these muscles have already been worked can potentially result in greater benefits at a given volume.';
-// Viada p143 rule 6.
-const SKILL_FIRST = 'The skill movements are focused on the first session because you may be "fresher," but this is not a hard-and-fast rule.';
+// Viada p143 rule 6, reworded (Michael approved the words 2026-09-19): "Allow at least 6 to 8 hours with one full meal before the resistance training session."
+const LEAD = 'Leave at least 6 to 8 hours and one full meal before the resistance training session.';
+// Viada p143 rule 6, reworded (Michael approved the words 2026-09-19): "If the morning session is a VT1 session lasting less than an hour, 4 to 6
+// hours may be sufficient, as long as you consume calories and monitor hydration after this session."
+const SHORT_VT1 = 'If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it.';
+// Viada p143 rule 5, reworded (Michael approved the words 2026-09-19): "Performing low-intensity conditioning after these muscles have already been
+// worked can potentially result in greater benefits at a given volume."
+const EASY_LAST = 'Doing low-intensity conditioning after these muscles have been worked may give greater benefits at a given volume.';
+// Viada p143 rule 6, reworded (Michael approved the words 2026-09-19): "The skill movements are focused on the first session because you may be
+// "fresher," but this is not a hard-and-fast rule."
+const SKILL_FIRST = 'The skill movements go in the first session because you may be fresher then, but this is not a strict rule.';
 // Viada p143 rule 6: "lasting less than an hour".
 const SHORT_SESSION_MINUTES = 60;
 

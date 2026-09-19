@@ -500,7 +500,7 @@ function checkPlacementLaws(
     if (lower.me.length > 0) {
       const before = [...daysBeforeMeLower].join(' and ');
       const adjacency = hardRunTheDayBefore;
-      const saysReduced = spoken.some((t) => t.includes('reduction in working 1RM'));
+      const saysReduced = spoken.some((t) => t.includes('drop in working 1RM'));
       if (adjacency && !saysReduced) {
         fails.push(`week ${wk}: hard RUN on ${before}, ME Lower on ${meWeekday}, and the block never `
           + `says the lower-body weights were reduced — p247's one compensated break, UNCOMPENSATED`);

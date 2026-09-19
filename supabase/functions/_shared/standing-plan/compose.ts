@@ -1069,11 +1069,14 @@ function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
   return out;
 }
 
-/** p247, cut (see the note where it is pushed). One constant so tests pin the words, not a fragment. */
+/**
+ * p247, reworded (Michael approved the words 2026-09-19); the page: "A 3 to 4 percent reduction in working 1RM should be assumed here. This
+ * reduction can be gradually phased out in eight to ten weeks." One constant so tests pin the words, not a fragment.
+ */
 // ⚠️ Cut to the two sentences with no "you" — the block description runs through the voice gate
 // (`standing-plan-live.test.ts`), and p247's first sentence opens "you may notice that".
-export const HAIRCUT_LINE = 'A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction '
-  + 'can be gradually phased out in eight to ten weeks.';
+export const HAIRCUT_LINE = 'Assume a 3 to 4 percent drop in working 1RM here. The drop '
+  + 'can be taken away gradually over eight to ten weeks.';
 
 /**
  * ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226's SKILL cell, whole (book-language fix, 2026-09-18). It read
@@ -4034,8 +4037,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     if (wantIdx > 0) {
       notes.push({
         kind: 'source',
-        text: 'Core sits after the main work and before the isolation work — isolation is rarely '
-          + 'degraded by a tired core, and core work carries the higher skill component.',
+        // p142 rule 4, reworded (Michael approved the words 2026-09-19); it read "Core sits after the main work and before the isolation work —
+        // isolation is rarely degraded by a tired core, and core work carries the higher skill component."
+        text: 'Core comes after the main work and before the isolation work, because a tired core seldom harms '
+          + 'isolation work and core work needs more skill.',
         cite: 'Viada p142 (rule 4), p223',
       });
       notes.push({ kind: 'ours', text: CORE_PICK_FREQUENCY_IS_OURS });

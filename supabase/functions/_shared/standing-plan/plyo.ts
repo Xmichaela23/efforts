@@ -180,16 +180,14 @@ export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: str
  *   it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's here!"
  * ⚠️ No number of efforts: the page says "multiple times" and gives none, so the row still carries no count.
  */
-// p227 — the page's words, cut (read off p227.jpg)
-export const P227_SESSION_LINE = 'What is important here is that these drills are all done separately. Each drill '
-  + 'should be performed multiple times with ample rest, with a full focus on technique and balance, as well as '
-  + 'consistent quality.';
+// p227, reworded (Michael approved the words 2026-09-19); the page's words are quoted above (read off p227.jpg)
+export const P227_SESSION_LINE = 'The point here is that each drill is done on its own. Do each drill '
+  + 'several times with plenty of rest, giving full attention to technique, balance and consistent quality.';
 // ⚠️ Cut after "no-no's" (the page ends "…no-no's here!"): the line also reaches the plan description, whose voice
 // gate bars an exclamation mark.
-// p227 — the page's words, cut after "no-no's"
-export const P227_DRILL_LINE = 'Each drill should be done until the movement is optimized for the day and the athlete '
-  + "develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all "
-  + "absolute no-no's.";
+// p227, reworded (Michael approved the words 2026-09-19); the page's words are quoted above
+export const P227_DRILL_LINE = 'Repeat each drill until the movement is at its best for the day and the athlete '
+  + 'is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.';
 
 /**
  * ⛔ EACH DRILL ROW'S NOTE (2026-09-19, Michael's words, pinned): the p227 table's column label and the drill's
@@ -203,5 +201,5 @@ export const plyoDrillNote = (family: PlyoFamilyId): string =>
  * ⛔ UNDER THE "Plyo warm-up" TITLE (2026-09-19, Michael's words, pinned). p275's strength note; p246, p274 and p278 name
  * the session a warm-up. Today's lift card prints it under the title of a session tagged `plyo`.
  */
-// p275 — the page's sentence
-export const P275_WARMUP_LINE = 'The midweek plyo warm-up may be anywhere from one to three plyometric skills.';
+// p275, reworded (Michael approved the words 2026-09-19); the page: "The midweek plyo warm-up may be anywhere from one to three plyometric skills."
+export const P275_WARMUP_LINE = 'The midweek plyo warm-up can include one to three plyometric skills.';

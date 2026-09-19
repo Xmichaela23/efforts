@@ -16,7 +16,7 @@
    "Threshold Time Trial",
    "An easy 6- to 8-minute jog to warm up. 2 × 100-meter strides (begin slow and accelerate to near full tilt). 3 rounds of 30 seconds at a \"fast run\" (mile PR) pace followed by 1 minute easy walk/jog. 1 minute additional rest. Begin time trial: 9.5/10 intensity to begin, ending at 10/10 intensity. Record distance traveled after 12 minutes (beginner, less than 2 years of training). The app reads the trial lap, takes 88% of that speed as your threshold pace and sets it.",
    "FTP Test — 20-Minute Protocol",
-   "Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. If you're using average watts, use the number at the 20-minute mark and multiply it by 0.95. This is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it.",
+   "Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. With average watts, take the 20-minute number and multiply it by 0.95. It is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it.",
    "FTP Test — 5-Minute All-Out"
   ],
   "supabase/functions/_shared/endurance-library/source-rules.ts": [
@@ -139,7 +139,7 @@
    "flying surges to max effort"
   ],
   "supabase/functions/_shared/planned-step-lines.ts": [
-   "\"All-out\" indicates \"best possible speed\" for the day.",
+   "\"All-out\" means the fastest speed available that day.",
    "{} m stride",
    "{} stride",
    "{} {} · easy pace {}",
@@ -147,18 +147,19 @@
    "{} between sets"
   ],
   "supabase/functions/_shared/standing-plan/family-lines.ts": [
+   "These sessions build anaerobic repeatability and are best ridden by feel, with a power floor instead of a set power target; treat the numbers below as guidelines.",
    "Easy ride below 75%.",
    "The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.",
-   "Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.",
-   "Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.",
-   "You're encouraged to practice your \"talk test\" at least twice per run if you're unsure—once after 5 minutes of running and the other after 20 minutes.",
-   "These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.",
-   "Each set should start at 110% and progress up to 125–130% by the end.",
+   "Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.",
+   "A session meant to maximize training time can mix zones. Hike/jog sessions can include rests or pauses with little negative effect.",
+   "If you're unsure, the \"talk test\" is worth doing at least twice per run: once after 5 minutes of running and once after 20.",
+   "These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.",
+   "Each set should begin at 110% and rise to 125–130% by the end.",
    "10-second all-out sprint every {} minutes.",
-   "You won't regret spending several minutes on every long ride practicing pedal stroke and working on position.",
-   "The precise percentage of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration status, and environmental conditions.",
+   "Several minutes of pedal stroke and position practice on every long ride is time well spent.",
+   "The exact percentage of threshold to stay at here can shift slightly with current fatigue, hydration, and environmental conditions.",
    "On Zwift or a smart trainer, turn ERG off.",
-   "Increase the pace here to race pace, but extend recovery periods by 25 percent."
+   "Raise the pace here to race pace, but lengthen recovery periods by 25 percent."
   ],
   "supabase/functions/_shared/standing-plan/plyo.ts": [
    "Lunge Hops",
@@ -167,11 +168,11 @@
    "day at three or four drills and puts the warm-up at one to three skills; taking one from each",
    "Which drill a family gives first follows p89: foot-speed drills and static plyometrics before",
    "skipping, bounding and hops. The ramp is his; only taking one drill from each family at a time",
-   "What is important here is that these drills are all done separately. Each drill",
-   "should be performed multiple times with ample rest, with a full focus on technique and balance, as well as",
-   "Each drill should be done until the movement is optimized for the day and the athlete",
-   "develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all",
-   "The midweek plyo warm-up may be anywhere from one to three plyometric skills."
+   "The point here is that each drill is done on its own. Do each drill",
+   "several times with plenty of rest, giving full attention to technique, balance and consistent quality.",
+   "Repeat each drill until the movement is at its best for the day and the athlete",
+   "is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.",
+   "The midweek plyo warm-up can include one to three plyometric skills."
   ],
   "supabase/functions/_shared/standing-plan/session-vocabulary.ts": [
    "Easy Run",
@@ -180,9 +181,9 @@
    "{} (race tempo)"
   ],
   "supabase/functions/_shared/standing-plan/setup-copy.ts": [
-   "Four lifting days, four runs. Mileage will be dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes.",
-   "If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you switch the program to the deload version.",
-   "the months progress beyond adjustment of 1RM and threshold as you improve.",
+   "Four lifting days, four runs. Mileage depends on experience level, and more proficient runners may run up to 90 to 100 minutes.",
+   "If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.",
+   "to month beyond updating 1RM and threshold as you improve.",
    "from your logged sets",
    "The 20-minute FTP test is scheduled into week one.",
    "Nothing on file. The 20-minute FTP test is scheduled into week one.",
@@ -195,7 +196,7 @@
    "Easy session {n}"
   ],
   "supabase/functions/_shared/standing-plan/spacing-line.ts": [
-   "If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long as you consume calories and monitor hydration after this session."
+   "If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it."
   ],
   "supabase/functions/_shared/standing-plan/sport-slots.ts": [
    "A kept swim is easy laps and technique. The hard swim sessions in the source — the all-out speed",
@@ -204,13 +205,13 @@
    "picked. p278 places the hard ride on day 1 of his cycling week; p246 places the near-threshold"
   ],
   "supabase/functions/_shared/standing-plan/warmup.ts": [
-   "A good warm-up is meant to prepare your body to do work, not be a stimulus.",
-   "With skill development work, every warm-up set should have equal focus and quality to the work sets.",
-   "The first set of your skill work should also be the last set of your warm-up."
+   "A good warm-up readies the body for work; it should not be a stimulus.",
+   "In skill development work, each warm-up set needs the same attention and quality as the work sets.",
+   "Your last warm-up set should also serve as your first set of skill work."
   ],
   "supabase/functions/_shared/standing-plan/week-conflicts.ts": [
-   "A highly taxing, 14+ work set session may diminish performance in other modalities significantly for",
-   "twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in",
+   "A very hard session of 14+ work sets may cut performance in other training a lot for",
+   "twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause",
    "prescribed for bar speed rather than load, and bar speed drops on legs that have",
    "{}: heavy legs and an easy run. The run is cut by a third."
   ],
@@ -223,10 +224,9 @@
    "Maximum motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet powerful.",
    "Speed and quality, with ample rest.",
    "Steady velocity.",
-   "Rest periods between sets should be sufficient to allow nearly full recovery (though not so long as",
-   "to allow you to cool down). Hit the next set when you know you can complete it without getting crushed.",
-   "RIR refers to \"reps in reserve (before failure).\" It's important to note, therefore, that 0 RIR is not failure",
-   "but refers to a set where you'd still complete the final repetition (even though it would be very slow).",
+   "Rest between sets should allow almost full recovery, but not be so long that you cool down.",
+   "Start the next set when you are sure you can finish it.",
+   "RIR means reps in reserve before failure. So 0 RIR is not failure: it is a set where the last rep still gets",
    "1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets",
    "2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets",
    "3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets",
@@ -234,25 +234,22 @@
    "maximum velocity",
    "controlled eccentric, fast concentric",
    "controlled eccentric, controlled concentric",
-   "Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.",
-   "Velocity and consistent bar path are the major objectives.",
-   "The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.",
-   "Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.",
-   "ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal",
-   "weight. It's typically an intentionally heavy set focused on peak force over the course of each repetition.",
-   "Bar speed is still important for this work but is secondary to simply moving the weight well. Each set should",
-   "be stopped short of failure because technical/form breakdown here can be counterproductive.",
-   "DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement. Velocity and",
-   "loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount.",
-   "For dynamic effort, while both the load and the rep range are lower, the emphasis on peak output/velocity",
-   "should be heavy enough to be a challenge, but form and consistency take priority over velocity.",
-   "Every rep either improves movement quality or degrades it!",
-   "HYP refers to hypertrophy work, and these sets are more of the standard \"bodybuilding\"-style work. Maximum",
-   "motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet powerful. Fatigue",
-   "fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as discussed in Chapter 4)",
-   "because some fatigue of all motor units is practically necessary to ensure maximum tension in all these",
-   "Sets should always remain on the lower end when starting a program, increasing only",
-   "if an athlete is finding that they are progressing well and seem to have recovery to spare!",
+   "End each set before failure, because a breakdown in technique or form here can be counterproductive.",
+   "The main goals are velocity and a consistent bar path.",
+   "Use a weight heavy enough to challenge you, but form and consistency come before velocity.",
+   "Fatigue is expected: reps will slow as the fast-twitch fibers tire.",
+   "ME (maximum effort) is a movement meant to build your ability to lift maximal or near-maximal weight.",
+   "It is usually a deliberately heavy set aimed at peak force through each rep.",
+   "DE (dynamic effort) sets put the emphasis on bar speed and movement quality. The main goals are velocity and",
+   "a consistent bar path, and each rep is treated as if the bar held a maximum weight. Fatigue is also avoided",
+   "In dynamic effort the load and rep range are both lower, but the stress on peak output/velocity should make it",
+   "Each rep makes movement quality either better or worse.",
+   "HYP means hypertrophy work; these sets are closer to standard bodybuilding-style training. The goal is",
+   "maximum motor unit recruitment, with reps at a steady tempo, controlled but powerful. Fatigue is expected:",
+   "reps will slow as the fast-twitch fibers tire and the fatigue-resistant fibers take on more of the work.",
+   "This is wanted, because some fatigue of every motor unit is nearly required for all of them to reach maximum",
+   "Sets should stay at the low end when a program starts, rising only",
+   "if the athlete is progressing well and seems to have recovery left over.",
    "2–5 min",
    "60 s"
   ],
@@ -261,12 +258,14 @@
    "· {} in reserve"
   ],
   "supabase/functions/_shared/strength/test-session.ts": [
-   "Perform a regular warm-up in your chosen lift, slowly working your way up to a starting weight of 75 percent or so of your predicted max.",
-   "A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10.",
-   "Use this set of 6 to confirm that this feels about right."
+   "Warm up as usual in the chosen lift, building slowly to a starting weight of about 75 percent of your predicted max.",
+   "Do as many reps as you can with this weight.",
+   "A weight you could lift 8 times comfortably, but near failure if pushed to 10.",
+   "{} This set of 6 checks that the weight feels about right.",
+   "Do {} reps with this weight."
   ],
   "src/lib/standing-plan-copy.ts": [
-   "{} — {} lb × {} sets the working 1-rep max at {} lb: (roughly) 96 percent of true 1-rep max."
+   "{} — {} lb × {} sets the working 1-rep max at {} lb: about 96 percent of true 1-rep max."
   ],
   "src/lib/strength-focus-copy.ts": [
    "Sub-maximal loading keeps fatigue manageable. Three lifting days — squat,",

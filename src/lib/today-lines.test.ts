@@ -39,18 +39,18 @@ Deno.test('the four intents print the book’s word and its cue', () => {
     { slot_intent: 'HYP', name: 'dumbbell curl' },
   ]), bar);
   assertEquals(rows[0].kind, 'Maximum effort');
-  assertEquals(rows[0].cue, '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.'); // p218 row + p219 (page photos)
+  assertEquals(rows[0].cue, '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. End each set before failure, because a breakdown in technique or form here can be counterproductive.'); // p218 row + p219 (page photos)
   assertEquals(rows[1].kind, 'Skill');
-  assertEquals(rows[1].cue, '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.'); // p218 row + p219
+  assertEquals(rows[1].cue, '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. Use a weight heavy enough to challenge you, but form and consistency come before velocity.'); // p218 row + p219
   assertEquals(rows[2].kind, 'Hypertrophy');
-  assertEquals(rows[2].cue, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
+  assertEquals(rows[2].cue, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.');
 });
 
 Deno.test('⛔ THE DE CUE IS p218\'S NUMBERS ON A BAR AND OFF IT — "Bar slows, set is over" is on no page', () => {
   const onBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), bar)[0];
   const offBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'dumbbell reverse lunge' }]), bar)[0];
-  assertEquals(onBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
-  assertEquals(offBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
+  assertEquals(onBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. The main goals are velocity and a consistent bar path.');
+  assertEquals(offBar.cue, '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. The main goals are velocity and a consistent bar path.');
 });
 
 Deno.test('the cue repeats when the kind repeats', () => {
@@ -102,7 +102,7 @@ Deno.test('⛔ A SUPERSET PAIR IS ONE LINE — names joined, the kind word once,
   ]), bar);
   assertEquals(lines.map((l) => l.movement), ['barbell bench press', 'tate press + drag curl', 'lateral raise']);
   assertEquals(lines[1].kind, 'Hypertrophy superset');
-  assertEquals(lines[1].cues, ['6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.']);
+  assertEquals(lines[1].cues, ['6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.']);
   assertEquals(lines[1].rows, [1, 2]);
   assertEquals(lines[0].rows, [0]);
   assertEquals(lines[2].rows, [3]);
@@ -115,8 +115,8 @@ Deno.test('a pair of two kinds names both kinds and carries both cues', () => {
   ]), bar);
   assertEquals(line.kind, 'Dynamic effort + Hypertrophy superset');
   assertEquals(line.cues, [
-    '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.',
-    '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',
+    '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. The main goals are velocity and a consistent bar path.',
+    '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.',
   ]);
 });
 
@@ -134,19 +134,19 @@ Deno.test('⛔ ONLY ADJACENT ROWS PAIR — a mark with something between is two 
 
 Deno.test('each named family gets its line, and only that line — the page\'s own words (2026-09-18)', () => {
   assertEquals(enduranceLinesFor(ride('ride_anaerobic', 'above')), [
-    'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
+    'These sessions build anaerobic repeatability and are best ridden by feel, with a power floor instead of a set power target; treat the numbers below as guidelines.',
   ]);
-  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.');
-  assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.');
+  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.');
+  assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'If you\'re unsure, the "talk test" is worth doing at least twice per run: once after 5 minutes of running and once after 20.');
   assertEquals(
     enduranceLinesFor(run('run_lsd', 'vt1_or_easier'))[0],
-    'Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.',
+    'A session meant to maximize training time can mix zones. Hike/jog sessions can include rests or pauses with little negative effect.',
   );
 });
 
 Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p233 for near-threshold (2026-09-18)', () => {
   assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
-  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
+  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.');
 });
 
 Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {

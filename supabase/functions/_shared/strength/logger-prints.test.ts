@@ -68,7 +68,7 @@ Deno.test('⛔ THE STAMPS ARE THE ANSWERS THE PHONE WORKED OUT', () => {
 
 Deno.test('⛔ THE INTENT LINE SPELLS THE INTENT OUT (approved, Michael 2026-09-18)', () => {
   const line = (slot_intent: string, target_reps: string) => loggerRowStamps({ slot_intent, target_reps }, true).intent_line;
-  assertEquals(line('ME', '1-5'), 'Maximum Effort · 1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.');
+  assertEquals(line('ME', '1-5'), 'Maximum Effort · 1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. End each set before failure, because a breakdown in technique or form here can be counterproductive.');
   assertEquals(line('DE', '2-4'), 'Dynamic Effort · 2-4 reps · 3 to 4 in reserve · maximum velocity');
   assertEquals(line('SKILL', '3-5'), 'Skill · 3-5 reps · 3 to 4 in reserve · controlled eccentric, fast concentric');
   assertEquals(line('HYP', '6-12'), 'Hypertrophy · 6-12 reps · 0 to 2 in reserve · controlled eccentric, controlled concentric');
@@ -122,8 +122,8 @@ Deno.test('⛔ THE PLYO LIST IS THE SAME LIST THE PHONE BUILT: the other drills 
 
 Deno.test('⛔ THE WARM-UP LINE BY PAGE SCOPE: p139 every lifting day, p140 only when the first lift is SKILL (Michael, 2026-09-18)', async () => {
   const { warmUpLineFor, WARM_UP_P139, WARM_UP_P140_SKILL } = await import('../standing-plan/warmup.ts');
-  assertEquals(WARM_UP_P139, 'A good warm-up is meant to prepare your body to do work, not be a stimulus.');
-  assertEquals(WARM_UP_P140_SKILL, 'With skill development work, every warm-up set should have equal focus and quality to the work sets. The first set of your skill work should also be the last set of your warm-up.');
+  assertEquals(WARM_UP_P139, 'A good warm-up readies the body for work; it should not be a stimulus.');
+  assertEquals(WARM_UP_P140_SKILL, 'In skill development work, each warm-up set needs the same attention and quality as the work sets. Your last warm-up set should also serve as your first set of skill work.');
   assertEquals(warmUpLineFor([{ slot_intent: 'ME' }, { slot_intent: 'HYP' }]), WARM_UP_P139);
   assertEquals(warmUpLineFor([{ slot_intent: 'DE' }, { slot_intent: 'SKILL' }]), WARM_UP_P139);
   assertEquals(warmUpLineFor([{ slot_intent: 'SKILL' }, { slot_intent: 'HYP' }]), `${WARM_UP_P139} ${WARM_UP_P140_SKILL}`);

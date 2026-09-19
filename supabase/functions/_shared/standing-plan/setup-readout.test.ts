@@ -31,7 +31,7 @@ Deno.test('⛔ Build focus: the server\'s rows are the plan\'s pick rows, and ea
 Deno.test('⛔ Build focus: Ride + Strength at a home kit reads as the screen did', () => {
   const b = setupBlock(HOME).build_focus.cycling_base;
   assertEquals(b.subtitle, 'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan.');
-  assertEquals(b.dose_line, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.'); // p218 HYP, one owner
+  assertEquals(b.dose_line, '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.'); // p218 HYP, one owner
   assertEquals(b.groups.map((g) => [g.heading, g.rows.map((r) => r.label)]), [
     ['Day 1', ['Push isolation', 'Pull isolation']],
     ['Day 2', ['Hinge variation', 'Leg variation']],

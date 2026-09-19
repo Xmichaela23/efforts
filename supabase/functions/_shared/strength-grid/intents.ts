@@ -201,11 +201,11 @@ export const REST_BETWEEN_SETS_RULE = {
    * for whoever maintains the number and not for someone standing under a bar.
    * ⚠️ ONE OWNER. The timer imports this; it does not carry its own wording (2026-08-27).
    */
-  // ⛔ 2026-09-18 (no paraphrasing): p78's own words, cut — "Rest periods between sets should be sufficient
+  // ⛔ p78, reworded (Michael approved the words 2026-09-19); the page: "Rest periods between sets should be sufficient
   // to allow nearly full recovery (though not so long as to allow you to cool down)" and "…In other words,
   // hit the next set when you know you can complete it without getting crushed."
-  cue: 'Rest periods between sets should be sufficient to allow nearly full recovery (though not so long as '
-    + 'to allow you to cool down). Hit the next set when you know you can complete it without getting crushed.',
+  cue: 'Rest between sets should allow almost full recovery, but not be so long that you cool down. '
+    + 'Start the next set when you are sure you can finish it.',
   // ⛔ `provenance` ("A strength session should not accumulate fatigue. The source gives this as a rule and no number
   // of minutes.") DELETED 2026-09-18 (rule 7 triage): nothing read it — every caller reads `.cue`.
 } as const;
@@ -215,19 +215,21 @@ export const REST_BETWEEN_SETS_RULE = {
  * caller can stamp the strength rule on a hypertrophy slot by accident.
  */
 export const REST_BETWEEN_SETS_RULE_HYP = {
-  // ⛔ 2026-09-18: p84's sentence whole. "Shorter rest on purpose" is on no page, and the old line dropped the
-  // page's hedge "may well be".
-  cue: 'Strength and power training typically dictate that this point of reduced capacity represents the end '
-    + 'of a productive session, but in hypertrophy training, this may well be a crucial part of the training '
-    + 'session itself!',
+  // ⛔ p84, reworded (Michael approved the words 2026-09-19); the page: "Strength and power training typically dictate
+  // that this point of reduced capacity represents the end of a productive session, but in hypertrophy training, this
+  // may well be a crucial part of the training session itself!"
+  cue: 'In strength and power training this point of reduced capacity usually marks the end of a productive session, '
+    + 'but in hypertrophy training it may be a central part of the session.',
   // ⛔ `provenance` DELETED 2026-09-18 (rule 7 triage): nothing read it — every caller reads `.cue`.
 } as const;
 
 /** RIR, defined on p219 — carried so a surface can explain the number rather than just print it. */
-// ⛔ 2026-09-18 (pass 6): p219's own words, cut (p219.jpg) — the lines now print "RIR", so the sheet says what it is.
+// ⛔ p219, reworded (Michael approved the words 2026-09-19); the page: "RIR refers to "reps in reserve (before
+// failure)." It's important to note, therefore, that 0 RIR is not failure but refers to a set where you'd still
+// complete the final repetition (even though it would be very slow)."
 export const RIR_NOTE =
-  'RIR refers to "reps in reserve (before failure)." It\'s important to note, therefore, that 0 RIR is not failure '
-  + "but refers to a set where you'd still complete the final repetition (even though it would be very slow).";
+  'RIR means reps in reserve before failure. So 0 RIR is not failure: it is a set where the last rep still gets '
+  + 'completed, though very slowly.';
 
 /**
  * ⛔⛔ THE ATHLETE-FACING LINE FOR EACH INTENT — ONE OWNER (book-language fix, 2026-09-18).
@@ -237,6 +239,8 @@ export const RIR_NOTE =
  * Today card, and the plan builder. The phone kept four copies of its own, with three different
  * answers for HYP (`8 to 12` / `6-12` / `8 to 10` reps; `1 to 2` / `1` / `a rep or two` in reserve).
  *
+ * ⛔ SUPERSEDED FOR THE SENTENCES 2026-09-19: each sentence below is a rewording of its page that Michael approved word
+ * for word (docs/AUDIT-author-sentences-2026-09-19.md); the numbers in `P218_ROW` stay as printed.
  * ⛔ THE RULE (Michael, 2026-09-18): the book's words and numbers, cut, never reworded. Pass 6: the page
  * photos (`Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`) ARE the book, so the lines below are
  * read off `p218.jpg` and `p219.jpg` directly. Pinned against `BARBELL`'s numbers in `strength-grid.test.ts`.
@@ -257,41 +261,64 @@ export const P218_TEMPO: Partial<Record<ViadaIntent, string>> = {
   HYP: 'controlled eccentric, controlled concentric',  // p218
 };
 
-/** p219 "Abbreviations", one sentence per intent, cut — the card's line (p219.jpg). */
+/**
+ * p219 "Abbreviations", one sentence per intent — the card's line (p219.jpg). Each is a rewording of p219 (Michael
+ * approved the words 2026-09-19); the page: ME "Each set should be stopped short of failure because technical/form
+ * breakdown here can be counterproductive."; DE "Velocity and consistent bar path are the major objectives."; SKILL
+ * "The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity."; HYP
+ * "Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted."
+ * ⚠️ The ME and SKILL sentences are also the last lines of their paragraphs below, which read them from here.
+ */
 const P219_SENTENCE: Record<ViadaIntent, string> = {
-  ME: 'Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.',  // p219
-  DE: 'Velocity and consistent bar path are the major objectives.',  // p219
-  SKILL: 'The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.',  // p219
-  HYP: 'Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',  // p219
+  ME: 'End each set before failure, because a breakdown in technique or form here can be counterproductive.',  // p219, reworded
+  DE: 'The main goals are velocity and a consistent bar path.',  // p219, reworded
+  SKILL: 'Use a weight heavy enough to challenge you, but form and consistency come before velocity.',  // p219, reworded
+  HYP: 'Fatigue is expected: reps will slow as the fast-twitch fibers tire.',  // p219, reworded
 };
 
 /**
- * p219 "Abbreviations", each intent's whole paragraph (p219.jpg), for the logger's set-type sheet. DE adds
- * p218's own paragraph on dynamic effort; SKILL adds the p76 and p143 quotes it carried before.
+ * p219 "Abbreviations", each intent's paragraph (p219.jpg), for the logger's set-type sheet. DE adds p218's own
+ * paragraph on dynamic effort; SKILL adds the p76 and p141 lines. Every sentence is a rewording of its page that
+ * Michael approved word for word (2026-09-19); the page's words:
+ *   ME (p219)  "ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal
+ *              weight. It's typically an intentionally heavy set focused on peak force over the course of each
+ *              repetition. Bar speed is still important for this work but is secondary to simply moving the weight well."
+ *   DE (p219)  "DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement. Velocity and
+ *              consistent bar path are the major objectives, and you should treat every repetition as though the bar
+ *              were loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount."
+ *   DE (p218)  "For dynamic effort, while both the load and the rep range are lower, the emphasis on peak output/velocity
+ *              should make the movement more challenging than similar skill work. The chief difference here is that
+ *              skill work is focused primarily on "movement perfection," whereas DE work should aim for good form (of
+ *              course), but with bar speed being the primary objective."
+ *   SKILL      p219 "SKILL work is somewhat unique in that the objective is purely patterning and movement practice.";
+ *              p76 "Every rep either improves movement quality or degrades it!"; p141 "Perfect practice makes perfect…
+ *              if you're performing the movement poorly, STOP." (cited p143 until 2026-09-19; the photo shows p141)
+ *   HYP (p219) "HYP refers to hypertrophy work, and these sets are more of the standard "bodybuilding"-style work.
+ *              Maximum motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet
+ *              powerful. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become
+ *              exhausted, and the fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as
+ *              discussed in Chapter 4) because some fatigue of all motor units is practically necessary to ensure
+ *              maximum tension in all these units is reached."
  */
 const P219_MEANING: Record<ViadaIntent, string[]> = {
-  ME: ["ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal "
-    + "weight. It's typically an intentionally heavy set focused on peak force over the course of each repetition. "
-    + 'Bar speed is still important for this work but is secondary to simply moving the weight well. Each set should '
-    + 'be stopped short of failure because technical/form breakdown here can be counterproductive.'],  // p219
-  DE: ['DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement. Velocity and '
-    + 'consistent bar path are the major objectives, and you should treat every repetition as though the bar were '
-    + 'loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount.',  // p219
-    // p218
-    'For dynamic effort, while both the load and the rep range are lower, the emphasis on peak output/velocity '
-    + 'should make the movement more challenging than similar skill work. The chief difference here is that skill '
-    + 'work is focused primarily on "movement perfection," whereas DE work should aim for good form (of course), '
-    + 'but with bar speed being the primary objective.'],
-  SKILL: ['SKILL work is somewhat unique in that the objective is purely patterning and movement practice. The weight '
-    + 'should be heavy enough to be a challenge, but form and consistency take priority over velocity.',  // p219
-    'Every rep either improves movement quality or degrades it!', // p76
-    "Perfect practice makes perfect… if you're performing the movement poorly, STOP."], // p143
-  HYP: ['HYP refers to hypertrophy work, and these sets are more of the standard "bodybuilding"-style work. Maximum '
-    + 'motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet powerful. Fatigue '
-    + 'is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted, and the '
-    + 'fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as discussed in Chapter 4) '
-    + 'because some fatigue of all motor units is practically necessary to ensure maximum tension in all these '
-    + 'units is reached.'],  // p219
+  ME: ['ME (maximum effort) is a movement meant to build your ability to lift maximal or near-maximal weight. '
+    + 'It is usually a deliberately heavy set aimed at peak force through each rep. '
+    + `Bar speed still matters here but comes second to moving the weight well. ${P219_SENTENCE.ME}`],  // p219, reworded
+  DE: ['DE (dynamic effort) sets put the emphasis on bar speed and movement quality. The main goals are velocity and '
+    + 'a consistent bar path, and each rep is treated as if the bar held a maximum weight. Fatigue is also avoided '
+    + 'because movement quality comes first.',  // p219, reworded
+    // p218, reworded
+    'In dynamic effort the load and rep range are both lower, but the stress on peak output/velocity should make it '
+    + 'harder than similar skill work. The main difference is that skill work aims mainly at perfecting the movement, '
+    + 'while DE work aims for good form (of course) but makes bar speed the first goal.'],
+  SKILL: [`SKILL work is unusual in that its only aim is patterning and movement practice. ${P219_SENTENCE.SKILL}`,  // p219, reworded
+    'Each rep makes movement quality either better or worse.', // p76, reworded
+    "Only correct practice improves a movement; if you're doing it poorly, stop."], // p141, reworded
+  HYP: ['HYP means hypertrophy work; these sets are closer to standard bodybuilding-style training. The goal is '
+    + 'maximum motor unit recruitment, with reps at a steady tempo, controlled but powerful. Fatigue is expected: '
+    + 'reps will slow as the fast-twitch fibers tire and the fatigue-resistant fibers take on more of the work. '
+    + 'This is wanted, because some fatigue of every motor unit is nearly required for all of them to reach maximum '
+    + 'tension.'],  // p219, reworded
 };
 
 /** p218's reserve band for an intent, or null (ME, and anything not a barbell intent). */
@@ -366,11 +393,13 @@ export function intentMeaning(intent: string | null | undefined): string[] {
 }
 
 /**
- * p218's first sentence, quoted in the SOURCE doc (Part J6). The set band's own rule, printed once — on the
+ * p218's first sentence, reworded (Michael approved the words 2026-09-19); the page, quoted in the SOURCE doc (Part J6):
+ * "Sets should always remain on the lower end when starting a program, increasing only if an athlete is finding that
+ * they are progressing well and seem to have recovery to spare!" The set band's own rule, printed once — on the
  * logger's set-type sheet, beside the band.
  */
-export const SETS_START_LOW_LINE = 'Sets should always remain on the lower end when starting a program, increasing only '
-  + 'if an athlete is finding that they are progressing well and seem to have recovery to spare!';
+export const SETS_START_LOW_LINE = 'Sets should stay at the low end when a program starts, rising only '
+  + 'if the athlete is progressing well and seems to have recovery left over.';
 
 /**
  * ⛔ THE RANGE BESIDE THE REST TIMER (round 4, 2026-09-18, Michael approved). The timer on a plan row counts UP from

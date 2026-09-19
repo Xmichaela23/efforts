@@ -350,7 +350,7 @@ Deno.test('rest between sets is HIS rule, on both sides, and never a number', ()
   // himself: the drop-off in capacity IS the hypertrophy stimulus.
   const hyp = resolveSlot({ intent: 'HYP', category: 'secondary', pattern: 'push_upper', equipment: null });
   // 2026-09-18: p84's own sentence, whole (no paraphrasing).
-  const restHyp = hyp.notes.find((n) => n.text.includes('may well be a crucial part of the training session itself'));
+  const restHyp = hyp.notes.find((n) => n.text.includes('it may be a central part of the session'));
   assert(restHyp, 'no note carrying p84\'s hypertrophy exception');
   assertEquals(restHyp!.cite, 'Viada p84');
   assert(!hyp.notes.some((n) => n.text.includes('cool down')),
@@ -716,17 +716,17 @@ Deno.test('every category carries the definition it was built from', () => {
 
 Deno.test('⛔⛔ intentLine prints p218\'s row in the page\'s order, and SKILL\'s two quotes', async () => {
   const { intentLine, rirBandText, restRuleFor, SETS_START_LOW_LINE } = await import('./intents.ts');
-  assertEquals(intentLine('ME'), '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.');
-  assertEquals(intentLine('DE'), '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
-  assertEquals(intentLine('SKILL'), '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.');
-  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
+  assertEquals(intentLine('ME'), '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. End each set before failure, because a breakdown in technique or form here can be counterproductive.');
+  assertEquals(intentLine('DE'), '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. The main goals are velocity and a consistent bar path.');
+  assertEquals(intentLine('SKILL'), '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. Use a weight heavy enough to challenge you, but form and consistency come before velocity.');
+  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is expected: reps will slow as the fast-twitch fibers tire.');
   assertEquals(intentLine('carry'), null);
   // ⛔ HYP's reserve is the band, never the stamped midpoint.
   assertEquals(rirBandText('HYP'), '0 to 2');
   assertEquals(rirBandText('ME'), null);
   // The page's rest rule per intent: p84 for HYP, p78 for the rest.
-  assert(restRuleFor('HYP')!.includes('may well be a crucial part of the training session itself'));
-  assert(restRuleFor('ME')!.startsWith('Rest periods between sets should be sufficient'));
+  assert(restRuleFor('HYP')!.includes('it may be a central part of the session'));
+  assert(restRuleFor('ME')!.startsWith('Rest between sets should allow almost full recovery'));
   assertEquals(restRuleFor('carry'), null);
-  assert(SETS_START_LOW_LINE.startsWith('Sets should always remain on the lower end when starting a program'));
+  assert(SETS_START_LOW_LINE.startsWith('Sets should stay at the low end when a program starts'));
 });

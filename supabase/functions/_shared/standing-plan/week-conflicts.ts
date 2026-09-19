@@ -25,10 +25,15 @@ import { WEEKDAYS, weekdayForFrameDay, type Weekday } from './day-map.ts';
 import { isHardSlot, isLongSlot } from './sport-slots.ts';
 import type { PlanSession } from './compose.ts';
 
-/** Viada p86 (SOURCE, quoted): the day-after cost of a lifting day, by its work sets. */
-const P86_SET_COST = 'A highly taxing, 14+ work set session may diminish performance in other modalities significantly for '
-  + 'twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in '
-  + 'only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.';
+/**
+ * Viada p86, reworded (Michael approved the words 2026-09-19): the day-after cost of a lifting day, by its work sets. The page (SOURCE,
+ * quoted): "A highly taxing, 14+ work set session may diminish performance in other modalities significantly for
+ * twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in
+ * only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session."
+ */
+const P86_SET_COST = 'A very hard session of 14+ work sets may cut performance in other training a lot for '
+  + 'twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause '  // p86, reworded
+  + 'only small performance drops for twenty-four hours, with few problems forty-eight hours later.';
 
 /**
  * ⛔ WHICH BREAK IT IS. Three come from `COST` and one from the frame — and the fourth is not a

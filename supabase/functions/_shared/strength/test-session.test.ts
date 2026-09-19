@@ -20,8 +20,8 @@ Deno.test('⛔ THE LAUNCHER WITH A MAX ON FILE — the empty bar, then p215\'s t
   assertEquals(bench.sets.map((s) => s.set_type), ['warmup', 'working', 'working', 'working']);
   assertEquals(bench.sets[3].amrap, true);
   // p215's own words (2026-09-18).
-  assertEquals(bench.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this feels about right.');
-  assertEquals(bench.sets[2].set_hint, 'Perform 5 repetitions with this weight.');
+  assertEquals(bench.sets[1].set_hint, 'A weight you could lift 8 times comfortably, but near failure if pushed to 10. This set of 6 checks that the weight feels about right.');
+  assertEquals(bench.sets[2].set_hint, 'Do 5 reps with this weight.');
   assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines).');
   // The press's empty bar is the bar, not 0.
   assertEquals(ohp.sets[0].weight, 45);
@@ -35,7 +35,7 @@ Deno.test('⛔ THE LAUNCHER WITH NO MAX ON FILE — the anchor rows, not a 45/95
   for (const r of [squat, dead]) {
     assertEquals(weights(r), [45, 0, 0, 0], `${r.name} was given a starting weight`);
     assertEquals(r.sets[1].pretest_anchor, true);
-    assertEquals(r.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Enter this weight here.'); // p215, 2026-09-18
+    assertEquals(r.sets[1].set_hint, 'A weight you could lift 8 times comfortably, but near failure if pushed to 10. Type this weight in.'); // p215, 2026-09-18
     assertEquals(r.sets.map((s) => s.reps ?? null), [null, 6, 5, null]);
     assertEquals(r.anchor_round_to, 5);
     assertEquals(r.notes, undefined);
@@ -55,7 +55,7 @@ Deno.test('⛔⛔ A PLAN\'S TEST ROW IS BUILT AS THE PLAN WROTE IT — its own w
   const planned = upper.strength_exercises.find((e) => e.name === 'Bench Press')!.set_plan as Array<{ weight: number }>;
   assertEquals(weights(bench), [45, ...planned.map((p) => p.weight)], 'the plan\'s step weights changed on the way to the logger');
   // p215 step 8 (2026-09-18) — the plan row's note and the set's hint are one line from one owner.
-  const P215_LAST = 'Perform the maximum number of repetitions possible with this weight.';
+  const P215_LAST = 'Do as many reps as you can with this weight.';
   assertEquals(bench.sets[bench.sets.length - 1].set_hint, P215_LAST);
   // 2026-09-18: "the last one is what you are trying to beat" is not how p215 works, and came off.
   assertEquals(bench.notes, `Bench Press on file: 160 lb (typed in your baselines). ${P215_LAST}`);
@@ -157,9 +157,9 @@ Deno.test('a planned test row prints p215\'s steps at their own weights, no ME l
   const lines = plannedTestRowLines(row, ['standing_plan', 'test_week', '1rm_test'], false)!;
   assertEquals(lines[0], 'Back Squat');
   assertEquals(lines.length, 5);
-  assert(lines[1].startsWith('45 lb · Perform a regular warm-up'), lines[1]);
-  assert(lines[2].startsWith('215 lb × 6 · A weight where you can comfortably perform 8 repetitions'), lines[2]);
-  assertEquals(lines[3], '235 lb × 5 · Perform 5 repetitions with this weight.');
+  assert(lines[1].startsWith('45 lb · Warm up as usual in the chosen lift'), lines[1]);
+  assert(lines[2].startsWith('215 lb × 6 · A weight you could lift 8 times comfortably'), lines[2]);
+  assertEquals(lines[3], '235 lb × 5 · Do 5 reps with this weight.');
   assertEquals(lines[4], `245 lb · ${TEST_LAST_SET_LINE}`);
   assert(!lines.some((l) => /^ME\b/.test(l)), 'the test is labelled ME');
   // An accessory on the test day is not a tested lift and keeps the ordinary line.

@@ -512,16 +512,19 @@ const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
 
 
 /**
+ * ⛔ p125, reworded (Michael approved the words 2026-09-19); the page: "A higher pain tolerance may be an excellent adaptation for endurance
+ * athletes because the ability to manage increasingly uncomfortable sensations during various endurance-dependent
+ * events may be directly related to their overall performance in their sport. For strength athletes, however, it may
+ * be less clear; a higher tolerance may be of negligible benefit or even counterproductive to longer-term health."
  * ⛔⛔ THE p125 LINE, IN p125's OWN WORDS (pass 6, 2026-09-18, read off p125.jpg). It had been a paraphrase that
  * dropped the page's "may"; pass 4 took it off because p125 was not in the SOURCE doc. The page photo is the
  * book, so it comes back as the page prints it. Said once, on the block description. No second person (the
  * description's voice gate).
  */
 export const PAIN_TOLERANCE_NOTE =
-  'A higher pain tolerance may be an excellent adaptation for endurance athletes because the ability to manage '
-  + 'increasingly uncomfortable sensations during various endurance-dependent events may be directly related to their '
-  + 'overall performance in their sport. For strength athletes, however, it may be less clear; a higher tolerance may '
-  + 'be of negligible benefit or even counterproductive to longer-term health.';
+  'Higher pain tolerance may be a very useful adaptation for endurance athletes, since handling growing discomfort in '
+  + 'endurance events may tie directly to how well they perform in their sport. For strength athletes the case is less '
+  + 'clear; higher tolerance may bring little benefit or may even be bad for longer-term health.';
 
 function describeBlock(
   weeks: number,

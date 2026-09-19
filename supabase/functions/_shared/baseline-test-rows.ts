@@ -134,9 +134,11 @@ export function ftpTestRow(date: string): BaselineTestRow {
     name: 'FTP Test — 20-Minute Protocol',  // not-instruction: session name, not an instruction; p212 heads the test "The 20-Minute Test"; Michael's call
     type: 'ride',
     date,
-    // ⛔ p212's own words, in its order (2026-09-18). "indoor trainer recommended; a power meter or smart trainer" and
+    // ⛔ p212's own words, in its order (2026-09-18). The last two p212 sentences are reworded (Michael approved the
+    // words 2026-09-19); the page: "If you're using average watts, use the number at the 20-minute mark and multiply it
+    // by 0.95. This is your starting functional threshold power (FTP) in watts. "indoor trainer recommended; a power meter or smart trainer" and
     // "even" were on no page and came off. The last sentence operates the app.
-    description: 'Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. If you\'re using average watts, use the number at the 20-minute mark and multiply it by 0.95. This is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it.',
+    description: 'Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. With average watts, take the 20-minute number and multiply it by 0.95. It is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it.',
     // OURS — `ftpTestRow` 45-min duration: the steps' own sum (8 + 5 + 3 + 3 + 7 + 20 + 5 minutes, rounded up); the materializer's step sum wins once built
     duration: 45,
     // ⛔ THE ROW IS AN ASSESSMENT NOW (2026-09-18): `buildAssessmentSteps` builds the protocol from `ftpTestSteps()`,

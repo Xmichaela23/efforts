@@ -112,13 +112,13 @@ const built = (family: string, level: 1 | 2 | 3, archetype: string, opts?: { rac
 
 Deno.test('each family line is the page\'s own words (p231, p233, p235, p237, p238, p239)', () => {
   assertEquals(familyLineFor('run_mlss'), 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
-  assertEquals(familyLineFor('run_near_threshold'), 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
-  assertEquals(familyLineFor('ride_sweet_spot'), 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.');
+  assertEquals(familyLineFor('run_near_threshold'), 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.');
+  assertEquals(familyLineFor('ride_sweet_spot'), 'These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.');
   assertEquals(familyLineFor('ride_endurance', 'steady'), 'Easy ride below 75%.');
-  assert(familyLineFor('ride_anaerobic', 'progressive_repeats')!.endsWith('Each set should start at 110% and progress up to 125–130% by the end.'));
+  assert(familyLineFor('ride_anaerobic', 'progressive_repeats')!.endsWith('Each set should begin at 110% and rise to 125–130% by the end.'));
   // The flat anaerobic rides do not carry the progressive option's sentence.
   assert(!familyLineFor('ride_anaerobic', 'one_to_one')!.includes('Each set'));
-  assertEquals(RACE_TEMPO_LINE, 'Increase the pace here to race pace, but extend recovery periods by 25 percent.');
+  assertEquals(RACE_TEMPO_LINE, 'Raise the pace here to race pace, but lengthen recovery periods by 25 percent.');
 });
 
 Deno.test('a rest the page names prints the page\'s word and no pace: MLSS "recovery walk/jog between sets" (p232)', () => {
@@ -227,9 +227,9 @@ Deno.test('p235\'s fartlek is 6 efforts, not offered at level 1', () => {
 });
 
 Deno.test('the VO2 ride prints p238\'s line; the easy and long runs print p235\'s own second sentences', () => {
-  assert(String(familyLineFor('ride_vo2')).startsWith('These workouts are intended to push your maximum aerobic intake'));
-  assert(String(built('run_vt1', 1, 'continuous').row.description).includes('may vary slightly depending on current level of fatigue'));
-  assert(String(built('run_lsd', 2, 'hike').row.description).includes('can be modified extensively'));
+  assert(String(familyLineFor('ride_vo2')).startsWith('These sessions are meant to push your maximum aerobic intake'));
+  assert(String(built('run_vt1', 1, 'continuous').row.description).includes('can shift slightly with current fatigue'));
+  assert(String(built('run_lsd', 2, 'hike').row.description).includes('can be changed a great deal'));
 });
 
 Deno.test('the page\'s percentages in a ride\'s line are never read as its warm-up\'s power (p237 "125–130%")', () => {

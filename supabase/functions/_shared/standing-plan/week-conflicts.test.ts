@@ -168,7 +168,7 @@ Deno.test('⛔ THE LONG RUN AND HEAVY LEGS — a day apart and stacked are two d
     .week.conflicts.find((x) => x.rule === 'long_after_heavy_legs');
   assert(apart, 'the long run beside the heavy leg day raised nothing');
   // p86's own words since 2026-09-18 (book-language pass 2).
-  assertEquals(apart!.text, 'Tuesday heavy legs, Wednesday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.');
+  assertEquals(apart!.text, 'Tuesday heavy legs, Wednesday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.');
   assertEquals(apart!.days.length, 2, apart!.days.join(','));
 
   /**

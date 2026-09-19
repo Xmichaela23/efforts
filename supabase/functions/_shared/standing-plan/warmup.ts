@@ -99,7 +99,8 @@ export function warmupSetsFor(name: string, workWeightLb: number | null | undefi
 export const DEFAULT_BAR_LB = 45;
 
 /**
- * The warm-up line, one owner — the pages' own words, cut (pass 6, read off p139.jpg and p140.jpg), SPLIT BY EACH
+ * The warm-up line, one owner — since 2026-09-19 a rewording of each page that Michael approved word for word; the
+ * pages' own words are quoted below (pass 6, read off p139.jpg and p140.jpg), SPLIT BY EACH
  * PAGE'S OWN SCOPE (Michael, 2026-09-18):
  *   p139 Rule 1, every lifting day: "A good warm-up is meant to prepare your body to do work, not be a stimulus."
  *   p140 Rule 2a, skill work only: "With skill development work, every warm-up set should have equal focus and quality
@@ -108,9 +109,9 @@ export const DEFAULT_BAR_LB = 45;
  * ⚠️ p139-140 give no percentages, loads or rep counts for a warm-up ("working up in weight", "gradually heavier
  * squats until the work set"). The warm-up SETS are StrongLifts' (`warmupSetsFor`, above), not the book's.
  */
-export const WARM_UP_P139 = 'A good warm-up is meant to prepare your body to do work, not be a stimulus.'; // p139
-export const WARM_UP_P140_SKILL = 'With skill development work, every warm-up set should have equal focus and quality to the work sets. ' // p140
-  + 'The first set of your skill work should also be the last set of your warm-up.'; // p140
+export const WARM_UP_P139 = 'A good warm-up readies the body for work; it should not be a stimulus.'; // p139, reworded
+export const WARM_UP_P140_SKILL = 'In skill development work, each warm-up set needs the same attention and quality as the work sets. ' // p140, reworded
+  + 'Your last warm-up set should also serve as your first set of skill work.'; // p140, reworded
 
 /**
  * The session's warm-up line (materialize-plan stamps it as `computed.warm_up_line`; the logger prints it above the

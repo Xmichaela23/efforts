@@ -20,10 +20,10 @@ const run = (band: string) => ({ type: 'run', training_plan_id: PLAN, tags: ['st
 const swim = () => ({ type: 'swim', training_plan_id: PLAN, tags: ['sport:swim'] });
 
 // ⛔ p143's own words (2026-09-18, book-language pass 2).
-const LEAD = 'Allow at least 6 to 8 hours with one full meal before the resistance training session.';
-const SHORT = 'If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long as you consume calories and monitor hydration after this session.';
-const EASY = 'Performing low-intensity conditioning after these muscles have already been worked can potentially result in greater benefits at a given volume.';
-const SKILL = 'The skill movements are focused on the first session because you may be "fresher," but this is not a hard-and-fast rule.';
+const LEAD = 'Leave at least 6 to 8 hours and one full meal before the resistance training session.';
+const SHORT = 'If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it.';
+const EASY = 'Doing low-intensity conditioning after these muscles have been worked may give greater benefits at a given volume.';
+const SKILL = 'The skill movements go in the first session because you may be fresher then, but this is not a strict rule.';
 
 Deno.test('one session, two endurance sessions, or a session not from the plan: nothing', () => {
   assertEquals(spacingLineFor([lift([{ slot_intent: 'ME' }])]), null);

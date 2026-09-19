@@ -75,8 +75,8 @@ const STANDARD = FRAMES.strength_5k.columns.standard;
 // dropped reduction was ours and is deleted; p247 is silent outside its own layout and so is the
 // block. "Dropped" therefore means the reduction sentence is not there.
 const haircutSaid = (wk: { notes: Array<{ text: string }> }) => ({
-  reduced: wk.notes.some((n) => n.text.includes('reduction in working 1RM')),
-  dropped: !wk.notes.some((n) => n.text.includes('reduction in working 1RM')),
+  reduced: wk.notes.some((n) => n.text.includes('drop in working 1RM')),
+  dropped: !wk.notes.some((n) => n.text.includes('drop in working 1RM')),
 });
 const week2 = (mix: Record<string, number>) =>
   composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: mix });
@@ -482,12 +482,12 @@ Deno.test('the haircut follows the CALENDAR, not the frame — a pinned-away har
   //    the day before the leg day, and that difference is the whole point of the fix.
   assert(STANDARD.find((d) => d.day === 1)!.endurance.some((sl) => isHardSlot(sl)),
     'frame day 1 no longer carries a hard slot; this test no longer proves what it claims');
-  assert(!wk.notes.some((n) => n.text.includes('reduction in working 1RM')),
+  assert(!wk.notes.some((n) => n.text.includes('drop in working 1RM')),
     'the block still claims the lower-body weights were cut for a run that has moved away');
 
   // ⛔ AND THE FRAME'S OWN LAYOUT STILL EARNS IT — p247's one compensated break, untouched.
   const frameWeek = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 4, rides: 0 } });
-  assert(frameWeek.notes.some((n) => n.text.includes('reduction in working 1RM')),
+  assert(frameWeek.notes.some((n) => n.text.includes('drop in working 1RM')),
     'the untouched frame week lost the reduction p247 asks for');
 
   // ⛔ THE BAR MOVES, AND BY THE HAIRCUT'S OWN SIZE. A note without a number would be decoration.
@@ -549,7 +549,7 @@ Deno.test('a bike-mix block says NOTHING about the haircut, and the running bloc
    * is the paragraph explaining the silence.
    */
   const wk = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 1, rides: 3 } });
-  assert(!wk.notes.some((n) => n.text.includes('reduction in working 1RM')),
+  assert(!wk.notes.some((n) => n.text.includes('drop in working 1RM')),
     'a bike-heavy block is applying p247\'s run-layout reduction');
   /**
    * ⚠️ MATCHED ON THE DELETED NOTE'S OWN OPENING, and the two near-misses are why it is that narrow.
@@ -561,7 +561,7 @@ Deno.test('a bike-mix block says NOTHING about the haircut, and the running bloc
     `the deleted ours-note about the dropped reduction came back: ${JSON.stringify(wk.notes.map((n) => n.text))}`);
   // The running week keeps saying the thing that IS on a page, in his voice.
   const run = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 4 } });
-  assert(run.notes.some((n) => n.cite === 'Viada p247' && /reduction in working 1RM/.test(n.text)));
+  assert(run.notes.some((n) => n.cite === 'Viada p247' && /drop in working 1RM/.test(n.text)));
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

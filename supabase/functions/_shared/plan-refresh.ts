@@ -58,8 +58,10 @@ import { localDateInTz } from './local-date.ts';
 // 18 (2026-09-19): the hard run and ride are titled by the workout's own name with the type under it; the MLSS line is
 //   one approved rewording of p231 (hills included); p232's last ladder recovery, p237's 9-minute L3 spin between sets,
 //   and p238's fixed 2 × 6 / 8 / 10 short VO2 repeats build as printed.
+// 19 (2026-09-19): the author's sentences are replaced by the 74 approved rewrites (docs/AUDIT-author-sentences-2026-09-19.md)
+//   — session lines, drawer notes, spacing lines, plyo, warm-up, test-day and block-description words.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 18;
+export const PLAN_WRITER_VERSION = 19;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
