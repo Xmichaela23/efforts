@@ -153,10 +153,13 @@ export function ftpTestRow(date: string): BaselineTestRow {
 export function ftp5MinTestRow(date: string): BaselineTestRow {
   return {
     // ⛔ NO "48 HOURS PRIOR" and no source citation in the name — see the run test above.
-    name: 'FTP Test — 5-Minute All-Out',
+    name: 'FTP Test — 5-Minute All-Out', // not-instruction: session name, not an instruction; no page names it; Michael's call
     type: 'ride',
     date,
-    description: 'FTP test — the 5-minute all-out protocol. PREPARATION: indoor trainer recommended; a power meter or smart trainer is required. The test: start as hard as you can hold and hang on until five minutes are up. There is no pacing strategy, which is what makes it repeatable. Your 5-minute power feeds the power curve the FTP estimate is fitted from.',
+    // ⛔ NO WORDS (2026-09-18, rule 7 triage). The 5-minute test is coach-course material, not the book: the SOURCE doc
+    // has no 5-minute FTP test (grepped "5-minute", "five-minute", "5 minute", "hang on"), so it prints nothing. The
+    // sentence that stood here ("indoor trainer recommended… start as hard as you can hold and hang on…") was on no page.
+    description: '',
     // OURS — `ftp5MinTestRow` 40-min duration and the warm-up / cool-down presets: no page
     duration: 40,
     steps_preset: [
