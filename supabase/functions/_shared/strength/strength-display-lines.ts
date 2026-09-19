@@ -13,7 +13,8 @@
 
 export type WeightUnit = 'lb' | 'kg';
 
-import { P218_TEMPO, rirBandFor, rirBandText, type ViadaIntent } from '../strength-grid/intents.ts';
+import { P218_TEMPO, intentLine, rirBandFor, rirBandText, type ViadaIntent } from '../strength-grid/intents.ts';
+import { INTENT_TITLE } from '../intent-title.ts';
 
 // (2026-09-18) `RESERVE_WHEN_NO_TARGET` ("1 to 2", ours, no caller) is deleted.
 
@@ -71,17 +72,21 @@ export function reserveSeedFor(row: { slot_intent?: unknown; target_rir?: unknow
 }
 
 /**
- * ⛔ THE ROW'S INTENT LINE — `HYP · 6-12 reps · 0 to 2 in reserve` — ONE OWNER. The logger printed its
+ * ⛔ THE ROW'S INTENT LINE — `Hypertrophy · 6-12 reps · 0 to 2 in reserve · …` — ONE OWNER. The logger printed its
  * own (with "· move the bar fast", on no page); it now prints this.
  */
 export function intentRowLine(row: { slot_intent?: unknown; target_rir?: unknown; target_reps?: unknown } | null | undefined): string | null {
   const intent = String(row?.slot_intent ?? '').toUpperCase();
-  if (!BOOK_WORDS.has(intent) || intent === 'ME' || !row?.target_reps) return null;
+  // ⛔ THE ME ROW (2026-09-18): p218's row and p219's sentence (`intentLine('ME')`) — the line the logger built on the
+  // phone as "ME · …", now spelled "Maximum Effort · …" and sent with the row. p218 gives ME no reserve.
+  if (intent === 'ME') { const me = intentLine('ME'); return me ? `${INTENT_TITLE.ME} · ${me}` : null; }
+  if (!BOOK_WORDS.has(intent) || !row?.target_reps) return null;
   const reps = String(row.target_reps).replace(/\+$/, '');
   const rir = reserveTextFor(row);
   // p218's tempo words for the intent, as printed (p218.jpg): "maximum velocity", "controlled eccentric, …".
   const tempo = P218_TEMPO[intent as ViadaIntent];
-  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;  // p218 ("0 to 2 RIR", the tempo words); p219 — RIR refers to "reps in reserve (before failure)."
+  // The intent spelled out as p219 names it ("Hypertrophy", "Dynamic Effort"), approved 2026-09-18 (`INTENT_TITLE`).
+  return `${INTENT_TITLE[intent]} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;  // p218 ("0 to 2 RIR", the tempo words); p219 — RIR refers to "reps in reserve (before failure)."
 }
 
 /**

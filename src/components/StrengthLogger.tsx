@@ -5489,19 +5489,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // ⚠️ An assist-capable movement puts TWO values in the load column (help and
                   // added), so it takes 1.6fr and squeezes `previous` further. At the 375pt floor
                   // with RIR also present, an even 1fr leaves each half ~21px and "-60" clips.
+                  // ⛔ 2026-09-18: NO NUMBER CELL WRAPS, 320–430 px. At 320 the reps cell was 21–29 px and "1-5" broke
+                  // into "1-" over "5" (read as a fixed 5 on ME rows); the RIR cell was a fixed 34 px and "3 to 4" broke
+                  // at every width. `previous` now yields first (it shrinks to 40 px), the weight and reps cells hold at
+                  // least "245" and "6-12", the RIR cell is as wide as its words, and the gaps tighten under 400 px.
                   const gridTemplate = [
                     '22px',
-                    exShowRir ? (exIsAssistCapable ? '56px' : '68px') : '84px',
-                    exShowWeight ? (exIsAssistCapable ? 'minmax(0,1.6fr)' : 'minmax(0,1fr)') : null,
-                    'minmax(0,1fr)',
-                    exShowRir ? '34px' : null,
+                    exShowRir ? (exIsAssistCapable ? 'minmax(36px,56px)' : 'minmax(40px,68px)') : 'minmax(40px,84px)',
+                    exShowWeight ? (exIsAssistCapable ? 'minmax(56px,1.6fr)' : 'minmax(40px,1fr)') : null,
+                    'minmax(40px,1fr)',
+                    exShowRir ? 'max-content' : null,
                     '34px',
                     '16px',
                   ].filter(Boolean).join(' ');
                   const gridStyle: React.CSSProperties = {
                     display: 'grid',
                     gridTemplateColumns: gridTemplate,
-                    columnGap: exShowRir ? '8px' : '10px',
+                    columnGap: exShowRir ? 'var(--set-grid-gap, 8px)' : 'var(--set-grid-gap, 10px)',
                     // ⛔ `end`, NOT `center` (2026-08-27). The number cells are 44px tall so they can
                     // be hit; centring them would leave the set index and the Previous column floating
                     // halfway up the row while the numbers sat on their underline. Bottom alignment
@@ -5558,54 +5562,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     ? ((exercise as any)?.slot_intent
                         ?? (/\bME\b/.test(standingSlotText) ? 'ME' : /\bDE\b/.test(standingSlotText) ? 'DE' : null))
                     : null;
-                  /**
-                   * ⛔⛔ THE DE CARD SHOWS NOTHING NOW, AND "NOTHING" HAD TO BE SAID EXPLICITLY
-                   * (Michael's ruling, 2026-08-28).
-                   *
-                   * The per-card speed cue is gone. Every clause of it was already covered by the
-                   * approved session line, contradicted by it, or a phrase he had cut:
-                   * *"move the bar fast and controlled"* is the session line's own first sentence;
-                   * *"2-4 reps"* is printed directly underneath by `targetHint`; *"About 70-80% of
-                   * your max"* was the original defect (no bar and no percentage field on a pull-up);
-                   * *"if the bar slows, it's too heavy"* is OURS and he cut it on sight; *"add a
-                   * little next time"* is the rep-chase tail already deleted from the ME cue, and DE
-                   * is in `advance-nudge.ts`'s `ENGINE_OWNED_INTENTS` so the engine owns that
-                   * decision anyway.
-                   *
-                   * ⛔⛔ BUT `null` WOULD NOT HAVE MEANT NOTHING. The render below is
-                   * `standingCue ?? titleCue`, so a DE row returning null FALLS THROUGH to
-                   * `barSpeedCueFor` — and close-grip bench press is a secondary push in this frame
-                   * AND on `MAIN_BARBELL_LIFTS`, so that row would have started reading *"Every rep
-                   * explosive and controlled."* the previous program's words on a Viada block. **Deleting the DE
-                   * cue would have restored the exact defect the DE cue was written to beat** — the
-                   * comment above says so in as many words. `suppressed` is the difference between
-                   * "no standing cue" and "no cue".
-                   */
-                  const standingCue: string | null | 'suppressed' = slotIntent === 'ME'
-                    // ⚠️ NO `loadPrescribed` ARGUMENT SINCE 2026-09-09 — the direction clause it
-                    // selected ("Assistance if you need it…") was ours and is deleted; the Assist/+
-                    // column labels itself.
-                    ? bookIntentLine('ME') // p218 — one owner, `strength-grid/intents.ts`
-                    : slotIntent === 'DE'
-                      ? 'suppressed'
-                      : null;
-                  /**
-                   * ⛔ NO FALL-THROUGH LEFT TO GUARD (2026-09-09). With `titleCue` deleted there is
-                   * nothing under `standingCue` to fall to, so `'suppressed'` and `null` now reach
-                   * the same place — and the DE row keeps its own `intentLine` below either way,
-                   * which is the line the suppression existed to protect.
-                   * ⚠️ THE SENTINEL STAYS. It is the record that a DE row renders NOTHING here on
-                   * purpose; collapsing it would leave the next reader unable to tell "no cue" from
-                   * "no standing cue", which is exactly how the previous program's words got onto a
-                   * Viada block the first time.
-                   */
-                  const cardCueRaw = standingCue === 'suppressed' ? null : standingCue;
-                  // The book's word for the set leads the line — ME / DE / SKILL / HYP with its reps and reserve
-                  // (p218). ⛔ ONE OWNER since 2026-09-18: the plan's own row line (`intent_line`, stamped by the server off
-                  // `intentRowLine`). "· move the bar fast" / "· move fast" came off — no page's words.
+                  // The book's word for the set leads the line, spelled out — Maximum Effort / Dynamic Effort / Skill /
+                  // Hypertrophy with its reps and reserve (p218, p219). ⛔ ONE OWNER since 2026-09-18: the row's own line
+                  // (`intent_line`, stamped by the server off `intentRowLine`; the ME row's is p218's row and p219's
+                  // sentence, which the phone used to build as "ME · …"). "· move the bar fast" came off — no page's words.
                   const bookWord = (slotIntent === 'ME' || slotIntent === 'DE' || slotIntent === 'SKILL' || slotIntent === 'HYP') ? slotIntent : null;
                   const intentLine = bookWord ? (exercise.intent_line ?? null) : null;
-                  const cardCue = cardCueRaw && bookWord === 'ME' ? `ME · ${cardCueRaw}` : cardCueRaw;
                   /**
                    * ⛔ THE ADVANCE NUDGE — extracted to `@/lib/advance-nudge` on 2026-08-26, in the
                    * change that narrowed its scope. The rule it now enforces is a RULING — *a row the
@@ -5671,7 +5633,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         * `STANDING_ME_SET_CUE` and `barSpeedCueFor`'s title cue — leaving either
                         * accented re-creates the problem with fewer instances. ⚠️ It rendered
                         * `STANDING_DE_SET_CUE` too until 2026-08-28; that cue no longer reaches a
-                        * card at all — see `standingCue` above.
+                        * card at all — the ME row prints its `intent_line` (p218, p219).
                         *
                         * ⚠️ AND IT IS NOT A NEW TREATMENT. `white/55` is what the per-set
                         * `targetHint` line ("target 6-12 · 1 in reserve") and the `advanceNudge`
@@ -5682,22 +5644,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {/* The word is the kind of set; tap it and one line explains it (2026-09-08). */}
                       {intentLine && (
                         <button type="button" data-first-run="set-word" onClick={() => bookWord && setSetTypeFor(bookWord)}
-                          className="block w-full text-left px-1.5 pt-0.5 pb-1 text-caption font-medium text-label-secondary leading-snug">
+                          className={`block w-full text-left px-1.5 pt-0.5 ${bookWord === 'ME' ? 'pb-2' : 'pb-1'} text-caption font-medium text-label-secondary leading-snug`}>
                           {intentLine}
                         </button>
-                      )}
-                      {cardCue && (
-                        bookWord === 'ME'
-                          ? (
-                            <button type="button" data-first-run="set-word" onClick={() => setSetTypeFor('ME')}
-                              className="block w-full text-left px-1.5 pt-0.5 pb-2 text-caption font-medium text-label-secondary leading-snug">
-                              {cardCue}
-                            </button>
-                          ) : (
-                            <div className="px-1.5 pt-0.5 pb-2 text-caption font-medium text-label-secondary leading-snug">
-                              {cardCue}
-                            </div>
-                          )
                       )}
                       {/* The detected advance trigger — a fact about last session, dimmer than the
                           rule above it. Renders independently of the cues: an old-plan band row
@@ -5794,8 +5743,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // sitting on its rule exactly as before — the box grows upward, the ink does
                         // not move — and the grid switches to `alignItems: end` so every cell, the set
                         // index and the Previous column all share the one baseline.
-                        const numCls = `w-full h-11 flex items-end justify-center bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
-                        const numStyle: React.CSSProperties = { fontSize: 'var(--type-body)'};
+                        const numCls = `w-full h-11 flex items-end justify-center whitespace-nowrap bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
+                        // One step down the type scale under 400 px (`--set-num-size`, index.css) so "245.5" and "12-15" fit.
+                        const numStyle: React.CSSProperties = { fontSize: 'var(--set-num-size, var(--type-body))'};
                         // D-097 / D-406: a value that came from the previous session or from the
                         // composer's suggestion is a STARTING POINT, greyed so it can never be
                         // mistaken for something the athlete logged.

@@ -1384,3 +1384,8 @@ body.wizard-active { --tabbar-h: 0px; }
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1.0; }
 }
+/* The logger's set grid under 400 px: tighter column gaps and the numbers one step down the type scale (subhead),
+   so no number cell wraps or overflows (2026-09-18). */
+@media (max-width: 399px) {
+  :root { --set-grid-gap: 4px; --set-num-size: var(--type-subhead); }
+}

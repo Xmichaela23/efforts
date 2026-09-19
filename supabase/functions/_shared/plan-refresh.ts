@@ -51,8 +51,10 @@ import { localDateInTz } from './local-date.ts';
 //   `reserve_lit`, `reserve_seed`, `intent_line`), so the phone prints them and works nothing out.
 // 15 (2026-09-18): one shown name per movement on every row (`execution_name`, `strength/shown-name.ts`) — the book's
 //   "DB" spelling, Overhead Press, never "Kb/db Swings".
+// 16 (2026-09-18): the row's intent line spells the intent out ("Maximum Effort · …", "Hypertrophy · …"), and the ME
+//   row's line is sent with the row instead of built on the phone.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 15;
+export const PLAN_WRITER_VERSION = 16;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

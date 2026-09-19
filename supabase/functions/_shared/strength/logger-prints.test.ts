@@ -64,14 +64,21 @@ Deno.test('⛔ THE STAMPS ARE THE ANSWERS THE PHONE WORKED OUT', () => {
     const bookWord = ['ME', 'DE', 'SKILL', 'HYP'].includes(String(r.slot_intent)) ? r.slot_intent : null;
     assertEquals(s.intent_line ?? null, bookWord ? intentRowLine(r) : null, JSON.stringify(r));
   }
-  assertEquals(loggerRowStamps(ROWS[0], true).intent_line, 'HYP · 6-12 reps · 0 to 2 in reserve · controlled eccentric, controlled concentric');
+});
+
+Deno.test('⛔ THE INTENT LINE SPELLS THE INTENT OUT (approved, Michael 2026-09-18)', () => {
+  const line = (slot_intent: string, target_reps: string) => loggerRowStamps({ slot_intent, target_reps }, true).intent_line;
+  assertEquals(line('ME', '1-5'), 'Maximum Effort · 1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.');
+  assertEquals(line('DE', '2-4'), 'Dynamic Effort · 2-4 reps · 3 to 4 in reserve · maximum velocity');
+  assertEquals(line('SKILL', '3-5'), 'Skill · 3-5 reps · 3 to 4 in reserve · controlled eccentric, fast concentric');
+  assertEquals(line('HYP', '6-12'), 'Hypertrophy · 6-12 reps · 0 to 2 in reserve · controlled eccentric, controlled concentric');
 });
 
 Deno.test('⛔ NO INTENT LINE OFF A STANDING-PLAN DAY; A ROW WITH NO slot_intent READS ME / DE OUT OF ITS NOTES', () => {
   assertEquals(loggerRowStamps(ROWS[0], false).intent_line, undefined);
   assertEquals(loggerStampsForStep({ reps: '2-4', target_rir: 3.5, notes: '1 x DE: speed' }, true).intent_line,
     intentRowLine({ slot_intent: 'DE', target_rir: 3.5, target_reps: '2-4' }));
-  assertEquals(loggerStampsForStep({ reps: '1-5', notes: '1 x ME' }, true).intent_line, undefined);
+  assertEquals(loggerStampsForStep({ reps: '1-5', notes: '1 x ME' }, true).intent_line, intentRowLine({ slot_intent: 'ME' }));
 });
 
 const KITS: Array<string[] | null> = [null, [], ['barbell', 'dumbbells', 'bench'], ['dumbbells'], ['bands'], ['agility ladder']];
