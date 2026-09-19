@@ -284,6 +284,42 @@ export function hipThrustStandIn(equipment: string[] | null | undefined): GridMo
   return { name: HIP_THRUST_STAND_IN.name, category: 'focused', pattern: 'hinge_lower', asymmetrical: false, standIn: true };
 }
 
+/**
+ * ⛔ TWO DUMBBELLS, ONE PER HAND (Michael, 2026-09-18): the logger's weight column reads "LB EACH" / "KG EACH" on these
+ * rows when the kit does them with dumbbells; barbell, machine and one-dumbbell rows keep "LB" / "KG". Read off each
+ * movement's approved how-to ("a dumbbell in each hand", "two dumbbells"). One-dumbbell movements (DB row, Kroc row, DB
+ * pullover, goblet squat, the swings, the concentration curl, the dumbbell leg curl, the behind-the-neck extension,
+ * single-leg RDL, suitcase carry) are not here.
+ */
+const TWO_DUMBBELLS = new Set([
+  'db bench press', 'db incline press', 'db floor press', 'db shoulder press', 'db push press', 'seated db press',
+  'arnold press', 'chest fly', 'lateral raise', 'front raise', 'rear delt fly', 'rear delt machine', 'tate press',
+  'skull crusher', 'dumbbell curl', 'hammer curl', 'spider curl', 'drag curl', 'db romanian deadlift',
+  'romanian deadlift', 'stiff-legged deadlift', 'weighted single leg calf raise', 'farmers carry', 'gorilla row',
+  // ACE's lunge: "grip one dumbbell in each hand" — bodyweight on a kit with no dumbbells.
+  'lunge',
+]);
+/**
+ * Does this row use two dumbbells on this kit? A movement done only with dumbbells always does. One the kit could
+ * do another way does when the kit's route for it is dumbbells: the first route of `gearRoutesFor` the kit reaches,
+ * and never when the kit owns the machine (a gym does the rear delt machine on the machine, as `executionName` says).
+ */
+export function usesTwoDumbbellsOnKit(name: string, equipment: string[] | null | undefined): boolean {
+  const f = foldExerciseName(name);
+  const key = SAME_MOVEMENT[String(name ?? '').toLowerCase().trim()] ?? SAME_MOVEMENT[f] ?? f;
+  const listed = [...TWO_DUMBBELLS].some((k) => foldExerciseName(k) === foldExerciseName(key));
+  if (!listed) return false;
+  const routes = gearRoutesFor(name);
+  if (routes.length > 0 && routes.every((r) => r.includes('dumbbells'))) return true;
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return false;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  if (routes.some((r) => r.includes('machine') && r.every((k) => keys.has(k)))) return false;
+  const first = routes.find((r) => r.every((k) => keys.has(k)));
+  if (first != null && first.length === 0) return keys.has('dumbbells'); // needs nothing: dumbbells if the kit has them
+  return first != null && first.includes('dumbbells');
+}
+
 /** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
 export function builderReaches(name: string, equipment: string[] | null | undefined): boolean {
   return reachable(name, equipment);

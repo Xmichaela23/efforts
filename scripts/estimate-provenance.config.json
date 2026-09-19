@@ -453,6 +453,12 @@
           "getInSlotAlternatives(",
           "Direct swaps"
         ]
+      },
+      {
+        "field": "strength row.weight_per (materialize-plan, swap-list)",
+        "words": [
+          "}/hand`"
+        ]
       }
     ]
   }

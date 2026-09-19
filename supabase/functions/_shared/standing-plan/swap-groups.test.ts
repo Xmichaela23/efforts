@@ -74,3 +74,24 @@ Deno.test('⛔ ONE NAME PER MOVEMENT ON A KIT (Michael, 2026-09-18)', () => {
   // A commercial gym has a sandbag, as it has a sled.
   assert(swapGroupsFor('KB Swing', GYM).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });
+
+Deno.test('⛔ "EACH" ON TWO-DUMBBELL ROWS ONLY (Michael, 2026-09-18)', async () => {
+  const { usesTwoDumbbellsOnKit } = await import('../strength-grid/grid.ts');
+  const HOME_DB = ['Dumbbells', 'Bench (flat/adjustable)'];
+  // The dumbbell skull crusher logs per dumbbell; at a gym it is the barbell one, one total.
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', HOME_DB), true);
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', GYM), false);
+  // Dumbbell-only movements read "each" on any kit.
+  assertEquals(usesTwoDumbbellsOnKit('DB Bench Press', GYM), true);
+  assertEquals(usesTwoDumbbellsOnKit('Seated DB Press', null), true);
+  // One dumbbell keeps the plain unit.
+  for (const n of ['DB Row', 'Kroc Row', 'DB Pullover', 'Goblet Squat', 'Behind The Neck DB Triceps Extension', 'Dumbbell Swing']) {
+    assertEquals(usesTwoDumbbellsOnKit(n, HOME_DB), false, n);
+  }
+  // A gym does the rear delt machine on the machine; at home it is two dumbbells.
+  assertEquals(usesTwoDumbbellsOnKit('Rear Delt Machine', GYM), false);
+  assertEquals(usesTwoDumbbellsOnKit('Rear Delt Machine', HOME_DB), true);
+  // The Romanian deadlift is the barbell at a gym, dumbbells at home.
+  assertEquals(usesTwoDumbbellsOnKit('Romanian Deadlift', GYM), false);
+  assertEquals(usesTwoDumbbellsOnKit('Romanian Deadlift', HOME_DB), true);
+});

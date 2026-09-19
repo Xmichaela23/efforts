@@ -19,7 +19,7 @@ import { useAppContext } from '@/contexts/AppContext';
 // fills the row's own level and pattern with (one heading). The phone prints them; the plyo drills below are the one
 // list still read here, off `@shared/standing-plan/plyo`.
 import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
-type AlternativeOption = { name: string; display?: string };
+type AlternativeOption = { name: string; display?: string; weight_per?: 'each' };
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
 import {
   getExerciseConfig,
@@ -296,6 +296,8 @@ interface LoggedExercise {
   how_to?: string;
   /** A row prescribed in words, not sets and reps (p226 carry, 2026-09-13). Printed as the row's target line. */
   prescription_words?: string;
+  /** 'each' when the server says the row uses two dumbbells, one per hand (2026-09-18): the weight column reads "Lb each". */
+  weight_per?: 'each';
   /** The slot's own pick list for the Swap sheet, stamped by the server on frame accessory rows. */
   swap_options?: { name: string; display: string }[];
   load_prescribed?: boolean;
@@ -2234,6 +2236,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ? s.execution_name.trim()
               : undefined,
             how_to: typeof s?.how_to === 'string' && s.how_to.trim() ? s.how_to.trim() : undefined,
+            weight_per: s?.weight_per === 'each' ? 'each' : undefined,
             prescription_words: typeof s?.prescription_words === 'string' && s.prescription_words.trim()
               ? s.prescription_words.trim() : undefined,
             swap_options: Array.isArray(s?.swap_options) && s.swap_options.length > 0 ? s.swap_options : undefined,
@@ -5229,7 +5232,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       // ⚠️ THE SWAP IS APPLIED IMMEDIATELY and the weight lands a beat later. The name
                       // change is the athlete's gesture and must not wait on a network call — D-289
                       // makes that rename the declaration that a swap happened, not a skip.
-                      const applySwap = (altName: string) => {
+                      const applySwap = (altName: string, weightPer?: 'each') => {
                         const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
                         const targetReps = exercise.sets.find((s) => typeof s.reps === 'number')?.reps;
                         const prevName = exercise.planned_name || exercise.name;
@@ -5260,6 +5263,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 // belong to the movement, so they are re-derived for the new one.
                                 execution_name: (() => { const d = executionName(altName, strengthEquipment); return d !== altName ? d : undefined; })(),
                                 how_to: executionHowTo(altName, strengthEquipment) ?? undefined,
+                                // "Each" comes with the option from `swap-list` (2026-09-18); a typed or plyo swap has none.
+                                weight_per: weightPer,
                                 // The prescription (target reps, target RIR, authored %) belongs to the
                                 // SLOT, not to the lift that was sitting in it, so it rides through the
                                 // swap untouched. The athlete's own entries do not: `rir` was their
@@ -5285,7 +5290,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           key={a.name}
                           variant="secondary"
                           size="sm"
-                          onClick={() => applySwap(a.name)}
+                          onClick={() => applySwap(a.name, a.weight_per)}
                           className="px-2.5 py-1.5 text-caption"
                         >{a.display ?? a.name}</GalaxyButton>
                       );
@@ -5393,9 +5398,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // "Lb" on every account. The band and assist boxes follow it (Stage 7 session 3, words approved).
                   const exUnit = unitOf(exercise);
                   const exUnitWord = exUnit === 'kg' ? 'Kg' : exUnit === 'lb' ? 'Lb' : '';
+                  // ⛔ "EACH" IS THE SERVER'S (Michael, 2026-09-18): `weight_per` on the row, set where the kit does the movement
+                  // with two dumbbells. It replaced a "/hand" the phone picked from the name, which a one-dumbbell row also got.
                   const exWeightLabel = exIsAssistCapable ? 'Assist / Added' /* 2026-09-03: band assist left, added weight right */
                     : exEquip === 'band' ? (exUnit === 'kg' ? 'Band kg' : 'Band lb')
-                    : exEquip === 'dumbbell' ? (exUnitWord ? `${exUnitWord}/hand` : '')
+                    : exercise.weight_per === 'each' ? (exUnitWord ? `${exUnitWord} each` : '')
                     : exUnitWord;
                   // The bar the chip and the plates read: the set's own if it is one of this unit's bars, else the unit's first.
                   const exBarKeys = barKeysForUnit(exUnit ?? 'lb');

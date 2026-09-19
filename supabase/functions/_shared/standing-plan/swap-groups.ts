@@ -15,12 +15,13 @@
  * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
  * movement it holds.
  */
-import { cellOptions, builderReaches, executionName } from '../strength-grid/grid.ts';
+import { cellOptions, builderReaches, executionName, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { movementLabel } from './accessory-picks.ts';
 
-export type SwapOption = { name: string; display: string };
+/** `weight_per: 'each'` when the kit does it with two dumbbells, so a swap carries the logger's "LB EACH" with it. */
+export type SwapOption = { name: string; display: string; weight_per?: 'each' };
 export type SwapGroup = { heading: string; page: string; options: SwapOption[] };
 
 /** The page's heading for each level. */
@@ -60,12 +61,12 @@ export function swapGroupsFor(
     if (k === now || seen.has(k) || shown.has(display.toLowerCase())) continue;
     seen.add(k);
     shown.add(display.toLowerCase());
-    options.push({ name: m.name, display });
+    options.push({ name: m.name, display, ...(usesTwoDumbbellsOnKit(m.name, equipment) ? { weight_per: 'each' as const } : {}) });
   }
   // The slot's own movement comes back after a swap, if the kit reaches it.
   if (rowNow && canonicalize(rowNow) !== canonicalize(slotName) && !seen.has(canonicalize(slotName))
     && builderReaches(slotName, equipment)) {
-    options.unshift({ name: slotName, display: label(slotName) });
+    options.unshift({ name: slotName, display: label(slotName), ...(usesTwoDumbbellsOnKit(slotName, equipment) ? { weight_per: 'each' as const } : {}) });
   }
   return options.length > 0
     ? [{ heading: HEADING[filed.category], page: CATEGORY_DEFINITION[filed.category].cite, options }]

@@ -34,8 +34,9 @@ import { localDateInTz } from './local-date.ts';
 // 7 (2026-09-18): tricep extension folded into skull crusher (Dumbbell Skull Crusher on a dumbbell kit, its own how-to);
 //   how-tos for DB Shoulder Press, Dumbbell Curl, Lunge, Reverse Flyes (bodyweight); p219's Deadlift and p220's forward
 //   Lunge offered again.
+// 8 (2026-09-18): a row done with two dumbbells carries `weight_per: 'each'` (the logger reads "LB EACH").
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 7;
+export const PLAN_WRITER_VERSION = 8;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
