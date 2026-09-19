@@ -84,6 +84,71 @@ export function intentRowLine(row: { slot_intent?: unknown; target_rir?: unknown
   return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;  // p218 ("0 to 2 RIR", the tempo words); p219 — RIR refers to "reps in reserve (before failure)."
 }
 
+/**
+ * ⛔ WHAT THE LOGGER PRINTS FOR A ROW'S RESERVE AND INTENT, STAMPED BY THE SERVER (2026-09-18). The phone called the
+ * four functions above on every render; the row now carries their answers and the phone prints them.
+ *   `reserve_text`  — `reserveTextFor` (the RIR cell's placeholder and the per-set "… in reserve" hint)
+ *   `reserve_lit`   — the RIR pills lit on the adjust strip: `reserveIntegersFor`, plus the 5+ pill when the row's
+ *                     own number is 5 or more (the phone's old `targetRir >= 5` test, moved here)
+ *   `reserve_seed`  — `reserveSeedFor` (the reserve saved on Done without a tap)
+ *   `intent_line`   — `intentRowLine`, on a standing-plan day only, with the logger's old fallback for a row
+ *                     materialized before `slot_intent` existed: ME / DE read out of the notes
+ * An absent field means the function answered null / [].
+ */
+export type LoggerRowStamps = {
+  reserve_text?: string;
+  reserve_lit?: number[];
+  reserve_seed?: number;
+  intent_line?: string;
+};
+
+export function loggerRowStamps(
+  row: { slot_intent?: unknown; target_rir?: unknown; target_reps?: unknown; notes?: unknown } | null | undefined,
+  standingDay: boolean,
+): LoggerRowStamps {
+  const out: LoggerRowStamps = {};
+  const text = reserveTextFor(row);
+  if (text) out.reserve_text = text;
+  const lit = reserveIntegersFor(row);
+  const r = Number(row?.target_rir);
+  if (row?.target_rir != null && Number.isFinite(r) && r >= 5 && !lit.includes(5)) lit.push(5);
+  if (lit.length) out.reserve_lit = lit;
+  const seed = reserveSeedFor(row);
+  if (seed != null) out.reserve_seed = seed;
+  if (standingDay) {
+    const notes = String(row?.notes ?? '');
+    const intent = typeof row?.slot_intent === 'string'
+      ? row.slot_intent
+      : (/\bME\b/.test(notes) ? 'ME' : /\bDE\b/.test(notes) ? 'DE' : null);
+    const line = intent && BOOK_WORDS.has(intent) ? intentRowLine({ ...row, slot_intent: intent }) : null;
+    if (line) out.intent_line = line;
+  }
+  return out;
+}
+
+/**
+ * A planned step's stamps, read the way the logger reads the step (`parseFromComputed`): `target_rir` only as a
+ * number, `slot_intent` only as a string, the target reps out of `reps` (a string with a digit, or a positive number).
+ */
+export function loggerStampsForStep(s: Record<string, unknown> | null | undefined, standingDay: boolean): LoggerRowStamps {
+  const repsRaw = s?.reps;
+  const targetReps = typeof repsRaw === 'string' && /\d/.test(repsRaw)
+    ? repsRaw.trim()
+    : (typeof repsRaw === 'number' && repsRaw > 0 ? String(repsRaw) : undefined);
+  const notes = String(s?.notes || '').trim();
+  return loggerRowStamps({
+    slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
+    target_rir: typeof s?.target_rir === 'number' ? s.target_rir : undefined,
+    target_reps: targetReps,
+    notes: notes || undefined,
+  }, standingDay);
+}
+
+/** True when a session's tags mark it a standing-plan day (the logger's gate for the intent line). */
+export function isStandingDay(tags: unknown): boolean {
+  return Array.isArray(tags) && tags.some((t) => String(t) === 'standing_plan');
+}
+
 /** `Superset · A with B` — the one label for a printed pair (p274 prints the word "superset"). */
 export function supersetLabel(a: string, b: string): string {
   return `Superset · ${a} with ${b}`;

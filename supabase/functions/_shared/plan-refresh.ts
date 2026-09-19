@@ -47,8 +47,10 @@ import { localDateInTz } from './local-date.ts';
 //   10 kg or more under the work weight.
 // 13 (2026-09-18): round 5 — every ride and run step has a top except sprints: sweet spot tops at FTP, the anaerobic
 //   floor shows (and sends) up to 130% of FTP, the "never over FTP" extension to other rides is gone.
+// 14 (2026-09-18): strength rows carry the logger's reserve words and numbers and its intent line (`reserve_text`,
+//   `reserve_lit`, `reserve_seed`, `intent_line`), so the phone prints them and works nothing out.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 13;
+export const PLAN_WRITER_VERSION = 14;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

@@ -8,9 +8,14 @@
  * POST { planned_workout_id } — a planned `1rm_test` session (test week, retest).
  * POST { test_type: 'lower' | 'upper' | 'full' } — the Baselines launcher, which has no planned row.
  * → { success, exercises: TestSessionRow[] }
+ * POST { anchor_weight, round_to } — the weight the athlete logged on an anchor set (set 1 of a test with no max
+ * on file) and the row's `anchor_round_to`. → { success, steps } — `pretestStepWeights`: the rounded A, then
+ * 1.10A and 1.15A rounded (a step equal to a later one is null). The logger fills sets 2 and 3 from `steps[1]`
+ * and `steps[2]` and works nothing out itself (2026-09-18).
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { launcherTestSession, plannedTestSession } from '../_shared/strength/test-session.ts';
+import { pretestStepWeights } from '../_shared/standing-plan/working-number.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +31,12 @@ Deno.serve(async (req) => {
   try {
     const { userId, supabase } = await requireUser(req);
     const body = await req.json().catch(() => ({}));
+
+    if (body?.anchor_weight != null) {
+      const a = Number(body.anchor_weight);
+      const roundTo = Number(body?.round_to);
+      return json({ success: true, steps: roundTo > 0 ? pretestStepWeights(a, roundTo) : null });
+    }
 
     const { data: baselines } = await supabase
       .from('user_baselines').select('performance_numbers, units').eq('user_id', userId).maybeSingle();

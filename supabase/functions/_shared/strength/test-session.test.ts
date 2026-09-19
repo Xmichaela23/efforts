@@ -86,6 +86,8 @@ Deno.test('⛔ A NON-PLAN RETEST TAKES THE SAME PRETEST OFF THE TYPED MAX, AND A
   assertEquals(rows[1], {
     name: 'Hanging Leg Raise', planned_name: 'Hanging Leg Raise', target_reps: '8-10', target_rir: 2, notes: 'Slow.',
     unit: 'lb',
+    // The logger's reserve words and numbers, stamped (2026-09-18, `loggerRowStamps`).
+    reserve_text: '2', reserve_lit: [2], reserve_seed: 2,
     sets: [{ weight: 0, set_type: 'working' }, { weight: 0, set_type: 'working' }, { weight: 0, set_type: 'working' }],
   });
   assertEquals(isTestedLift({ name: 'Hanging Leg Raise', sets: 3, reps: '8-10' }), false);
@@ -115,7 +117,11 @@ Deno.test('⛔ THE PHONE NO LONGER BUILDS A TEST, AND NO DELETED NUMBER OR CUE S
   assertEquals(/createBaselineTestExercise|createStandingTestExercise|baselineSeedFor|\* 0\.88|addWarmupSet/.test(logger), false,
     'a test builder or the 88% seed is back on the phone');
   assert(/'strength-test-session'/.test(logger), 'the logger stopped asking the server for a test session');
-  assert(/pretestStepWeights\(/.test(logger), 'the anchor fill stopped using the server\'s step function');
+  // 2026-09-18: the anchor fill asks the server for the steps; the phone no longer runs `pretestStepWeights`.
+  assert(/anchor_weight:/.test(logger), 'the anchor fill stopped asking the server for its steps');
+  assertEquals(/pretestStepWeights\(/.test(logger), false, 'the step arithmetic is back on the phone');
+  const fn = await Deno.readTextFile(new URL('../../strength-test-session/index.ts', import.meta.url));
+  assert(/pretestStepWeights\(/.test(fn), 'strength-test-session stopped answering with the server\'s step function');
   const server = await Deno.readTextFile(new URL('./test-session.ts', import.meta.url));
   for (const gone of ['RPE 9', 'aim ~3', 'Add 25', '0.88', '0.57', '0.80', 'barStart']) {
     assert(!server.includes(gone), `${gone} was moved instead of deleted`);

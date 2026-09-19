@@ -24,6 +24,7 @@ import { strengthTestKey } from '../strength-test-key.ts';
 import { pretestSession, type TestedLift } from '../standing-plan/working-number.ts';
 import { DEFAULT_BAR_LB } from '../standing-plan/warmup.ts';
 import { liftInAthletesUnit } from './session-volume.ts';
+import { isStandingDay, loggerRowStamps, type LoggerRowStamps } from './strength-display-lines.ts';
 import { BAR_TYPES } from '../../../../src/lib/bar-types.ts';
 
 export type TestSessionSet = {
@@ -56,7 +57,7 @@ export type TestSessionRow = {
   /** The athlete's unit: every `weight_in_unit` and `anchor_round_to` on the row is in it. */
   unit?: 'kg' | 'lb';
   sets: TestSessionSet[];
-};
+} & LoggerRowStamps;
 
 export type LauncherTestType = 'lower' | 'upper' | 'full';
 
@@ -85,9 +86,11 @@ export const TEST_ROUND_TO_KG = 2.5;
  * gains `weight_in_unit`, the row carries `unit`, and an anchor row's increment is the unit's. The logger
  * opens its boxes on these and converts nothing.
  */
-function inAthletesUnit(rows: TestSessionRow[], metric: boolean): TestSessionRow[] {
+function inAthletesUnit(rows: TestSessionRow[], metric: boolean, standingDay = false): TestSessionRow[] {
   return rows.map((r) => ({
     ...r,
+    // The logger's reserve words and numbers and its intent line, printed as sent (`loggerRowStamps`).
+    ...loggerRowStamps(r, standingDay),
     unit: metric ? 'kg' : 'lb',
     ...(r.anchor_round_to != null ? { anchor_round_to: metric ? TEST_ROUND_TO_KG : r.anchor_round_to } : {}),
     sets: r.sets.map((st) => (st.weight > 0 ? { ...st, weight_in_unit: liftInAthletesUnit(st.weight, metric) } : st)),
@@ -305,7 +308,7 @@ export function plannedTestSession(
       ? planSteps
       : (planSteps && planSteps.some((p) => p.amrap) ? planSteps : (lift ? stepsFromPretest(lift, onFile, roundTo) : null));
     return barbellTestRow(standing ? rowName : liftName, steps, onFile, standing ? String(ex?.notes || '').trim() : '', roundTo, metric);
-  }), metric);
+  }), metric, isStandingDay(tags));
 }
 
 /**

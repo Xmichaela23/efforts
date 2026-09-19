@@ -15,14 +15,50 @@
  * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
  * movement it holds.
  */
-import { cellOptions, builderReaches, executionName, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
+import { cellOptions, builderReaches, executionHowTo, executionName, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
+import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from './plyo.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { movementLabel } from './accessory-picks.ts';
 
-/** `weight_per: 'each'` when the kit does it with two dumbbells, so a swap carries the logger's "LB EACH" with it. */
-export type SwapOption = { name: string; display: string; weight_per?: 'each' };
-export type SwapGroup = { heading: string; page: string; options: SwapOption[] };
+/**
+ * `weight_per: 'each'` when the kit does it with two dumbbells, so a swap carries the logger's "LB EACH" with it.
+ * `execution_name` / `how_to` (2026-09-18): what the row shows once the athlete picks this option — the name the kit
+ * does it under (absent when that is the option's own name) and its how-to — so the phone looks nothing up.
+ */
+export type SwapOption = { name: string; display: string; weight_per?: 'each'; execution_name?: string; how_to?: string };
+/** `heading` is null on a plyo drill's list, which prints no heading. */
+export type SwapGroup = { heading: string | null; page: string; options: SwapOption[] };
+
+/** The row's name and how-to for an option on this kit (`executionName`, `executionHowTo`). */
+function kitWords(name: string, equipment: string[] | null | undefined): Pick<SwapOption, 'execution_name' | 'how_to'> {
+  const exec = executionName(name, equipment);
+  const how = executionHowTo(name, equipment);
+  return { ...(exec !== name ? { execution_name: exec } : {}), ...(how != null ? { how_to: how } : {}) };
+}
+
+// ⛔ THE PLYO ROW'S LIST, MOVED FROM THE LOGGER (2026-09-18) word for word: the other drills in the drill's own family
+// (p227), and ladder drills only with an agility ladder in the kit.
+const PLYO_LADDER_DRILLS = new Set(['ladder drills']);
+export function plyoFamilyFor(name: string): PlyoFamily | null {
+  const n = String(name || '').trim().toLowerCase();
+  for (const id of PLYO_FAMILY_IDS) {
+    const fam = PLYO_FAMILIES[id];
+    if (fam.drills.some((d) => d.toLowerCase() === n)) return fam;
+  }
+  return null;
+}
+export function plyoSwapGroups(name: string, equipment: string[] | null | undefined): SwapGroup[] {
+  const fam = plyoFamilyFor(name);
+  if (!fam) return [];
+  const hasLadder = (equipment || []).some((e) => /agility ladder/i.test(String(e)));
+  const n = String(name || '').trim().toLowerCase();
+  const options = fam.drills
+    .filter((d) => d.toLowerCase() !== n)
+    .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
+    .map((d) => ({ name: d, display: d, ...kitWords(d, equipment ?? []) }));
+  return options.length > 0 ? [{ heading: null, page: 'p227', options }] : [];
+}
 
 /** The page's heading for each level. */
 const HEADING: Record<ViadaCategory, string> = {
@@ -61,12 +97,12 @@ export function swapGroupsFor(
     if (k === now || seen.has(k) || shown.has(display.toLowerCase())) continue;
     seen.add(k);
     shown.add(display.toLowerCase());
-    options.push({ name: m.name, display, ...(usesTwoDumbbellsOnKit(m.name, equipment) ? { weight_per: 'each' as const } : {}) });
+    options.push({ name: m.name, display, ...(usesTwoDumbbellsOnKit(m.name, equipment) ? { weight_per: 'each' as const } : {}), ...kitWords(m.name, equipment) });
   }
   // The slot's own movement comes back after a swap, if the kit reaches it.
   if (rowNow && canonicalize(rowNow) !== canonicalize(slotName) && !seen.has(canonicalize(slotName))
     && builderReaches(slotName, equipment)) {
-    options.unshift({ name: slotName, display: label(slotName), ...(usesTwoDumbbellsOnKit(slotName, equipment) ? { weight_per: 'each' as const } : {}) });
+    options.unshift({ name: slotName, display: label(slotName), ...(usesTwoDumbbellsOnKit(slotName, equipment) ? { weight_per: 'each' as const } : {}), ...kitWords(slotName, equipment) });
   }
   return options.length > 0
     ? [{ heading: HEADING[filed.category], page: CATEGORY_DEFINITION[filed.category].cite, options }]

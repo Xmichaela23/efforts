@@ -24,7 +24,7 @@ import {
   plannedSwimDistance,
   type SwimDistanceTally,
 } from '../_shared/swim/swim-plan-summary.ts';
-import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts'
+import { formatStrengthExercise, formatStrengthExerciseLines, isStandingDay, loggerStampsForStep, type WeightUnit } from '../_shared/strength/strength-display-lines.ts'
 import { plannedTestRowLines } from '../_shared/strength/test-session.ts';
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { plannedStepLines } from '../_shared/planned-step-lines.ts';
@@ -4712,9 +4712,13 @@ Deno.serve(async (req) => {
             const testDay = isTestSession({ name: (row as any)?.name, tags: (row as any)?.tags } as never);
             const testLines = (i: number): string[] | null =>
               testDay && authored?.[i] ? plannedTestRowLines(authored[i], (row as any)?.tags, weightUnit === 'kg') : null;
+            // The logger's reserve words and numbers and its intent line (`loggerStampsForStep`), so the phone prints them.
+            const standingDay = isStandingDay((row as any)?.tags);
             strengthRows.forEach((s: any, i: number) => {
               const own = testLines(i);
               s.display_line = own ? own.join(' · ') : formatStrengthExercise(s, weightUnit);
+              delete s.reserve_text; delete s.reserve_lit; delete s.reserve_seed; delete s.intent_line;
+              Object.assign(s, loggerStampsForStep(s, standingDay));
             });
             if (strengthRows.length) update.computed.strength_lines = formatStrengthExerciseLines(strengthRows, weightUnit, (_s, i) => testLines(i));
             if (authored && authored.length && strengthRows.length >= authored.length

@@ -5,10 +5,12 @@
  * `name` is the slot's own movement; `now` is what the row holds after a swap, when it differs.
  * Each list is the slot's own level and pattern as the builder fills it (one heading), the ones the athlete's
  * kit reaches (`_shared/standing-plan/swap-groups.ts`). The phone prints it and decides nothing.
+ * A row holding a plyo drill gets the other drills in its family, under no heading (`plyoSwapGroups`, p227; moved
+ * from the logger 2026-09-18). Every option carries the row's name and how-to on this kit (`execution_name`, `how_to`).
  * The athlete's kit is read here (`user_baselines.equipment.strength`), never sent by the phone.
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
-import { swapGroupsFor } from '../_shared/standing-plan/swap-groups.ts';
+import { plyoFamilyFor, plyoSwapGroups, swapGroupsFor } from '../_shared/standing-plan/swap-groups.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +32,8 @@ Deno.serve(async (req) => {
     const lists = rows.map((r) => {
       const name = typeof r?.name === 'string' ? r.name : '';
       const now = typeof r?.now === 'string' && r.now ? r.now : null;
+      const current = now ?? name;
+      if (current && plyoFamilyFor(current)) return plyoSwapGroups(current, equipment);
       return name ? swapGroupsFor(name, equipment, now) : [];
     });
     return json({ lists });
