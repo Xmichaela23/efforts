@@ -24,11 +24,13 @@ import { STANDING_PLAN_PROTOCOL_ID } from './standing-plan/protocol-id.ts';
 import { fetchAthleteTimezone, resolveAthleteTimezone } from './athlete-timezone.ts';
 import { localDateInTz } from './local-date.ts';
 
-// OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
 // 2 (2026-09-18): one name per movement (83 spellings merged), every movement filed by its page, the pull-up leads the primary pull cell.
 // 3 (2026-09-18): decline bench to Secondary push, bodyweight dips off Braced push, sandbag throw only with a sandbag,
 //   the kit's own name for the stiff-legged deadlift.
-export const PLAN_WRITER_VERSION = 3;
+// 4 (2026-09-18): a commercial gym has a sandbag; one name per movement on a kit (a dumbbell kit's Romanian deadlift reads
+//   DB Romanian Deadlift; the rear delt fly and the home rear delt machine are one option).
+// OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
+export const PLAN_WRITER_VERSION = 4;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

@@ -259,6 +259,8 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       // The app already treats a commercial gym as having a sled (`substituteExerciseForEquipment` keeps
       // sled push and sled pull there); the key says the same thing here.
       out.add('sled');
+      // A commercial gym has a sandbag, as it has a sled (Michael, 2026-09-18).
+      out.add('sandbag');
     }
     // ⛔ THE TWO CHIPS ADDED 2026-08-26 — see the GearKey note. Matched by SUBSTRING, like every
     // clause above, so "TRX / suspension trainer" and "Stability ball" both land.

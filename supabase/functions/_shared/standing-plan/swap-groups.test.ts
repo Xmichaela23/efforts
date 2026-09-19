@@ -63,3 +63,13 @@ Deno.test('⛔ THE KIT\'S OWN NAME: no machine name without the machine; the dum
   assert(hinge.includes('Dumbbell Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
   assert(swapGroupsFor('Romanian Deadlift', [...HOME, 'Sandbag']).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });
+
+Deno.test('⛔ ONE NAME PER MOVEMENT ON A KIT (Michael, 2026-09-18)', () => {
+  const HOME_DB = ['Dumbbells', 'Bench (flat/adjustable)'];
+  const hinge = swapGroupsFor('Single Leg RDL', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
+  assertEquals(hinge.filter((d) => /romanian deadlift/i.test(d)), ['DB Romanian Deadlift']);
+  const pull = swapGroupsFor('Drag Curl', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
+  assertEquals(pull.filter((d) => /rear delt/i.test(d)), ['Bent-Over Dumbbell Rear Delt Fly']);
+  // A commercial gym has a sandbag, as it has a sled.
+  assert(swapGroupsFor('KB Swing', GYM).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
+});

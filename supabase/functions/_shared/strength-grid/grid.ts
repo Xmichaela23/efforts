@@ -26,6 +26,7 @@ import {
   allGridMovements,
   canPerform,
   CATEGORY_DEFINITION,
+  filingOf,
   STAND_INS,
   HIP_THRUST_STAND_IN,
   isAsymmetrical,
@@ -232,7 +233,22 @@ function poolFor(
   let pool = movementsIn(category, pattern).filter(OFFERABLE);
   if (asymmetrical) pool = pool.filter((m) => m.asymmetrical);
   if (gated) pool = pool.filter((m) => reachable(m.name, equipment));
-  const ranked = rank(pool, equipment);
+  // ⛔ ONE NAME, ONE MOVEMENT, ON THIS KIT (2026-09-18): two entries the kit does the same way (the name it will do,
+  // `executionName`) are one option, in its own place in the builder's order. The one the page prints is kept (p222's
+  // rear delt machine over the rear delt fly, p220's Romanian deadlift over its dumbbell version), so a pick naming it holds.
+  const ranked: GridMovement[] = [];
+  const at = new Map<string, number>();
+  for (const m of rank(pool, equipment)) {
+    const k = executionName(m.name, equipment).toLowerCase();
+    const i = at.get(k);
+    if (i == null) { at.set(k, ranked.length); ranked.push(m); continue; }
+    if (filingOf(ranked[i].name)?.basis !== 'printed' && filingOf(m.name)?.basis === 'printed') {
+      ranked.splice(i, 1);
+      for (const [key, idx] of at) if (idx > i) at.set(key, idx - 1);
+      at.set(k, ranked.length);
+      ranked.push(m);
+    }
+  }
   // ⛔ THE PULL-UP LEADS THE PRIMARY PULL CELL (Michael, 2026-09-18) — p218 prints it first, and with the barbell
   // row filed beside it (p218) a week built the row twice and no vertical pull. Every other cell keeps its order.
   if (category === 'primary' && pattern === 'pull_upper') {
@@ -619,6 +635,16 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
    * has a home route now, and the name says what the athlete will lie across.
    */
   'pullover machine': 'Flat-Bench Dumbbell Pullover',
+  // ⛔ ONE NAME FOR ONE MOVEMENT AT HOME (Michael, 2026-09-18): on a dumbbell kit the Romanian deadlift IS the DB Romanian
+  // deadlift, and a rear delt fly IS the bent-over dumbbell rear delt fly the rear delt machine becomes. Same words, one
+  // option (the swap list shows a name once; the builder places a name once).
+  'romanian deadlift': [
+    { route: ['barbell'], value: 'Romanian Deadlift' },
+    { route: ['dumbbells'], value: 'DB Romanian Deadlift' },
+  ],
+  'rear delt fly': [
+    { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
+  ],
   // ⛔ ON A DUMBBELL KIT, THE DUMBBELL VERSION BY THAT NAME (Michael, 2026-09-18); with a barbell, his name.
   'stiff legged deadlift': [
     { route: ['barbell'], value: 'Stiff-Legged Deadlift' },
