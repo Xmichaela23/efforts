@@ -2,7 +2,7 @@
 //
 //   ~/.deno/bin/deno test --no-check --sloppy-imports src/lib/plate-plan.test.ts
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { platePlanForSets, platesPerSideText } from './plate-plan.ts';
+import { platePlanForSets, platesPerSideText, type PlatePlanSet } from './plate-plan.ts';
 
 const LB = [
   { weight: 45, count: 4 }, { weight: 35, count: 2 }, { weight: 25, count: 2 },
@@ -67,4 +67,27 @@ Deno.test('a weight the rack cannot make shows the closest load under it', () =>
   const plan = platePlanForSets([bar(137)], LB);
   assertEquals(plan[0]!.possible, false);
   assertEquals(plan[0]!.plates, [45]);
+});
+
+Deno.test('35 per side on, 45 per side next: the 35 stays and a 10 goes outside it', () => {
+  assertEquals(text(platePlanForSets([115, 135].map(bar), LB)), ['35 per side', '35 + 10 per side']);
+});
+
+Deno.test('a fresh load never repeats a plate where one bigger plate would do', () => {
+  assertEquals(text(platePlanForSets([bar(55)], LB)), ['5 per side']);
+  assertEquals(text(platePlanForSets([kg(25)], KG)), ['2.5 per side']);
+  // Every weight from an empty bar: no run of the same plate adds up to one plate the rack has.
+  const check = (weights: number[], set: (w: number) => PlatePlanSet, rack: typeof LB) => {
+    for (const w of weights) {
+      const p = platePlanForSets([set(w)], rack)[0]!.plates;
+      for (let i = 0; i < p.length;) {
+        let n = 1;
+        while (p[i + n] === p[i]) n++;
+        if (n > 1) assertEquals(rack.some((r) => r.weight === n * p[i]), false, `${w}: ${p.join(' ')}`);
+        i += n;
+      }
+    }
+  };
+  check(Array.from({ length: 183 }, (_, i) => 45 + i * 2.5), bar, LB);
+  check(Array.from({ length: 200 }, (_, i) => 20 + i * 1.25), kg, KG);
 });
