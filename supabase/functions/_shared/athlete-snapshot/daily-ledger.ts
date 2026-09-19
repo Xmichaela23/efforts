@@ -6,6 +6,7 @@
 // =============================================================================
 
 import { completedMovingSeconds } from '../moving-seconds.ts';
+import { rirOffTarget, rirTargetFor, rirTargetText } from '../strength-grid/intents.ts';
 import type {
   LedgerDay,
   PlannedSession,
@@ -119,6 +120,8 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
         reps,
         target_weight: weight,
         target_rir: rir,
+        // p218's band on a p218 row, the number otherwise (the one rule, `strength-grid/intents.ts`).
+        target_rir_text: rirTargetText(rirTargetFor(ex)),
         notes: ex.notes ? String(ex.notes) : null,
       };
     });
@@ -157,7 +160,7 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
       const parts = [ex.exercise];
       if (ex.sets > 0 && ex.reps) parts.push(`${ex.sets}x${ex.reps}`);
       if (ex.target_weight) parts.push(`@ ${ex.target_weight}${unitLabel}`);
-      if (ex.target_rir != null) parts.push(`RIR ${ex.target_rir}`);
+      if (ex.target_rir_text) parts.push(`RIR ${ex.target_rir_text}`);
       prescriptionParts.push(parts.join(' '));
     }
   } else if (isStrength && row?.description) {
@@ -240,7 +243,12 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
           targetRir = ex.rir;
         }
 
-        const rirDelta = (avgRir != null && targetRir != null) ? Math.round((avgRir - targetRir) * 10) / 10 : null;
+        // ⛔ PASS 7 (book-language fix): a row with a p218 intent is judged against p218's band — 0 inside it —
+        // read off the logged exercise's `slot_intent` (the logger saves it). ME has no target. Any other row keeps
+        // its own number, as before.
+        const target = rirTargetFor({ slot_intent: ex?.slot_intent }) ?? rirTargetFor({ target_rir: targetRir });
+        const isMe = String(ex?.slot_intent ?? '').toUpperCase() === 'ME';
+        const rirDelta = (avgRir != null && target != null && !isMe) ? Math.round(rirOffTarget(avgRir, target) * 10) / 10 : null;
 
         return {
           name: String(ex?.name || ex?.exercise || ''),
@@ -248,7 +256,9 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
           best_weight: weights.length ? Math.max(...weights) : 0,
           best_reps: reps.length ? Math.max(...reps) : 0,
           avg_rir: avgRir,
-          target_rir: targetRir,
+          target_rir: isMe ? null : targetRir,
+          target_rir_band: target?.band ? { lo: target.lo, hi: target.hi } : null,
+          target_rir_text: isMe ? null : rirTargetText(target),
           rir_delta: rirDelta,
           unit: imperial ? 'lbs' as const : 'kg' as const,
         };

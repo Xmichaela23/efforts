@@ -164,34 +164,41 @@ function observeStrengthSession(
   const easy = isEasyPhase(phase);
 
   // Plan-relative RIR observations (preferred when target_rir is available)
-  const withTarget = exercises.filter(e => e.avg_rir != null && e.target_rir != null);
+  const withTarget = exercises.filter(e => e.avg_rir != null && (e.target_rir != null || e.target_rir_band != null));
 
   if (withTarget.length > 0) {
     const avgActual = withTarget.reduce((s, e) => s + e.avg_rir!, 0) / withTarget.length;
-    const avgTarget = withTarget.reduce((s, e) => s + e.target_rir!, 0) / withTarget.length;
-    const delta = avgActual - avgTarget;
+    const withNumber = withTarget.filter((e) => e.target_rir != null);
+    const avgTarget = withNumber.length ? withNumber.reduce((s, e) => s + e.target_rir!, 0) / withNumber.length : 0;
+    // ⛔ PASS 7 (book-language fix): the delta is the mean of each lift's `rir_delta`, which the ledger computes
+    // against p218's band on a p218 row (0 inside it) and against the row's number otherwise. For rows with
+    // no band this equals the old `avgActual - avgTarget`.
+    const delta = withTarget.reduce((s, e) => s + (e.rir_delta ?? (e.avg_rir! - e.target_rir!)), 0) / withTarget.length;
+    // The target as printed: the band(s) when any row has one ("0 to 2"), else the rounded number, as before.
+    const bandTexts = [...new Set(withTarget.filter((e) => e.target_rir_band).map((e) => e.target_rir_text).filter(Boolean))];
+    const targetWord = bandTexts.length > 0 ? bandTexts.join(' and ') : String(Math.round(avgTarget));
 
     // OURS — `observeStrengthSession` RIR bands: ±0.5 on target (±1.0 easy), ±1.0 off, per-lift 1.5 (2.0 easy), average < 1.5 / > 3.5, −1 vs norm: no source, kept as found
     if (Math.abs(delta) <= (easy ? 1.0 : 0.5)) {
       if (easy) {
-        obs.push(`Recovery compliance — averaged ${avgActual.toFixed(1)} RIR against target ${Math.round(avgTarget)}.`);
+        obs.push(`Recovery compliance — averaged ${avgActual.toFixed(1)} RIR against target ${targetWord}.`);
       } else {
-        obs.push(`Hit prescribed intensity — averaged ${avgActual.toFixed(1)} RIR against target ${Math.round(avgTarget)}.`);
+        obs.push(`Hit prescribed intensity — averaged ${avgActual.toFixed(1)} RIR against target ${targetWord}.`);
       }
     } else if (delta > 1.0) {
       if (easy) {
-        obs.push(`Even more conservative than prescribed — ${avgActual.toFixed(1)} RIR vs target ${Math.round(avgTarget)}. Fine for ${phase} week.`);
+        obs.push(`Even more conservative than prescribed — ${avgActual.toFixed(1)} RIR vs target ${targetWord}. Fine for ${phase} week.`);
       } else {
-        obs.push(`Left more in the tank than prescribed — ${avgActual.toFixed(1)} RIR vs target ${Math.round(avgTarget)}. Held back or not ready for this load?`);
+        obs.push(`Left more in the tank than prescribed — ${avgActual.toFixed(1)} RIR vs target ${targetWord}. Held back or not ready for this load?`);
       }
     } else if (delta < -1.0) {
       if (easy) {
-        obs.push(`Pushed harder than prescribed in a ${phase} week — ${avgActual.toFixed(1)} RIR vs target ${Math.round(avgTarget)}. Recovery won't work if you don't back off.`);
+        obs.push(`Pushed harder than prescribed in a ${phase} week — ${avgActual.toFixed(1)} RIR vs target ${targetWord}. Recovery won't work if you don't back off.`);
       } else {
-        obs.push(`Pushed harder than prescribed — ${avgActual.toFixed(1)} RIR vs target ${Math.round(avgTarget)}. Intentional or ego lift?`);
+        obs.push(`Pushed harder than prescribed — ${avgActual.toFixed(1)} RIR vs target ${targetWord}. Intentional or ego lift?`);
       }
     } else {
-      obs.push(`Close to prescribed intensity — ${avgActual.toFixed(1)} RIR vs target ${Math.round(avgTarget)}.`);
+      obs.push(`Close to prescribed intensity — ${avgActual.toFixed(1)} RIR vs target ${targetWord}.`);
     }
 
     // Per-exercise callouts for notable deviations
@@ -199,7 +206,7 @@ function observeStrengthSession(
     for (const ex of withTarget) {
       if (Math.abs(ex.rir_delta!) > deviationThreshold) {
         const dir = ex.rir_delta! > 0 ? 'easier' : 'harder';
-        obs.push(`${ex.name}: ${dir} than prescribed (${ex.avg_rir!.toFixed(1)} RIR vs target ${ex.target_rir}).`);
+        obs.push(`${ex.name}: ${dir} than prescribed (${ex.avg_rir!.toFixed(1)} RIR vs target ${ex.target_rir_text ?? ex.target_rir}).`);
       }
     }
   } else {
@@ -244,8 +251,8 @@ function observeStrengthSession(
   if (topLifts.length > 0) {
     const liftStrs = topLifts.map(e => {
       let s = `${e.name} ${e.best_weight}${e.unit} × ${e.best_reps}`;
-      if (e.avg_rir != null && e.target_rir != null) {
-        s += ` (${e.avg_rir.toFixed(1)} vs ${e.target_rir} RIR)`;
+      if (e.avg_rir != null && (e.target_rir_text ?? e.target_rir) != null) {
+        s += ` (${e.avg_rir.toFixed(1)} vs ${e.target_rir_text ?? e.target_rir} RIR)`;
       }
       return s;
     });

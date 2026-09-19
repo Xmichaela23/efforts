@@ -313,6 +313,47 @@ export function rirBandText(intent: string | null | undefined): string | null {
 }
 
 /**
+ * ⛔⛔ THE ONE RULE FOR JUDGING A LOGGED RESERVE AGAINST THE PLAN (book-language fix, passes 6–7, 2026-09-18).
+ *
+ * A planned row with a p218 intent is judged against p218's band — DE / SKILL 3 to 4, HYP 0 to 2 — read off the
+ * row's `slot_intent`, never off the stamped `target_rir` (the composer stamps the band's midpoint, HYP 1, which
+ * is ours). ME carries "no RIR target" (p218): no target at all. A row with no intent keeps its own number
+ * (`band: false`); every reader keeps its own old rule for those.
+ * ⚠️ WHY THE INTENT: materialize-plan copies planned rows through a whitelist that keeps `slot_intent`.
+ * Readers: `longitudinal-signals.ts`, `athlete-snapshot/daily-ledger.ts` + `body-response.ts`,
+ * `response-model/weekly.ts` (via coach), `analyze-strength-workout`, `session-detail/strength-slots.ts`.
+ */
+export type RirTarget = { lo: number; hi: number; band: boolean };
+
+export function rirTargetFor(
+  row: { slot_intent?: unknown; target_rir?: unknown; rir?: unknown } | null | undefined,
+  fallback?: number | null,
+): RirTarget | null {
+  const intent = String(row?.slot_intent ?? '').toUpperCase();
+  if (intent === 'ME') return null; // p218: "no RIR target"
+  const b = rirBandFor(intent);
+  if (b) return { lo: b.lo, hi: b.hi, band: true };
+  const n = typeof row?.target_rir === 'number' ? row.target_rir
+    : typeof row?.target_rir === 'string' && row.target_rir.trim() && Number.isFinite(Number(row.target_rir)) ? Number(row.target_rir)
+    : typeof row?.rir === 'number' ? row.rir
+    : fallback ?? null;
+  return n == null || !Number.isFinite(n) ? null : { lo: n, hi: n, band: false };
+}
+
+/** How far a logged reserve sits off the target: 0 inside a band, negative under it, positive over it. */
+export function rirOffTarget(logged: number, t: RirTarget): number {
+  if (logged < t.lo) return logged - t.lo;
+  if (logged > t.hi) return logged - t.hi;
+  return 0;
+}
+
+/** The target as printed: `0 to 2` for a band, the number otherwise. */
+export function rirTargetText(t: RirTarget | null | undefined): string | null {
+  if (!t) return null;
+  return t.lo === t.hi ? String(t.lo) : `${t.lo} to ${t.hi}`;
+}
+
+/**
  * The card's line: p218's row as printed, then p219's sentence for the intent.
  *   HYP "6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not
  *        the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted."

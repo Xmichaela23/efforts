@@ -655,6 +655,8 @@ export type SessionDetailV1 = {
     volume_direction: 'up' | 'down' | 'even' | null;
     avg_rir: number | null;
     target_rir: number | null;
+    /** "0 to 2" on a p218 row (its band), else the number as text. Book-language fix, pass 7. */
+    target_rir_text?: string | null;
     rir_verdict: 'too_easy' | 'on_target' | 'too_hard' | null;
     rir_concern: boolean;
     /** The advice line for the verdict, else null. */

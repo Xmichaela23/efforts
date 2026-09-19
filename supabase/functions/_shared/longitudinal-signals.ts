@@ -1,4 +1,4 @@
-import { rirBandFor } from './strength-grid/intents.ts';
+import { rirTargetFor, type RirTarget } from './strength-grid/intents.ts';
 /**
  * Longitudinal signals — multi-week pattern detection for the weekly coach.
  *
@@ -513,12 +513,6 @@ function parseStrengthExercisesArray(raw: unknown): any[] {
   return v;
 }
 
-function prescribedRirFromExercise(ex: any): number | null {
-  if (typeof ex?.target_rir === 'number' && !Number.isNaN(ex.target_rir)) return ex.target_rir;
-  if (typeof ex?.rir === 'number' && !Number.isNaN(ex.rir)) return ex.rir;
-  return null;
-}
-
 function normLiftKey(s: string): string {
   return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
 }
@@ -534,23 +528,15 @@ function normLiftKey(s: string): string {
  * `slot_intent` and would drop a new band field; this judge reads `planned_workouts.strength_exercises`.
  * `band: false` marks a row with no intent (not a p218 row): it keeps its own number and the ours tolerances.
  */
-type PrescribedRir = { lo: number; hi: number; band: boolean };
-
-function prescribedRirBandFromExercise(ex: any): PrescribedRir | null {
-  const b = rirBandFor(ex?.slot_intent);
-  if (b) return { lo: b.lo, hi: b.hi, band: true };
-  const r = prescribedRirFromExercise(ex);
-  return r == null ? null : { lo: r, hi: r, band: false };
-}
+type PrescribedRir = RirTarget;
 
 function buildPrescribedRirByName(strengthExercises: any): Map<string, PrescribedRir> {
   const m = new Map<string, PrescribedRir>();
   for (const ex of parseStrengthExercisesArray(strengthExercises)) {
     const name = normLiftKey(String(ex?.name || ''));
     if (!name) continue;
-    // ME carries no reserve target (p218) — `rirBandFor('ME')` is null and ME rows stamp none, so no entry.
-    if (String(ex?.slot_intent ?? '').toUpperCase() === 'ME') continue;
-    const r = prescribedRirBandFromExercise(ex);
+    // The one rule (`strength-grid/intents.ts` rirTargetFor): p218's band by intent, none on ME, else the number.
+    const r = rirTargetFor(ex);
     if (r != null) m.set(name, r);
   }
   return m;

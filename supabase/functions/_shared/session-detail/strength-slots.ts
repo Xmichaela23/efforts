@@ -27,6 +27,7 @@
  */
 import { matchExercises, normalizeExerciseName, type ExerciseMatch } from '../strength/match-exercises.ts';
 import { canonicalize } from '../canonicalize.ts';
+import { rirTargetFor, rirTargetText } from '../strength-grid/intents.ts';
 import { completedStrengthVolume, isPerformedSet, liftInAthletesUnit, KG_PER_LB } from '../strength/session-volume.ts';
 import type { SessionDetailV1 } from './types.ts';
 import { isAssistanceSlot } from '../../../../src/lib/assistance-slot.ts';
@@ -234,11 +235,12 @@ export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFiel
   };
 
   // The analyzer's RIR read, keyed the way the table used to look it up.
-  const rirByKey = new Map<string, { target_rir: number | null; avg_rir: number | null; rir_verdict: RirVerdict | null }>();
+  const rirByKey = new Map<string, { target_rir: number | null; target_rir_text: string | null; avg_rir: number | null; rir_verdict: RirVerdict | null }>();
   for (const ea of Array.isArray(input.exerciseAdherence) ? input.exerciseAdherence as any[] : []) {
     if (!ea?.matched || ea?.adherence?.target_rir == null) continue;
     const entry = {
       target_rir: Number(ea.adherence.target_rir),
+      target_rir_text: typeof ea.adherence.target_rir_text === 'string' ? ea.adherence.target_rir_text : null,
       avg_rir: ea.adherence.avg_rir != null ? Number(ea.adherence.avg_rir) : null,
       rir_verdict: (ea.adherence.rir_verdict ?? null) as RirVerdict | null,
     };
@@ -317,6 +319,8 @@ export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFiel
       volume_direction: delta == null ? null : delta > 0 ? 'up' : delta < 0 ? 'down' : 'even',
       avg_rir: rir?.avg_rir ?? null,
       target_rir: rir?.target_rir ?? (typeof p?.target_rir === 'number' ? p.target_rir : null),
+      // Pass 7 (book-language fix): the target as printed — p218's band on a p218 row ("0 to 2"), else the number.
+      target_rir_text: rir?.target_rir_text ?? rirTargetText(rirTargetFor(p ?? null)),
       rir_verdict: verdict,
       rir_concern: verdict === 'too_hard',
       rir_line: verdict ? RIR_LINE[verdict] : null,

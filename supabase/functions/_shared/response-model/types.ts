@@ -365,6 +365,11 @@ export type StrengthLiftSnapshot = {
   baseline_avg_rir: number | null;
   /** Protocol-derived target RIR for this lift. Null when protocol is unknown. */
   target_rir: number | null;
+  /**
+   * p218's band when the lift's latest logged row carries a p218 intent (book-language fix, pass 7), else absent.
+   * When present the verdict judges against it (`strength-grid/intents.ts` rirOffTarget) instead of `target_rir`.
+   */
+  target_rir_band?: { lo: number; hi: number } | null;
   sessions_in_window: number;
   best_weight: number | null;       // most recent top working weight logged
   /** D-231 typed-anchored 1RM (canonical lifts only; null for accessories / gap-fill). Judge + suggest consult this. */

@@ -96,7 +96,11 @@ export type StrengthExerciseActual = {
   best_reps: number;
   avg_rir: number | null;
   target_rir: number | null;
-  rir_delta: number | null;          // avg_rir - target_rir (positive = left more in reserve)
+  /** p218's band when the row has a p218 intent (book-language fix, pass 7), else null — `strength-grid/intents.ts`. */
+  target_rir_band?: { lo: number; hi: number } | null;
+  /** The target as printed: "0 to 2" for a band, the number otherwise. */
+  target_rir_text?: string | null;
+  rir_delta: number | null;          // off the target: 0 inside a p218 band; else avg_rir - target_rir (positive = left more in reserve)
   unit: 'lbs' | 'kg';
 };
 
@@ -106,6 +110,8 @@ export type StrengthExercisePrescription = {
   reps: string;                      // "8-10" or "5"
   target_weight: number | null;
   target_rir: number | null;
+  /** "0 to 2" for a p218 band, the number otherwise (pass 7). */
+  target_rir_text?: string | null;
   notes: string | null;
 };
 

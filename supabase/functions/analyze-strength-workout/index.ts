@@ -16,6 +16,7 @@ import { roleForExercise, ROLE_WEIGHT } from '../../../src/lib/exercise-role.ts'
 import { isPerformedStrengthSet } from '../_shared/strength/performed-set.ts';
 import { matchExercises } from '../_shared/strength/match-exercises.ts';
 import { buildSubstitutionNote } from '../_shared/strength/substitution-note.ts';
+import { rirOffTarget, rirTargetFor, rirTargetText } from '../_shared/strength-grid/intents.ts';
 import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
 import { strengthTestKey } from '../_shared/strength-test-key.ts';
 
@@ -539,10 +540,19 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
 
   // Target RIR: exercise-level target_rir is the source of truth (set by protocol).
   // Fall back to set-level rir on the first planned set if not present.
-  const exerciseTargetRIR: number | null =
+  const stampedTargetRIR: number | null =
     typeof planned.target_rir === 'number' ? planned.target_rir
     : typeof planned.target_rir === 'string' ? Number(planned.target_rir) || null
     : plannedSets.find((s: any) => s.rir != null)?.rir ?? null;
+  /**
+   * ⛔ PASS 7 (book-language fix, 2026-09-18): the one rule (`strength-grid/intents.ts` rirTargetFor). A planned row
+   * with a p218 intent is judged against p218's band — HYP 0 to 2, DE/SKILL 3 to 4 — read off its `slot_intent`
+   * (0 inside the band), not the stamped midpoint. ME: "no RIR target" (p218) — no target. Other rows: their number.
+   */
+  const rirTarget = String(planned?.slot_intent ?? '').toUpperCase() === 'ME'
+    ? null
+    : (rirTargetFor({ slot_intent: planned?.slot_intent }) ?? rirTargetFor({ target_rir: stampedTargetRIR }));
+  const exerciseTargetRIR: number | null = rirTarget ? stampedTargetRIR : null;
 
   // Get executed RIR data
   // D-203/provenance: only count RIR the athlete actually entered/confirmed. Auto-filled
@@ -558,7 +568,7 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
       sum + Math.pow(set.rir - avgExecutedRIR!, 2), 0) / executedRIRSets.length;
     rirConsistency = Math.sqrt(variance);
 
-    if (exerciseTargetRIR !== null) {
+    if (rirTarget !== null) {
       // 2026-09-03 (Michael's chest-supported row went 15 → 20 → 25 lb and finished at target, and the
       // average still said "too much in the tank"): when the athlete raised the weight during the exercise,
       // the LAST set is the read — that is where they arrived. Otherwise the average, as before.
@@ -575,7 +585,7 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
       );
       const lastRir = num(last?.rir);
       const readRir = corrected && lastRir != null ? lastRir : avgExecutedRIR;
-      rirAdherence = Math.round((readRir - exerciseTargetRIR) * 10) / 10;
+      rirAdherence = Math.round(rirOffTarget(readRir, rirTarget) * 10) / 10;
     }
   }
 
@@ -598,6 +608,8 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     set_completion: Math.round(setCompletion),
     weight_progression: Math.round(weightProgression * 10) / 10,
     target_rir: exerciseTargetRIR,
+    target_rir_band: rirTarget?.band ? { lo: rirTarget.lo, hi: rirTarget.hi } : null,
+    target_rir_text: rirTargetText(rirTarget),
     rir_adherence: rirAdherence,
     rir_verdict: rirVerdict,
     avg_rir: avgExecutedRIR != null ? Math.round(avgExecutedRIR * 10) / 10 : null,
@@ -997,6 +1009,8 @@ function generateExerciseBreakdown(
           set_completion: adherence.set_completion,
           load_adherence: weightScore, // Percentage based on weight difference
           target_rir: adherence.target_rir,
+          target_rir_band: adherence.target_rir_band ?? null,
+          target_rir_text: adherence.target_rir_text ?? null,
           rir_adherence: adherence.rir_adherence,
           rir_verdict: adherence.rir_verdict,
           volume_completion: adherence.volume_completion
@@ -2066,9 +2080,14 @@ Deno.serve(withAlarm('analyze-strength-workout', async (req) => {
         xs.length === 0 ? null : Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10;
       const avgTargetRir = meanOrNull(rirEntries.map((e: { target: number | null }) => e.target).filter((v: number | null): v is number => typeof v === 'number'));
       const avgActualRir = meanOrNull(rirEntries.map((e: { actual: number | null }) => e.actual).filter((v: number | null): v is number => typeof v === 'number'));
-      const rirDelta = (avgActualRir != null && avgTargetRir != null)
-        ? Math.round((avgActualRir - avgTargetRir) * 10) / 10
-        : null;
+      // Pass 7: when any row is judged against a p218 band, the delta is the mean of each row's own off-target
+      // distance (0 inside the band); otherwise the old mean-minus-mean.
+      const banded = (analysis.exercise_adherence || []).filter((ea: any) => ea?.adherence?.target_rir_band && typeof ea?.adherence?.rir_adherence === 'number');
+      const rirDelta = banded.length > 0
+        ? meanOrNull(banded.map((ea: any) => ea.adherence.rir_adherence as number))
+        : (avgActualRir != null && avgTargetRir != null)
+          ? Math.round((avgActualRir - avgTargetRir) * 10) / 10
+          : null;
       // Same shared ±1.0 band as the Details table + State (VERDICT_DEVIATION). Was ±1.0 already, so
       // behavior is unchanged here — routed through the one helper for single-source.
       const rirVerdict = rirVerdictFromDelta(rirDelta);

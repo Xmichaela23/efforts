@@ -23,7 +23,7 @@ import {
   type Level,
 } from '../endurance-library/index.ts';
 import { bandRouteName, executionHowTo, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
-  type ViadaIntent, type ViadaPattern } from '../strength-grid/index.ts';
+  type ViadaIntent, type ViadaPattern, rirBandFor } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
@@ -213,6 +213,13 @@ export type StrengthExercise = {
   source_row?: string;
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
+  /**
+   * ⛔ p218's reserve BAND for the slot (book-language fix, pass 7) — HYP 0-2, DE/SKILL 3-4; absent on ME. The
+   * stamped target. `target_rir` above stays as the band's midpoint (ours) for readers that take one number.
+   * ⚠️ materialize-plan's row whitelist does not carry it yet; every judge reads the band off `slot_intent`
+   * through `strength-grid/intents.ts`, which it does carry.
+   */
+  target_rir_band?: { lo: number; hi: number };
   /**
    * ⛔⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT — **INCLUDING WHEN THERE ISN'T ONE** (widened 2026-09-01).
    *
@@ -1798,6 +1805,7 @@ function exerciseForSlot(
         weight: 'By feel',
         load_prescribed: false,
         ...(targetRir != null ? { target_rir: targetRir } : {}),
+        ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
         slot_intent: slot.intent,
         source_row: noteForWeek(slot, args.week),
         ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
@@ -1944,6 +1952,7 @@ function exerciseForSlot(
       weight,
       percent_1rm: pct,
       ...(targetRir != null ? { target_rir: targetRir } : {}),
+      ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
       // ⛔ WHAT THEY GOT, ON THE ROW (item 6). `reps` above is the BAND and stays "1-5" — every
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
       // on that shape, so the result travels as its own field rather than inside the string.
