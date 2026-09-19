@@ -20,7 +20,6 @@ import {
   defaultCompetitionLifts,
   EMITTED_TOKEN_SHAPES,
   FRAMES,
-  HARD_ON_BIKE_CITE,
   isHardSlot,
   isLongSlot,
   lowerBodyHaircut,
@@ -159,11 +158,9 @@ Deno.test('the hard sessions go on the bike, and the run keeps its long day', ()
     if (isHardSlot(frameSlot)) assertEquals(slot.sport, 'ride', `a hard slot stayed a run: ${k}`);
     if (isLongSlot(frameSlot)) assertEquals(slot.sport, 'run', `the long slot was taken from the run: ${k}`);
   }
-  // ⚠️ ASSERTED THROUGH THE CONSTANT, not the literal 'Viada p280'. The cite was marked UNVERIFIED in
-  // place on 2026-08-26 (p280 is not transcribed in the corpus), and a test hard-coding the old
-  // string would have to be edited every time the marking is reworded. `HARD_ON_BIKE_CITE` is where
-  // the copy lives; the test below pins that it still says UNVERIFIED.
-  assert(a.notes.some((n) => n.cite === HARD_ON_BIKE_CITE), 'the dial placed the hard work and said nothing');
+  // ⛔ THE "COSTS THE LIFTING LESS" NOTE CAME OFF (2026-09-18, book-language pass 1): p280 says cycling is
+  // "surprisingly taxing on the central nervous system" and lowers lower-body performance. No note may say otherwise.
+  assert(!a.notes.some((n) => /costs the lifting less/i.test(n.text)), 'the p280-contradicting note is back');
 });
 
 Deno.test('the cost of losing the hard run is stated, not left to be noticed', () => {
@@ -967,30 +964,19 @@ Deno.test('the RUN slots are untouched by all of it — different families canno
 // THE BIKE SENTENCE COUNTS THE WEEK IT WAS BUILT FOR (2026-08-26)
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('⛔ "the hard sessions are on the bike" says what is TRUE of the built week', () => {
-  // ⛔ THE DEFECT, FROM A SCREEN. The note fired whenever ANY slot was substituted to a ride, so a
-  // week with one hard run and one hard ride told the athlete every hard session was on the bike.
-  // Same disease as the "four runs" block description, same fix: read the finished week, not the
-  // fact that a substitution happened.
+Deno.test('⛔ no week says the hard sessions are on the bike (the note came off, 2026-09-18)', () => {
+  // ⛔ p280, read off the page: cycling is "surprisingly taxing on the central nervous system" and lowers
+  // lower-body performance. The note that said riding hard costs the lifting less said the opposite; it came off in
+  // the book-language pass (audit item 15). Every mix, both branches into `assignSports`.
   const S = FRAMES.strength_5k.columns.standard;
-  const say = (mix: Record<string, unknown>) =>
-    assignSports(S, mix as never).notes.find((n) => /on the bike/.test(n.text))?.text ?? null;
-
-  const mixed = say({ runs: 2, rides: 2, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } });
-  assert(mixed != null, 'a week with a hard ride in it said nothing about the bike');
-  assert(/^One of the hard sessions is on the bike\./.test(mixed!),
-    `one hard ride and one hard run read: "${mixed}"`);
-
-  const allBike = say({ runs: 1, rides: 3, slots: { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } });
-  assert(/^The hard sessions are on the bike\./.test(allBike ?? ''),
-    `an all-bike hard week read: "${allBike}"`);
-
-  assertEquals(say({ runs: 4, rides: 0, slots: { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'run' } }), null,
-    'an all-run week claimed hard sessions were on the bike');
-
-  // ⚠️ THE RATIO BRANCH TAKES THE SAME EXIT. Two ways into `assignSports`, one sentence.
-  assert(/^One of the hard sessions is on the bike\./.test(say({ runs: 3, rides: 1 }) ?? ''),
-    'the ratio branch miscounted a single hard ride');
+  for (const mix of [
+    { runs: 2, rides: 2, slots: { '1:0': 'run', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } },
+    { runs: 1, rides: 3, slots: { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'ride' } },
+    { runs: 3, rides: 1 },
+  ]) {
+    const notes = assignSports(S, mix as never).notes;
+    assert(!notes.some((n) => /on the bike|costs the lifting less/.test(n.text)), JSON.stringify(notes));
+  }
 });
 
 Deno.test('⚠️ THE BIKE SENTENCE COUNTS FRAME SLOTS, NOT ASSIGNED FAMILIES', () => {
@@ -1016,15 +1002,6 @@ Deno.test('⚠️ THE BIKE SENTENCE COUNTS FRAME SLOTS, NOT ASSIGNED FAMILIES', 
   // ⚠️ THE SENTENCE ITSELF is pinned by the test above, which owns the helper that builds it. Not
   // repeated here: a second copy of an assertion drifts from the first, which is the defect this
   // whole file keeps catching.
-});
-
-Deno.test('the bike claim is marked unverified where the copy lives', () => {
-  // ⛔ MICHAEL, 2026-08-26: do not delete the claim, mark the cite so nobody later reads it as
-  // page-backed. p280 is not transcribed in `docs/SOURCE-viada-hybrid-athlete.md`.
-  const S = FRAMES.strength_5k.columns.standard;
-  const note = assignSports(S, { runs: 3, rides: 1 } as never).notes.find((n) => /on the bike/.test(n.text));
-  assert(note != null);
-  assert(/UNVERIFIED/.test(note!.cite ?? ''), `the bike cite reads as page-backed: "${note!.cite}"`);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

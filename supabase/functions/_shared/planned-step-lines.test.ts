@@ -78,24 +78,18 @@ Deno.test('the approved ladder lines, word for word (2026-09-17)', () => {
 });
 
 /**
- * ⛔ THE BOOK'S EFFORT WORDS, WORD FOR WORD (Michael, 2026-09-17). No step prints an effort number; the talk test
- * (p235) goes under a VT1 or LSD run, "all-out" (p229–231) under a Sprint / Power run whose work carries no target.
+ * ⛔ THE BOOK'S EFFORT WORDS (Michael, 2026-09-17). No step prints an effort number. The talk test (p235) is the VT1
+ * run's own line (`family-lines.ts`), printed above the steps; the copy under the steps came off 2026-09-18
+ * (book-language pass 1). "All-out" (p229–231) still goes under a Sprint / Power run whose work carries no target.
  */
 const easyWrap = (kind: string, seconds: number): PlannedStep =>
   ({ kind, seconds, distanceDerived: true, prescription: 'heart_rate', hr_range: { lower: 138, upper: 144 }, pace_range: easy });
 
-Deno.test('VT1 and LSD: the talk-test line, after the run and ahead of the cool-down', () => {
+Deno.test('VT1 and LSD: no talk-test line under the steps — the session line carries it, once', () => {
   const run: PlannedStep = { kind: 'work', seconds: 1800, distanceDerived: true, prescription: 'heart_rate', hr_range: { lower: 138, upper: 144 }, pace_range: easy };
   for (const family of ['run_vt1', 'run_lsd']) {
-    assertEquals(plannedStepLines([run], { sport: 'run', family }), [
-      '30:00 @ HR 138–144 · ref 8:33–9:41/mi',
-      'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.',
-    ]);
+    assertEquals(plannedStepLines([run], { sport: 'run', family }), ['30:00 @ HR 138–144 · ref 8:33–9:41/mi']);
   }
-  assertEquals(plannedStepLines([easyWrap('warmup', 600), run, easyWrap('cooldown', 480)], { sport: 'run', family: 'run_vt1' }).slice(-2), [
-    'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.',
-    '8:00 cool-down · HR 138–144 · ref 8:33–9:41/mi',
-  ]);
 });
 
 Deno.test('Sprint / Power: the all-out line when a work step carries no target, and none when every step has one', () => {

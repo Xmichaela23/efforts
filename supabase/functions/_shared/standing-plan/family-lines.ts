@@ -72,6 +72,12 @@ export const RIDE_ENDURANCE_DRAWER_NOTE =
   'Spend a few minutes of the ride paying attention to how you pedal (smooth circles, not stomping) and how you sit on the bike.';
 
 /**
+ * ⛔ THE MLSS HILLS NOTE, IN THE DRAWER AFTER THE LINE (p231). Moved here 2026-09-18 (book-language pass 1) so the
+ * run's sentences have one owner; it was written inline in `session-vocabulary.ts`.
+ */
+export const RUN_MLSS_DRAWER_NOTE = 'Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.';
+
+/**
  * ⛔ THE ERG NOTE ON THE ANAEROBIC RIDE, IN THE DRAWER AFTER THE LINE (approved by Michael, 2026-09-18). p237: *"best
  * done by feel with a power FLOOR rather than a specific power target"* — ERG holds a target, so it comes off.
  * The session note goes to the Planned tab, the Garmin workout description and the Intervals.icu description.

@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { recordProviderResult } from '../_shared/connection-health.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { convertWorkoutToGarmin, type PlannedWorkout } from '../_shared/garmin/convert-workout.ts'
+import { sessionTitle } from '../_shared/session-title.ts'
 import { applyGarminBaselines } from '../_shared/garmin/prepare.ts'
 import { ensureValidGarminAccessToken, sendToGarmin, scheduleWorkoutOnDate } from '../_shared/garmin/training-api.ts'
 
@@ -65,6 +66,8 @@ serve(async (req) => {
       .eq('user_id', userId)
       .maybeSingle()
     applyGarminBaselines(workout, ub)
+    // ⛔ THE SAME TITLE THE CALENDAR SYNC SENDS (2026-09-18, book-language pass 1) — `_shared/session-title.ts`.
+    ;(workout as any).name = sessionTitle(workout as any)
 
     const garminPayload = convertWorkoutToGarmin(workout)
     try {

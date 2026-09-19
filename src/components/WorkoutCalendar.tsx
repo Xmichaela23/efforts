@@ -227,6 +227,12 @@ function derivePlannedCellLabel(w: any): string | null {
       else if (hasTag('long_ride')) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
       // ⚠️ A BANDED-HARD ROW SKIPS THIS ENTIRELY, tag or no tag.
       else if (!bandedHard && (hasTag('recovery') || hasTag('easy'))) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
+      /**
+       * ⛔ THE ANAEROBIC RIDE IS NOT A VO2 RIDE (2026-09-18, book-language pass 1, audit M10). It travels as a
+       * `bike_vo2_` token for its power band, and the token fallback below printed "BK-VO2" on it. p237 heads the
+       * session "Anaerobic (AnA)"; p238's "VO2" is a different session. The row's `family:` tag decides.
+       */
+      else if (hasTag('family:ride_anaerobic')) label = `BK-AnA${durStr ? ` ${durStr}` : ''}`.trim();
       // Token / text fallback (legacy plans without authoritative tags).
       else if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();

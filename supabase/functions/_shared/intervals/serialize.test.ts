@@ -55,8 +55,19 @@ Deno.test('explicit failures', () => {
   assertThrows(() => serializeRide({ id: 'e', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [] } }), IntervalsSerializeError, 'no saved steps');
   assertThrows(() => serializeRide({ id: 'f', date: '2026-09-15', type: 'ride', computed: { steps: [{ kind: 'work', seconds: 60 }] } }), IntervalsSerializeError, 'no FTP');
   assertThrows(() => serializeRide({ id: 'g', date: '2026-09-15', type: 'run', computed: { anchors, steps: [{ kind: 'work', seconds: 60 }] } }), IntervalsSerializeError, 'not a ride');
-  assertThrows(() => serializeRide({ id: 'h', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', label: 'Hard — 3 min', seconds: 180 }] } }), IntervalsSerializeError, 'contains digits');
+  assertThrows(() => serializeRide({ id: 'h', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', label: 'twice 3x', seconds: 180 }] } }), IntervalsSerializeError, 'repeat');
   assertThrows(() => serializeRide({ id: 'i', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', powerRange: { lower: 100, upper: 120 } }] } }), IntervalsSerializeError, 'no duration');
+});
+
+/**
+ * ⛔ A LABEL WITH DIGITS PRINTS ON ITS OWN LINE ABOVE THE STEP (2026-09-18, book-language pass 4). The FTP test's page
+ * words ("3 minutes at high intensity. Push yourself at a 9/10 effort") refused the whole ride before.
+ */
+Deno.test('a step labelled with the page\'s numbers goes out with the words above it, not refused', () => {
+  const ev = serializeRide({ id: 'h2', date: '2026-09-15', type: 'ride', name: 'FTP', computed: { anchors, steps: [
+    { kind: 'work', label: 'high intensity. Push yourself at a 9/10 effort', seconds: 180 },
+  ] } });
+  assertEquals(ev.description, 'high intensity. Push yourself at a 9/10 effort\n- 3m freeride');
 });
 
 /** ⛔ p239's easy step (0 up to 75% of FTP) goes to Intervals.icu / Zwift with no target (Michael, 2026-09-18). */

@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
 
@@ -827,12 +827,11 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);
   // ⛔ p237 — ERG off on the anaerobic ride, after its line (2026-09-18).
   if (session.family === 'ride_anaerobic') parts.push(RIDE_ANAEROBIC_DRAWER_NOTE);
-  if (session.family === 'run_mlss') {
-    parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
-  }
-  if (session.family === 'run_vt1' || session.family === 'run_lsd') {
-    parts.push('Go by heart rate. Pace varies with fatigue, hydration and weather.');
-  }
+  // ⛔ p231 — the hills note, after the MLSS line, in the drawer only. One owner: `family-lines.ts`.
+  if (session.family === 'run_mlss') parts.push(RUN_MLSS_DRAWER_NOTE);
+  // ⛔ "Go by heart rate. Pace varies with fatigue, hydration and weather." CAME OFF (2026-09-18, book-language
+  // pass 1, audit item 13). p235 tells the athlete to use the talk test, which the VT1 line already says; the drawer
+  // printed both instructions for the same run.
   if (raceTempo) {
     parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
   }

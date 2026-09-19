@@ -18,6 +18,7 @@
  * repeats nothing prints on its own line.
  */
 import { isCeilingOnly } from './ride-power.ts';
+import { clock as clockOf, displayFormat, M_PER_MI } from './display-format.ts';
 
 type Range = { lower?: number; upper?: number };
 export type PlannedStep = {
@@ -27,6 +28,10 @@ export type PlannedStep = {
   distanceMeters?: number;
   distance_m?: number;
   distanceDerived?: boolean;
+  /** The label is the page's own words (`materialize-plan`); the lines print it. */
+  page_label?: boolean;
+  /** An untimed step the athlete ends with the lap button. */
+  lap_button?: boolean;
   paceTarget?: string;
   pace_range?: Range | [number | string, number | string] | null;
   powerRange?: Range | null;
@@ -46,17 +51,13 @@ export type StepLineOptions = {
 };
 
 /**
- * ⛔ THE BOOK'S OWN EFFORT WORDS, ON THE TWO SESSIONS WHOSE PAGES PRINT THEM (Michael, 2026-09-17).
- *
- * No run or ride step prints an effort number: the pages prescribe a percentage of threshold and nothing else.
- * Two pages do give an effort in words, and those words go under the steps as one line. Both strings are approved
- * word for word — do not reword, re-case or re-punctuate them.
+ * ⛔ THE BOOK'S EFFORT WORDS UNDER THE STEPS (2026-09-18, book-language pass 1).
+ * The talk-test line that printed here was a second copy of the session's own line (`family-lines.ts`, p235),
+ * which the planned screens print above these steps; it came off. The all-out line stays for p229's run
+ * sprints, whose steps carry no target.
  */
-// Viada p235 (VT1 and LSD): "Practise the talk test at least twice per run — once after 5 minutes and once after 20."
-export const TALK_TEST_LINE = 'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.';
 // Viada p229–231 (Sprint / Power): "All-out" = "best possible speed for the day".
 export const ALL_OUT_LINE = 'All-out: the best speed you have today.';
-const TALK_TEST_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_vt1', 'run_lsd']);
 const ALL_OUT_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_sprint_power']);
 
 const kindOf = (s: PlannedStep) => String(s?.kind || '').toLowerCase();
@@ -89,17 +90,23 @@ function fmtDist(meters: number, units?: string | null): string {
   return mi < 1 ? `${mi.toFixed(2)} mi` : `${mi.toFixed(1)} mi`;
 }
 
-const clock = (sec: number) => {
-  const r = Math.round(Number(sec));
-  return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`;
-};
+/**
+ * ⛔ A PACE RANGE IN THE ATHLETE'S OWN UNIT, THROUGH THE SERVER'S ONE FORMATTER (2026-09-18, book-language pass 1,
+ * audit item 31). Work steps printed /mi and warm-ups /km for the same metric athlete; every range now goes
+ * through `display-format.ts`. Paces travel as seconds per MILE.
+ */
+function paceRangeText(loSecPerMi: number, hiSecPerMi: number, units?: string | null): string {
+  const f = displayFormat(String(units || '').toLowerCase() === 'metric');
+  const perKm = (secPerMi: number) => secPerMi / (M_PER_MI / 1000);
+  return `${clockOf(f.metric ? perKm(loSecPerMi) : loSecPerMi)}–${f.pacePerUnit(perKm(hiSecPerMi))}`;
+}
 
 function paceText(s: PlannedStep, opts: StepLineOptions): string | undefined {
   if (opts.raceDay && typeof s?.paceTarget === 'string' && s.paceTarget) return s.paceTarget;
   const pr = s?.pace_range as any;
-  if (pr && !Array.isArray(pr) && Number(pr.lower) > 0 && Number(pr.upper) > 0) return `${clock(pr.lower)}–${clock(pr.upper)}/mi`;
+  if (pr && !Array.isArray(pr) && Number(pr.lower) > 0 && Number(pr.upper) > 0) return paceRangeText(Number(pr.lower), Number(pr.upper), opts.units);
   if (Array.isArray(pr) && pr.length === 2 && pr[0] && pr[1]) {
-    return typeof pr[0] === 'number' ? `${clock(pr[0])}–${clock(Number(pr[1]))}/mi` : `${pr[0]}–${pr[1]}`;
+    return typeof pr[0] === 'number' ? paceRangeText(pr[0], Number(pr[1]), opts.units) : `${pr[0]}–${pr[1]}`;
   }
   return typeof s?.paceTarget === 'string' && s.paceTarget ? s.paceTarget : undefined;
 }
@@ -118,6 +125,15 @@ function powerText(s: PlannedStep): string | undefined {
 const hrText = (s: PlannedStep) =>
   s?.prescription === 'heart_rate' && s?.hr_range && typeof s.hr_range.lower === 'number' && typeof s.hr_range.upper === 'number'
     ? `HR ${Math.round(s.hr_range.lower)}–${Math.round(s.hr_range.upper)}` : undefined;
+
+/**
+ * ⛔ THE PAGE'S OWN WORDS FOR A STEP, WHERE THE STEP CARRIES THEM (2026-09-18, book-language). Only a label marked
+ * `page_label` prints: the other labels on the steps are ours and never reached these lines.
+ */
+const pageWords = (s: PlannedStep): string | null =>
+  s?.page_label === true && typeof s?.label === 'string' && s.label.trim() ? s.label.trim() : null;
+const untimed = (s: PlannedStep): boolean =>
+  !(Number(s?.seconds) > 0) && !(Number(s?.distanceMeters ?? s?.distance_m) > 0);
 
 /** The step's length as prescribed: a derived distance on a timed step never prints. */
 function lengthText(s: PlannedStep, opts: StepLineOptions): string {
@@ -141,35 +157,38 @@ function targetText(s: PlannedStep, opts: StepLineOptions): string {
   return isRecovery(s) ? ' easy' : '';
 }
 
-// FIELD — definition: 1 mi = 1.609344 km.
-const KM_PER_MI = 1.609344;
-
-/** A pace range in the athlete's own unit: /km for a metric athlete, /mi otherwise. */
-function paceTextInUnits(s: PlannedStep, opts: StepLineOptions): string | undefined {
-  if (String(opts.units || '').toLowerCase() !== 'metric') return paceText(s, opts);
-  const pr = s?.pace_range as any;
-  const lo = Array.isArray(pr) ? Number(pr[0]) : Number(pr?.lower);
-  const hi = Array.isArray(pr) ? Number(pr[1]) : Number(pr?.upper);
-  if (lo > 0 && hi > 0) return `${clock(lo / KM_PER_MI)}–${clock(hi / KM_PER_MI)}/km`;
-  return paceText(s, opts);
-}
-
 function wrapperLine(s: PlannedStep, word: string, opts: StepLineOptions): string {
   const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s);
+  const words = pageWords(s);
+  /**
+   * ⛔ A WARM-UP OR COOL-DOWN STEP IN THE PAGE'S OWN WORDS (2026-09-18, book-language pass 4) prints the page's box
+   * heading word and its line: `10:00 warm-up · 10-minute easy jog`, `warm-up · 3 sets of 20m walking lunges`, and a
+   * power target only where the page prints a number (`5:00 warm-up · 214–261 W · 5 minutes @ 95%`).
+   */
+  if (words) {
+    if (untimed(s)) return `${word} · ${words}`;
+    return `${lengthText(s, opts)} ${word}${hr ? ` · ${hr}` : pace ? ` · ${pace}` : pow ? ` · ${pow}` : ''} · ${words}`;
+  }
   const len = lengthText(s, opts);
   /**
    * ⛔ A RUN'S WARM-UP AND COOL-DOWN PRINT THE EASY PACE (Michael's words, approved 2026-09-17):
    *   10:00 warm-up · easy pace 10:56–12:22/mi
    * The book prints "10-min easy jog" (p231–235); the watch gets the step as time only. /km for a metric athlete.
    */
-  if (!hr && pace && opts.sport === 'run' && !opts.raceDay) return `${len} ${word} · easy pace ${paceTextInUnits(s, opts)}`;
+  if (!hr && pace && opts.sport === 'run' && !opts.raceDay) return `${len} ${word} · easy pace ${pace}`;
   if (hr) return `${len} ${word} · ${hr}${pace ? ` · ref ${pace}` : ''}`;
   if (pace) return `${len} ${word} · ${s?.prescription === 'heart_rate' ? 'ref ' : ''}${pace}`;
   if (pow) return `${len} ${word} · ${pow}`;
   return `${len} ${word}`;
 }
 
-const stepText = (s: PlannedStep, opts: StepLineOptions) => `${lengthText(s, opts)}${targetText(s, opts)}`;
+const stepText = (s: PlannedStep, opts: StepLineOptions) => {
+  const words = pageWords(s);
+  // An untimed page step is its words alone (the lap button ends it).
+  if (words && untimed(s)) return words;
+  const base = `${lengthText(s, opts)}${words && isRecovery(s) && !paceText(s, opts) && !hrText(s) && !powerText(s) ? '' : targetText(s, opts)}`;
+  return words ? `${base} · ${words}` : base;
+};
 const sigOf = (s: PlannedStep, opts: StepLineOptions) => `${isRecovery(s) ? 'r' : 'w'}|${stepText(s, opts)}`;
 
 function unitText(unit: PlannedStep[], opts: StepLineOptions): string {
@@ -319,8 +338,7 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
 function withEffortLine(lines: string[], steps: PlannedStep[], opts: StepLineOptions): string[] {
   const family = String(opts.family || '').toLowerCase();
   let line: string | null = null;
-  if (TALK_TEST_LINE_FAMILIES.has(family)) line = TALK_TEST_LINE;
-  else if (ALL_OUT_LINE_FAMILIES.has(family)
+  if (ALL_OUT_LINE_FAMILIES.has(family)
     && steps.some((s) => !isWarmup(s) && !isCooldown(s) && !isRecovery(s) && !paceText(s, opts) && !hrText(s) && !powerText(s))) {
     line = ALL_OUT_LINE;
   }

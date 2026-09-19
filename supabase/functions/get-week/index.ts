@@ -776,27 +776,9 @@ Deno.serve(async (req)=>{
             let processedStep = {
               ...step
             };
-            // Process pace ranges for running workouts
-            if (!processedStep.pace_range && processedStep.paceTarget && typeof processedStep.paceTarget === 'string') {
-              const paceMatch = processedStep.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
-              if (paceMatch) {
-                const minutes = parseInt(paceMatch[1], 10);
-                const seconds = parseInt(paceMatch[2], 10);
-                const unit = paceMatch[3].toLowerCase();
-                const totalSeconds = minutes * 60 + seconds;
-                // Convert to seconds per mile for consistency
-                const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
-                // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
-                const tolerance = 0.05;
-                const lower = Math.round(secPerMi * (1 - tolerance));
-                const upper = Math.round(secPerMi * (1 + tolerance));
-                processedStep.pace_range = {
-                  lower,
-                  upper,
-                  unit: 'mi'
-                };
-              }
-            }
+            // ⛔ NO PACE BAND IS MADE UP HERE (2026-09-18, book-language pass 1, audit item 26). A ±5% range was built
+            // around `paceTarget` when a step had none — a third pace tolerance beside materialize's. `toV3Step` writes
+            // `pace_range` beside every `paceTarget`, so this never ran; a step without one now shows its single pace.
             // Process power ranges for cycling workouts
             if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
               // Handle percentage ranges like "85-95% FTP" or "90% FTP"
@@ -1086,27 +1068,9 @@ Deno.serve(async (req)=>{
           let processedStep = {
             ...step
           };
-          // Process pace ranges for running workouts
-          if (!processedStep.pace_range && processedStep.paceTarget && typeof processedStep.paceTarget === 'string') {
-            const paceMatch = processedStep.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
-            if (paceMatch) {
-              const minutes = parseInt(paceMatch[1], 10);
-              const seconds = parseInt(paceMatch[2], 10);
-              const unit = paceMatch[3].toLowerCase();
-              const totalSeconds = minutes * 60 + seconds;
-              // Convert to seconds per mile for consistency
-              const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
-              // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
-              const tolerance = 0.05;
-              const lower = Math.round(secPerMi * (1 - tolerance));
-              const upper = Math.round(secPerMi * (1 + tolerance));
-              processedStep.pace_range = {
-                lower,
-                upper,
-                unit: 'mi'
-              };
-            }
-          }
+          // ⛔ NO PACE BAND IS MADE UP HERE (2026-09-18, book-language pass 1, audit item 26). A ±5% range was built
+          // around `paceTarget` when a step had none — a third pace tolerance beside materialize's. `toV3Step` writes
+          // `pace_range` beside every `paceTarget`, so this never ran; a step without one now shows its single pace.
           // Process power ranges for cycling workouts
           if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
             // Handle percentage ranges like "85-95% FTP" or "90% FTP"
@@ -1185,30 +1149,7 @@ Deno.serve(async (req)=>{
           if (step.pace_range) {
             return step;
           }
-          // If step has paceTarget but no pace_range, convert it
-          if (step.paceTarget && typeof step.paceTarget === 'string') {
-            const paceMatch = step.paceTarget.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
-            if (paceMatch) {
-              const minutes = parseInt(paceMatch[1], 10);
-              const seconds = parseInt(paceMatch[2], 10);
-              const unit = paceMatch[3].toLowerCase();
-              const totalSeconds = minutes * 60 + seconds;
-              // Convert to seconds per mile for consistency
-              const secPerMi = unit === 'km' ? totalSeconds * 1.60934 : totalSeconds;
-              // Create pace range with ±5% tolerance (same as ensureWeekMaterialized)
-              const tolerance = 0.05;
-              const lower = Math.round(secPerMi * (1 - tolerance));
-              const upper = Math.round(secPerMi * (1 + tolerance));
-              return {
-                ...step,
-                pace_range: {
-                  lower,
-                  upper,
-                  unit: 'mi'
-                }
-              };
-            }
-          }
+          // ⛔ No ±5% pace band is made up here either (2026-09-18, audit item 26) — see the note above.
           return step;
         }) : null;
         const planned = {

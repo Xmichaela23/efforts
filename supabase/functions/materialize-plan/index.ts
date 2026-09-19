@@ -18,7 +18,6 @@ import {
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
 // Easy and long rides, and the easy parts of sprint rides: Coggan's endurance zone, 56–75% of FTP — the same band
 // State reads (2026-09-14, Michael). The top is the book's "below 75%" (p239); the old 65% floor was ours.
-import { COGGAN_Z2 } from '../_shared/state-trend/zones.ts';
 import {
   categorizeSwimTokensForDisplay,
   formatSwimSubtitleFromBuckets,
@@ -332,6 +331,7 @@ type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
 import { PLAN_WRITER_VERSION } from '../_shared/plan-refresh.ts';
+import { ftpTestSteps, runTestSteps, RUN_TEST_TRIAL_MIN, type ProtocolStep } from '../_shared/baseline-test-rows.ts';
 
 /**
  * Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower).
@@ -1492,7 +1492,7 @@ function uid(): string { try { return crypto.randomUUID(); } catch { return `${D
  * No pace targets — the athlete discovers their pace; that's the point of the test.
  * Steps use duration_s or distance_m matching the session's test protocol.
  */
-function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string }[] {
+export function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string; lap_button?: boolean }[] {
   // Swim CSS Test: 400 yd warmup → 3 min rest → 400 yd TT → 3 min rest → 200 yd TT → 200 yd cool-down
   if (tags.includes('css_test')) {
     // FIELD — CSS test = a 400 and a 200 time trial (Costill, Maglischo, Richardson; docs/SWIM-PROTOCOL.md).
@@ -1506,58 +1506,24 @@ function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: stri
       { id: uid(), kind: 'cooldown', distance_m: 183, label: 'Easy cool-down — 200 yd' },
     ];
   }
-  // ⛔ THE BOOK'S OWN TESTS, step for step (pp.210 and 212, read off the page 2026-09-02; SOURCE Part H0).
-  // This branch OVERRIDES the row's steps_preset tokens (the `assessment` tag bypasses token expansion at
-  // the call site), so the protocol has to live HERE — the Baselines description and these steps must agree.
-  // "The 20-Minute Test" (p212): 5–10 min easy · 3 × 1 min high turnover / 1 min rest · 3 min easy ·
-  // 3 min at 9/10 · 6–8 min easy · 20 min best effort (FTP = avg watts × 0.95, read by
-  // compute-workout-analysis) · cool-down (the page gives none; 5 min, OURS).
-  if (tags.includes('ftp_test')) {
-    // Viada p212 (see above): 8 min sits inside the page's 5–10, 3 × 1 min / 1 min, 3 min easy, 3 min at 9/10.
-    return [
-      { id: uid(), kind: 'warmup',   duration_s: 480,  label: 'Easy spin — 8 min' },
-      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
-      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
-      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
-      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
-      { id: uid(), kind: 'recovery', duration_s: 180,  label: 'Easy — 3 min' },
-      { id: uid(), kind: 'work',     duration_s: 180,  label: 'Hard — 3 min at 9 out of 10' },
-      // Viada p212 (see above): 7 min inside the page's 6–8, then the 20-minute test; the 5-min cool-down is OURS (above).
-      { id: uid(), kind: 'recovery', duration_s: 420,  label: 'Easy — 7 min' },
-      { id: uid(), kind: 'work',     duration_s: 1200, label: '20-minute test — best effort you can hold the whole way. This is the test.' },
-      { id: uid(), kind: 'cooldown', duration_s: 300,  label: 'Easy cool-down — 5 min' },
-    ];
-  }
-  // "Establishing your VO2 max pace and threshold pace" (p210): 6–8 min easy jog · 2 × 100 m strides
-  // (slow to near full tilt) · 3 × 30 s at a fast (mile-PR) pace with 1 min easy between · 1 min rest ·
-  // the trial, 12 min (<2 yrs) / 10 (2–4) / 8 (4+), 9.5/10 to start and 10/10 to finish · easy cool-down.
-  // Threshold = 88% of the trial's SPEED (compute-workout-analysis run_test). The trial length comes
-  // from a `run_tt_{n}min` token on the row when there is one; 12 min otherwise.
+  // ⛔ THE BOOK'S OWN TESTS, step for step (pp.210 and 212). This branch OVERRIDES the row's steps_preset tokens (the
+  // `assessment` tag bypasses token expansion at the call site). ⛔ THE STEPS AND THEIR WORDS ARE WRITTEN ONCE, in
+  // `_shared/baseline-test-rows.ts` (`ftpTestSteps`, `runTestSteps`), beside the description that quotes the same page
+  // (2026-09-18, book-language pass 1). A step with no clock (p210's strides, which the page does not time) goes to the
+  // watch as a lap-button step.
+  const fromProtocol = (list: ProtocolStep[]) => list.map((st) => ({
+    id: uid(), kind: st.kind, label: st.label, page_label: true,
+    ...(st.seconds > 0 ? { duration_s: st.seconds } : { lap_button: true }),
+  }));
+  if (tags.includes('ftp_test')) return fromProtocol(ftpTestSteps());
+  // p210. The trial length rides on the row's `run_tt_{n}min` token (12 when there is none).
   if (tags.includes('run_test')) {
     const ttTok = (tokens || []).map((t) => String(t).toLowerCase()).find((t) => /^run_tt_\d+min$/.test(t));
-    const ttMin = ttTok ? parseInt(ttTok.match(/^run_tt_(\d+)min$/)![1], 10) : 12;
-    const ttSec = Number.isFinite(ttMin) && ttMin > 0 ? ttMin * 60 : 720;
-    // Viada p210 (see above): 7 min inside the page's 6–8, 3 × 30 s with 1 min between, 1 min rest.
-    // OURS — `buildAssessmentSteps` 20 s for a 100 m stride, 1 min after each stride, 9-min cool-down (the corpus records none).
-    return [
-      { id: uid(), kind: 'warmup',   duration_s: 420, label: 'Easy jog — 7 min' },
-      { id: uid(), kind: 'work',     duration_s: 20,  label: 'Stride — about 100 m (20 s), slow to near full tilt' },
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 20,  label: 'Stride — about 100 m (20 s), slow to near full tilt' },
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
-      // Viada p210 (see above): the 1-min rest and the trial; 9-min cool-down OURS (see above).
-      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Rest — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: ttSec, label: `Time trial — ${Math.round(ttSec / 60)} min. Start at 9.5 out of 10, finish at 10. Even the whole way.` },
-      { id: uid(), kind: 'cooldown', duration_s: 540, label: 'Easy cool-down — 9 min' },
-    ];
+    const ttMin = ttTok ? parseInt(ttTok.match(/^run_tt_(\d+)min$/)![1], 10) : RUN_TEST_TRIAL_MIN;
+    const steps = runTestSteps();
+    const trial = steps[steps.length - 1];
+    if (Number.isFinite(ttMin) && ttMin > 0) trial.seconds = ttMin * 60;
+    return fromProtocol(steps);
   }
   return [];
 }
@@ -1665,13 +1631,14 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // threshold pace. 12 / 10 / 8 minutes by training age; the reader accepts any of the three.
   if (/^run_tt_\d+min$/.test(lower)) {
     const m = lower.match(/^run_tt_(\d+)min$/); const sec = m ? parseInt(m[1],10)*60 : 720;
-    out.push({ id: uid(), kind:'work', duration_s: sec, label: `Time trial — ${Math.round(sec/60)} min, all out and even` });
+    // ⛔ THE TRIAL'S WORDS ARE p210's, WRITTEN ONCE (`runTestSteps`, 2026-09-18). "all out and even" was ours.
+    out.push({ id: uid(), kind:'work', duration_s: sec, label: runTestSteps()[runTestSteps().length - 1].label });
     return out;
   }
   // a plain rest, no target (p210 step 4: "1 minute additional rest")
   if (/^run_rest_\d+min$/.test(lower)) {
     const m = lower.match(/^run_rest_(\d+)min$/); const sec = m ? parseInt(m[1],10)*60 : 60;
-    out.push({ id: uid(), kind:'recovery', duration_s: sec, label: `Rest — ${Math.round(sec/60)} min` });
+    out.push({ id: uid(), kind:'recovery', duration_s: sec, label: 'additional rest' });
     return out;
   }
   // OURS — 1800 s default, see the `expandRunToken` defaults note at the top.
@@ -2252,13 +2219,12 @@ function expandBikeToken(
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
   const rule = ridePowerRuleOf(family);
   /**
-   * ⛔ p239 — "easy ride below 75%" (Michael, 2026-09-18). On an endurance ride the easy steps are 0 up to 75% of
-   * FTP, as the library's own easy steps are: nothing marks a rider down for going easier. Other rows keep the
-   * Coggan Z2 band they had.
+   * ⛔ p239 — "easy ride below 75%" (Michael, 2026-09-18). The easy steps are 0 up to 75% of FTP, as the library's
+   * own easy steps are: nothing marks a rider down for going easier.
+   * ⛔ EVERY EASY RIDE STEP, NOT ONLY `ride_endurance` (2026-09-18, book-language pass 1, audit item 17 / M8). A row
+   * with no family tag got Coggan's 56–75% here — a second answer to the same easy ride, with a floor no page prints.
    */
-  const easyRange = () => family === 'ride_endurance'
-    ? (ftp ? { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * ftp) } : undefined)
-    : pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi);
+  const easyRange = () => (ftp ? { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * ftp) } : undefined);
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
     if (!ftp) return undefined;
@@ -2297,8 +2263,11 @@ function expandBikeToken(
   if (/bike_ftp_test_\d+min/.test(lower)) {
     // Viada p212 — the 20-minute test (1200 s default).
     const sec = minutesTokenToSeconds(lower) ?? 1200;
-    // No power_range - this is a maximal test, not a zone workout
-    out.push({ id: uid(), kind:'work', duration_s: sec, label: 'FTP Test - Maximal Effort', notes: 'All-out sustainable effort' });
+    // No power_range — the page prescribes a best effort, not a zone.
+    // ⛔ p212's words for the 20 minutes, written once (`ftpTestSteps`, 2026-09-18). "FTP Test - Maximal Effort" /
+    // "All-out sustainable effort" were ours. Any other length (the 5-minute test) is not on a page: no words.
+    const p212Test = ftpTestSteps().find((st) => st.kind === 'work' && st.seconds === 1200);
+    out.push({ id: uid(), kind:'work', duration_s: sec, ...(sec === 1200 && p212Test ? { label: p212Test.label } : {}) });
     return out;
   }
   /**
@@ -4050,6 +4019,15 @@ export function toV3Step(st: any, row?: any): any {
   }
   // Time only on the watch (and no cue on the phone): warm-up, cool-down, and a jog the page gives no percentage.
   if (st?.watch_target === 'none') out.watch_target = 'none';
+  /**
+   * ⛔ A LAP-BUTTON STEP STAYS ONE (2026-09-18, book-language pass 4). This whitelist dropped `lap_button`, so the
+   * strides' untimed walk/jog and every step a page prints without a clock reached `computed.steps` as a step with no
+   * time at all — which the Garmin sender turned into a one-second rest. Carried now; the sender maps it to `OPEN`.
+   */
+  if (st?.lap_button === true) out.lap_button = true;
+  // ⛔ THE LABEL IS THE PAGE'S OWN WORDS (2026-09-18, book-language): the step lines print it. Other labels are ours
+  // and stay off the step lines, as before.
+  if (st?.page_label === true && typeof st?.label === 'string' && st.label.trim()) out.page_label = true;
   // The phone recording screen's cue: the outer band and the words, decided here (H-D16, 2026-09-10).
   const liveCue = liveCueFor(out);
   if (liveCue) out.live_cue = liveCue;
