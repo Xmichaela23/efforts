@@ -89,7 +89,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     pctOf1RM: { lo: 0.70, hi: 0.80 },
     rir: { lo: 3, hi: 4 },
     setsBand: { lo: 4, hi: 6 },
-    tempo: 'Maximum velocity.',
+    tempo: 'Maximum velocity.',  // p218 — the DE row's words
     objective: 'Bar speed and quality of movement. Velocity and a consistent bar path are the '
       + 'objectives; treat every rep as though the bar were loaded to a maximum. Fatigue is discouraged.',
     cite: 'Viada p218, p219',
@@ -100,7 +100,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     pctOf1RM: { lo: 0.75, hi: 0.85 },
     rir: { lo: 3, hi: 4 },
     setsBand: { lo: 3, hi: 5 },
-    tempo: 'Controlled eccentric, fast concentric.',
+    tempo: 'Controlled eccentric, fast concentric.',  // p218 — the SKILL row's words
     objective: 'Purely patterning and movement practice. Heavy enough to be a challenge, but form '
       + 'and consistency take priority over velocity.',
     cite: 'Viada p218, p219',
@@ -112,7 +112,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     pctOf1RM: null,
     rir: { lo: 0, hi: 2 },
     setsBand: { lo: 3, hi: 4 },
-    tempo: 'Controlled eccentric, controlled concentric.',
+    tempo: 'Controlled eccentric, controlled concentric.',  // p218 — the HYP row's words
     objective: 'Standard bodybuilding-style work. Maximum motor-unit recruitment is the goal; steady '
       + 'tempo, controlled yet powerful. Fatigue is not the enemy — reps inevitably slow as fast-twitch '
       + 'fibres tire and fatigue-resistant fibres engage, and that is desirable.',

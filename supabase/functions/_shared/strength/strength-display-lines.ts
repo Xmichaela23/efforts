@@ -108,7 +108,7 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
   const rirText = reserveTextFor(exercise);
   const parts: string[] = [bookWord ? `${bookWord} · ${name}` : name];
   if (sets > 0 && reps != null && String(reps).trim()) parts.push(`${sets}×${reps}`);
-  if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);
+  if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);  // p218 RIR; p219 — RIR refers to "reps in reserve (before failure)."
 
   const weightDisplay = exercise?.weight_display;
   if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
@@ -170,7 +170,7 @@ export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb
       const reps = e?.reps;
       const rirText = reserveTextFor(e);
       const tail = ''; // the "your call" clause is gone (2026-09-10); the reserve is already on the line
-      out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);
+      out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);  // p218 RIR; p219 — RIR refers to "reps in reserve (before failure)."
       i += 1;
       continue;
     }
