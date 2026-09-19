@@ -14,6 +14,19 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED (2026-09-18, Michael) — THE MENU (☰) IS UNRELIABLE
+
+The menu does not always open, from any screen, and its items do not always open their screen when chosen from
+another item's screen. Trace first: every screen that shows the menu, what opens it, and what each item does when
+another item's screen is already open. Reproduce on the phone build and on the web before fixing.
+
+## QUEUED (2026-09-18, Michael) — ATHLETIC RECORD NEEDS AN AUDIT, AND MORE OF WHAT RUNNERS AND RIDERS EXPECT
+
+Audit what the Athletic Record page shows today and where each number comes from (one source each, server-sent).
+Then add what athletes expect from a record page, modelled on a named app (Strava's profile: this year's and
+all-time distance, time and count per sport; best efforts): miles run this year, miles ridden this year, fastest
+times at standard distances. Each number from the athlete's own synced data; each label from the named app's usage.
+
 ## QUEUED (2026-09-18, Michael: "so we have an ours thing happening?") — THE PERFORMANCE WORKLOAD "usual" RANGE IS OURS
 
 The workload chip on Performance prints "usual 36–54" (`src/components/AdherenceChips.tsx:319-331`, server
