@@ -21,6 +21,8 @@
  * ⚠️ STANDING PLAN BLOCKS ONLY — the refresh is that block's rebuild; other plan types are never queued.
  */
 import { STANDING_PLAN_PROTOCOL_ID } from './standing-plan/protocol-id.ts';
+import { fetchAthleteTimezone, resolveAthleteTimezone } from './athlete-timezone.ts';
+import { localDateInTz } from './local-date.ts';
 
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
 export const PLAN_WRITER_VERSION = 1;
@@ -69,6 +71,19 @@ export function isExpanded(r: RowLike): boolean {
 export function isRefreshable(r: RowLike, today: string): boolean {
   const d = String(r?.date ?? '').slice(0, 10);
   return !!d && d >= today && !isDoneRow(r);
+}
+
+/**
+ * ⛔ "TODAY" IS THE ATHLETE'S DAY, NOT THE SERVER'S (2026-09-18). The server runs on UTC, so from 5 pm Pacific
+ * `toISOString()` is already tomorrow and that evening's session would count as the past — left as it is by the
+ * refresh. The zone is the one the app already stores (`user_baselines.timezone`, reported by the phone on load,
+ * `_shared/athlete-timezone.ts`), and the date is `localDateInTz` — the same two calls calendar-sync makes. No
+ * zone on file = UTC, that module's neutral. Never throws.
+ */
+// deno-lint-ignore no-explicit-any
+export async function athleteToday(supabase: any, userId: string, now: Date = new Date()): Promise<string> {
+  const tz = resolveAthleteTimezone({ storedTimezone: await fetchAthleteTimezone(supabase, userId) });
+  return localDateInTz(now, tz);
 }
 
 /** A refreshable, expanded session written by older code. */
@@ -150,8 +165,10 @@ export async function queuePlanRefresh(supabase: any, args: {
  * If so, queue the refresh. One small select of the plan's rows from today on. Never throws.
  */
 // deno-lint-ignore no-explicit-any
-export async function queueRefreshIfStale(supabase: any, userId: string, planId: string, today: string): Promise<QueueResult | null> {
+export async function queueRefreshIfStale(supabase: any, userId: string, planId: string, todayIn?: string): Promise<QueueResult | null> {
   try {
+    // The athlete's day (`athleteToday`) unless the caller already has it.
+    const today = todayIn ?? await athleteToday(supabase, userId);
     const { data: rows } = await supabase
       .from('planned_workouts')
       .select(`id, date, workout_status, completed_workout_id, ${STAMP_SELECT}`)

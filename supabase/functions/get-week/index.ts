@@ -49,7 +49,7 @@ import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
-import { isStandingPlanConfig, queueRefreshIfStale } from '../_shared/plan-refresh.ts';
+import { athleteToday, isStandingPlanConfig, queueRefreshIfStale } from '../_shared/plan-refresh.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -187,9 +187,11 @@ Deno.serve(async (req)=>{
          * for it and nothing on screen changes until it has run.
          */
         {
-          const todayIso = new Date().toISOString().slice(0, 10);
+          // ⛔ The athlete's day, not UTC (2026-09-18) — read only when a Standing Plan block is active.
+          let todayIso: string | null = null;
           for (const plan of plans) {
             if (!isStandingPlanConfig(plan?.config)) continue;
+            todayIso ??= await athleteToday(supabase, userId);
             await queueRefreshIfStale(supabase, userId, String(plan.id), todayIso);
           }
         }

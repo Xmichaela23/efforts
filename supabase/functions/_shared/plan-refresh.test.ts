@@ -29,3 +29,12 @@ Deno.test('the Standing Plan block is recognised in both dialects, nothing else 
   assertEquals(isStandingPlanConfig({ source: 'strength_primary' }), false);
   assertEquals(isStandingPlanConfig(null), false);
 });
+
+Deno.test('the athlete\'s day: 18:00 Pacific on the 18th is the 18th, while UTC is already the 19th', async () => {
+  const { athleteToday } = await import('./plan-refresh.ts');
+  const client = (tz: string | null) => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { timezone: tz } }) }) }) }) });
+  const at = new Date('2026-09-19T01:00:00Z'); // 18:00 PDT on 2026-09-18
+  assertEquals(await athleteToday(client('America/Los_Angeles'), 'u', at), '2026-09-18');
+  assertEquals(await athleteToday(client(null), 'u', at), '2026-09-19', 'no zone on file = UTC');
+  assertEquals(await athleteToday(client('Not/AZone'), 'u', at), '2026-09-19', 'a bad zone is discarded');
+});

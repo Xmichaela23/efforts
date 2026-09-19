@@ -31,7 +31,7 @@
 // `run-jobs` calls it with the service key and the job's `user_id`.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
-import { isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
+import { athleteToday, isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
@@ -104,7 +104,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const weeks = Number(plan.duration_weeks) || 12;
-    const today = asOf ?? new Date().toISOString().slice(0, 10);
+    // ⛔ THE ATHLETE'S DAY, NOT UTC (2026-09-18): at 6 pm Pacific the evening session is still today's and is
+    // rewritten. The same day decides the block week and the retest row's date. `as_of` still wins.
+    const today = asOf ?? await athleteToday(supabase, userId);
     const currentWeek = resolvePlanWeekIndex(config, today, weeks) ?? 1;
 
     /**
