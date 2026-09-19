@@ -30,8 +30,9 @@ import { localDateInTz } from './local-date.ts';
 // 4 (2026-09-18): a commercial gym has a sandbag; one name per movement on a kit (a dumbbell kit's Romanian deadlift reads
 //   DB Romanian Deadlift; the rear delt fly and the home rear delt machine are one option).
 // 5 (2026-09-18): on a dumbbell kit the pullover machine is not offered (it is p220's DB pullover).
+// 6 (2026-09-18): how-tos for DB Romanian Deadlift, Single Leg Calf Raise and Weighted Single Leg Calf Raise ride on the rows.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 5;
+export const PLAN_WRITER_VERSION = 6;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

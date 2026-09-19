@@ -1061,6 +1061,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ACE, "Prone Scapular (Shoulder) Stabilization Exercises" — https://www.acefitness.org/resources/everyone/exercise-library/249/prone-scapular-shoulder-stabilization-series-i-y-t-w-o-formation/' },
   'zercher squat': { text: 'Set a bar in a rack at about the height of your breastbone. Rest the bar in the crooks of your arms, just below the elbows, hands apart or clasped. Stand up, take a few small steps back, and squat down with your upper arms vertical and the bar over the middle of your feet. Stand back up, keeping your shoulders down.',
     source: 'Dave Tate / elitefts, "A Beginner\'s Guide to the Zercher Squat" — https://elitefts.com/blogs/training/a-beginners-guide-to-the-zercher-squat; Viada p220 names it' },
+  // ⛔ THREE MORE, APPROVED BY MICHAEL 2026-09-18 AS WRITTEN — movements the filing places that had no words.
+  'db romanian deadlift': { text: 'Stand with your feet hip-width apart, a dumbbell in each hand at your sides, palms facing in. With your knees slightly bent and your back flat, push your hips back and lower the dumbbells until you feel a stretch in your hamstrings, about mid-shin. Push your hips forward to stand up, stopping just short of fully straight at the hips.',
+    source: 'NASM, "Dumbbell Romanian Deadlift" — https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift' },
+  'single leg calf raise': { text: 'Stand 6 to 12 inches from a wall with your hands on it at chest height, and lift your left foot off the floor. Raise your right heel as high as you can with your knee straight, pause, then lower it slowly. Finish your reps, then do the other leg.',
+    source: 'ACE, "Standing Calf Raises - Wall" (single-leg version) — https://www.acefitness.org/resources/everyone/exercise-library/73/standing-calf-raises-wall/' },
+  'weighted single leg calf raise': { text: 'Stand on the edge of a step with a dumbbell in each hand at your sides, and cross your left foot behind your right ankle. Lower your right heel below the step until you feel a stretch, then rise onto your toes as high as you can and pause. Finish your reps, then do the other leg.',
+    source: 'PureGym, "Single Leg Calf Raises" (with weight) — https://www.puregym.com/exercises/legs/calf-exercises/single-leg-calf-raises/' },
 };
 
 /**

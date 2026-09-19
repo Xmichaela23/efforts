@@ -730,6 +730,9 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 
 | Source | Movements it sets the steps for | Where |
 |---|---|---|
+| FIELD — NASM, "Dumbbell Romanian Deadlift" (https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift) | DB Romanian Deadlift (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Standing Calf Raises - Wall" (https://www.acefitness.org/resources/everyone/exercise-library/73/standing-calf-raises-wall/) | Single Leg Calf Raise (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — PureGym, "Single Leg Calf Raises" (https://www.puregym.com/exercises/legs/calf-exercises/single-leg-calf-raises/) | Weighted Single Leg Calf Raise (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ACE, "Farmer's Carry" (https://www.acefitness.org/resources/everyone/exercise-library/359/farmer-s-carry/) | Farmers Carry | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ACE, "Glute Bridge" (https://www.acefitness.org/resources/everyone/exercise-library/49/glute-bridge/) | Glute Bridge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ACE, "Lateral Lunge" (https://www.acefitness.org/resources/everyone/exercise-library/364/lateral-lunge/) | Lateral Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
