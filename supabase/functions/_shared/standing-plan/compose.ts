@@ -22,7 +22,7 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, executionHowTo, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
+import { bandRouteName, executionHowTo, executionName, hipThrustStandIn, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
   type ViadaIntent, type ViadaPattern } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
@@ -1153,6 +1153,11 @@ function exerciseForSlot(
         }
       }
     }
+    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
+    if (admittedNoMuscle.has(canonicalize('hip thrust')) || admittedNoMuscle.has(canonicalize('barbell hip thrust'))) {
+      const stand = hipThrustStandIn(args.equipment ?? null);
+      if (stand && !have.has(canonicalize(stand.name))) { resolved.options.push(stand); have.add(canonicalize(stand.name)); }
+    }
   }
   if (slot.muscle) {
     const want = String(slot.muscle);
@@ -1200,6 +1205,11 @@ function exerciseForSlot(
           }
         }
       }
+    }
+    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
+    if (admitted.has(canonicalize('hip thrust')) || admitted.has(canonicalize('barbell hip thrust'))) {
+      const stand = hipThrustStandIn(args.equipment ?? null);
+      if (stand && !resolved.options.some((x) => canonicalize(x.name) === canonicalize(stand.name))) resolved.options.push(stand);
     }
     const onMuscle = resolved.options.filter((o) => keep(o.name));
     if (onMuscle.length > 0) {

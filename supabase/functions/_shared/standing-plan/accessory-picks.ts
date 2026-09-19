@@ -32,6 +32,9 @@ import {
   resolveSlot,
   executionName,
   bandRouteName,
+  hipThrustStandIn,
+  builderReaches,
+  STAND_INS,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
@@ -716,8 +719,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ THE HIP THRUST LEADS (Michael, 2026-09-13, off the page photos): p246/p278 print no list for this
     // row's "accessory lower", and p247 defines an accessory as a non-competition lift in a similar movement
     // pattern. The frame cell names it (`alsoAdmits`). p220's press-lower movements follow.
-    hisList: ['hip thrust', 'split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
-    leadWith: ['hip thrust', 'split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
+    // ⛔ 2026-09-18 (Michael): p223's two hip thrusts lead; the barbell hip thrust stands in, marked, only where the
+    // kit has neither (`hipThrustStandIn`).
+    hisList: ['machine hip thrust', 'smith machine hip thrust', 'split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
+    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
     leadCite: 'Viada p247 — accessory lower (non-competition, similar pattern); p220 — secondary press lower',
     servesChips: [],
     requiresLoad: true,
@@ -1823,6 +1828,11 @@ export function pickOptions(
      * lower" row is a hinge in the catalogue. Only a name the row admits and not already found above is
      * looked for there; nothing else crosses the pattern. The composer runs the same search.
      */
+    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
+    if (admitted.has(canonicalize('hip thrust')) || admitted.has(canonicalize('barbell hip thrust'))) {
+      const stand = hipThrustStandIn(equipment);
+      if (stand && !found.some((m) => canonicalize(m.name) === canonicalize(stand.name))) found.push(stand);
+    }
     const have = new Set([...resolved.options, ...found].map((m) => canonicalize(m.name)));
     for (const pat of ['push_upper', 'pull_upper', 'press_lower', 'hinge_lower'] as ViadaPattern[]) {
       if (pat === spec.slot?.pattern) continue;
@@ -1958,7 +1968,7 @@ export function pickOptions(
        * called his own printed movement a substitute.**
        */
       // ⛔ A MOVEMENT PRINTED ON ANOTHER PAGE FOR THIS PATTERN (`alsoHis`) IS NOT A SUBSTITUTE.
-      ...(((narrowed.substituted && !alsoKeys.includes(canonicalize(m.name)))
+      ...(((narrowed.substituted && !alsoKeys.includes(canonicalize(m.name))) || (m as GridMovement).standIn === true
         || (admitted.has(canonicalize(m.name)) && !his.has(canonicalize(m.name)) && !alsoKeys.includes(canonicalize(m.name))))
         ? { substituted: true as const } : {}),
     }));
@@ -2345,6 +2355,19 @@ export function dialRowOptions(
   //
   // ⚠️ FALLS BACK TO THE UNFILTERED POOL RATHER THAN OFFERING NOTHING. No equipment case reaches it
   // today; it exists so a future catalogue edit degrades to a bad option instead of an empty select.
+  /**
+   * ⛔ A MARKED STAND-IN WHEN THE KIT REACHES NOTHING THE PAGES FILE FOR THIS MUSCLE (Michael, 2026-09-18). The
+   * smallest bodyweight or band movement the kit can do (`STAND_INS`), marked. OURS; ledger row "Stand-ins".
+   */
+  if (out.length === 0) {
+    const muscles = new Set<string>(DIAL_MUSCLES[chip]);
+    for (const name of Object.values(STAND_INS).flat()) {
+      const muscle = musclesWorkedBy(name)?.primary ?? null;
+      if (!muscle || !muscles.has(muscle) || !builderReaches(name, equipment ?? null)) continue;
+      out.push({ name, display: movementLabel(name), muscle, substituted: true });
+      break;
+    }
+  }
   const repBased = out.filter((o) => isRepPrescribable(o.name));
   const pool = repBased.length > 0 ? repBased : out;
 

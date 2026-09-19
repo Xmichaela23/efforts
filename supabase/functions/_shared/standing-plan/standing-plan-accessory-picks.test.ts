@@ -40,7 +40,7 @@ import { buildStandingPlanRow } from './plan-row.ts';
 import { FRAMES } from './frames.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { WEEKLY_SETS_SOLID, isRepPrescribable, musclesWorkedBy } from '../accessory-dosing/index.ts';
-import { allGridMovements } from '../strength-grid/index.ts';
+import { STAND_INS, allGridMovements } from '../strength-grid/index.ts';
 import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 /** A commercial-gym athlete. ⚠️ Declared equipment is the case the grid gates on. */
@@ -164,11 +164,12 @@ Deno.test('a day-scoped lower pick fills its OWN day and leaves the other alone'
   // has its own control, so a movement named for Friday must not appear on Tuesday.
   const picks: Partial<Record<ViadaPickKey, string>> = {
     ...defaultViadaPicks(EQUIPMENT, []),
-    single_leg_a: 'step up',
+    // ⛔ step up left for split squat 2026-09-18: a step-up is on no page, so no slot places it.
+    single_leg_a: 'split squat',
     single_leg_b: 'walking lunge',
   };
   const rows = rowsOf(week({ slotPicks: picks }));
-  assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize('step up')).map((r) => r.day),
+  assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize('split squat')).map((r) => r.day),
     ['Tuesday'], 'the day-2 single-leg pick left its day');
   assertEquals(rows.filter((r) => canonicalize(r.name) === canonicalize('walking lunge')).map((r) => r.day),
     ['Friday'], 'the day-5 single-leg pick left its day');
@@ -566,7 +567,9 @@ Deno.test('⛔ EVERY focus-row default is rep-based and on the catalogue', () =>
         `${chip} defaults to "${first.name}", which is measured in time, for ${JSON.stringify(equipment)}`);
       // ⛔ ON THE CATALOGUE. A name the grid does not hold is D-322's disease — it resolves to
       // nothing downstream and the control silently does nothing.
-      assert(allGridMovements().some((m) => canonicalize(m.name) === canonicalize(first.name)),
+      // ⚠️ OR A MARKED STAND-IN (Michael, 2026-09-18) — on no page, placed only when the kit reaches nothing filed.
+      const standIn = first.substituted === true && Object.values(STAND_INS).flat().includes(first.name);
+      assert(standIn || allGridMovements().some((m) => canonicalize(m.name) === canonicalize(first.name)),
         `${chip} defaults to "${first.name}", which is not in the grid catalogue`);
     }
   }
@@ -836,8 +839,9 @@ Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names'
   // THE DAY SPLIT STANDS; the heads now open on HIS OWN NAMES after the strict cut (2026-08-29).
   // p220 prints "Split squat" and "Forward or reverse lunge" - the Bulgarian and walking versions are
   // the same movements under a setup modification (p218), not separate entries.
-  // ⚠️ REBASED 2026-09-13 (Michael): the Day 2 "accessory lower" row opens on the hip thrust (p247).
-  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'hip thrust');
+  // ⚠️ REBASED 2026-09-13 (Michael): the Day 2 "accessory lower" row opens on the hip thrust (p247) — and since
+  // 2026-09-18 on p223's machine hip thrust, the barbell one a marked stand-in where the kit has neither.
+  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'machine hip thrust');
   assertEquals(VIADA_PICKS.single_leg_b.leadWith[0], 'walking lunge');
 });
 

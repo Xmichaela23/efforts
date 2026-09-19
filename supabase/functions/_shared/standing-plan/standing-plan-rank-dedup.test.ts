@@ -128,6 +128,8 @@ Deno.test('⛔ A BODYWEIGHT FALLBACK NEVER OUTRANKS A LOADED MOVEMENT THE ATHLET
       const patterns: (ViadaPattern | null)[] =
         category === 'core' || category === 'carry' ? [null] : VIADA_PATTERNS;
       for (const pattern of patterns) {
+        // ⛔ THE ONE CELL WHOSE HEAD IS RULED (Michael, 2026-09-18): the pull-up leads primary pull.
+        if (category === 'primary' && pattern === 'pull_upper') continue;
         for (const intent of VIADA_INTENTS) {
           const r = resolveSlot({ category, pattern, intent, equipment: kit.equipment });
           checked++;
@@ -261,8 +263,9 @@ Deno.test('⛔ THE COLLISIONS ARE REAL — the dedup has a subject', () => {
     byCanon.set(c, [...(byCanon.get(c) ?? []), m.name]);
   }
   const groups = [...byCanon.entries()].filter(([, names]) => names.length > 1);
-  assert(groups.length >= 10,
-    `only ${groups.length} collision groups — the dedup fix has lost its subject`);
+  // ⛔ ZERO SINCE 2026-09-18: one name for one movement (`SAME_MOVEMENT`) left the grid one entry per lift. The
+  // dedup stays for names that arrive from outside the catalogue (a stored row, a typed name).
+  assertEquals(groups.map(([c, n]) => `${c}: ${n.join(', ')}`), [], 'two grid entries are one lift');
 
   // The named ones from the report and its neighbours, each proven to be one lift and two strings.
   assertEquals(canonicalize('Bulgarian Split Squats'), canonicalize('bulgarian split squat'));

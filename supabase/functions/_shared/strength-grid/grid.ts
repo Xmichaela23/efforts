@@ -26,6 +26,9 @@ import {
   allGridMovements,
   canPerform,
   CATEGORY_DEFINITION,
+  STAND_INS,
+  HIP_THRUST_STAND_IN,
+  isAsymmetrical,
   equipmentFitRank,
   isGearTagged,
   movementsIn,
@@ -33,7 +36,7 @@ import {
   type ViadaCategory,
   type ViadaPattern,
 } from './taxonomy.ts';
-import { foldExerciseName, resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
+import { foldExerciseName, resolveExerciseConfig, SAME_MOVEMENT } from '../../../../src/lib/exercise-config.ts';
 import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement, athleteEquipmentToKeys, gearRoutesFor, type GearKey } from '../../../../src/lib/strength-gear.ts';
 
 export type SlotNote = {
@@ -72,6 +75,8 @@ export type ResolvedSlot = {
     toCategory: ViadaCategory;
     droppedAsymmetrical: boolean;
     ungated: boolean;
+    /** A marked stand-in on no page (`STAND_INS`, 2026-09-18). */
+    standIn?: true;
     reason: string;
     cite: string;
   };
@@ -227,7 +232,14 @@ function poolFor(
   let pool = movementsIn(category, pattern).filter(OFFERABLE);
   if (asymmetrical) pool = pool.filter((m) => m.asymmetrical);
   if (gated) pool = pool.filter((m) => reachable(m.name, equipment));
-  return rank(pool, equipment);
+  const ranked = rank(pool, equipment);
+  // ⛔ THE PULL-UP LEADS THE PRIMARY PULL CELL (Michael, 2026-09-18) — p218 prints it first, and with the barbell
+  // row filed beside it (p218) a week built the row twice and no vertical pull. Every other cell keeps its order.
+  if (category === 'primary' && pattern === 'pull_upper') {
+    const i = ranked.findIndex((m) => m.name === 'pull up');
+    if (i > 0) ranked.unshift(...ranked.splice(i, 1));
+  }
+  return ranked;
 }
 
 /**
@@ -242,6 +254,16 @@ export function cellOptions(
   equipment: string[] | null | undefined,
 ): GridMovement[] {
   return poolFor(category, category === 'core' || category === 'carry' ? null : pattern, false, equipment, true);
+}
+
+/**
+ * The barbell hip thrust as a marked stand-in, when the kit reaches neither hip thrust p223 prints; null otherwise
+ * (`HIP_THRUST_STAND_IN`, Michael 2026-09-18).
+ */
+export function hipThrustStandIn(equipment: string[] | null | undefined): GridMovement | null {
+  if (HIP_THRUST_STAND_IN.printed.some((n) => reachable(n, equipment))) return null;
+  if (!reachable(HIP_THRUST_STAND_IN.name, equipment)) return null;
+  return { name: HIP_THRUST_STAND_IN.name, category: 'focused', pattern: 'hinge_lower', asymmetrical: false, standIn: true };
 }
 
 /** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
@@ -359,6 +381,28 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
   // `gearRoutesFor` says it in as many words — *"a false exclusion is worse than a false offer"*.
   // An athlete who is shown a movement they cannot set up can swap it; an athlete shown an empty
   // slot has a hole in their programme and no way to know what belonged there.
+  // ── Rung 3: A MARKED STAND-IN (Michael, 2026-09-18). Nothing the pages file is reachable anywhere on the ladder,
+  // so the smallest bodyweight or band movement the kit can do holds the slot, marked. OURS (`STAND_INS`).
+  if (options.length === 0 && pattern) {
+    const found = STAND_INS[pattern]
+      .filter((name) => reachable(name, equipment))
+      .map((name): GridMovement => ({ name, category: req.category, pattern, asymmetrical: isAsymmetrical(name), standIn: true }));
+    if (found.length > 0) {
+      options = [found[0]];
+      substitution = {
+        fromCategory: req.category,
+        toCategory: req.category,
+        droppedAsymmetrical: asym,
+        ungated: false,
+        standIn: true,
+        reason: 'No movement the pages file for this slot is reachable with the declared equipment, so the '
+          + 'smallest bodyweight or band movement the kit can do stands in, marked.',
+        cite: 'ours',
+      };
+      notes.push({ kind: 'ours', text: 'A stand-in: no page prints a movement this kit can do for this slot.' });
+    }
+  }
+
   if (options.length === 0) {
     for (const alt of SUBSTITUTION_LADDER[req.category]) {
       const found = poolFor(alt, pattern, false, equipment, false);
@@ -997,9 +1041,19 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
  * The how-to for a movement on this kit, or `null` when the movement is not one a plan prints. Station words for an
  * athlete who owns the station (or declared no kit); the home version's words otherwise. See `EXECUTION_HOW_TO`.
  */
+/** A merged spelling's words (2026-09-18, `SAME_MOVEMENT`): the one entry's, or any spelling that now names it. */
+function sameMovementHowTo(name: string): (typeof EXECUTION_HOW_TO)[string] | undefined {
+  const f = foldExerciseName(name);
+  const canon = SAME_MOVEMENT[String(name ?? '').toLowerCase().trim()] ?? SAME_MOVEMENT[f] ?? f;
+  if (EXECUTION_HOW_TO[canon]) return EXECUTION_HOW_TO[canon];
+  const alias = Object.keys(SAME_MOVEMENT).find((a) => SAME_MOVEMENT[a] === canon && EXECUTION_HOW_TO[foldExerciseName(a)]);
+  return alias ? EXECUTION_HOW_TO[foldExerciseName(alias)] : undefined;
+}
+
 export function executionHowTo(name: string, equipment: string[] | null | undefined): string | null {
   const entry = EXECUTION_HOW_TO[foldExerciseName(name)]
-    ?? EXECUTION_HOW_TO[foldExerciseName(bandRouteName(name, equipment))];
+    ?? EXECUTION_HOW_TO[foldExerciseName(bandRouteName(name, equipment))]
+    ?? sameMovementHowTo(name);
   if (!entry) return null;
   if (!Array.isArray(entry)) return entry.text;
   const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());

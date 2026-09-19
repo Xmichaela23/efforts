@@ -180,7 +180,7 @@ Deno.test('a substitution is always declared, and an exact fill never claims one
         assert(r.substitution.reason.length > 20, `${where}: substituted with no reason`);
         assert(r.substitution.cite.length > 0, `${where}: substituted with no citation`);
         const changed = r.substitution.toCategory !== r.substitution.fromCategory
-          || r.substitution.droppedAsymmetrical || r.substitution.ungated;
+          || r.substitution.droppedAsymmetrical || r.substitution.ungated || r.substitution.standIn === true;
         assert(changed, `${where}: declared a substitution that changed nothing`);
         // The movement really is from the category it says it is.
         assertEquals(r.chosen.category, r.substitution.toCategory,
@@ -428,16 +428,15 @@ Deno.test('his own worked examples classify the way he files them', () => {
     ['sled push', 'carry', null],
     ['sled pull', 'carry', null],
     ['suitcase carry', 'carry', null],
-    // ⚠️ NOT A CARRY. A lateral band walk matches the carry test's `walk` and transports nothing —
-    // it is the only real subject of `CARRY_EXCLUDE_RE`, and without it that exclusion is untested.
-    ['lateral band walk', 'secondary', 'hinge_lower'],
+    // ⛔ ON NO PAGE (2026-09-18): the filing holds only what a page prints or its definition reaches.
+    ['lateral band walk', null as unknown as ViadaCategory, null],
   ];
 
   const wrong: string[] = [];
   for (const [name, category, pattern] of GROUND_TRUTH) {
     const gotC = viadaCategoryOf(name);
     if (gotC !== category) wrong.push(`${name}: category ${gotC} (he files it ${category})`);
-    if (category !== 'core' && category !== 'carry') {
+    if (category && category !== 'core' && category !== 'carry') {
       const gotP = viadaPatternOf(name);
       if (gotP !== pattern) wrong.push(`${name}: pattern ${gotP} (he files it ${pattern})`);
     }
@@ -445,29 +444,26 @@ Deno.test('his own worked examples classify the way he files them', () => {
   assertEquals(wrong, [], `the classifier disagrees with the source:\n  ${wrong.join('\n  ')}`);
 });
 
-Deno.test('single-joint beats bracing, because that is how HE resolves the overlap', () => {
-  // ⛔ A PEC DECK IS A MACHINE AND SINGLE-JOINT, AND HE FILES IT UNDER FOCUSED. Testing bracing
-  // first would move half his focused list into braced, so the order is load-bearing.
-  // Our catalogue's stand-ins for that overlap:
-  assertEquals(viadaCategoryOf('cable crossover'), 'focused', 'a single-joint cable movement went to braced');
-  assertEquals(viadaCategoryOf('cable curl'), 'focused', 'a single-joint cable movement went to braced');
-  // And a multi-joint cable movement stays braced.
-  assertEquals(viadaCategoryOf('cable row'), 'braced');
+Deno.test('⛔ FILED BY WHAT IT IS, NOT BY WORDS IN ITS NAME (Michael, 2026-09-18)', () => {
+  // A drag curl is a curl (p222 focused pull/arms), not a carry/drag.
+  assertEquals([viadaCategoryOf('drag curl'), viadaPatternOf('drag curl')], ['focused', 'pull_upper']);
+  // p222 prints the Tate press and skull crushers under FOCUSED PUSH/ARMS.
+  assertEquals(viadaCategoryOf('tate press'), 'focused');
+  assertEquals(viadaCategoryOf('skull crusher'), 'focused');
+  // Dips with the dip machine/pressdown, p221 braced push.
+  assertEquals(viadaCategoryOf('dips'), 'braced');
+  assertEquals(viadaCategoryOf('tricep dips'), 'braced');
+  // p220's definition reaches a dumbbell or kettlebell version of a printed movement, and nothing of another kind.
+  assertEquals(viadaCategoryOf('db bench press'), 'secondary');
+  assertEquals(viadaCategoryOf('kettlebell press'), 'secondary');
+  for (const n of ['kettlebell snatches', 'db thruster', 'push up', 'diamond push up', 'cable row', 'core work (5 min - your choice)', 'core work']) {
+    assertEquals(viadaCategoryOf(n), null, `${n} is on no page for any level`);
+  }
+  // Single-joint work stays focused, whatever the implement.
+  assertEquals(viadaCategoryOf('cable crossover'), 'focused');
+  assertEquals(viadaCategoryOf('cable curl'), 'focused');
   assertEquals(viadaCategoryOf('lat pulldown'), 'braced');
-});
-
-Deno.test('the arm flag does not turn a compound press into an isolation movement', () => {
-  // ⛔ `armIsolation` IS TRUE FOR A CLOSE-GRIP BENCH AND A DIAMOND PUSH-UP — correctly, they are
-  // triceps movements — and NEITHER IS SINGLE-JOINT. Viada files close-grip bench under SECONDARY
-  // PUSH UPPER by name. This is `exercise-config.ts`'s own "same data, two questions" warning
-  // arriving: the arm flag is right about arms and silent about joint count.
-  assertEquals(getExerciseConfig('close grip bench press')?.armIsolation, true,
-    'the premise of this test has gone — close-grip bench is no longer flagged as arm work');
   assertEquals(viadaCategoryOf('close grip bench press'), 'secondary');
-  assertEquals(viadaCategoryOf('diamond push up'), 'secondary');
-  // While real single-joint arm work does land in focused.
-  assertEquals(viadaCategoryOf('triceps pushdown'), 'focused');
-  assertEquals(viadaCategoryOf('dumbbell curl'), 'focused');
 });
 
 Deno.test('asymmetrical is a MODIFIER — there is no sixth category', () => {

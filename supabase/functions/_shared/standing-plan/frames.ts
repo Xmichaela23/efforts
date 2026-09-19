@@ -486,7 +486,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -570,7 +570,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -999,7 +999,7 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -1060,7 +1060,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],

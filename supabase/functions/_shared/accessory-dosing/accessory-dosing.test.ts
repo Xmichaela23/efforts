@@ -193,7 +193,8 @@ Deno.test('every catalogued movement attributes to exactly one muscle, or to non
       assert(MUSCLE_GROUPS.includes(s), `${m.name}: secondary "${s}" is not a group`);
     }
   }
-  assert(attributed > 150, `only ${attributed} movements attributed`);
+  // ⛔ 150 → 110 on 2026-09-18: the grid holds only what the pages file, one entry per movement.
+  assert(attributed > 110, `only ${attributed} movements attributed`);
   assertEquals(musclesWorkedBy('interpretive dance'), null);
   assertEquals(musclesWorkedBy(''), null);
 });

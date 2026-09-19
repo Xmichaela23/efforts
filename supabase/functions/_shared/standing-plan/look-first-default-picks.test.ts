@@ -22,11 +22,14 @@ const day2 = (frame: 'strength_5k' | 'cycling_base', equipment: string[], picks?
 
 Deno.test('⛔ the defaults Michael ruled, per plan and kit', () => {
   for (const f of ['strength_5k', 'cycling_base'] as const) {
-    assertEquals(defaultViadaPicks(GYM, [], f).hinge_lower, 'kettlebell swing');
-    assertEquals(defaultViadaPicks(HOME_KB, [], f).hinge_lower, 'kettlebell swing');
+    // `kettlebell swing` is one entry with p220's `KB swing` since 2026-09-18 (SAME_MOVEMENT).
+    assertEquals(defaultViadaPicks(GYM, [], f).hinge_lower, 'kb swing');
+    assertEquals(defaultViadaPicks(HOME_KB, [], f).hinge_lower, 'kb swing');
     assertEquals(defaultViadaPicks(HOME, [], f).hinge_lower, 'romanian deadlift');
+    // p223's hip thrust at a gym; the barbell one, a marked stand-in, where the kit has neither (2026-09-18).
+    assertEquals(defaultViadaPicks(GYM, [], f).single_leg_a, 'machine hip thrust');
+    assertEquals(defaultViadaPicks(HOME, [], f).single_leg_a, 'hip thrust');
     for (const kit of [GYM, HOME]) {
-      assertEquals(defaultViadaPicks(kit, [], f).single_leg_a, 'hip thrust');
       assertEquals(defaultViadaPicks(kit, [], f).iso_push, 'lateral raise');
     }
   }
@@ -63,6 +66,6 @@ Deno.test('⛔ Day 2 builds the hip thrust on the accessory lower row with the d
   for (const f of ['strength_5k', 'cycling_base'] as const) {
     const rows = day2(f, HOME_KB, defaultViadaPicks(HOME_KB, [], f) as Record<string, string>);
     assertEquals(rows.map((e) => `${e.slot_intent}:${e.name}:${e.sets}x${e.reps}`),
-      ['ME:Back Squat:1x1-5', 'ME:Trap Bar Deadlift:1x1-5', 'DE:Kettlebell Swing:4x2-4', 'HYP:Hip Thrust:3x6-12']);
+      ['ME:Back Squat:1x1-5', 'ME:Trap Bar Deadlift:1x1-5', 'DE:KB Swing:4x2-4', 'HYP:Hip Thrust:3x6-12']);
   }
 });

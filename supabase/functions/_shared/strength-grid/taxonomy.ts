@@ -34,6 +34,7 @@
 
 import {
   EXERCISE_CONFIG,
+  SAME_MOVEMENT,
   foldExerciseName,
   getExerciseConfig,
   type MovementPattern,
@@ -42,7 +43,6 @@ import {
   ASSISTANCE_GEAR,
   canPerform,
   equipmentFitRank,
-  gearRoutesFor,
 } from '../../../../src/lib/strength-gear.ts';
 
 /**
@@ -132,55 +132,11 @@ export function viadaPatternOfMovementPattern(p: MovementPattern | null | undefi
   }
 }
 
-// ── THE CLASSIFIER ──────────────────────────────────────────────────────────────────────────────
+// ── THE EQUIPMENT READING OF A NAME ─────────────────────────────────────────────────────────────
 //
-// ⛔ ORDER IS THE WHOLE ALGORITHM, and it is taken from how HE resolves his own overlaps. A pec deck
-// is both a machine and single-joint, and he files it under FOCUSED, not BRACED — so single-joint is
-// tested BEFORE external bracing. A machine chest press is a machine and multi-joint, so it lands in
-// BRACED. Reversing those two tests moves half his focused list into braced.
-
-/** Transports the load, or picks it up and puts it down (p226). */
-const CARRY_RE = /\b(carry|carries|farmer|farmers|yoke|sled|drag|tire flip|suitcase|walk|walks)\b/;
-
-/**
- * ⚠️ THE EXCLUSION'S REAL SUBJECT IS THE BAND WALK, not the walking lunge — checked rather than
- * assumed. `\bwalk\b` does not match "walking lunge" at all, so the lunge clause never fired; what
- * DOES match is `lateral band walk`, a banded hip-abduction drill that transports nothing. The
- * lunge clause is kept because a "walk lunge" spelling would reach it, and it costs nothing.
- */
-const CARRY_EXCLUDE_RE = /\blunge|band walk|lateral walk\b/;
-
-/**
- * Single-joint emphasis (pp222-223). ⚠️ `armIsolation` on the config answers the arm half of this
- * already and is READ rather than re-derived — it is the existing accessor for exactly this question
- * one axis over. The name test covers the leg and shoulder half, which no existing flag answers.
- */
-const SINGLE_JOINT_RE =
-  /\b(raise|raises|extension|extensions|curl|curls|fly|flye|flyes|flies|pushdown|pressdown|kickback|kickbacks|pec deck|adduction|abduction|pullover|pullovers|scaption|crossover)\b/;
-
-/**
- * ⛔ THE SINGLE-JOINT TEST'S EXCLUSIONS, EACH FOR A NAMED REASON — a bare regex over "extension" and
- * "raise" swallows four movements that are hinges, and his own lists put every one of them under a
- * lower-body heading rather than under FOCUSED.
- *
- *   back extension / hyperextension  — his BRACED HINGE LOWER list, by name
- *   glute-ham raise                  — the same list's GHD entry; it is a two-joint posterior chain lift
- *   hip thrust                       — a hinge; his FOCUSED entry is specifically the MACHINE version
- *   knee raise / leg raise (hanging) — trunk flexion; his CORE list, by name
- */
-const SINGLE_JOINT_EXCLUDE_RE =
-  /\b(back extension|hyperextension|hyper|glute ham|glute-ham|hip thrust|knee raise|knee raises|leg raise|leg raises|hip extension)\b/;
-
-/**
- * ⛔ AND THE SECOND SET OF EXCLUSIONS, WHICH THE `armIsolation` FLAG MAKES NECESSARY. That flag
- * answers *"is this direct arm work?"* — and it is TRUE for a close-grip bench press and a diamond
- * push-up, correctly, because both are triceps movements. **Neither is single-joint.** Viada files
- * close-grip bench under SECONDARY PUSH UPPER by name.
- *
- * ⚠️ This is the `armIsolation` header's own warning arriving: *"same data, two questions."* The arm
- * flag is right about arms and silent about joint count, so joint count is asked separately here.
- */
-const COMPOUND_DESPITE_ARM_RE = /\b(bench press|push up|push-up|pushup|dip|dips|row|pull up|chin up)\b/;
+// ⛔ THE NAME-READING CLASSIFIER IS GONE (2026-09-18): a movement's heading is its entry in `FILING` below, by what
+// it is (a drag curl is a curl, not a drag). What is left of the name tests answers one other question — does a
+// movement need a machine — for the equipment gate.
 
 /** More externally braced (pp221-222): a machine, a Smith rack, a cable stack, a sled-guided path. */
 const BRACED_RE =
@@ -225,28 +181,202 @@ export function readsAsMachineBraced(exerciseName: string): boolean {
  */
 const MACHINE_BRACED_EXCLUDE_RE = /\bband\b/;
 
-/**
- * ⛔ CONTEST LIFT — the PRIMARY test, and it is derived from OUR data rather than from his list.
- *
- * His definition has two halves: *compound, barbell or bar, cardinal plane* AND *contest- or
- * assessment-specific*. The app already records which movements are the assessment lifts: they are
- * the ones a 1RM is held for (`primaryRef`) which load at their own reference — `ratio === 1`. That
- * is `back squat`, `deadlift` and its bar variants, `bench press`, the overhead presses. Everything
- * else that references a primary loads at some fraction of it, which is precisely Viada's
- * "noncontested" secondary.
- *
- * ⚠️ TWO NAMED ADDITIONS, BOTH COMPETITION LIFTS THAT OUR RATIOS PRICE BELOW 1.0 BECAUSE THEY ARE
- * HARDER, NOT BECAUSE THEY ARE ACCESSORIES: the front squat (0.85 of a back squat) and the pull-up.
- * Both are contest/assessment movements — the front squat is a competition lift in weightlifting and
- * an assessment lift here, and the pull-up has a tested capacity field of its own
- * (`performance_numbers.pullupMaxReps`). Leaving them out would file a pull-up as "secondary pull".
- */
-const PRIMARY_NAMED_RE = /\b(front squat|pull up|pull-up|pullup|chin up|chin-up|chinup|box squat)\b/;
 
-/** Anything the app itself treats as bar work. Used only to keep bodyweight out of PRIMARY. */
-function isBarMovement(name: string): boolean {
-  const routes = gearRoutesFor(name);
-  return routes.some((r) => r.includes('barbell'));
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// ⛔ THE FILING — EVERY MOVEMENT BY WHAT IT IS, WITH ITS PAGE (Michael, 2026-09-18).
+//
+// This replaced the name-reading classifier (the regexes above it now answer only the equipment question in
+// `readsAsMachineBraced`). The rule, his words: *the page's printed list for the slot, extended ONLY by the
+// definition's own words, and nothing of another kind*; "file by what the movement is, not by words in its name"
+// (a drag curl is a curl). One filing, read by the builder and by the Swap sheet.
+//
+//   printed  — named on the page, under that heading.
+//   variant  — the definition's own words reach it: PRIMARY "contest-/assessment-specific movement with or without
+//              minor modifications to setup" (pp218-219); SECONDARY "compound noncontested movements, dumbbell
+//              variants" (p220) — a dumbbell or kettlebell version of a printed movement; FOCUSED "single-joint
+//              emphasis (chest/deltoid/lat/hamstring/quad/calf/biceps/triceps)" (pp222-223); CORE "dynamic plank
+//              variants" and the printed movements' own variants (p223); CARRY "axial loading/carry variants" (p226).
+//   ⚠️ judged — ours: a single-limb version of a printed movement (Bulgarian split squat, single-leg RDL, walking
+//              lunge), filed with the movement it is. Named in the report so it can be struck.
+//
+// Anything not here is on no page for any level: the builder does not place it and the Swap sheet does not offer
+// it (push-ups, inverted rows, band rows, step-ups, glute bridges, hip thrusts on a bar, static planks, side bends).
+// A spelling of one of these resolves through `SAME_MOVEMENT` in exercise-config.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+type Filed = { category: ViadaCategory; pattern: ViadaPattern | null; basis: 'printed' | 'variant' | 'judged'; cite: string };
+const F = (category: ViadaCategory, pattern: ViadaPattern | null, basis: Filed['basis'], cite: string): Filed =>
+  ({ category, pattern, basis, cite });
+
+export const FILING: Readonly<Record<string, Filed>> = {
+  // PRIMARY — p218 push upper, pull; p219 hinge, push lower
+  'bench press': F('primary', 'push_upper', 'printed', 'p218'),
+  'decline bench press': F('primary', 'push_upper', 'variant', 'p218 — bench press, setup modified'),
+  'military press': F('primary', 'push_upper', 'printed', 'p218'),
+  'push press': F('primary', 'push_upper', 'printed', 'p218'),
+  'pull up': F('primary', 'pull_upper', 'printed', 'p218'),
+  'chin up': F('primary', 'pull_upper', 'variant', 'p218 — pull-up, grip modified'),
+  'barbell row': F('primary', 'pull_upper', 'printed', 'p218'),
+  'deadlift': F('primary', 'hinge_lower', 'printed', 'p219'),
+  'paused deadlift': F('primary', 'hinge_lower', 'printed', 'p219'),
+  'sumo deadlift': F('primary', 'hinge_lower', 'printed', 'p219'),
+  'trap bar deadlift': F('primary', 'hinge_lower', 'printed', 'p219'),
+  'back squat': F('primary', 'press_lower', 'printed', 'p219'),
+  'front squat': F('primary', 'press_lower', 'printed', 'p219'),
+  'box squat': F('primary', 'press_lower', 'printed', 'p219'),
+  // SECONDARY — p220
+  'larsen press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'incline bench press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'close grip bench press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'jm press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'seated db press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'arnold press': F('secondary', 'push_upper', 'printed', 'p220'),
+  'db bench press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell bench press'),
+  'db incline press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell incline bench press'),
+  'db shoulder press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell military press'),
+  'db floor press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell bench press from the floor'),
+  'db push press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell push press'),
+  'kettlebell press': F('secondary', 'push_upper', 'variant', 'p220 — kettlebell military press'),
+  'kroc row': F('secondary', 'pull_upper', 'printed', 'p220'),
+  't-bar row': F('secondary', 'pull_upper', 'printed', 'p220'),
+  'meadows row': F('secondary', 'pull_upper', 'printed', 'p220'),
+  'gorilla row': F('secondary', 'pull_upper', 'printed', 'p220'),
+  'db pullover': F('secondary', 'pull_upper', 'printed', 'p220 — DB pullovers'),
+  'db row': F('secondary', 'pull_upper', 'variant', 'p220 — dumbbell barbell row'),
+  'kettlebell row': F('secondary', 'pull_upper', 'variant', 'p220 — kettlebell barbell row'),
+  'romanian deadlift': F('secondary', 'hinge_lower', 'printed', 'p220'),
+  'stiff-legged deadlift': F('secondary', 'hinge_lower', 'printed', 'p220'),
+  'weighted reverse hyper': F('secondary', 'hinge_lower', 'printed', 'p220 — bench reverse hyper'),
+  'good morning': F('secondary', 'hinge_lower', 'printed', 'p220'),
+  'kb swing': F('secondary', 'hinge_lower', 'printed', 'p220'),
+  'sandbag throw': F('secondary', 'hinge_lower', 'printed', 'p220'),
+  'db romanian deadlift': F('secondary', 'hinge_lower', 'variant', 'p220 — dumbbell Romanian deadlift'),
+  'dumbbell swing': F('secondary', 'hinge_lower', 'variant', 'p220 — dumbbell KB swing'),
+  'single leg rdl': F('secondary', 'hinge_lower', 'judged', 'p220 — Romanian deadlift, one leg'),
+  'split squat': F('secondary', 'press_lower', 'printed', 'p220'),
+  'zercher squat': F('secondary', 'press_lower', 'printed', 'p220'),
+  'freestanding barbell calf raise': F('secondary', 'press_lower', 'printed', 'p220'),
+  'lunge': F('secondary', 'press_lower', 'printed', 'p220 — forward lunge'),
+  'reverse lunge': F('secondary', 'press_lower', 'printed', 'p220'),
+  'goblet squat': F('secondary', 'press_lower', 'variant', 'p220 — dumbbell front squat'),
+  'weighted single leg calf raise': F('secondary', 'press_lower', 'variant', 'p220 — dumbbell freestanding calf raise'),
+  'walking lunge': F('secondary', 'press_lower', 'judged', 'p220 — forward lunge, travelling'),
+  'barbell walking lunge': F('secondary', 'press_lower', 'judged', 'p220 — forward lunge, travelling'),
+  'bulgarian split squat': F('secondary', 'press_lower', 'judged', 'p220 — split squat, rear foot raised'),
+  // BRACED — p221 push upper, pull upper, push lower; p222 hinge lower
+  'smith machine press': F('braced', 'push_upper', 'printed', 'p221'),
+  'machine chest press': F('braced', 'push_upper', 'printed', 'p221'),
+  'dip machine': F('braced', 'push_upper', 'printed', 'p221 — dip machine/pressdown'),
+  'dips': F('braced', 'push_upper', 'variant', 'p221 — dip machine/pressdown (Michael, 2026-09-18)'),
+  'chest supported row': F('braced', 'pull_upper', 'printed', 'p221'),
+  'lat pulldown': F('braced', 'pull_upper', 'printed', 'p221 — single or double, any grip'),
+  'explosive lat pull down': F('braced', 'pull_upper', 'printed', 'p221 — lat pulldown'),
+  'cable upright row': F('braced', 'pull_upper', 'printed', 'p221'),
+  'hack squat': F('braced', 'press_lower', 'printed', 'p221'),
+  'leg press': F('braced', 'press_lower', 'printed', 'p221'),
+  'lever squat': F('braced', 'press_lower', 'printed', 'p221'),
+  'reverse hyperextension': F('braced', 'hinge_lower', 'printed', 'p222 — reverse hyperextension (machine)'),
+  'ghd back extension': F('braced', 'hinge_lower', 'printed', 'p222'),
+  'ground-based deadlift machine': F('braced', 'hinge_lower', 'printed', 'p222'),
+  'machine back extension': F('braced', 'hinge_lower', 'printed', 'p222'),
+  'back extension': F('braced', 'hinge_lower', 'printed', 'p222 — machine back extension, on a bench'),
+  // FOCUSED — p222 push/arms, pull/arms; p223 push lower/quads, hinge lower/hamstrings
+  'triceps pushdown': F('focused', 'push_upper', 'printed', 'p222'),
+  'tate press': F('focused', 'push_upper', 'printed', 'p222'),
+  'behind the neck db triceps extension': F('focused', 'push_upper', 'printed', 'p222'),
+  'skull crusher': F('focused', 'push_upper', 'printed', 'p222'),
+  'pec deck': F('focused', 'push_upper', 'printed', 'p222'),
+  'lateral raise': F('focused', 'push_upper', 'printed', 'p222'),
+  'tricep extension': F('focused', 'push_upper', 'variant', 'p222 — single-joint triceps'),
+  'band tricep pushdown': F('focused', 'push_upper', 'variant', 'p222 — triceps pushdown, band'),
+  'chest fly': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),
+  'cable crossover': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),
+  'front raise': F('focused', 'push_upper', 'variant', 'p222 — single-joint deltoid'),
+  'plate raise': F('focused', 'push_upper', 'variant', 'p222 — single-joint deltoid'),
+  'band lateral raise': F('focused', 'push_upper', 'variant', 'p222 — lateral raise, band'),
+  'scaption': F('focused', 'push_upper', 'variant', 'p222 — single-joint deltoid'),
+  'preacher curl': F('focused', 'pull_upper', 'printed', 'p222'),
+  'spider curl': F('focused', 'pull_upper', 'printed', 'p222'),
+  'rear delt machine': F('focused', 'pull_upper', 'printed', 'p222'),
+  'drag curl': F('focused', 'pull_upper', 'printed', 'p222'),
+  'pullover machine': F('focused', 'pull_upper', 'printed', 'p222'),
+  'barbell curl': F('focused', 'pull_upper', 'variant', 'p222 — single-joint biceps'),
+  'dumbbell curl': F('focused', 'pull_upper', 'variant', 'p222 — single-joint biceps'),
+  'hammer curl': F('focused', 'pull_upper', 'variant', 'p222 — single-joint biceps'),
+  'cable curl': F('focused', 'pull_upper', 'variant', 'p222 — single-joint biceps'),
+  'rear delt fly': F('focused', 'pull_upper', 'variant', 'p222 — rear delt machine, free weight'),
+  'reverse flyes (bodyweight)': F('focused', 'pull_upper', 'variant', 'p222 — single-joint deltoid'),
+  'ytw raise': F('focused', 'pull_upper', 'variant', 'p222 — single-joint deltoid'),
+  'leg extension': F('focused', 'press_lower', 'printed', 'p223'),
+  'hip adduction machine': F('focused', 'press_lower', 'printed', 'p223'),
+  'weighted knee raise': F('focused', 'press_lower', 'printed', 'p223 — weighted knee raises (hip flexors)'),
+  'seated calf raise': F('focused', 'press_lower', 'printed', 'p223'),
+  'banded leg extension': F('focused', 'press_lower', 'variant', 'p223 — leg extension, band'),
+  'calf raise': F('focused', 'press_lower', 'variant', 'p223 — single-joint calf'),
+  'single leg calf raise': F('focused', 'press_lower', 'variant', 'p223 — single-joint calf'),
+  'soleus raise': F('focused', 'press_lower', 'variant', 'p223 — single-joint calf'),
+  'machine hip thrust': F('focused', 'hinge_lower', 'printed', 'p223'),
+  'smith machine hip thrust': F('focused', 'hinge_lower', 'printed', 'p223'),
+  'leg curl': F('focused', 'hinge_lower', 'printed', 'p223 — hamstring curls (seated or prone)'),
+  'cable kickback': F('focused', 'hinge_lower', 'printed', 'p223'),
+  'band leg curl': F('focused', 'hinge_lower', 'variant', 'p223 — hamstring curl, band'),
+  'nordic hamstring curl': F('focused', 'hinge_lower', 'variant', 'p223 — single-joint hamstring'),
+  // CORE EXERCISES — p223
+  'hanging leg raise': F('core', null, 'printed', 'p223'),
+  'hanging knee raise': F('core', null, 'variant', 'p223 — hanging leg raise, knees bent'),
+  'toes to bar': F('core', null, 'variant', 'p223 — hanging leg raise'),
+  'crunch': F('core', null, 'printed', 'p223'),
+  'reverse crunch': F('core', null, 'variant', 'p223 — crunch'),
+  'bicycle crunch': F('core', null, 'variant', 'p223 — crunch'),
+  'cross body crunch': F('core', null, 'variant', 'p223 — crunch'),
+  'cable crunch': F('core', null, 'variant', 'p223 — crunch'),
+  'ab machine crunch': F('core', null, 'variant', 'p223 — crunch'),
+  'v up': F('core', null, 'printed', 'p223'),
+  'ab wheel rollout': F('core', null, 'printed', 'p223'),
+  'stability ball rollout': F('core', null, 'variant', 'p223 — rollout'),
+  'plank with shoulder tap': F('core', null, 'variant', 'p223 — dynamic plank variants'),
+  'stir the pot': F('core', null, 'variant', 'p223 — dynamic plank variants'),
+  'trx fallout': F('core', null, 'variant', 'p223 — dynamic plank variants'),
+  'side plank with hip dip': F('core', null, 'variant', 'p223 — dynamic plank variants'),
+  'side plank abduction': F('core', null, 'variant', 'p223 — dynamic plank variants'),
+  // CARRY/DRAG/PICK OPTIONS — p226
+  'farmers carry': F('carry', null, 'printed', "p226 — farmer's carry"),
+  'suitcase carry': F('carry', null, 'variant', "p226 — farmer's carry, one hand"),
+  'overhead carry': F('carry', null, 'variant', 'p226 — axial loading/carry variants'),
+  'sled push': F('carry', null, 'printed', 'p226'),
+  'sled pull': F('carry', null, 'printed', 'p226'),
+};
+
+/**
+ * ⛔ STAND-INS — ON NO PAGE, NEVER OFFERED, PLACED ONLY WHEN THE KIT REACHES NOTHING THE PAGES FILE (Michael,
+ * 2026-09-18: "the builder keeps the smallest bodyweight/band movement the kit can do as a marked stand-in; the swap
+ * list never offers it"). OURS — the pages print no bodyweight or band movement for these patterns; the order,
+ * smallest first, is ours. Ledger row: docs/STATE-SOURCES.md "Stand-ins". Read only by the builder's last gated rung
+ * (`resolveSlot`); the Swap sheet reads `FILING` and never sees these.
+ */
+export const STAND_INS: Readonly<Record<ViadaPattern, readonly string[]>> = {
+  push_upper: ['push up', 'band overhead press', 'pike push up'],
+  pull_upper: ['band row', 'inverted row', 'band pull down', 'band assisted pull up'],
+  hinge_lower: ['glute bridge', 'single leg glute bridge'],
+  press_lower: ['bodyweight squat', 'step up', 'single leg squat'],
+};
+
+/**
+ * ⛔ THE BARBELL HIP THRUST, A MARKED STAND-IN ONLY WHERE THE KIT HAS NEITHER HIP THRUST p223 PRINTS (Michael,
+ * 2026-09-18: "keep as a marked stand-in only where the kit has no hip thrust machine or Smith machine").
+ */
+export const HIP_THRUST_STAND_IN = { name: 'hip thrust', printed: ['machine hip thrust', 'smith machine hip thrust'] } as const;
+
+/** The filing for a movement under any of its spellings, or null when no page reaches it. */
+export function filingOf(exerciseName: string): Filed | null {
+  const raw = String(exerciseName ?? '').trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  const folded = foldExerciseName(raw);
+  const key = SAME_MOVEMENT[lower] ?? SAME_MOVEMENT[folded] ?? lower;
+  if (FILING[key]) return FILING[key];
+  const fk = Object.keys(FILING).find((k) => foldExerciseName(k) === foldExerciseName(key));
+  return fk ? FILING[fk] : null;
 }
 
 /**
@@ -257,63 +387,13 @@ function isBarMovement(name: string): boolean {
  * reaches an athlete.
  */
 export function viadaCategoryOf(exerciseName: string): ViadaCategory | null {
-  const raw = String(exerciseName ?? '').trim();
-  if (!raw) return null;
-  const key = foldExerciseName(raw);
-  const cfg = getExerciseConfig(raw);
-  if (!cfg) return null;
-
-  // 1. Transported load. His own category, and nothing else can claim it.
-  if (CARRY_RE.test(key) && !CARRY_EXCLUDE_RE.test(key)) return 'carry';
-
-  /**
-   * ⛔ PLYOMETRICS ARE NOT IN THE LIFTING KEY, and neither is anything the app cannot give a pattern.
-   *
-   * p227 is its own section with its own rules — drills done separately, ample rest, stop when the
-   * movement is optimised for the day, and "fatigue, poor form and imprecise movements are absolute
-   * no-no's". None of that is a set-and-rep prescription, and running a box jump through the ME/DE/
-   * SKILL/HYP table would produce one. The All Rounder's day 3 is a *plyo warm-up*, not a lifting
-   * slot, and the composer owns it.
-   *
-   * ⚠️ The pattern-less remainder — dead hangs, wall sits, burpees — has no place in a grid indexed
-   * by pattern either. Excluding them is what stops them being offered as "secondary, no pattern".
-   */
-  if (cfg.pattern === 'plyometric') return null;
-  if (cfg.pattern == null) return null;
-
-  // 2. Trunk. `core` is already the app's own pattern value for exactly this.
-  if (cfg.pattern === 'core') return 'core';
-
-  // 3. Single-joint BEFORE bracing — his pec deck sits in FOCUSED, not BRACED.
-  const singleJoint = (cfg.armIsolation === true || cfg.pattern === 'calf' || SINGLE_JOINT_RE.test(key))
-    && !SINGLE_JOINT_EXCLUDE_RE.test(key)
-    && !COMPOUND_DESPITE_ARM_RE.test(key);
-  if (singleJoint) return 'focused';
-
-  // 4. Externally braced.
-  if (BRACED_RE.test(key)) return 'braced';
-
-  // 5. Contest / assessment lift on a bar.
-  /**
-   * ⚠️ NO DUMBBELL EXCLUSION HERE, AND THAT IS MEASURED RATHER THAN ASSUMED. A guard reading
-   * `!/db|dumbbell|kettlebell|band|goblet/` stood here to keep his "dumbbell variants" out of
-   * PRIMARY. Mutation-testing removed it and nothing moved: **no movement in the catalogue has
-   * `ratio === 1` and a `primaryRef` and a dumbbell name**, because a dumbbell variant is priced at
-   * a fraction of the lift it references, which is exactly what makes it secondary. The guard had no
-   * subject, no test could reach it, and an unread branch is the disease this codebase keeps
-   * deleting — so it is deleted rather than kept as decoration.
-   */
-  const contest = (cfg.ratio === 1 && cfg.primaryRef != null) || PRIMARY_NAMED_RE.test(key);
-  if (contest && (isBarMovement(raw) || cfg.primaryRef != null || PRIMARY_NAMED_RE.test(key))) {
-    return 'primary';
-  }
-
-  // 6. Everything else compound and free — his secondary.
-  return 'secondary';
+  return filingOf(exerciseName)?.category ?? null;
 }
 
 /** His four patterns, for a movement, via the app's own nine. */
 export function viadaPatternOf(exerciseName: string): ViadaPattern | null {
+  const filed = filingOf(exerciseName);
+  if (filed) return filed.pattern;
   const cfg = getExerciseConfig(String(exerciseName ?? ''));
   return viadaPatternOfMovementPattern(cfg?.pattern ?? null);
 }
@@ -332,6 +412,8 @@ export function isAsymmetrical(exerciseName: string): boolean {
 // ── THE CATALOGUE, INDEXED ──────────────────────────────────────────────────────────────────────
 
 export type GridMovement = {
+  /** A movement on no page, placed because the kit reaches nothing the pages file (`STAND_INS`). Never offered. */
+  standIn?: true;
   /** ⛔ THE STORED NAME. It resolves EXACTLY in `EXERCISE_CONFIG` — asserted by the gate, because a
    *  name that only fuzzy-matches silently borrows another movement's ratio (D-322). */
   name: string;
@@ -429,68 +511,6 @@ export function allGridMovements(): GridMovement[] {
   return out;
 }
 
-/**
- * ⛔⛔ A MOVEMENT MAY SIT IN TWO OF HIS CATEGORIES, BECAUSE HIS OWN KEY DOES THAT (Michael's ruling,
- * 2026-08-29: *"I would just put them in both and don't complicate it, the only gates that matter are
- * equipment gates"*).
- *
- * ⛔ THE CASE, AND IT IS THE ONLY ONE IN THE KEY: **calf raises are printed in two categories.**
- *   · p220, SECONDARY press lower — *"freestanding barbell calf raises"*
- *   · p223, FOCUSED push lower / quads — *"seated calf raises"*
- *
- * ⚠️ `viadaCategoryOf` CANNOT EXPRESS THIS AND IS NOT ASKED TO. It answers "what IS this movement"
- * with one value, by rule (single-joint → focused), and every other caller depends on that single
- * answer. This table answers a different question — *"which cells may OFFER it"* — and it is
- * additive only: nothing is removed from the category the classifier gives it. Same data, two
- * questions, two accessors, which is the shape `CLAUDE.md` names.
- *
- * ⚠️ IT IS NOT A LICENCE TO CROSS-FILE ANYTHING. A movement belongs here only when HE prints it in
- * two lists. Everything else is the classifier's business.
- */
-const ALSO_OFFERED_IN: { match: RegExp; categories: ViadaCategory[] }[] = [
-  // ⛔ Every calf variant, both ways. The rule-based classifier files them all `focused` (single
-  // joint); p220 puts the barbell one in `secondary`. Rather than adjudicate per variant — which is
-  // the complication the ruling refuses — both cells offer all of them and the EQUIPMENT GATE
-  // decides what an athlete actually sees: the barbell one needs a barbell, the seated one a station.
-  { match: /\bcalf\b|\bsoleus\b/i, categories: ['secondary', 'focused'] },
-  /**
-   * FOUR OF HIS OWN MOVEMENTS THAT THE RULE-BASED CLASSIFIER MISFILES (2026-08-29). Each is printed
-   * in a FOCUSED list on p222 and lands somewhere else by rule:
-   *   tate press, skull crusher -> `secondary` (they read as compound presses)
-   *   rear delt machine         -> `braced`    (the machine bracing wins over the single joint)
-   *   drag curl                 -> `carry`     (the word "drag" matches the carry/drag family)
-   *
-   * The last one is the clearest illustration of why this table exists: a name-shaped rule cannot
-   * know that dragging the bar up your torso is a curl. His page is the authority on where his
-   * movements live; the classifier is a fallback for everything he does not name.
-   *
-   * ADDITIVE, LIKE THE CALVES ABOVE. `viadaCategoryOf` still answers with one value and every other
-   * caller is untouched - this only widens which cells may OFFER them.
-   */
-  { match: /\btate press\b|\bskull crusher/i, categories: ['focused'] },
-  { match: /\brear delt machine\b/i, categories: ['focused'] },
-  { match: /\bdrag curl/i, categories: ['focused'] },
-  // Same class again: p223 prints "weighted knee raises (hip flexors)" under FOCUSED PUSH
-  // LOWER/QUADS. The classifier reads it as a loaded compound and files it `secondary`.
-  { match: /\bweighted knee raise/i, categories: ['focused'] },
-  /**
-   * ⚠️ THE RAISE CROSSOVER WAS BUILT AND BACKED OUT, 2026-08-29 — recorded so the next attempt starts
-   * from the finding rather than from the idea.
-   *
-   * ⛔ MICHAEL ASKED FOR IT and the page supports it: p223 prints **hanging leg raises** under CORE
-   * and **weighted knee raises (hip flexors)** under FOCUSED PUSH LOWER/QUADS — the same family,
-   * filed twice on one page. `{ match: /(leg|knee)\s+raise/i, categories: ['core', 'focused'] }`.
-   *
-   * ⛔⛔ WHAT STOPPED IT: a weighted knee raise's PRIME MOVER is `core`. Offering it in the leg cell
-   * makes it the default there for a home athlete, which satisfies the week's core floor — and the
-   * floor is how an explicitly chosen core movement reaches the week, so the athlete's own pick is
-   * then silently dropped. **Two of his own filings collide through the muscle map, not through the
-   * category map.**
-   *
-   * ⛔ SO IT IS THE SAME PIECE OF WORK AS THE OPT-IN CORE ROW: an added row must not depend on the
-   * floor being hungry. Fix that first and this crossover lands with it.
-   */
-];
 
 /**
  * ⚠️ CUTTING THE CORE CELL TO HIS FIVE WAS BUILT AND BACKED OUT, 2026-08-29 — recorded so the next
@@ -512,16 +532,8 @@ const ALSO_OFFERED_IN: { match: RegExp; categories: ViadaCategory[] }[] = [
 
 /** Movements in one cell of the grid. Unfiltered by equipment — that is the grid's job. */
 export function movementsIn(category: ViadaCategory, pattern: ViadaPattern | null): GridMovement[] {
-  return allGridMovements()
-    .filter((m) => {
-      if (pattern != null && m.pattern !== pattern) return false;
-      if (m.category === category) return true;
-      // ⛔ THE SECOND HOME, IF HE GAVE IT ONE.
-      return ALSO_OFFERED_IN.some((r) => r.categories.includes(category) && r.match.test(m.name));
-    })
-    // ⚠️ The cell reports the category it was ASKED for, so a caller reading `m.category` back off a
-    // cell's own list never sees a movement claiming to belong somewhere it was not offered from.
-    .map((m) => (m.category === category ? m : { ...m, category }));
+  // One heading per movement, from `FILING`. (The second homes the name classifier needed are gone with it.)
+  return allGridMovements().filter((m) => m.category === category && (pattern == null || m.pattern === pattern));
 }
 
 /**
