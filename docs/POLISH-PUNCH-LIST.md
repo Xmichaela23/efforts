@@ -14,6 +14,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED (2026-09-18) — HEAVY LIFTERS GET SEVEN WARM-UP SETS OF FIVE
+
+Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb squat or 400 lb deadlift gets seven
+sets of five before the work. Many coaches drop reps as the weight climbs (5, 3, 2, 1); that needs its own named
+source before it changes. Not urgent: light and middle lifters get two to five sets.
+
 ## QUEUED (2026-09-18, Michael) — THE MENU (☰) IS UNRELIABLE
 
 The menu does not always open, from any screen, and its items do not always open their screen when chosen from
