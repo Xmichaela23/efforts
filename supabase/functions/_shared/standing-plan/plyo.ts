@@ -81,7 +81,7 @@ export const PLYO_FAMILIES: Record<PlyoFamilyId, PlyoFamily> = {
   footspeed: {
     id: 'footspeed',
     benefit: 'general foot and leg control',
-    drills: ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch'],
+    drills: ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch'],  // p227 — the drill names as printed ("Ladder drills", "Ickey Shuffle", "Hopscotch")
     /**
      * ⚠️ ALREADY EASIEST-FIRST, so this repeats the table: the plain ladder before a named ladder
      * pattern, and hopscotch — the only one that leaves the ground — last. This whole family is
@@ -179,11 +179,13 @@ export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: str
  *   it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's here!"
  * ⚠️ No number of efforts: the page says "multiple times" and gives none, so the row still carries no count.
  */
+// p227 — the page's words, cut (read off p227.jpg)
 export const P227_SESSION_LINE = 'What is important here is that these drills are all done separately. Each drill '
   + 'should be performed multiple times with ample rest, with a full focus on technique and balance, as well as '
   + 'consistent quality.';
 // ⚠️ Cut after "no-no's" (the page ends "…no-no's here!"): the line also reaches the plan description, whose voice
 // gate bars an exclamation mark.
+// p227 — the page's words, cut after "no-no's"
 export const P227_DRILL_LINE = 'Each drill should be done until the movement is optimized for the day and the athlete '
   + "develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all "
   + "absolute no-no's.";

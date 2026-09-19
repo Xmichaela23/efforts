@@ -304,6 +304,7 @@ export const RIDE_EQUIVALENCE_IS_OURS =
  * sighting skill; **neither is ever reachable from this plan** and a lint holds that.
  */
 export const SWIM_SLOT: { family: FamilyId; level: Level } = { family: 'swim_endurance', level: 1 };
+// not-instruction: never prints — compose.ts pushes it as a kind 'ours' note; 'ours' notes go only to config.standing_plan_notes, which nothing in src renders (describeBlock reads 'source' notes, plan-row compromises read 'warning' notes)
 export const SWIM_IS_EASY_ONLY =
   'A kept swim is easy laps and technique. The hard swim sessions in the source — the all-out speed '
   + 'sets and the open-water sighting work — are never prescribed by this plan.';
@@ -418,6 +419,7 @@ export function declineHardSlot(
   };
 }
 
+// not-instruction: never prints — assignSports pushes it as a kind 'ours' note; 'ours' notes go only to config.standing_plan_notes, which nothing in src renders
 export const HARD_SESSIONS_ARE_OPT_IN =
   'Hard sessions are added, up to two. A week with none still carries its four sessions — the hard '
   + 'ones become easy running instead, so the miles and hours you set are unchanged.';

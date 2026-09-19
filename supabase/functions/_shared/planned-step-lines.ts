@@ -140,8 +140,8 @@ const untimed = (s: PlannedStep): boolean =>
 function lengthText(s: PlannedStep, opts: StepLineOptions): string {
   const dist = Number(s?.distanceMeters ?? s?.distance_m);
   const stride = /stride/i.test(String(s?.label || ''));
-  if (!s?.distanceDerived && dist > 0) return stride ? `${Math.round(dist)} m stride` : fmtDist(dist, opts.units);
-  if (Number(s?.seconds) > 0) return stride ? `${fmtTime(Number(s.seconds))} stride` : fmtTime(Number(s.seconds));
+  if (!s?.distanceDerived && dist > 0) return stride ? `${Math.round(dist)} m stride` : fmtDist(dist, opts.units);  // p210 — the page's word: "2 × 100-meter strides"
+  if (Number(s?.seconds) > 0) return stride ? `${fmtTime(Number(s.seconds))} stride` : fmtTime(Number(s.seconds));  // p210 — the page's word: "2 × 100-meter strides"
   if (dist > 0) return fmtDist(dist, opts.units);
   return String(s?.label || '').trim() || 'interval';
 }
@@ -243,7 +243,7 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
     let line: string;
     const unit = seg.slice(from, from + p);
     if (sets > 1 && r > 1) {
-      line = `${sets} sets of ${r} × ${unitText(unit, opts)} · ${stepText(seg[sepIdx], opts)} between sets`;
+      line = `${sets} sets of ${r} × ${unitText(unit, opts)} · ${stepText(seg[sepIdx], opts)} between sets`;  // p231 — "2 sets of 3 rounds of … 2-minute recovery walk/jog between sets"; the page writes a count with "x" ("4 x 25m")
     } else if (sets > 1) {
       line = `${sets} × ${unitText([...unit, seg[sepIdx]], opts)}`;
     } else {
@@ -325,7 +325,7 @@ export function plannedStepLines(steps: PlannedStep[] | null | undefined, opts: 
           k += block.covered;
           // The lone recovery that separates one set from the next.
           if (k < seg.length && isRecovery(seg[k]) && setBlockAt(seg, k + 1, opts)) {
-            out.push(`${stepText(seg[k], opts)} between sets`);
+            out.push(`${stepText(seg[k], opts)} between sets`);  // p231 — "… between sets"
             k++;
           }
           continue;

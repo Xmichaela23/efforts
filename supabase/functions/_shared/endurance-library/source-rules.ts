@@ -643,7 +643,7 @@ export const FAMILIES: Record<FamilyId, {
 
   run_sprint_power: {
     sport: 'run',
-    label: 'Sprint / power',
+    label: 'Sprint / power',  // not-instruction: family name, a label for the session, not an instruction; no page names it; Michael's call
     workFloorPct: 1.3,
     intent: 'Pure speed, technical and neuromuscular. Paces come from performance and RPE rather '
       + 'than a prescribed pace; "all-out" means the best speed available that day.',
@@ -732,7 +732,7 @@ export const FAMILIES: Record<FamilyId, {
      * The exact replacement is his to change — "Above threshold" is page-true and plain, and it is
      * ours.
      */
-    label: 'Above threshold',
+    label: 'Above threshold',  // not-instruction: family name, a label for the session, not an instruction; no page names it; Michael's call
     workFloorPct: 1.0,
     intent: 'Maximum time in zone 4 with equalised fatigue.',
     cite: 'Viada pp231-232',
@@ -746,6 +746,7 @@ export const FAMILIES: Record<FamilyId, {
          *   L2  2 sets of 4 rounds of the same, 2-minute recovery walk/jog between sets
          *   L3  3 sets of 4 rounds of the same, 2-minute recovery walk/jog between sets
          */
+        // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
           1: { sets: 1, rounds: 6, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)] },
           2: { sets: 2, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },
@@ -793,7 +794,7 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 15, hi: 15 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.30),
-        float: { band: { lo: 45, hi: 45 }, intensity: pct(1.05), label: 'Near-threshold float' },
+        float: { band: { lo: 45, hi: 45 }, intensity: pct(1.05), label: 'Near-threshold float' },  // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
         set: { repeatsPerSet: { lo: 4, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
         cite: 'Viada pp231-232 — 2-minute walk/recovery jog between sets',
@@ -838,12 +839,13 @@ export const FAMILIES: Record<FamilyId, {
          *   L2  2 sets of 4 rounds of the same
          *   L3  3 sets of 4 rounds of: 45 s @ 125% / 1 min @ 115% / 1 min @ 100% / 1:30 @ VT1, 2 min between sets
          */
+        // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
           1: { sets: 2, rounds: 3, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
           2: { sets: 2, rounds: 4, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
           3: { sets: 3, rounds: 4, round: [W(45, 1.25, 'Surge'), W(60, 1.15, 'Near-threshold float'), W(60, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
         },
-        label: 'Long surge with a near-threshold float',
+        label: 'Long surge with a near-threshold float',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 45, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.25),
@@ -909,7 +911,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 3, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
           3: { sets: 4, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
         },
-        label: 'Short above-threshold repeats',
+        label: 'Short above-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 60, hi: 90 },
         repsBand: { lo: 8, hi: 16 },
         work: pct(1.00, 1.05),
@@ -970,7 +972,7 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'below_threshold',
         shape: 'intervals',
-        label: 'Sustained sub-threshold repeats',
+        label: 'Sustained sub-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 210, hi: 240 },
         repsBand: { lo: 5, hi: 8 },
         repsByLevel: { 1: { lo: 5, hi: 5 }, 2: { lo: 6, hi: 6 }, 3: { lo: 8, hi: 8 } },
@@ -1021,7 +1023,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'sustained_5min_90',
         shape: 'intervals',
-        label: 'Eight sustained five-minute repeats',
+        label: 'Eight sustained five-minute repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 300, hi: 300 },
         repsBand: { lo: 8, hi: 8 },
         repsByLevel: { 3: { lo: 8, hi: 8 } },
@@ -1059,7 +1061,7 @@ export const FAMILIES: Record<FamilyId, {
          *  steps down with it. Split so the two can no longer be combined. */
         id: 'below_threshold_long',
         shape: 'intervals',
-        label: 'Long sub-threshold repeats',
+        label: 'Long sub-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 360, hi: 510 },
         repsBand: { lo: 3, hi: 6 },
         repsByLevel: { 1: { lo: 3, hi: 3 }, 2: { lo: 5, hi: 5 }, 3: { lo: 4, hi: 6 } },
@@ -1099,7 +1101,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 2, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
           3: { sets: 3, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
         },
-        label: 'Threshold block with an embedded surge',
+        label: 'Threshold block with an embedded surge',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 240, hi: 300 },
         repsBand: { lo: 4, hi: 12 },
         repsByLevel: { 1: { lo: 4, hi: 4 }, 2: { lo: 8, hi: 8 }, 3: { lo: 12, hi: 12 } },
@@ -1124,7 +1126,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 1, rounds: 6, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)] },
           3: { sets: 2, rounds: 4, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
         },
-        label: 'Long steady effort opened by a sharp surge',
+        label: 'Long steady effort opened by a sharp surge',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         // ⚠️ THE BLOCK IS THE SURGE PLUS THE STEADY EFFORT, and it sits BELOW the short race repeat's
         // length deliberately: two shapes of equal length with different counts trip the library's
         // own pairing property, and these two are not equal on the page either.
@@ -1160,7 +1162,7 @@ export const FAMILIES: Record<FamilyId, {
          * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
          * and `cite` lines below are unchanged — the session did not change, only its name.
          */
-        label: 'Steady easy run',
+        label: 'Steady easy run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 25 * 60, hi: 90 * 60 },
         work: vt1,
         recovery: { kind: 'open' },
@@ -1186,7 +1188,7 @@ export const FAMILIES: Record<FamilyId, {
          * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
          * and `cite` lines below are unchanged — the session did not change, only its name.
          */
-        label: 'Long easy run with inserted sets',
+        label: 'Long easy run with inserted sets',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 30, hi: 240 },
         work: pct(0.95, 1.15),
         recovery: { kind: 'stated', band: { lo: 30, hi: 60 }, intensity: vt1 },
@@ -1217,7 +1219,7 @@ export const FAMILIES: Record<FamilyId, {
          * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
          * and `cite` lines below are unchanged — the session did not change, only its name.
          */
-        label: 'Long easy run with a race-pace finish',
+        label: 'Long easy run with a race-pace finish',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 5 * 60, hi: 15 * 60 },
         work: { kind: 'race_pace' },
         recovery: { kind: 'open' },
@@ -1242,7 +1244,7 @@ export const FAMILIES: Record<FamilyId, {
          * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
          * and `cite` lines below are unchanged — the session did not change, only its name.
          */
-        label: 'Easy fartlek',
+        label: 'Easy fartlek',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 180, hi: 240 },
         work: pct(0.85),
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
@@ -1270,7 +1272,7 @@ export const FAMILIES: Record<FamilyId, {
          * stored `archetype` pick, the composer's `archetypes` map, `VARIANT_BODY`. ⚠️ The `intent`
          * and `cite` lines below are unchanged — the session did not change, only its name.
          */
-        label: 'Mixed-terrain hike or easy jog',
+        label: 'Mixed-terrain hike or easy jog',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 60 * 60, hi: 300 * 60 },
         work: vt1,
         recovery: { kind: 'open' },
@@ -1414,6 +1416,7 @@ export const FAMILIES: Record<FamilyId, {
          *   L3  2 sets of 4 rounds of: 30 s @ 120% / 5:30 @ 90% / 30 s @ 120% / 4-minute easy spin,
          *       5-minute additional spin/recovery between sets
          */
+        // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
           1: { sets: 1, rounds: 5, round: [W(30, 1.20, 'Surge'), W(150, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
           2: { sets: 1, rounds: 6, round: [W(30, 1.20, 'Surge'), W(240, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
@@ -1503,12 +1506,13 @@ export const FAMILIES: Record<FamilyId, {
          *   L2  4 sets of 6 minutes, 3-minute easy spin between
          *   L3  4 sets of 8 minutes, 3-minute easy spin between
          */
+        // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
           1: { sets: 3, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
           2: { sets: 4, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
           3: { sets: 4, rounds: 8, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
         },
-        label: 'Sweet-spot blocks with a surge on the minute',
+        label: 'Sweet-spot blocks with a surge on the minute',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 360, hi: 480 },
         repsBand: { lo: 3, hi: 4 },
         work: pct(0.90),
@@ -1919,6 +1923,6 @@ export const SWIM_ENDURANCE_PRINTED: Record<Level, { token: string; words: strin
     { token: 'swim_drill_dps_1x100m', words: 'DPS or glide drill' },
     { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
     { token: 'swim_aerobic_8x25m_r5', words: 'sprint' },
-    { token: 'swim_aerobic_3x1200m_r180', words: 'easy-to-moderate intensity (race pace)' },
+    { token: 'swim_aerobic_3x1200m_r180', words: 'easy-to-moderate intensity (race pace)' },  // p241 L3, as printed
   ],
 };

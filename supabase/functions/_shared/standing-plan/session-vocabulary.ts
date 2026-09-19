@@ -435,8 +435,8 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
    * stand was one WORD naming two different sessions.
    */
   run_mlss: 'Hard Run',
-  run_near_threshold: 'Near-threshold Run',
-  run_vt1: 'Easy Run',
+  run_near_threshold: 'Near-threshold Run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+  run_vt1: 'Easy Run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
   run_lsd: 'Long Run',
   // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
   // says "sweet spot" or "MLSS" at an athlete, and the description carries the intensity.

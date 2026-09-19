@@ -96,7 +96,7 @@ export const NUMBERS_COPY = {
   strength_title: 'Strength',
   lift_labels: { squat: 'Squat', bench: 'Bench', deadlift: 'Deadlift', overheadPress1RM: 'OHP', pullupMaxReps: 'Pull-ups' },
   reps_suffix: ' reps',
-  source_learned_lifts: 'from your logged sets',
+  source_learned_lifts: 'from your logged sets',  // not-instruction: a source label (where the number on file came from), not an instruction
   source_typed: 'typed in Baselines',
   strength_use_complete: 'The block uses these; no test week.',
   /** {lifts} is the untested lifts joined with ' and '; {verb} is 'is' for one, 'are' for more. */
@@ -122,7 +122,7 @@ export const NUMBERS_COPY = {
   run_test: 'The threshold time trial is scheduled into week one.',
   run_none: 'Nothing on file. The threshold time trial is scheduled into week one.',
   // FIELD — "per 100" is the swim pace unit (time per 100 m or 100 yd), a definition, not a prescription.
-  swim_title: 'Swim pace (per 100)',
+  swim_title: 'Swim pace (per 100)',  // not-instruction: a row heading, not an instruction
   source_swim: 'on file',
   swim_none: 'Nothing on file — there is no swim test to schedule; the number is typed on Profile.',
 } as const;
