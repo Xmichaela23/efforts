@@ -19,8 +19,9 @@ Deno.test('⛔ THE LAUNCHER WITH A MAX ON FILE — the empty bar, then p215\'s t
   assertEquals(bench.sets.map((s) => s.reps ?? null), [null, 6, 5, null]);
   assertEquals(bench.sets.map((s) => s.set_type), ['warmup', 'working', 'working', 'working']);
   assertEquals(bench.sets[3].amrap, true);
-  assertEquals(bench.sets[1].set_hint, 'Step 1 — the first ramp set, as prescribed.');
-  assertEquals(bench.sets[2].set_hint, 'Step 2 — heavier, as prescribed.');
+  // p215's own words (2026-09-18).
+  assertEquals(bench.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this feels about right.');
+  assertEquals(bench.sets[2].set_hint, 'Perform 5 repetitions with this weight.');
   assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.');
   // The press's empty bar is the bar, not 0.
   assertEquals(ohp.sets[0].weight, 45);

@@ -182,8 +182,10 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
   assert(plyo, 'the plyo day vanished');
   assertEquals(plyo!.description, '', 'the plyo day grew a session line back');
   const drills = plyo!.strength_exercises ?? [];
-  assert(drills.length > 0 && drills.every((d) => /Tired or sloppy, stop\.$/.test(String(d.notes))),
-    'the drills lost the approved stop rule the session line was deleted in favour of');
+  // ⛔ 2026-09-18: the drill note was a paraphrase of p227 (the SOURCE doc quotes none of p227's words) and
+  // came off. A drill row carries no note, and the session line stays empty.
+  assert(drills.length > 0 && drills.every((d) => !String(d.notes ?? '').trim()),
+    'a drill row grew a note back');
   const test = week(1).sessions.filter((s) => (s.tags ?? []).includes('test_week'));
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {

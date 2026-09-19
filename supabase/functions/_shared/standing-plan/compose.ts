@@ -1057,6 +1057,12 @@ function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
   return out;
 }
 
+/** p247, cut (see the note where it is pushed). One constant so tests pin the words, not a fragment. */
+// ⚠️ Cut to the two sentences with no "you" — the block description runs through the voice gate
+// (`standing-plan-live.test.ts`), and p247's first sentence opens "you may notice that".
+export const HAIRCUT_LINE = 'A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction '
+  + 'can be gradually phased out in eight to ten weeks.';
+
 /** ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226, and only the wording Michael approved (2026-09-13). */
 export const CARRY_ROW_WORDS: Partial<Record<ViadaIntent, string>> = {
   SKILL: 'medium weight, no fatigue, full rest',
@@ -1851,7 +1857,7 @@ function exerciseForSlot(
   // that dropping p247's lower-body reduction for a bike-heavy week was OUR reading of his p280
   // reason — an athlete-facing sentence whose whole content was that it had no page. The behaviour is
   // unchanged: p247 applies where p247's own layout holds, and says nothing where it does not.
-  if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text.includes('lower-body'))) {
+  if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text === HAIRCUT_LINE)) {
     notes.push({
       kind: 'source',
       // ⛔ IT NAMES THE DAYS (Michael, 2026-08-26). His own wording for this class of sentence is
@@ -1860,9 +1866,12 @@ function exerciseForSlot(
       // claim the athlete has to take on trust. This is the COMPENSATED break — p247's own layout —
       // so it is the one sentence here that reports a cost already paid.
       // Viada p247: a 3-4% reduction phased out over the first nine weeks. OURS — "three and a half" is the midpoint of 3-4 (see progression.ts)
-      text: `The hard run lands the day before the heavy leg session, so the lower-body weights `
-        + 'start about three and a half per cent under where the test put them. That comes back over '
-        + 'the first nine weeks.',
+      // ⛔ 2026-09-18 (no paraphrasing): p247's own words, cut — "For the first few weeks, you may notice that
+      // the ME lower session is slightly hindered by lingering fatigue. As such, a 3 to 4 percent reduction in
+      // working 1RM should be assumed here. As long as progression is maintained…, this reduction can be
+      // gradually phased out in eight to ten weeks". The engine applies 3.5 (OURS, progression.ts); the line
+      // prints the page's band.
+      text: HAIRCUT_LINE,
       cite: 'Viada p247',
     });
   }
@@ -2135,7 +2144,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
 function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
-    notes.push({ kind: 'source', text: PLYO_DOSE.stopRule, cite: PLYO_DOSE.stopRuleIsHis });
+    // ⛔ 2026-09-18: `PLYO_DOSE.stopRule` (a paraphrase of p227) no longer reaches the plan description.
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
   return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) })).map(({ family, name }) => ({
@@ -2158,8 +2167,9 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
      * absolute no-nos (p227).
      * ⚠️ THE BENEFIT PHRASE LEADS, as it does today — it is his table's own column and it stays.
      */
-    notes: `${PLYO_FAMILIES[family].benefit}. Repeat until it feels right and you are confident, `
-      + 'then move on. Full rest between. Tired or sloppy, stop.',
+    // ⛔ 2026-09-18: the row note ("{benefit}. Repeat until it feels right… Full rest between. Tired or sloppy,
+    // stop.") came off — a paraphrase of p227, and the SOURCE doc quotes none of p227's words. No note.
+
   }));
 }
 

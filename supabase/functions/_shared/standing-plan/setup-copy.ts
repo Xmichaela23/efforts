@@ -58,7 +58,11 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   all_rounder: {
     name: 'Run + Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
-    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. The weights go up as you adapt to the training.',
+    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." was a paraphrase; p275's own words (All
+    // Rounder notes): "few changes are needed as the months progress beyond adjustment of 1RM and threshold as
+    // you improve."
+    confirm_line: 'A {weeks}-week plan to get stronger and faster on the run and the bike. Few changes are needed as '
+      + 'the months progress beyond adjustment of 1RM and threshold as you improve.',
     ftp_note: null,
   },
   strength_5k: {
@@ -72,7 +76,9 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   cycling_base: {
     name: 'Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
-    confirm_line: 'A {weeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.',
+    // ⛔ 2026-09-18: "The weights go up as you adapt to the training." came off — a paraphrase, and p278/p280
+    // print no sentence on it.
+    confirm_line: 'A {weeks}-week plan to get faster and stronger.',
     ftp_note: "If you're coming back from a riding break, make sure your FTP is current.",
   },
 };

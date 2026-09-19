@@ -206,8 +206,11 @@ export const REST_BETWEEN_SETS_RULE = {
    * for whoever maintains the number and not for someone standing under a bar.
    * ⚠️ ONE OWNER. The timer imports this; it does not carry its own wording (2026-08-27).
    */
-  cue: 'Rest until you are nearly recovered, but not so long that you cool down. Take the next set '
-    + 'when you know you can finish it.',
+  // ⛔ 2026-09-18 (no paraphrasing): p78's own words, cut — "Rest periods between sets should be sufficient
+  // to allow nearly full recovery (though not so long as to allow you to cool down)" and "…In other words,
+  // hit the next set when you know you can complete it without getting crushed."
+  cue: 'Rest periods between sets should be sufficient to allow nearly full recovery (though not so long as '
+    + 'to allow you to cool down). Hit the next set when you know you can complete it without getting crushed.',
   /** ⛔ WHY ANY CLOCK BESIDE IT IS OURS. */
   provenance: 'A strength session should not accumulate fatigue. The source gives this as a rule '
     + 'and no number of minutes.',
@@ -218,7 +221,11 @@ export const REST_BETWEEN_SETS_RULE = {
  * caller can stamp the strength rule on a hypertrophy slot by accident.
  */
 export const REST_BETWEEN_SETS_RULE_HYP = {
-  cue: 'Shorter rest on purpose. Carrying some fatigue into the next set is part of this work.',
+  // ⛔ 2026-09-18: p84's sentence whole. "Shorter rest on purpose" is on no page, and the old line dropped the
+  // page's hedge "may well be".
+  cue: 'Strength and power training typically dictate that this point of reduced capacity represents the end '
+    + 'of a productive session, but in hypertrophy training, this may well be a crucial part of the training '
+    + 'session itself!',
   provenance: 'The source gives this as a rule and no number of minutes.',
 } as const;
 

@@ -349,8 +349,8 @@ Deno.test('rest between sets is HIS rule, on both sides, and never a number', ()
   // ⛔ AND THE OPPOSITE ANSWER FOR HYP — p84. Stamping the strength rule here quotes him against
   // himself: the drop-off in capacity IS the hypertrophy stimulus.
   const hyp = resolveSlot({ intent: 'HYP', category: 'secondary', pattern: 'push_upper', equipment: null });
-  // 17403381 reworded the cue in plain words: "…is part of this work."
-  const restHyp = hyp.notes.find((n) => n.text.includes('part of this work'));
+  // 2026-09-18: p84's own sentence, whole (no paraphrasing).
+  const restHyp = hyp.notes.find((n) => n.text.includes('may well be a crucial part of the training session itself'));
   assert(restHyp, 'no note carrying p84\'s hypertrophy exception');
   assertEquals(restHyp!.cite, 'Viada p84');
   assert(!hyp.notes.some((n) => n.text.includes('cool down')),

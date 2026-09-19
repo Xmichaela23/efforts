@@ -120,8 +120,18 @@ const PULLUP_EASY_HINT = '2–3 easy pull-ups, then rest ~2 min before the test 
 const PULLUP_TEST_HINT =
   'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.';
 
-const stepHint = (i: number): string =>
-  i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.`;
+/**
+ * ⛔ p215's own words per step (2026-09-18). "Step 1 — the first ramp set, as prescribed." was ours.
+ * Step 1 (75% × 6): "(This may be a guess, but it's a weight where you can comfortably perform 8
+ * repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this
+ * feels about right.)" — cut at the front. Step 2: "Perform 5 repetitions with this weight D." — the
+ * letter cut; the rep count is the row's own, which is p215's 5.
+ */
+const P215_STEP_ONE =
+  "A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. "
+  + 'Use this set of 6 to confirm that this feels about right.';
+const stepHint = (i: number, reps?: number): string =>
+  i === 0 ? P215_STEP_ONE : `Perform ${Number(reps) > 0 ? reps : 5} repetitions with this weight.`;
 
 const fileNoteFor = (name: string, onFile: number | undefined, hasSteps: boolean, metric: boolean): string =>
   onFile && onFile > 0
@@ -191,7 +201,7 @@ function barbellTestRow(
         prefilled: true as const,
         ...(p.amrap
           ? { amrap: true as const, set_hint: TEST_LAST_SET_HINT }
-          : { set_hint: stepHint(i) }),
+          : { set_hint: stepHint(i, Number(p.reps) > 0 ? Number(p.reps) : undefined) }),
       }))
     // p215's own protocol with the athlete supplying A: A for 6, then 1.10A for 5, then 1.15A for max
     // reps (`PRETEST_STEPS`). The rep counts are the page's.
