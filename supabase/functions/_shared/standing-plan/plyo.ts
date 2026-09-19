@@ -190,3 +190,18 @@ export const P227_SESSION_LINE = 'What is important here is that these drills ar
 export const P227_DRILL_LINE = 'Each drill should be done until the movement is optimized for the day and the athlete '
   + "develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all "
   + "absolute no-no's.";
+
+/**
+ * ⛔ EACH DRILL ROW'S NOTE (2026-09-19, Michael's words, pinned): the p227 table's column label and the drill's
+ * family entry in that column, then p227's drill line. It read the bare lowercase fragment ("running gait and speed").
+ */
+// p227 — the table's "Benefit" column, then the page's drill line
+export const plyoDrillNote = (family: PlyoFamilyId): string =>
+  `Benefit: ${PLYO_FAMILIES[family].benefit}. ${P227_DRILL_LINE}`;
+
+/**
+ * ⛔ UNDER THE "Plyo warm-up" TITLE (2026-09-19, Michael's words, pinned). p275's strength note; p246, p274 and p278 name
+ * the session a warm-up. Today's lift card prints it under the title of a session tagged `plyo`.
+ */
+// p275 — the page's sentence
+export const P275_WARMUP_LINE = 'The midweek plyo warm-up may be anywhere from one to three plyometric skills.';

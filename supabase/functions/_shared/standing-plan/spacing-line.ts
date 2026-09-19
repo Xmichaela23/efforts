@@ -102,25 +102,46 @@ const minutesOf = (row: SpacingRow): number | null => {
   return Number.isFinite(s) && s > 0 ? s / 60 : null;
 };
 
-export function spacingLineFor(rows: readonly SpacingRow[]): SpacingLine | null {
+/**
+ * The day read once, for both the sentence and the order: the plan's lift and its ride or run, and which of p143's two
+ * order rules holds. Null where the page says nothing about this day.
+ */
+function readDay<T extends SpacingRow>(rows: readonly T[]) {
   const planned = rows.filter(isFromPlan);
   if (planned.length !== 2) return null;
   const lift = planned.find(isStrength);
   const endurance = planned.find((r) => !isStrength(r) && isEndurance(r));
   if (!lift || !endurance) return null;
-
   const sport = sportOf(endurance);
   const vt1 = tagValue(endurance, 'band') === 'vt1_or_easier';
-  const mins = minutesOf(endurance);
-  const lead = vt1 && mins != null && mins < SHORT_SESSION_MINUTES && (sport === 'run' || sport === 'ride')
-    ? `${LEAD} ${SHORT_VT1}` : LEAD;
-  if (sport !== 'run' && sport !== 'ride') return { lead: LEAD };
-
   const upper = isUpperDay(lift);
   const intents = intentsOf(lift);
   // ⚠️ AN UNKNOWN BAND COUNTS AS NOT EASY: the claim needs the page, not the absence of a tag.
-  const easy = vt1 && !upper;
-  const skill = !upper && (intents.has('SKILL') || intents.has('DE'));
+  const runOrRide = sport === 'run' || sport === 'ride';
+  const easy = runOrRide && vt1 && !upper;
+  const skill = runOrRide && !upper && (intents.has('SKILL') || intents.has('DE'));
+  return { lift, endurance, sport, vt1, mins: minutesOf(endurance), easy, skill };
+}
+
+export function spacingLineFor(rows: readonly SpacingRow[]): SpacingLine | null {
+  const day = readDay(rows);
+  if (!day) return null;
+  const { sport, vt1, mins, easy, skill } = day;
+  const lead = vt1 && mins != null && mins < SHORT_SESSION_MINUTES && (sport === 'run' || sport === 'ride')
+    ? `${LEAD} ${SHORT_VT1}` : LEAD;
+  if (sport !== 'run' && sport !== 'ride') return { lead: LEAD };
   if (!easy && !skill) return { lead };
   return { lead, closer: [easy ? EASY_LAST : null, skill ? SKILL_FIRST : null].filter(Boolean).join(' ') };
+}
+
+/**
+ * ⛔ THE DAY'S ORDER, FROM THE SAME TWO RULES AS THE CLOSER ABOVE (2026-09-19). The lift is listed first exactly when
+ * the closer prints: p143 rule 5 (the easy ride or run goes after the legs were worked) or p143 rule 6 with p77 (skill
+ * and speed sets in the first session, "go in fresh"). The frame's upper day is neither: p131, a session needs to be
+ * fresh in the systems it uses, and a ride or run tires the legs, not the bench. Where this returns null the page
+ * says nothing about the order and `_shared/day-order.ts` falls back to its own tie-break.
+ */
+export function liftGoesFirst<T extends SpacingRow>(rows: readonly T[]): { lift: T; endurance: T } | null {
+  const day = readDay(rows);
+  return day && (day.easy || day.skill) ? { lift: day.lift, endurance: day.endurance } : null;
 }

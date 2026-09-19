@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
     if (!plan) return json({ success: false, error: 'Plan not found' }, 404);
     const { data: rows, error: rowsErr } = await supabase
       .from('planned_workouts')
-      .select('id,week_number,day_number,date,type,name,tags,duration,total_duration_seconds,computed,intervals')
+      .select('id,week_number,day_number,date,type,name,tags,duration,total_duration_seconds,computed,intervals,training_plan_id,strength_exercises')
       .eq('training_plan_id', planId)
       .eq('user_id', userId);
     if (rowsErr) return json({ success: false, error: rowsErr.message }, 500);
@@ -58,7 +58,11 @@ Deno.serve(async (req) => {
     const order = dayOrderFor(
       rows ?? [],
       (r) => (r?.date ? String(r.date).slice(0, 10) : (r?.week_number != null && r?.day_number != null ? `w${r.week_number}d${r.day_number}` : null)),
-      (r) => ({ type: r?.type ?? null, name: r?.name ?? null, tags: r?.tags ?? null, workout_metadata: r?.workout_metadata ?? null }),
+      (r) => ({
+        type: r?.type ?? null, name: r?.name ?? null, tags: r?.tags ?? null, workout_metadata: r?.workout_metadata ?? null,
+        training_plan_id: r?.training_plan_id ?? null, strength_exercises: r?.strength_exercises ?? null,
+        duration: r?.duration ?? null, total_duration_seconds: r?.total_duration_seconds ?? null,
+      }),
     );
     const day_order: Record<string, number> = {};
     for (const r of rows ?? []) { const n = order.get(r); if (r?.id && n != null) day_order[String(r.id)] = n; }

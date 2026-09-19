@@ -183,9 +183,12 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
   assert(plyo, 'the plyo day vanished');
   assertEquals(plyo!.description, '', 'the plyo day grew a session line back');
   const drills = plyo!.strength_exercises ?? [];
-  // ⛔ 2026-09-18 (pass 6): the drill note is p227's own words, read off p227.jpg.
-  assert(drills.length > 0 && drills.every((d) => String(d.notes) === P227_DRILL_LINE),
-    'a drill row lost p227\'s words');
+  // ⛔ 2026-09-18 (pass 6): the drill note is p227's own words, read off p227.jpg; 2026-09-19 led by the table's
+  // "Benefit:" label and the family's entry.
+  assert(drills.length > 0 && drills.every((d) => /^Benefit: [a-z][^.]*\. /.test(String(d.notes)) && String(d.notes).endsWith(P227_DRILL_LINE)),
+    'a drill row lost p227\'s words or its Benefit label');
+  assert(drills.some((d) => String(d.notes) === `Benefit: running gait and speed. ${P227_DRILL_LINE}`),
+    'the bounding drill does not read "Benefit: running gait and speed."');
   const test = week(1).sessions.filter((s) => (s.tags ?? []).includes('test_week'));
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {

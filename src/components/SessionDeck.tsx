@@ -192,9 +192,9 @@ export const SessionDeck: React.FC<{
         {/* ⛔ THE WEIGHT SITS ON THE NAME LINE, RIGHT. It used to be absolutely positioned above
             the name, which cost the card a whole line for four characters. */}
         <div className="flex items-baseline justify-between gap-3">
-          {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+          {/* ⛔ EVERY SESSION'S TITLE IS ONE SIZE (2026-09-18), whatever its order in the day; the second session is quieter by colour only. */}
           <div
-            className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
+            className="text-title3 font-semibold leading-tight min-w-0"
             style={{ letterSpacing: '-0.01em', color: emphasis === 'lead' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.82)' }}
           >
             {c.name}
@@ -285,6 +285,8 @@ export const LiftSessionCard: React.FC<{
   const title = deriveWorkoutTitle(session as never);
   const meta = formatSessionDuration(session);
   const cards = liftCardRowsFor(session, useImperial);
+  const rawTitleNote = (session as { title_note?: unknown }).title_note;
+  const titleNote = typeof rawTitleNote === 'string' && rawTitleNote.trim() ? rawTitleNote : null;
 
   const [open, setOpen] = React.useState(false);
   const reduced = React.useMemo(reducedMotion, []);
@@ -334,7 +336,7 @@ export const LiftSessionCard: React.FC<{
           tabIndex={0}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen?.(); } }}
-          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
+          className="text-title3 font-semibold leading-tight min-w-0"
           style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86, cursor: 'pointer' }}
         >
           {title}
@@ -343,6 +345,10 @@ export const LiftSessionCard: React.FC<{
           <span className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>{meta}</span>
         ) : null}
       </div>
+      {/* server-word: get-week's `title_note` (2026-09-19) — p275's sentence under the plyo warm-up's title. */}
+      {titleNote ? (
+        <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 4, color: 'var(--label-secondary)' }}>{titleNote}</div>
+      ) : null}
 
       <div
         ref={listRef}
@@ -419,9 +425,9 @@ export const SessionCard: React.FC<{
     >
       {/* ⛔ THE TIME SITS ON THE NAME LINE, RIGHT — the same rule the deck card follows. */}
       <div className="flex items-baseline justify-between gap-3">
-        {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+        {/* ⛔ EVERY SESSION'S TITLE IS ONE SIZE (2026-09-18), whatever its order in the day; the second session is quieter by colour only. */}
         <div
-          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
+          className="text-title3 font-semibold leading-tight min-w-0"
           style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86 }}
         >
           {title}
@@ -551,9 +557,9 @@ export const CompletedSessionCard: React.FC<{
             belongs to work still ahead; the ✓ says done. `--label` is #fff on the dark card, well over WCAG
             2.2's 4.5:1. (Before: the sport colour, first at 55% / 43% — 2.2–2.6:1 — then full strength;
             docs/AUDIT-type-legibility-2026-09-18.md.) */}
-        {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+        {/* ⛔ EVERY SESSION'S TITLE IS ONE SIZE (2026-09-18), whatever its order in the day; the second session is quieter by colour only. */}
         <div
-          className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
+          className="text-title3 font-semibold leading-tight min-w-0"
           style={{ color: 'var(--label)' }}
         >
           {deriveWorkoutTitle(workout as never)}

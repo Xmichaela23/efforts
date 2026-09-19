@@ -8,14 +8,14 @@
  * `day_order` on every item and plan-overview on every planned row; the screens sort by it and hold
  * no rule of their own.
  *
- * THE RULE, moved unchanged from the phone:
- *   1. A lower-body lift and its same-day partner. The partner is the first found of long ride,
- *      quality run, quality ride, easy run, easy ride. A long ride goes first (heavy lower work
- *      after a long ride, never before — a legacy pair; `week-model` forbids it now). Every other
- *      partner comes AFTER the lift: FIELD — Eddens, resistance before endurance on a concurrent day
- *      (+6.91% lower-body dynamic strength); sprints and climbs empty local glycogen and fatigue the
- *      CNS, and a heavy bar after them is lifted on compromised stabilisers (Michael, 2026-08-18).
- *      `strength_ordering_preference` is not consulted: the choice it offered was to invert that.
+ * THE RULE:
+ *   0. THE PLYO WARM-UP GOES FIRST (2026-09-19): p246, p274 and p278 name the session a warm-up ("Plyo warm-up"), and
+ *      p275 calls it "the midweek plyo warm-up", so it is listed before the run, ride or lift it warms up for.
+ *   1. THE BOOK'S ORDER, AND ONLY WHERE THE PAGE STATES ONE (2026-09-19): the plan's lift goes before its ride or run
+ *      exactly when Today prints the order sentence — `liftGoesFirst` in `standing-plan/spacing-line.ts`, one rule for
+ *      the sentence and the order (Viada p143 rules 5 and 6, p77). It replaced the phone's rule moved here on
+ *      2026-09-10 (a lower-body lift before any partner but a long ride), which put the lift first on days the page
+ *      is silent about and read the lift's region off its name.
  *   2. Else a stored AM/PM on the row (`workout_metadata.timing`, activate-plan on a combined plan).
  *   3. Else discipline: swim, bike, run, strength, then the rest. OURS — a stable tie-break with no
  *      outside source (docs/STATE-SOURCES.md).
@@ -24,6 +24,8 @@
  * ⛔ SHARED = DEPLOY TRAP: grep -rln "day-order" supabase/functions --include=index.ts
  */
 
+import { liftGoesFirst } from './standing-plan/spacing-line.ts';
+
 export type DayOrderRow = {
   type?: string | null;
   discipline?: string | null;
@@ -31,58 +33,27 @@ export type DayOrderRow = {
   tags?: unknown;
   timing?: unknown;
   workout_metadata?: unknown;
+  /** What rule 1 reads (`SpacingRow`): the plan the row belongs to, the lift's rows, the session's minutes. */
+  training_plan_id?: string | null;
+  strength_exercises?: unknown;
+  duration?: number | null;
+  total_duration_seconds?: number | null;
 };
 
-const LOWER_PAIRING_PARTNERS = ['long_ride', 'quality_run', 'quality_bike', 'easy_run', 'easy_bike'] as const;
-type PartnerKind = (typeof LOWER_PAIRING_PARTNERS)[number];
-
-function tagsOf(r: DayOrderRow): string[] {
-  const raw = Array.isArray(r.tags) ? r.tags : [];
-  return raw.map((t) => String(t).toLowerCase());
-}
-
-/** The matrix slot a row fills, tag first, then the conservative name patterns the server's own slot reader uses. */
-export function classifyKind(r: DayOrderRow): PartnerKind | 'lower_body_strength' | 'other' {
-  const ty = String(r.type ?? r.discipline ?? '').toLowerCase();
-  const tags = tagsOf(r);
-  const name = String(r.name ?? '').toLowerCase();
-  if (ty === 'strength') {
-    if (tags.includes('lower_body')) return 'lower_body_strength';
-    if (/\(lower\)|lower body|deadlift|squat|hip thrust|rdl|step-up|split|posterior|neural/.test(name)) return 'lower_body_strength';
-    return 'other';
-  }
-  if (ty === 'run' || ty === 'walk') {
-    if (tags.includes('long_run')) return 'other';
-    if (tags.includes('quality') || tags.includes('intervals') || tags.includes('marathon_pace') || tags.includes('race_specific')) return 'quality_run';
-    return 'easy_run';
-  }
-  if (ty === 'bike' || ty === 'ride' || ty === 'cycling') {
-    if (tags.includes('long_ride')) return 'long_ride';
-    if (tags.includes('quality') || tags.includes('vo2') || tags.includes('sweet') || tags.includes('threshold') || tags.includes('tempo')) return 'quality_bike';
-    return 'easy_bike';
-  }
-  return 'other';
-}
-
-function decideOrdering(partnerKind: PartnerKind): { lower: 'AM' | 'PM'; partner: 'AM' | 'PM' } {
-  if (partnerKind === 'long_ride') return { lower: 'PM', partner: 'AM' };
-  return { lower: 'AM', partner: 'PM' };
-}
-
-/** The lift and its first-found partner get a half of the day; every other row stays untimed. */
+/** Rule 1: the lift first and its ride or run second where the page states the order; every other row stays untimed. */
 export function dayTimings<T>(rows: readonly T[], read: (r: T) => DayOrderRow): Map<T, 'AM' | 'PM'> {
   const out = new Map<T, 'AM' | 'PM'>();
-  const lower = rows.find((r) => classifyKind(read(r)) === 'lower_body_strength');
-  if (!lower) return out;
-  for (const kind of LOWER_PAIRING_PARTNERS) {
-    const partner = rows.find((r) => r !== lower && classifyKind(read(r)) === kind);
-    if (!partner) continue;
-    const o = decideOrdering(kind);
-    out.set(lower, o.lower);
-    out.set(partner, o.partner);
-    return out;
-  }
+  const read_ = rows.map(read);
+  const pair = liftGoesFirst(read_);
+  if (!pair) return out;
+  out.set(rows[read_.indexOf(pair.lift)], 'AM');
+  out.set(rows[read_.indexOf(pair.endurance)], 'PM');
   return out;
+}
+
+/** Rule 0: the plan's plyo session (`compose.ts` tags it `plyo`), which the book names a warm-up. */
+function isPlyoWarmUp(r: DayOrderRow): boolean {
+  return Array.isArray(r.tags) && r.tags.some((t) => String(t).toLowerCase() === 'plyo');
 }
 
 function storedTiming(r: DayOrderRow): 'AM' | 'PM' | null {
@@ -111,9 +82,12 @@ export function orderDay<T>(rows: readonly T[], read: (r: T) => DayOrderRow): T[
     if (t === 'PM') return 2;
     return 1;
   };
+  const warmUpRank = (r: T): number => (isPlyoWarmUp(read(r)) ? 0 : 1);
   return rows
     .map((r, i) => ({ r, i }))
     .sort((a, b) => {
+      const w = warmUpRank(a.r) - warmUpRank(b.r);
+      if (w !== 0) return w;
       const t = timingRank(a.r) - timingRank(b.r);
       if (t !== 0) return t;
       const d = disciplineRank(read(a.r)) - disciplineRank(read(b.r));

@@ -1,50 +1,86 @@
 /**
- * The day's listing order, decided on the server (audit H-T16, 2026-09-10). The cases are the phone's
- * own (`src/lib/pairing-timing.test.ts`, deleted with the phone rule).
+ * The day's listing order, decided on the server (audit H-T16, 2026-09-10). Rule 1 is the book's since 2026-09-19:
+ * the lift goes first exactly where Today prints the order sentence (`liftGoesFirst`, Viada p143 rules 5 and 6).
  *   deno test --no-lock --allow-all supabase/functions/_shared/day-order.test.ts
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { dayOrderFor, orderDay, type DayOrderRow } from './day-order.ts';
+import { spacingLineFor } from './standing-plan/spacing-line.ts';
 
 const id = (r: DayOrderRow) => r;
-const qualityRun = { type: 'run', tags: ['quality'], name: 'Quality Run 4×1mi' };
-const lowerStrength = { type: 'strength', tags: ['lower_body'], name: 'Strength (Lower)' };
-const upperStrength = { type: 'strength', tags: ['upper_body'], name: 'Strength (Upper)' };
-const swim = { type: 'swim', tags: [], name: 'Swim — Drills' };
-const longRide = { type: 'ride', tags: ['long_ride'], name: 'Long Ride' };
-const easyRun = { type: 'run', tags: ['easy_run'], name: 'Easy Run' };
+const PLAN = 'plan-1';
+const lift = (name: string, tags: string[], intents: string[]) => ({
+  type: 'strength', name, training_plan_id: PLAN, tags: ['standing_plan', ...tags],
+  strength_exercises: intents.map((slot_intent) => ({ slot_intent })),
+});
+const upperME = lift('Upper body: Push', ['frame:all_rounder'], ['ME', 'DE', 'HYP']);
+const lowerME = lift('Lower body: Hinge', ['frame:all_rounder', 'lower:me'], ['ME', 'HYP', 'DE']);
+const lowerHyp = lift('Lower body: Push', ['frame:all_rounder', 'lower:me'], ['ME', 'HYP']);
+const session = (type: string, name: string, band: string) =>
+  ({ type, name, training_plan_id: PLAN, tags: ['standing_plan', `sport:${type}`, `band:${band}`] });
+const hardRun = session('run', 'Intervals', 'above');
+const hardRide = session('ride', 'Anaerobic Ride', 'above');
+const easyRide = session('ride', 'Ride', 'vt1_or_easier');
+const swim = { type: 'swim', name: 'Swim', training_plan_id: PLAN, tags: ['sport:swim'] };
 
-Deno.test('the barbell goes first on a quality pair, whichever way the rows arrive', () => {
-  assertEquals(orderDay([qualityRun, lowerStrength], id).map((w) => w.type), ['strength', 'run']);
-  assertEquals(orderDay([lowerStrength, qualityRun], id).map((w) => w.type), ['strength', 'run']);
+/** The lift is listed first exactly when Today prints the order sentence. */
+const sentenceSaysLiftFirst = (rows: DayOrderRow[]) => spacingLineFor(rows as never)?.closer != null;
+
+Deno.test('a leg day with speed sets goes before a hard ride, whichever way the rows arrive, and the sentence prints', () => {
+  assertEquals(orderDay([hardRide, lowerME], id).map((w) => w.type), ['strength', 'ride']);
+  assertEquals(orderDay([lowerME, hardRide], id).map((w) => w.type), ['strength', 'ride']);
+  assertEquals(sentenceSaysLiftFirst([hardRide, lowerME]), true);
 });
 
-Deno.test('a long ride goes before the lift; an easy run goes after it', () => {
-  assertEquals(orderDay([lowerStrength, longRide], id).map((w) => w.name), ['Long Ride', 'Strength (Lower)']);
-  assertEquals(orderDay([easyRun, lowerStrength], id).map((w) => w.name), ['Strength (Lower)', 'Easy Run']);
+Deno.test('a leg day goes before an easy ride (p143 rule 5), even with no speed or skill sets', () => {
+  assertEquals(orderDay([easyRide, lowerHyp], id).map((w) => w.type), ['strength', 'ride']);
+  assertEquals(sentenceSaysLiftFirst([easyRide, lowerHyp]), true);
 });
 
-Deno.test('no lower-body lift: discipline order, swim before an upper-body lift', () => {
-  assertEquals(orderDay([upperStrength, swim], id).map((w) => w.type), ['swim', 'strength']);
+Deno.test('the upper day (heavy bench) beside a hard run: the page is silent, no sentence, the run is listed first', () => {
+  assertEquals(orderDay([upperME, hardRun], id).map((w) => w.type), ['run', 'strength']);
+  assertEquals(sentenceSaysLiftFirst([upperME, hardRun]), false);
 });
 
-Deno.test('a stored AM/PM on the row is read when the day has no pair to decide', () => {
+Deno.test('the upper day beside an easy ride: silent, the ride is listed first', () => {
+  assertEquals(orderDay([upperME, easyRide], id).map((w) => w.type), ['ride', 'strength']);
+  assertEquals(sentenceSaysLiftFirst([upperME, easyRide]), false);
+});
+
+Deno.test('a leg day with no speed or skill sets beside a hard ride: silent, the ride is listed first', () => {
+  assertEquals(orderDay([lowerHyp, hardRide], id).map((w) => w.type), ['ride', 'strength']);
+  assertEquals(sentenceSaysLiftFirst([lowerHyp, hardRide]), false);
+});
+
+Deno.test('a swim beside a leg day: the page gives no order, discipline order puts the swim first', () => {
+  assertEquals(orderDay([lowerME, swim], id).map((w) => w.type), ['swim', 'strength']);
+});
+
+Deno.test('a session not from the plan never triggers the book order', () => {
+  const logged = { ...hardRide, training_plan_id: null };
+  assertEquals(orderDay([lowerME, logged], id).map((w) => w.type), ['ride', 'strength']);
+});
+
+Deno.test('the plyo warm-up is listed before the session it warms up for, hard or easy, run, ride or lift', () => {
+  const plyo = { type: 'strength', name: 'Plyo warm-up', training_plan_id: PLAN, tags: ['standing_plan', 'plyo'] };
+  assertEquals(orderDay([hardRide, plyo], id).map((w) => w.name), ['Plyo warm-up', 'Anaerobic Ride']);
+  assertEquals(orderDay([easyRide, plyo], id).map((w) => w.name), ['Plyo warm-up', 'Ride']);
+  assertEquals(orderDay([hardRun, plyo], id).map((w) => w.name), ['Plyo warm-up', 'Intervals']);
+  assertEquals(orderDay([upperME, plyo], id).map((w) => w.name), ['Plyo warm-up', 'Upper body: Push']);
+});
+
+Deno.test('a stored AM/PM on the row is read when the page gives no order', () => {
   const pm = { type: 'swim', tags: [], name: 'Swim', workout_metadata: { timing: 'PM' } };
   const am = { type: 'strength', tags: ['upper_body'], name: 'Upper', workout_metadata: { timing: 'AM' } };
   assertEquals(orderDay([pm, am], id).map((w) => w.name), ['Upper', 'Swim']);
 });
 
-Deno.test('a lower-body lift is read from its name when the tag is missing', () => {
-  const squat = { type: 'strength', tags: [], name: 'Lower body: Squat' };
-  assertEquals(orderDay([qualityRun, squat], id).map((w) => w.type), ['strength', 'run']);
-});
-
 Deno.test('day_order is 1-based within each day and rows with no day get none', () => {
   const rows = [
-    { date: '2026-09-10', ...qualityRun },
-    { date: '2026-09-10', ...lowerStrength },
-    { date: '2026-09-11', ...swim },
-    { date: null, ...easyRun },
+    { date: '2026-09-22', ...hardRide },
+    { date: '2026-09-22', ...lowerME },
+    { date: '2026-09-23', ...swim },
+    { date: null, ...easyRide },
   ];
   const order = dayOrderFor(rows, (r) => r.date, id);
   assertEquals(order.get(rows[1]), 1);
@@ -54,6 +90,6 @@ Deno.test('day_order is 1-based within each day and rows with no day get none', 
 });
 
 Deno.test('degenerate inputs: one row or none', () => {
-  assertEquals(orderDay([qualityRun], id), [qualityRun]);
+  assertEquals(orderDay([hardRun], id), [hardRun]);
   assertEquals(orderDay([], id), []);
 });

@@ -86,6 +86,7 @@ import {
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_MIX_IS_OURS,
   P227_DRILL_LINE,
+  plyoDrillNote,
 } from './plyo.ts';
 /**
  * ⛔ THE SERVER'S CANONICALIZER, NOT THE CLIENT MIRROR, AND THE DIFFERENCE IS THE BUG.
@@ -2200,7 +2201,8 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
      */
     // ⛔ 2026-09-18: the row note was a paraphrase ("{benefit}. Repeat until it feels right… Full rest between.
     // Tired or sloppy, stop."). Pass 6: p227's own words, read off p227.jpg (`plyo.ts`, one owner).
-    notes: P227_DRILL_LINE,
+    // 2026-09-19: led by the p227 table's "Benefit:" label and the family's entry (`plyoDrillNote`).
+    notes: plyoDrillNote(family),
 
   }));
 }
