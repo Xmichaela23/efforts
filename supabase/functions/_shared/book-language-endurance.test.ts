@@ -229,3 +229,10 @@ Deno.test('the VO2 ride prints p238\'s line; the easy and long runs print p235\'
   assert(String(built('run_vt1', 1, 'continuous').row.description).includes('may vary slightly depending on current level of fatigue'));
   assert(String(built('run_lsd', 2, 'hike').row.description).includes('can be modified extensively'));
 });
+
+Deno.test('the page\'s percentages in a ride\'s line are never read as its warm-up\'s power (p237 "125–130%")', () => {
+  const { v3, lines } = built('ride_anaerobic', 2, 'progressive_repeats');
+  assertEquals(v3[0].kind, 'warmup');
+  assertEquals(v3[0].powerRange, undefined);
+  assertEquals(lines[0], '12:30 warm-up · 10- to 15-minute easy spin');
+});

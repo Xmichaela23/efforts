@@ -3759,7 +3759,15 @@ export function expandTokensForRow(
   } catch {}
   // Parse textual target ranges from description and attach as structured fields when missing
   try {
-    const desc = String(row?.rendered_description || row?.description || '').toLowerCase();
+    /**
+     * ⛔ A ROW BUILT FROM THE LIBRARY IS NOT READ FOR TARGETS IN ITS PROSE (2026-09-18, book-language pass 5). Its
+     * description is the page's words now, and p237's "progress up to 125–130% by the end" read as a power range put
+     * 313–325 W on the anaerobic ride's easy-spin warm-up. Every target of a `family:` row is on its tokens; the prose
+     * reader stays for rows from the other generators.
+     */
+    const libraryRow = (Array.isArray((row as any)?.tags) ? (row as any).tags : [])
+      .some((t: unknown) => String(t ?? '').toLowerCase().startsWith('family:'));
+    const desc = libraryRow ? '' : String(row?.rendered_description || row?.description || '').toLowerCase();
     const parsePaceRange = (s:string): [number,number] | null => {
       // 10:00-10:30/mi or 5:00-5:15/km
       let m = s.match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
