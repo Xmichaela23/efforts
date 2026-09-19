@@ -2,8 +2,8 @@
  "_doc": "Rule 7 pins — the book's words as approved. Rewrite ONLY with --write-book-pins after Michael approves the words. docs/AUDIT-book-language-2026-09-18.md",
  "lines": {
   "supabase/functions/_shared/baseline-test-rows.ts": [
-   "An easy 6- to 8-minute jog to warm up",
    "100-meter stride (begin slow and accelerate to near full tilt)",
+   "An easy 6- to 8-minute jog to warm up",
    "\"fast run\" (mile PR) pace",
    "easy walk/jog",
    "additional rest",
@@ -118,9 +118,7 @@
    "run the talk test twice — once after 5 minutes and once after 20.",
    "Sprint paces come from performance and RPE, not from a prescribed pace. \"All-out\" means the best",
    "speed available that day. Work intervals may be run on hills with the pace adjusted to hold the",
-   "Six efforts of thirty seconds is ours. The source prescribes strides by name and gives no dose",
-   "for them; twenty to thirty seconds is the field standard. The placement, the all-out intensity",
-   "and the untimed full recovery are his.",
+   "The dose is p210's: 2 × 100-meter strides (begin slow and accelerate to near full tilt), untimed, no rest",
    "A handful of strides at the end of an easy run trains running economy without a separate speed",
    "session. Run them fast and relaxed, at the best speed available that day — there is no pace",
    "target — and take full recovery between them.",

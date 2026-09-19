@@ -80,8 +80,8 @@ Deno.test('⛔⛔ THE STRIDES ARE WORK SETS, NOT MINUTES — his own line, and i
    */
   const withStrides = enduranceLedgerFor([build('run_vt1', 1, { addOn: 'strides', size: 0.5 })]);
   const plain = enduranceLedgerFor([build('run_vt1', 1, { size: 0.5 })]);
-  assert(withStrides.workSets >= 4 && withStrides.workSets <= 8,
-    `${withStrides.workSets} strides is outside his four-to-eight`);
+  // p210's two strides since 2026-09-18 (round 3): "2 × 100-meter strides".
+  assertEquals(withStrides.workSets, 2, `${withStrides.workSets} strides is not p210's two`);
   assertEquals(plain.workSets, 0, 'an easy run with no strides reported work sets');
   assertEquals(withStrides.overThresholdMinutes, 0,
     'a stride was counted as over-threshold minutes instead of as a work set');
@@ -93,7 +93,9 @@ Deno.test('⛔ AN UNTIMED RECOVERY IS UNMEASURED, NEVER ZERO', () => {
    * `demonstratedRunVolume` follows when it returns `weeklyMiles: null` rather than a zero. The
    * minutes are missing from the totals, so the totals are a LOWER BOUND and the ledger says so.
    */
-  const led = enduranceLedgerFor([build('run_vt1', 1, { addOn: 'strides' })]);
+  // ⚠️ p229's short maximal accelerations carry the `open` recovery. (The strides were the case here until 2026-09-18,
+  // round 3: p210's strides print no rest between them, so they carry no recovery at all.)
+  const led = enduranceLedgerFor([build('run_sprint_power', 1, { archetype: 'short_max' })]);
   assert(led.untimedSteps > 0, 'the untimed recoveries were not recorded');
   assertEquals(led.isLowerBound, true, 'a week with untimed rest did not declare itself a lower bound');
   const clean = enduranceLedgerFor([build('run_vt1', 1)]);

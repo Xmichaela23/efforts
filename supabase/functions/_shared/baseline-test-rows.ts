@@ -50,6 +50,13 @@ export type ProtocolStep = { kind: 'warmup' | 'work' | 'recovery' | 'cooldown'; 
  * `training_age`, `years_training`, `trainingAge`, `training_years`, `yearsTraining`: 0 hits) and the learner
  * reads a ~720 s lap (`learn-fitness-profile`), so the description prints the 12-minute clause only.
  */
+/**
+ * p210 step 2: "2 × 100-meter strides (begin slow and accelerate to near full tilt)." ONE OWNER for the page's stride:
+ * the run test prints it, and the easy run's strides add-on (`strides_p210`, materialize-plan) prints the same steps
+ * (2026-09-18, round 3). The page times none and prints no rest between them.
+ */
+export const P210_STRIDE_COUNT = 2;  // Viada p210: "2 × 100-meter strides"
+export const P210_STRIDE_LABEL = '100-meter stride (begin slow and accelerate to near full tilt)';  // p210
 export const RUN_TEST_TRIAL_MIN = 12; // Viada p210: "Record distance traveled after 12 minutes (beginner, less than 2 years of training)"
 export function runTestSteps(): ProtocolStep[] {
   return [
@@ -57,8 +64,7 @@ export function runTestSteps(): ProtocolStep[] {
     { kind: 'warmup', seconds: 420, label: 'An easy 6- to 8-minute jog to warm up' },  // p210
     // p210 step 2: "2 × 100-meter strides (begin slow and accelerate to near full tilt)." The page times none; each
     // stride is a lap-button step on the watch, back to back — the page prints no rest between them.
-    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },  // p210
-    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },  // p210
+    ...Array.from({ length: P210_STRIDE_COUNT }, () => ({ kind: 'work' as const, seconds: 0, label: P210_STRIDE_LABEL })),  // p210
     // p210 step 3: "3 rounds of 30 seconds at a "fast run" (mile PR) pace followed by 1 minute easy walk/jog."
     { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },  // p210
     { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },  // p210

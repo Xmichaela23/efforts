@@ -60,30 +60,29 @@ function easyRunTokens(): string[] {
   return easy!.steps_preset ?? [];
 }
 
-Deno.test('⛔⛔ THE STRIDES BECOME REAL INTERVAL STEPS — one per effort, no pace, no trailing rest', () => {
+Deno.test('⛔⛔ THE STRIDES BECOME REAL INTERVAL STEPS — p210\'s two, untimed, no pace, no rest', () => {
   const tokens = easyRunTokens();
-  const stride = tokens.find((t) => /^strides_\d+x\d+s$/.test(t));
+  const stride = tokens.find((t) => t === 'strides_p210');
   assert(stride, `no strides token on the easy run: ${tokens.join(', ')}`);
 
   const steps = expandRunToken(stride!, EXPANDER_BASELINES as never) as Array<Record<string, unknown>>;
   assert(steps.length > 0, 'the expander produced no intervals — the strides would never reach the watch');
 
-  const reps = Number(stride!.match(/^strides_(\d+)x/)![1]);
-  const seconds = Number(stride!.match(/x(\d+)s$/)![1]);
+  /**
+   * ⛔ p210 (2026-09-18, round 3): "2 × 100-meter strides (begin slow and accelerate to near full tilt)" — two
+   * lap-button steps in the page's words, and no rest between them (the page prints none).
+   */
   const work = steps.filter((x) => x.kind === 'work');
-  assertEquals(work.length, reps, 'the expander did not produce one step per stride');
+  assertEquals(work.length, 2, 'the expander did not produce p210\'s two strides');
   for (const w of work) {
-    assertEquals(w.duration_s, seconds, 'a stride lost its duration');
-    /**
-     * ⛔ NO PACE TARGET, AND THAT IS HIS (p229): *"Paces come from performance and RPE rather than a
-     * prescribed pace"* — "all-out" is the best speed available that day. A number here would be
-     * invented, which is the class of defect this repo calls the score that lies.
-     */
+    assertEquals(w.label, '100-meter stride (begin slow and accelerate to near full tilt)');
+    assertEquals(w.page_label, true);
+    assertEquals(w.lap_button, true);
+    assertEquals(w.duration_s, undefined, 'a stride was given a clock the page does not print');
+    // ⛔ NO PACE TARGET (p229: "all-out" is the best speed available that day).
     assertEquals(w.pace_sec_per_mi, undefined, 'a stride was handed a pace target nobody prescribed');
   }
-  // ⛔ FULL RECOVERY BETWEEN, AND NONE AFTER THE LAST. The watch ends on an effort, not on a walk.
-  assertEquals(steps.filter((x) => x.kind === 'recovery').length, reps - 1);
-  assertEquals(steps[steps.length - 1].kind, 'work', 'the session ends on a recovery step');
+  assertEquals(steps.filter((x) => x.kind === 'recovery').length, 0, 'a rest the page does not print came back');
 });
 
 Deno.test('⛔ THE EASY RUN ITSELF STILL EXPANDS — the strides did not replace it', () => {

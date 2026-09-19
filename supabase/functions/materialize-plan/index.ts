@@ -333,7 +333,7 @@ type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
 import { PLAN_WRITER_VERSION } from '../_shared/plan-refresh.ts';
-import { ftpTestSteps, runTestSteps, RUN_TEST_TRIAL_MIN, type ProtocolStep } from '../_shared/baseline-test-rows.ts';
+import { ftpTestSteps, P210_STRIDE_COUNT, P210_STRIDE_LABEL, runTestSteps, RUN_TEST_TRIAL_MIN, type ProtocolStep } from '../_shared/baseline-test-rows.ts';
 
 /**
  * Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower).
@@ -2140,6 +2140,20 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       out.push({ id: uid(), kind: 'cooldown', duration_s: 480, pace_sec_per_mi: easyPace, label: 'Cool-down' });
       return out;
     }
+  }
+
+  /**
+   * ⛔ THE STANDING PLAN'S STRIDES ARE p210's, STEP FOR STEP (2026-09-18, round 3). "2 × 100-meter strides (begin slow
+   * and accelerate to near full tilt)": the same steps the run test prints (`P210_STRIDE_COUNT`, `P210_STRIDE_LABEL`,
+   * one owner), untimed lap-button steps, and no rest between them — the page prints none. The "6 × 30 s stride" and
+   * "Walk/Jog — as long as you need" that stood here for this plan were on no page. The generic branch below is the
+   * other generators' and is unchanged.
+   */
+  if (lower === 'strides_p210') {
+    for (let i = 0; i < P210_STRIDE_COUNT; i++) {
+      out.push({ id: uid(), kind: 'work', label: P210_STRIDE_LABEL, page_label: true, lap_button: true });  // p210
+    }
+    return out;
   }
 
   // Strides: strides_4x100m or strides_6x20s

@@ -917,20 +917,18 @@ function addOnBlock(
   const spec = SESSION_ADD_ONS[id];
   if (!spec) return null;
   if (spec.sport !== ctx.sport || !spec.families.includes(ctx.family)) return null;
-  // ⚠️ THE DOSE SCALES WITH THE SESSION'S OWN SIZE — a longer easy day carries a few more. Both ends
-  // are ours (`STRIDES_DOSE_IS_OURS`); the page gives no dose for a stride at all.
+  // ⛔ p210's DOSE (2026-09-18, round 3): two untimed strides, back to back — the page prints no rest between them and
+  // times none, so the work step carries no clock and nothing is taken from the session's dose.
   const reps = Math.round(lerp(spec.reps, ctx.size));
-  // OURS — `STRIDES_DOSE_IS_OURS` stride seconds rounded to 5 (see above).
-  const seconds = Math.round(lerp(spec.secondsPerRep, ctx.size) / 5) * 5;
-  const work = step('work', spec.label.replace(/s$/, ''), seconds, spec.work, ctx.sport, ctx.anchor);
-  const rest = step('rest', 'Full recovery', null, { kind: 'easy' }, ctx.sport, ctx.anchor);
+  const seconds = Math.round(lerp(spec.secondsPerRep, ctx.size));
+  const work = step('work', spec.label.replace(/s$/, ''), seconds > 0 ? seconds : null, spec.work, ctx.sport, ctx.anchor);
   ctx.notes.push({ kind: 'source', text: STRIDES_NOTE, cite: spec.cite });
-  ctx.notes.push({ kind: 'ours', text: STRIDES_DOSE_IS_OURS });
+  ctx.notes.push({ kind: 'source', text: STRIDES_DOSE_IS_OURS, cite: 'Viada p210' });
   return {
     repeat: reps,
-    label: `${reps} x ${seconds}s ${spec.label.toLowerCase()}`,
+    label: `${reps} × 100-meter strides`,  // Viada p210
     steps: [work],
-    restBetween: rest,
+    restBetween: null,
     addOn: spec.id,
   };
 }

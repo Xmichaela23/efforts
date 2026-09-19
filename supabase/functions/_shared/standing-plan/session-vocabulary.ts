@@ -285,9 +285,9 @@ function addOnTokens(session: EnduranceSession): string[] {
   const out: string[] = [];
   for (const block of session.blocks) {
     if (block.addOn !== 'strides') continue;
-    const seconds = block.steps.find((st) => st.role === 'work')?.seconds ?? null;
-    if (seconds == null || block.repeat < 1) continue;
-    out.push(`strides_${block.repeat}x${Math.round(seconds)}s`);
+    if (block.repeat < 1) continue;
+    // ⛔ p210's strides (2026-09-18, round 3) — the materializer's `strides_p210` branch prints the page's steps.
+    out.push('strides_p210');
   }
   return out;
 }
@@ -928,6 +928,8 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   // ⛔ THE STRIDES ADD-ON (p109). The materializer has parsed this shape since before the Standing
   // Plan existed; it emits one untargeted work step per stride and a walk/jog between.
   { shape: /^strides_\d+x\d+s$/, example: 'strides_6x20s' },
+  // p210 — the Standing Plan's strides since 2026-09-18 (round 3): `expandRunToken`'s `strides_p210` branch.
+  { shape: /^strides_p210$/, example: 'strides_p210' },
   // ⛔ SLICE 4 — the ride and swim tokens, all of them already parsed by the materializer.
 
   { shape: /^bike_ss_\d+x\d+min_R\d+min$/, example: 'bike_ss_3x12min_R4min' },
@@ -998,4 +1000,5 @@ export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
   // 2026-08-26. Same cache rule as the rest of this list: if that regex moves, the gate is the
   // tripwire.
   /strides_\d+x/,
+  /^strides_p210$/,
 ];

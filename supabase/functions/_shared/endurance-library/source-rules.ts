@@ -1817,19 +1817,20 @@ export const SESSION_ADD_ONS: Record<SessionAddOnId, SessionAddOn> = {
     // that are not already speed work; hanging strides off a threshold session would be adding
     // quality to a quality day, which is not what the page is describing.
     families: ['run_vt1', 'run_lsd'],
-    // ⛔ A POINT, NOT A BAND — his own number inside the band that used to be ours. See above.
-    reps: { lo: 6, hi: 6 },
-    secondsPerRep: { lo: 30, hi: 30 },
+    // ⛔ p210's DOSE, NOT OURS (2026-09-18, round 3): "2 × 100-meter strides (begin slow and accelerate to near full
+    // tilt)". The page times none, so no seconds are charged to the session. The six thirty-second efforts that stood
+    // here were ours (Michael, 2026-08-28); the rule of 2026-09-18 is the page's words and numbers.
+    reps: { lo: 2, hi: 2 },  // Viada p210
+    secondsPerRep: { lo: 0, hi: 0 },  // Viada p210 — untimed
     work: { kind: 'all_out' },
-    cite: 'Viada p109',
+    cite: 'Viada p109, p210',
   },
 };
 
 // not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const STRIDES_DOSE_IS_OURS =
-  'Six efforts of thirty seconds is ours. The source prescribes strides by name and gives no dose '
-  + 'for them; twenty to thirty seconds is the field standard. The placement, the all-out intensity '
-  + 'and the untimed full recovery are his.';
+  'The dose is p210\'s: 2 × 100-meter strides (begin slow and accelerate to near full tilt), untimed, no rest '
+  + 'printed between them. The placement is p109\'s.';
 
 // not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const STRIDES_NOTE =
