@@ -43,7 +43,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -72,7 +72,7 @@ WEEK 02  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -95,7 +95,7 @@ WEEK 02  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -122,7 +122,7 @@ WEEK 03  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -145,7 +145,7 @@ WEEK 03  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -172,7 +172,7 @@ WEEK 04  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -195,7 +195,7 @@ WEEK 04  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -222,7 +222,7 @@ WEEK 05  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -245,7 +245,7 @@ WEEK 05  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -272,7 +272,7 @@ WEEK 06  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -295,7 +295,7 @@ WEEK 06  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -322,7 +322,7 @@ WEEK 07  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -345,7 +345,7 @@ WEEK 07  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -372,7 +372,7 @@ WEEK 08  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -395,7 +395,7 @@ WEEK 08  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -422,7 +422,7 @@ WEEK 09  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -445,7 +445,7 @@ WEEK 09  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -472,7 +472,7 @@ WEEK 10  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -495,7 +495,7 @@ WEEK 10  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -522,7 +522,7 @@ WEEK 11  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -545,7 +545,7 @@ WEEK 11  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
@@ -572,7 +572,7 @@ WEEK 12  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -595,7 +595,7 @@ WEEK 12  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension" · how-to
+      HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to

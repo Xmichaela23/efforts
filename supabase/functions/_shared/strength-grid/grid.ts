@@ -94,9 +94,11 @@ export type ResolvedSlot = {
  * ⚠️ They are excluded from the offered pool only. Nothing about their classification changes, and
  * `viadaCategoryOf('press')` still answers, because the composer may still hand one over.
  */
+// ⚠️ `deadlift` AND `lunge` LEFT THIS LIST 2026-09-18: since one name per movement they are the entries p219's
+// "Deadlift" and p220's "Forward lunge" are filed under, not loose stubs.
 const OFFER_STOPLIST = new Set([
-  'press', 'bench', 'row', 'rows', 'squat', 'squats', 'lunge', 'lunges',
-  'incline bench', 'shoulder press', 'core work', 'core circuit', 'deadlift',
+  'press', 'bench', 'row', 'rows', 'squat', 'squats', 'lunges',
+  'incline bench', 'shoulder press', 'core work', 'core circuit',
 ]);
 
 /**
@@ -537,7 +539,9 @@ export function executionName(name: string, equipment: string[] | null | undefin
   const keys = athleteEquipmentToKeys(equipment as string[]);
   const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
   if (hasStation) return name;
-  return byRoute(free, keys, name);
+  const named = byRoute(free, keys, name);
+  // A route whose name IS the movement's own (the barbell skull crusher, the barbell Romanian deadlift) is no rename.
+  return foldExerciseName(named) === foldExerciseName(name) ? name : named;
 }
 
 /**
@@ -640,6 +644,11 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   ],
   'rear delt fly': [
     { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
+  ],
+  // ⛔ THE DUMBBELL SKULL CRUSHER (Michael, 2026-09-18): the lying dumbbell extension, folded into p222's skull crushers.
+  'skull crusher': [
+    { route: ['barbell'], value: 'Skull Crusher' },
+    { route: ['dumbbells'], value: 'Dumbbell Skull Crusher' },
   ],
   // ⛔ ON A DUMBBELL KIT, THE DUMBBELL VERSION BY THAT NAME (Michael, 2026-09-18); with a barbell, his name.
   'stiff legged deadlift': [
@@ -1021,8 +1030,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Single Leg Squat (pistol)" — https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSquat' },
   'skater hops': { text: 'Stand with your feet hip-width apart. Leap sideways to the right and land lightly on your right foot, knee bent, swinging your left leg behind your right. Push off your right foot and leap to the left, landing on your left foot and swinging your right leg behind you. Swing your arms with each leap.',
     source: 'Jesse Zucker, CPT / BarBend, "The 12 Best Cardiovascular Exercises" (Skater) — https://barbend.com/best-cardiovascular-exercises/' },
-  'skull crusher': { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
-    source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' },
+  // ⛔ TWO ROUTES SINCE 2026-09-18 (Michael): the dumbbell skull crusher is the lying dumbbell extension, ACE's words.
+  'skull crusher': [
+    { route: ['barbell'], value: { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
+      source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' } },
+    { route: ['dumbbells'], value: { text: 'Lie on your back with your knees bent and feet on the floor, a dumbbell in each hand and your arms straight up over your chest. Bend your elbows to lower the dumbbells toward your ears, keeping your shoulders still. Straighten your arms to bring the dumbbells back up.',
+      source: 'ACE, Sabrena Jo, "Tone Up Your Triceps with These Three Exercises" — https://www.acefitness.org/resources/everyone/blog/4930/tone-up-your-triceps-with-these-three-exercises/' } },
+  ],
   'sled pull': { text: 'Put on a shoulder harness attached to the sled and face away from it. Lean forward and walk or run forward with short, quick steps, heels off the ground. Keep your back flat.',
     source: 'ExRx, "Sled Pull" — https://exrx.net/WeightExercises/Power/WTPullSprint' },
   'sled push': { text: 'Hold the sled\'s handles with your feet staggered and your hips low. Lean your body weight into the sled with your heels off the ground. Step forward as fast as you can, staying low.',
@@ -1068,6 +1082,16 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ACE, "Standing Calf Raises - Wall" (single-leg version) — https://www.acefitness.org/resources/everyone/exercise-library/73/standing-calf-raises-wall/' },
   'weighted single leg calf raise': { text: 'Stand on the edge of a step with a dumbbell in each hand at your sides, and cross your left foot behind your right ankle. Lower your right heel below the step until you feel a stretch, then rise onto your toes as high as you can and pause. Finish your reps, then do the other leg.',
     source: 'PureGym, "Single Leg Calf Raises" (with weight) — https://www.puregym.com/exercises/legs/calf-exercises/single-leg-calf-raises/' },
+  // ⛔ FOUR MORE, THE SOURCE'S OWN WORDS, APPROVED BY MICHAEL 2026-09-18. A how-to is the page's exact words; side
+  // switching and rep counting come from the row's "target … per side" line, not from here.
+  'db shoulder press': { text: 'Stand with your feet shoulder-width apart. Hold two dumbbells at shoulder height with your elbows bent and palms facing away. Press the dumbbells overhead until your elbows are fully extended. Squeeze the contraction, then slowly return the weights to the starting position.',
+    source: 'Garage Gym Reviews, Christopher Covello, with coaching from Amanda Capritto, CPT, "How to Do the Dumbbell Shoulder Press" — https://www.garagegymreviews.com/dumbbell-shoulder-press' },
+  'dumbbell curl': { text: 'Hold a dumbbell in each hand with your palms facing away from you and your arms hanging at your sides. Stand up straight with your feet shoulder-width apart. Without twisting your wrist, curl your right hand toward your right shoulder until your forearm is roughly perpendicular to the floor. Lower the dumbbell and return to the starting position, then repeat with your left hand.',
+    source: 'Legion, Michael Matthews, CPT (reviewed by Dr. Brian Grant, DPT, CSCS), "How to Do the Dumbbell Curl" — https://legionathletics.com/dumbbell-curl/' },
+  'lunge': { text: 'Stand with the feet hip-width apart and grip one dumbbell in each hand with the palms facing each other and the arms straight down by the side. Keep the back straight and step forward with the right leg. As the right foot hits the floor, lower the left knee towards the floor. Descend to a comfortable range of motion; push the right foot into the ground to stand up by bringing both feet back together at the starting position.',
+    source: 'ACE, "Lunge" — https://www.acefitness.org/resources/everyone/exercise-library/363/lunge/' },
+  'reverse flyes (bodyweight)': { text: "Lie face down on the ground. Raise your head and chest slightly and extend your arms out on the ground on either side of your chest to form a 'T' shape. Twist your hands so that your pinkie/little fingers are facing the ground. Raise your arms off the ground and squeeze your shoulder blades together. Lower your arms and repeat for the desired number of reps.",
+    source: 'Thrive Personal Training, "Bodyweight Prone Reverse Fly" — https://thrivept.net/exercises/body-weight-prone-reverse-fly' },
 };
 
 /**

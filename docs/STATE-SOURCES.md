@@ -730,6 +730,11 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 
 | Source | Movements it sets the steps for | Where |
 |---|---|---|
+| FIELD — ACE, Sabrena Jo, "Tone Up Your Triceps with These Three Exercises" (https://www.acefitness.org/resources/everyone/blog/4930/tone-up-your-triceps-with-these-three-exercises/) | Skull Crusher, dumbbell route (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Garage Gym Reviews, Christopher Covello, with coaching from Amanda Capritto, CPT, "How to Do the Dumbbell Shoulder Press" (https://www.garagegymreviews.com/dumbbell-shoulder-press) | DB Shoulder Press (approved 2026-09-18, source's words) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Legion, Michael Matthews, CPT, reviewed by Dr. Brian Grant, DPT, CSCS, "How to Do the Dumbbell Curl" (https://legionathletics.com/dumbbell-curl/) | Dumbbell Curl (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — ACE, "Lunge" (https://www.acefitness.org/resources/everyone/exercise-library/363/lunge/) | Lunge (approved 2026-09-18, source's words) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Thrive Personal Training, "Bodyweight Prone Reverse Fly" (https://thrivept.net/exercises/body-weight-prone-reverse-fly) | Reverse Flyes (bodyweight) (approved 2026-09-18, source's words) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — NASM, "Dumbbell Romanian Deadlift" (https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift) | DB Romanian Deadlift (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ACE, "Standing Calf Raises - Wall" (https://www.acefitness.org/resources/everyone/exercise-library/73/standing-calf-raises-wall/) | Single Leg Calf Raise (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — PureGym, "Single Leg Calf Raises" (https://www.puregym.com/exercises/legs/calf-exercises/single-leg-calf-raises/) | Weighted Single Leg Calf Raise (approved 2026-09-18) | `strength-grid/grid.ts EXECUTION_HOW_TO` |

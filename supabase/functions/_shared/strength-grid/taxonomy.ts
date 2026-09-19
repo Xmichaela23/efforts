@@ -288,7 +288,6 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'skull crusher': F('focused', 'push_upper', 'printed', 'p222'),
   'pec deck': F('focused', 'push_upper', 'printed', 'p222'),
   'lateral raise': F('focused', 'push_upper', 'printed', 'p222'),
-  'tricep extension': F('focused', 'push_upper', 'variant', 'p222 — single-joint triceps'),
   'band tricep pushdown': F('focused', 'push_upper', 'variant', 'p222 — triceps pushdown, band'),
   'chest fly': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),
   'cable crossover': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),

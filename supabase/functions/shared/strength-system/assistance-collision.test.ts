@@ -814,7 +814,9 @@ Deno.test('D-406 — every loadable catalog option resolves against the OneRepMa
   // all four maxes on file.
   const loadable = ['DB Shoulder Press', 'DB Bench Press', 'DB Incline Press', 'Dumbbell Row',
     'Barbell Row', 'Front Squat', 'Reverse Lunge', 'Bulgarian Split Squat', 'Dumbbell Curl',
-    'Triceps Extension', 'Triceps Pushdown', 'Lat Pulldown'];
+    'Triceps Pushdown', 'Lat Pulldown'];
+  // ⚠️ 'Triceps Extension' LEFT THIS LIST 2026-09-18: it is one entry with Skull Crusher now (Michael), which is
+  // prescribed by feel, so it carries no suggested weight.
   for (const name of loadable) {
     const category = catalogEntry(name)!.category;
     const week = normalizeAssistancePrefs(null);

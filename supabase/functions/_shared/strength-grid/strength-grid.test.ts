@@ -537,7 +537,8 @@ Deno.test('the grid has no duplicate offers, and no bare catalogue stubs', () =>
       const r = resolveSlot({ ...slot.req, equipment: kit.equipment });
       // ⛔ ABSENT FROM THE LIST, not merely unchosen. A stub sitting second in the options is still
       // offered — a swap sheet reads the whole list, and "Press" is not a movement anyone can perform.
-      for (const stub of ['press', 'bench', 'row', 'rows', 'squat', 'deadlift', 'lunge', 'incline bench']) {
+      // ⚠️ `deadlift` and `lunge` left the stub list 2026-09-18: they are p219's Deadlift and p220's forward lunge.
+      for (const stub of ['press', 'bench', 'row', 'rows', 'squat', 'incline bench']) {
         assert(!r.options.some((o) => o.name === stub),
           `${slot.label} [${kit.label}] offered the bare stub "${stub}"`);
       }

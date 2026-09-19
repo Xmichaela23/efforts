@@ -43,9 +43,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 90 min
   NOTES
@@ -70,7 +70,7 @@ WEEK 02  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 45wx5 105wx5 145wx3 170wx2 190x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -93,9 +93,9 @@ WEEK 02  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
@@ -119,7 +119,7 @@ WEEK 03  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 45wx5 105wx5 145wx3 170wx2 190x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -142,9 +142,9 @@ WEEK 03  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
@@ -168,7 +168,7 @@ WEEK 04  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -191,9 +191,9 @@ WEEK 04  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
@@ -217,7 +217,7 @@ WEEK 05  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -240,9 +240,9 @@ WEEK 05  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
@@ -266,7 +266,7 @@ WEEK 06  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -289,9 +289,9 @@ WEEK 06  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
@@ -315,7 +315,7 @@ WEEK 07  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -338,9 +338,9 @@ WEEK 07  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
@@ -364,7 +364,7 @@ WEEK 08  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -387,9 +387,9 @@ WEEK 08  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
@@ -413,7 +413,7 @@ WEEK 09  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 45wx5 105wx5 145wx3 175wx2 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -436,9 +436,9 @@ WEEK 09  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
@@ -462,7 +462,7 @@ WEEK 10  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 45wx5 110wx5 150wx3 180wx2 200x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -485,9 +485,9 @@ WEEK 10  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 82 min
   NOTES
@@ -510,7 +510,7 @@ WEEK 11  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 45wx5 110wx5 150wx3 180wx2 200x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -533,9 +533,9 @@ WEEK 11  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
@@ -558,7 +558,7 @@ WEEK 12  column=standard
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 45wx5 110wx5 150wx3 180wx2 200x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
@@ -581,9 +581,9 @@ WEEK 12  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 45wx5 90wx5 125wx3 150wx2 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Banded Leg Extension" · how-to
+      HYP    Banded Leg Extension           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 87 min
   NOTES
