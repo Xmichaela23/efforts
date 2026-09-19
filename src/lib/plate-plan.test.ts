@@ -1,8 +1,8 @@
-// ⛔ PLATES CARRY OVER; EACH SET IS THE FEWEST PLATE CHANGES FROM THE LAST, THEN THE FEWEST PLATES (2026-09-18).
+// ⛔ FEWEST PLATES PER SIDE, BIGGEST INSIDE; THE ONE CARRY-OVER IS "THE SAME PLATES PLUS ONE ON THE OUTSIDE" (2026-09-18).
 //
 //   ~/.deno/bin/deno test --no-check --sloppy-imports src/lib/plate-plan.test.ts
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { platePlanForSets } from './plate-plan.ts';
+import { platePlanForSets, platesPerSideText } from './plate-plan.ts';
 
 const LB = [
   { weight: 45, count: 4 }, { weight: 35, count: 2 }, { weight: 25, count: 2 },
@@ -14,30 +14,53 @@ const KG = [
 ];
 const bar = (weight: number) => ({ weight, barLoad: 45, bar: 'standard' });
 const kg = (weight: number) => ({ weight, barLoad: 20, bar: 'standard_kg' });
-const plates = (plan: ReturnType<typeof platePlanForSets>) => plan.map((s) => s!.plates.join(' '));
+const text = (plan: ReturnType<typeof platePlanForSets>) => plan.map((s) => platesPerSideText(s!.plates));
 
-Deno.test('the squat day, pounds', () => {
-  const plan = platePlanForSets([45, 135, 185, 225, 245, 245, 245, 205].map(bar), LB);
-  // 225: add 10 10 or swap the 25 for a 45 are two changes each; the swap leaves fewer plates on.
-  assertEquals(plates(plan), ['', '45', '45 25', '45 45', '45 45 10', '45 45 10', '45 45 10', '45 35']);
+Deno.test('the squat day, pounds (Michael, 2026-09-18)', () => {
+  const plan = platePlanForSets([45, 60, 85, 100, 110].map(bar), LB);
+  assertEquals(text(plan), [
+    'bar only', '5 + 2.5 per side', '2 × 10 per side', '25 + 2.5 per side', '25 + 5 + 2.5 per side',
+  ]);
   for (const s of plan) assertEquals(s!.possible, true);
 });
 
+Deno.test('the carry-over: the same plates plus one on the outside', () => {
+  // 95 → 25 per side; 115 → 35 per side is one 35 from scratch, but it is the 25 plus a 10 on the outside.
+  assertEquals(text(platePlanForSets([95, 115].map(bar), LB)), ['25 per side', '25 + 10 per side']);
+});
+
+Deno.test('no carry-over when the extra plate is bigger than the outermost', () => {
+  // 25 + 2.5 on, then 32.5 per side: adding a 5 outside the 2.5 would put a small plate inside a bigger one.
+  assertEquals(text(platePlanForSets([100, 110].map(bar), LB)), ['25 + 2.5 per side', '25 + 5 + 2.5 per side']);
+});
+
+Deno.test('a heavy ramp, pounds', () => {
+  assertEquals(text(platePlanForSets([135, 185, 225, 245, 205].map(bar), LB)), [
+    '45 per side', '45 + 25 per side', '2 × 45 per side', '2 × 45 + 10 per side', '45 + 35 per side',
+  ]);
+  assertEquals(text(platePlanForSets([bar(155)], LB)), ['45 + 10 per side']);
+  assertEquals(text(platePlanForSets([bar(175)], LB)), ['45 + 2 × 10 per side']);
+});
+
 Deno.test('the squat day, kilograms', () => {
-  const plan = platePlanForSets([20, 60, 80, 100, 110, 110, 90].map(kg), KG);
-  assertEquals(plates(plan), ['', '20', '20 10', '20 10 10', '20 10 10 5', '20 10 10 5', '20 10 5']);
+  assertEquals(text(platePlanForSets([20, 60, 80, 100, 110, 90].map(kg), KG)), [
+    // 80 and 100 carry the 20 and add a 10 outside each time; 110 adds a 5 outside those; 90 starts fresh.
+    'bar only', '20 per side', '20 + 10 per side', '20 + 2 × 10 per side', '20 + 2 × 10 + 5 per side',
+    '25 + 10 per side',
+  ]);
+  assertEquals(text(platePlanForSets([kg(52.5)], KG)), ['15 + 1.25 per side']);
 });
 
 Deno.test('a set with no weight is passed over; the plates carry on', () => {
-  const plan = platePlanForSets([bar(135), null, { weight: 0, barLoad: 45, bar: 'standard' }, bar(185)], LB);
+  const plan = platePlanForSets([bar(95), null, { weight: 0, barLoad: 45, bar: 'standard' }, bar(115)], LB);
   assertEquals(plan[1], null);
   assertEquals(plan[2], null);
-  assertEquals(plan[3]!.plates, [45, 25]);
+  assertEquals(plan[3]!.plates, [25, 10]);
 });
 
 Deno.test('a different bar starts from empty', () => {
-  const plan = platePlanForSets([bar(225), { weight: 185, barLoad: 45, bar: 'safety' }], LB);
-  assertEquals(plan[1]!.plates, [45, 25]);
+  const plan = platePlanForSets([bar(95), { weight: 115, barLoad: 45, bar: 'safety' }], LB);
+  assertEquals(plan[1]!.plates, [35]);
 });
 
 Deno.test('a weight the rack cannot make shows the closest load under it', () => {
