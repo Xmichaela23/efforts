@@ -52,6 +52,7 @@ import {
   STANDING_PLAN_PROTOCOL_ID,
   TEST_WEEK_INDEX,
   weekLedgersFor,
+  blockDescriptionFor,
 } from '../_shared/standing-plan/index.ts';
 import { calculateDurationWorkload, getDefaultIntensityForType, getStepsIntensity } from '../_shared/workload.ts';
 
@@ -569,6 +570,15 @@ Deno.serve(async (req: Request) => {
     const { error: cfgErr } = await supabase
       .from('plans')
       .update({
+        /**
+         * ⛔ THE PLAN'S OWN DESCRIPTION, REWRITTEN IN THE SAME PASS AS ITS SESSIONS (2026-09-19). The build wrote it once
+         * (`generate-strength-plan` → `plans.description`) and this write carried only `config`, so a plan built before
+         * a wording change kept the old words on the Plan screen and in the download. The same builder function
+         * (`blockDescriptionFor`), off `probe` — the block at its authored set counts, as it was built. The version
+         * stamp that queues this pass is the only trigger (`isRefresh`); an athlete's apply (a test read, a deload)
+         * leaves it alone, so a plan refreshed once is not rewritten until the version moves.
+         */
+        ...(isRefresh ? { description: blockDescriptionFor(probe, weeks) } : {}),
         config: {
           ...baseConfig,
           standing_plan: {

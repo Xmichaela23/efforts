@@ -305,17 +305,10 @@ export function buildStandingPlanRow(args: {
   }
 
   const frame = FRAMES[args.compose.frame];
-  /**
-   * ⛔ WHAT THE BLOCK ACTUALLY HOLDS, COUNTED OFF THE BUILT WEEK — one reading, two readers.
-   *
-   * ⚠️ THE REPRESENTATIVE WEEK IS THE FIRST NON-TEST ONE, the same choice `sport_counts` was
-   * already making below. Week one's LIFTING looks different (two of its days are the p215 pretest)
-   * and its endurance does not, so a description drawn from it would misreport the block.
-   */
   const shape = weekShapeOf(blocks.find((b) => !b.isTestWeek) ?? blocks[0]);
   return {
     name: (args.goalName ?? '').trim() || 'Strength, with running',
-    description: describeBlock(weeks, notes, blocks[0]?.isTestWeek === true, shape),
+    description: blockDescriptionFor(blocks, weeks, args.extraNotes),
     duration_weeks: weeks,
     sessions_by_week,
     phaseStructure: phasesFor(weeks, args.taperWeeks ?? []),
@@ -525,6 +518,33 @@ export const PAIN_TOLERANCE_NOTE =
   'Higher pain tolerance may be a very useful adaptation for endurance athletes, since handling growing discomfort in '
   + 'endurance events may tie directly to how well they perform in their sport. For strength athletes the case is less '
   + 'clear; higher tolerance may bring little benefit or may even be bad for longer-term health.';
+
+/**
+ * ⛔ THE PLAN'S OWN DESCRIPTION, OFF A COMPOSED BLOCK — ONE WRITER, TWO CALLERS (2026-09-19). The build
+ * (`buildStandingPlanRow`) and the version refresh (`rematerialize-standing-block`, the same pass that rewrites the
+ * sessions) both call this, so a plan built before a wording change gets the new wording on its next refresh.
+ *
+ * ⛔ WHAT THE BLOCK ACTUALLY HOLDS, COUNTED OFF THE BUILT WEEK — one reading, two readers.
+ * ⚠️ THE REPRESENTATIVE WEEK IS THE FIRST NON-TEST ONE, the same choice `sport_counts` was
+ * already making below. Week one's LIFTING looks different (two of its days are the p215 pretest)
+ * and its endurance does not, so a description drawn from it would misreport the block.
+ * ⚠️ THE NOTES ARE DEDUPED BY TEXT ACROSS THE BLOCK, as `buildStandingPlanRow` dedupes them.
+ */
+export function blockDescriptionFor(
+  blocks: ComposedWeek[],
+  weeks: number,
+  extraNotes: ComposedWeek['notes'] = [],
+): string {
+  const seen = new Set<string>();
+  const notes: ComposedWeek['notes'] = [];
+  for (const n of [...extraNotes, ...blocks.flatMap((b) => b.notes)]) {
+    if (seen.has(n.text)) continue;
+    seen.add(n.text);
+    notes.push(n);
+  }
+  const shape = weekShapeOf(blocks.find((b) => !b.isTestWeek) ?? blocks[0]);
+  return describeBlock(Math.max(1, Math.round(weeks)), notes, blocks[0]?.isTestWeek === true, shape);
+}
 
 function describeBlock(
   weeks: number,

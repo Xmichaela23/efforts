@@ -15,7 +15,8 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { ACCESSORY_FATIGUE_CUE, composeWeek, defaultCompetitionLifts, SET_END_CUE, SPEED_SET_END_CUE } from './index.ts';
-import { buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
+import { blockDescriptionFor, buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
+import { composeBlock } from './compose.ts';
 import { P227_DRILL_LINE } from './plyo.ts';
 import { PLYO_DOSE } from './frames.ts';
 import { FAMILIES } from '../endurance-library/source-rules.ts';
@@ -249,4 +250,14 @@ Deno.test('⛔⛔ NO WORD NAMES TWO DIFFERENT SESSIONS — the wizard and the pl
         `${family}'s library label "${label}" is ${other}'s session name`);
     }
   }
+});
+
+Deno.test('⛔ THE REFRESH WRITES THE PLAN DESCRIPTION THE BUILD WROTE — one function, the same words (2026-09-19)', () => {
+  // `rematerialize-standing-block` calls `blockDescriptionFor` on its own composition of the block; the build calls
+  // it through `buildStandingPlanRow`. Same block in, same description out.
+  const compose = { ...BASE } as never;
+  const row = buildStandingPlanRow({ compose, weeks: 12, taperWeeks: [] } as never) as { description: string };
+  const blocks = composeBlock({ ...(compose as object), weeks: 12, taperWeeks: [] } as never);
+  assertEquals(blockDescriptionFor(blocks, 12), row.description);
+  assert(row.description.includes(PAIN_TOLERANCE_NOTE));
 });
