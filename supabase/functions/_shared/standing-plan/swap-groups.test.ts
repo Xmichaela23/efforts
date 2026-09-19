@@ -15,7 +15,9 @@ Deno.test('⛔ THE REQUIRED CHECK: Seated DB Press offers p220 secondary upper p
   const gym = swapGroupsFor('Seated DB Press', GYM);
   assertEquals(gym.map((g) => g.heading), ['Secondary']);
   assertEquals(new Set(names(gym)), new Set(['larsen press', 'incline bench press', 'close grip bench press', 'jm press',
-    'arnold press', 'db bench press', 'db incline press', 'db shoulder press', 'db floor press', 'db push press', 'kettlebell press']));
+    'arnold press', 'db bench press', 'db incline press', 'db shoulder press', 'db floor press', 'db push press', 'kettlebell press',
+    // p220 files the incline bench here, and the decline with it (Michael, 2026-09-18).
+    'decline bench press']));
   assertEquals(new Set(names(swapGroupsFor('Seated DB Press', HOME))),
     new Set(['arnold press', 'db bench press', 'db shoulder press', 'db floor press', 'db push press']));
   // The incline needs the incline bench chip (a flat/adjustable bench is not incline, 2026-08-29).
@@ -51,4 +53,13 @@ Deno.test('after a swap the slot\'s movement comes back; a stand-in is never off
   }
   assertEquals(swapGroupsFor('Push Up', GYM), []);
   assertEquals(swapGroupsFor('Core Work (5 Min - Your Choice)', GYM), []);
+});
+
+Deno.test('⛔ THE KIT\'S OWN NAME: no machine name without the machine; the dumbbell stiff-legged deadlift by that name', () => {
+  const home = swapGroupsFor('Preacher Curl', HOME).flatMap((g) => g.options.map((o) => o.display));
+  assert(!home.includes('Pullover Machine') && !home.includes('Rear Delt Machine'), home.join(', '));
+  assert(home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
+  const hinge = swapGroupsFor('Romanian Deadlift', HOME).flatMap((g) => g.options.map((o) => o.display));
+  assert(hinge.includes('Dumbbell Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
+  assert(swapGroupsFor('Romanian Deadlift', [...HOME, 'Sandbag']).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });

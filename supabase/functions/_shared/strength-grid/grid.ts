@@ -619,6 +619,11 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
    * has a home route now, and the name says what the athlete will lie across.
    */
   'pullover machine': 'Flat-Bench Dumbbell Pullover',
+  // ⛔ ON A DUMBBELL KIT, THE DUMBBELL VERSION BY THAT NAME (Michael, 2026-09-18); with a barbell, his name.
+  'stiff legged deadlift': [
+    { route: ['barbell'], value: 'Stiff-Legged Deadlift' },
+    { route: ['dumbbells'], value: 'Dumbbell Stiff-Legged Deadlift' },
+  ],
   /**
    * ⛔ THE CONCENTRATION CURL (Michael, 2026-09-10 — the third home route in the same addendum:
    * "a bench, a rack and dumbbells is a pretty standard home gym"). The preacher curl's station

@@ -177,7 +177,7 @@ Deno.test('every route is spelled with a real key', () => {
   const vocabulary = new Set(Object.keys(ASSISTANCE_GEAR).length ? [
     'barbell', 'rack', 'bench', 'incline_bench', 'dumbbells', 'kettlebell', 'cable', 'pull_up_bar',
     'ab_wheel', 'bands', 'box', 'rings', 'machine', 'suspension_trainer', 'stability_ball',
-    'back_extension_bench', 'sled',
+    'back_extension_bench', 'sled', 'sandbag',
   ] : []);
   for (const [name, routes] of Object.entries(ASSISTANCE_GEAR)) {
     assertEquals(foldExerciseName(name), name, `"${name}" is not stored in folded form`);

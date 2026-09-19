@@ -26,7 +26,9 @@ import { localDateInTz } from './local-date.ts';
 
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
 // 2 (2026-09-18): one name per movement (83 spellings merged), every movement filed by its page, the pull-up leads the primary pull cell.
-export const PLAN_WRITER_VERSION = 2;
+// 3 (2026-09-18): decline bench to Secondary push, bodyweight dips off Braced push, sandbag throw only with a sandbag,
+//   the kit's own name for the stiff-legged deadlift.
+export const PLAN_WRITER_VERSION = 3;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

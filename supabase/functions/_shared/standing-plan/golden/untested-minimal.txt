@@ -64,7 +64,7 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -114,7 +114,7 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -164,7 +164,7 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -214,7 +214,7 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -264,7 +264,7 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -314,7 +314,7 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -364,7 +364,7 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -414,7 +414,7 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -464,7 +464,7 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -514,7 +514,7 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
@@ -564,7 +564,7 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test · how-to
       DE     Military Press                 4x2-4        @ By feel       | RIR 3.5 · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to

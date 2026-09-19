@@ -62,7 +62,7 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -111,7 +111,7 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -160,7 +160,7 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -209,7 +209,7 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -258,7 +258,7 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -307,7 +307,7 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -356,7 +356,7 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -405,7 +405,7 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -454,7 +454,7 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -502,7 +502,7 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
@@ -550,7 +550,7 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Dips                           3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      HYP    DB Bench Press                 3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to

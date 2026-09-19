@@ -122,7 +122,7 @@ Deno.test('⛔ THE ASSISTANCE GEAR MAP SPEAKS THE SHARED VOCABULARY — no secon
   const reachable = athleteEquipmentToKeys([
     'Commercial gym', 'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage',
     'Bench (flat/adjustable)', 'Incline bench', 'Decline bench', 'Pull-up bar', 'Kettlebells',
-    'Cable machine', 'Resistance bands', 'Ab wheel',
+    'Cable machine', 'Resistance bands', 'Ab wheel', 'Sandbag',
   ]);
   assertEquals([...used].filter((k) => !reachable.has(k)), [],
     'these keys cannot be produced by any equipment chip at all');
@@ -188,7 +188,7 @@ Deno.test('⛔ THE PICKER LIST AND THE KEY MAP AGREE — a renamed chip is a sil
   const PICKER = [
     'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
     'Incline bench', 'Pull-up bar', 'Kettlebells', 'Cable machine', 'Resistance bands', 'Ab wheel',
-    'TRX / suspension trainer', 'Stability ball', 'Back extension bench', 'Sled',
+    'TRX / suspension trainer', 'Stability ball', 'Back extension bench', 'Sled', 'Sandbag',
   ];
   const dead = PICKER.filter((chip) => athleteEquipmentToKeys([chip]).size === 0);
   assertEquals(dead, [], 'these chips produce no gear key — ticking them does nothing');

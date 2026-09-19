@@ -146,7 +146,10 @@ export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
     // ⛔ ADDED 2026-09-16 (D-479) on Michael's ruling from p226 — the stated exception to the ownership bar (no
     // survey number). Matched by SUBSTRING ("sled") in `athleteEquipmentToKeys` and EXACTLY in
     // `substituteExerciseForEquipment`.
-    "Sled"
+    "Sled",
+    // ⛔ ADDED 2026-09-18 (Michael): p220's sandbag throw is offered only to a kit with a sandbag. Matched by SUBSTRING
+    // ("sandbag") in `athleteEquipmentToKeys`.
+    "Sandbag"
   ];
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
