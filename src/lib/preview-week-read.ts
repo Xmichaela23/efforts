@@ -101,6 +101,8 @@ export function hardCardLabel(
 ): string {
   const sport = discipline === 'bike' ? 'Hard ride' : 'Hard run';
   if (String(ownership ?? '') === 'club') return `${sport} — club session`;
-  const intensity = hardIntensityOf(String(family ?? '')) ?? fallbackIntensity;
-  return `${sport}${intensity === 'threshold' ? ' — sustained threshold' : ' — top-end intensity'}`;
+  // ⛔ "— sustained threshold" / "— top-end intensity" came off (2026-09-18, book-language pass 3): no page prints
+  // either, and p231 puts MLSS in zone 4, which "top-end" misnamed. The card names the sport and the role.
+  void family; void fallbackIntensity;
+  return sport;
 }

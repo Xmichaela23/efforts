@@ -828,15 +828,9 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
     }
     if (placed > 0) {
       notes.push({ kind: 'ours', text: RIDE_EQUIVALENCE_IS_OURS });
-      if (runs > 0) {
-        // ⛔ STATE THE COST (pivot §2). A held sport keeps its base and loses its top end.
-        notes.push({
-          kind: 'source',
-          text: 'The running keeps its long session and loses its hard one. Base endurance holds on '
-            + 'that; top-end running speed decays.',
-          cite: 'Viada p275',
-        });
-      }
+      // ⛔ "The running keeps its long session and loses its hard one. Base endurance holds on that; top-end running
+      // speed decays." CAME OFF (2026-09-18, book-language pass 3). It cited p275 and is not on that page, and p119
+      // says the opposite: "no quality should be allowed to deteriorate completely".
     }
   }
 

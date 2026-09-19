@@ -139,3 +139,15 @@ Deno.test('the level 1 swim is p241\'s: 200 m, three 50s, two 600s, in the page\
   assertEquals(work.map((s: any) => s.distanceMeters), [200, 50, 50, 50, 600, 600]);
   assertEquals(work[work.length - 1].label, 'easy-to-moderate intensity (race pace)');
 });
+
+// ── Pass 3: the lines on no page, off ───────────────────────────────────────────────────────────
+
+import { swappedSessionBlock } from './session-swap/swap.ts';
+import { hardCardLabel } from '../../../src/lib/preview-week-read.ts';
+
+Deno.test('the swapped row and the builder card say what the app did, and nothing no page says', () => {
+  const b = swappedSessionBlock({ type: 'ride', tags: ['swapped_from:run'] } as any);
+  assert(!/same effort/i.test(b.note), b.note);
+  assertEquals(hardCardLabel('run', null, 'run_mlss', 'top-end'), 'Hard run');
+  assertEquals(hardCardLabel('bike', null, 'ride_sweet_spot', 'threshold'), 'Hard ride');
+});

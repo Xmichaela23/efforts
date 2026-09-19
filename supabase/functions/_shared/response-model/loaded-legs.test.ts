@@ -61,7 +61,7 @@ Deno.test('novel + plan-start: names the movement, plan-aware suggestion', () =>
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: "Monday's opener" });
   assertEquals(d.label, 'LEGS LOADED');
   assertEquals(d.why, "Why: Monday's lower-body work — lunges (not in your recent training), RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
-  assertEquals(d.suggestion, "Expect this to ease over 2–3 days — new movements hit hardest the first time. Fine to keep rides/runs easy until it clears; you'll be fresh for Monday's opener.");
+  assertEquals(d.suggestion, ''); // no page says it (2026-09-18, book-language pass 3)
 });
 
 // ── 2. Novel movement, no imminent plan event ─────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ Deno.test('novel + no plan event: generic ease-over-2-3-days suggestion', () => 
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: null });
   assertEquals(d.label, 'LEGS LOADED');
   assertEquals(d.why, "Why: Monday's lower-body work — lunges (not in your recent training), RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
-  assertEquals(d.suggestion, 'Expect this to ease over 2–3 days — easy movement helps more than rest.');
+  assertEquals(d.suggestion, ''); // no page says it (2026-09-18, book-language pass 3)
 });
 
 // ── 3. Non-novel lower-body ───────────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ Deno.test('non-novel: no movement clause, normal-loading suggestion', () => {
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'squats', isNovel: false, planEvent: null });
   assertEquals(d.label, 'LEGS LOADED');
   assertEquals(d.why, "Why: Monday's lower-body work — RPE 9 — efforts since feeling harder (5.3 vs 4.4) · load balanced, nothing systemic");
-  assertEquals(d.suggestion, 'Normal loading response — keep efforts easy if legs still feel heavy.');
+  assertEquals(d.suggestion, ''); // no page says it (2026-09-18, book-language pass 3)
 });
 
 // ── 4. Athlete-reported soreness → LEGS SORE (state language, declared truth) ──────────────────────
@@ -85,11 +85,11 @@ Deno.test('athlete-reported soreness: LEGS SORE label, soreness-specific suggest
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: null, athleteReportedSoreness: true });
   assertEquals(d.label, 'LEGS SORE');
   assertEquals(d.why, "Why: Monday's lower-body work (RPE 9) — you reported sore legs, efforts since feeling harder (5.3 vs 4.4) · load balanced");
-  assertEquals(d.suggestion, 'Soreness like this typically eases in 2–3 days — easy movement helps more than rest.');
+  assertEquals(d.suggestion, ''); // no page says it (2026-09-18, book-language pass 3)
 });
 Deno.test('athlete-reported soreness + plan-start: appends the plan clause', () => {
   const d = buildLoadedLegsDiagnosis({ ...BASE, movement: 'lunges', isNovel: true, planEvent: "Monday's opener", athleteReportedSoreness: true });
-  assertEquals(d.suggestion, "Soreness like this typically eases in 2–3 days — easy movement helps more than rest. You'll be fresh for Monday's opener.");
+  assertEquals(d.suggestion, ''); // no page says it (2026-09-18, book-language pass 3)
 });
 
 // ── edge: missing RPE (no fabricated number) ──────────────────────────────────────────────────────

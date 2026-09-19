@@ -163,12 +163,9 @@ Deno.test('the hard sessions go on the bike, and the run keeps its long day', ()
   assert(!a.notes.some((n) => /costs the lifting less/i.test(n.text)), 'the p280-contradicting note is back');
 });
 
-Deno.test('the cost of losing the hard run is stated, not left to be noticed', () => {
-  // ⛔ pivot §2: a held sport keeps its base and loses its top end, and the copy says so.
+Deno.test('no note says top-end running speed decays (p275 does not say it; p119 says the opposite)', () => {
   const a = assignSports(STANDARD, { runs: 2, rides: 2 });
-  const cost = a.notes.find((n) => /top-end/i.test(n.text));
-  assert(cost, `the cost was never stated: ${JSON.stringify(a.notes)}`);
-  assertEquals(cost!.cite, 'Viada p275');
+  assert(!a.notes.some((n) => /top-end/i.test(n.text)), JSON.stringify(a.notes));
 });
 
 Deno.test('with no running in the mix the long session becomes a ride — his own permission', () => {

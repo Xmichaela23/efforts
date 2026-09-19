@@ -4851,7 +4851,7 @@ Deno.serve(async (req) => {
         // sessions") came off State with the verdict words. `bodyRpeDriver` stays in `_shared` with its tests.
         readiness_rpe_driver: null,
         // D-232: the loaded-legs suggestion line (rendered under the Why). Null for systemic/EFFORT-UP.
-        readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion ?? null,
+        readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion || null,
         signals: trendSignals,
       },
       details: {

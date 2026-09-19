@@ -26,14 +26,12 @@ export const PROGRAM_COPY = {
       + 'week one.',
   },
   // Viada p246: four lifting days and four runs. Viada p247: the long run goes up to 90 to 100 minutes.
-  // OURS — `PROGRAM_COPY` "Twelve weeks", "comfortable running a full hour" and "about three hours of running and seven to nine hours of training in all"; no page.
+  // ⛔ OFF 2026-09-18 (book-language pass 3): "Your speed and mileage hold.", "Twelve weeks", "comfortable running a full
+  // hour" and "about three hours of running and seven to nine hours of training in all" — on no page.
   run_strength: {
     label: 'Run + Strength',
-    blurb: 'You get stronger. Your speed and mileage hold. Twelve weeks: four lifting days, four runs. '
-      + 'The long run stays under 100 minutes.',
-    requirement: 'Needs a barbell and plates, a rack and a bench. You should be comfortable running a full hour; '
-      + 'the week holds about three hours of running and seven to nine hours of training in all. '
-      + 'A lift you have not tested gets a test session in week one.',
+    blurb: 'You get stronger. Four lifting days, four runs. The long run stays under 100 minutes.',
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // Viada p278: three lifting days; five rides are its Deload column's five. OURS — `PROGRAM_COPY` the four-ride option (`fewerRidesDropsSlot`).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
@@ -71,7 +69,9 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
     name: 'Ride + Strength',
     confirm_title: '{name}, {weeks} weeks.',
     confirm_line: 'A {weeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.',
-    ftp_note: "If you're coming back from a riding break, make sure your FTP is current.",
+    // ⛔ "If you're coming back from a riding break, make sure your FTP is current." came off 2026-09-18 (book-language
+    // pass 3): p278–p281 say nothing of it (grepped the SOURCE doc's Part E2 for "FTP", "break", "current").
+    ftp_note: null,
   },
 };
 
@@ -101,13 +101,17 @@ export const NUMBERS_COPY = {
   source_ftp_manual: 'typed in Baselines',
   source_ftp_learned: 'estimated from your rides',
   source_ftp_low: 'estimated, low confidence',
-  ftp_test: 'The 20-minute FTP test (p212) is scheduled into week one.',
-  ftp_none: 'Nothing on file. The 20-minute FTP test (p212) is scheduled into week one.',
+  // ⛔ No page number on screen (2026-09-18): citations live in the ledger. p212 / p210 are the tests' pages.
+  // Viada p212 — the 20-minute test.
+  ftp_test: 'The 20-minute FTP test is scheduled into week one.',
+  // Viada p212 — the 20-minute test.
+  ftp_none: 'Nothing on file. The 20-minute FTP test is scheduled into week one.',
   run_title: 'Run threshold',
   source_run_typed: 'typed in Baselines',
   source_run_learned: 'from your runs',
-  run_test: 'The threshold time trial (p210) is scheduled into week one.',
-  run_none: 'Nothing on file. The threshold time trial (p210) is scheduled into week one.',
+  run_test: 'The threshold time trial is scheduled into week one.',
+  run_none: 'Nothing on file. The threshold time trial is scheduled into week one.',
+  // FIELD — "per 100" is the swim pace unit (time per 100 m or 100 yd), a definition, not a prescription.
   swim_title: 'Swim pace (per 100)',
   source_swim: 'on file',
   swim_none: 'Nothing on file — there is no swim test to schedule; the number is typed on Profile.',
@@ -150,7 +154,8 @@ const WORD: Record<number, string> = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four'
 
 export const RUNS_COPY = {
   commitment: '{lifting} lifting days a week. {runs} runs fit around them.',
-  sub: 'Pick how long the long run is. The easy run is {minutes} minutes. The two hard runs rotate.',
+  // ⛔ "The two hard runs rotate." came off 2026-09-18 (book-language pass 3): p246–p247 print no rotation.
+  sub: 'Pick how long the long run is. The easy run is {minutes} minutes.',
   row: 'Day {day} · {label}',
   length_label: 'Length',
   length_varies: 'length varies week to week',

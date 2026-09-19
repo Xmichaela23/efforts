@@ -32,21 +32,19 @@ export interface LoadedLegsDiagnosis {
   suggestion: string;
 }
 
-// OURS — `NOVEL_GENERIC_SUGGESTION` / `SORE_BASE_SUGGESTION` "2–3 days": general repeated-bout physiology (see above), no named source
-const NOVEL_GENERIC_SUGGESTION = 'Expect this to ease over 2–3 days — easy movement helps more than rest.';
-const NON_NOVEL_SUGGESTION = 'Normal loading response — keep efforts easy if legs still feel heavy.';
-const SORE_BASE_SUGGESTION = 'Soreness like this typically eases in 2–3 days — easy movement helps more than rest.';
-const novelPlanSuggestion = (planEvent: string) =>
-  `Expect this to ease over 2–3 days — new movements hit hardest the first time. Fine to keep rides/runs easy until it clears; you'll be fresh for ${planEvent}.`;
-
-function suggestionFor(isNovel: boolean, movement: string | null, planEvent: string | null): string {
-  if (isNovel && movement) return planEvent ? novelPlanSuggestion(planEvent) : NOVEL_GENERIC_SUGGESTION;
-  return NON_NOVEL_SUGGESTION;
+/**
+ * ⛔ NO SUGGESTION (2026-09-18, book-language pass 3, audit T5). "Expect this to ease over 2–3 days — easy movement
+ * helps more than rest", "Normal loading response — keep efforts easy if legs still feel heavy", "Fine to keep
+ * rides/runs easy until it clears; you'll be fresh for {event}" — each told the athlete what to do, and no page says
+ * any of it (the 2–3 days was ours, "general repeated-bout physiology"). The label and the Why are facts about the
+ * week and stay; the suggestion is empty, and the coach sends none.
+ */
+function suggestionFor(_isNovel: boolean, _movement: string | null, _planEvent: string | null): string {
+  return '';
 }
 
-// LEGS SORE (declared) — its own line; append the plan-start clause when the plan starts within the window.
-function soreSuggestion(planEvent: string | null): string {
-  return planEvent ? `${SORE_BASE_SUGGESTION} You'll be fresh for ${planEvent}.` : SORE_BASE_SUGGESTION;
+function soreSuggestion(_planEvent: string | null): string {
+  return '';
 }
 
 /**
