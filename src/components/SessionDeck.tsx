@@ -480,7 +480,7 @@ const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSPrope
    * from the load card directly beneath them.
    * ⚠️ DONE STILL READS AS DONE, and it does NOT do it with a different surface: the edge is thinner
    * and unglowed, and the row carries a checkmark. Same material, quieter. (The title was at low alpha
-   * until 2026-09-18; it measured under 4.5:1, so it is full colour and the card's ground is calmed —
+   * until 2026-09-18; it measured under 4.5:1, so it is primary white and the card's ground is calmed —
    * `plate-calm` — so Garmin's device line under it clears 4.5:1 too.)
    */
   // ⛔ THINNER EDGE, NO GLOW, WHEN IT IS NOT THE FIRST SESSION (§3e.2).
@@ -528,7 +528,6 @@ export const CompletedSessionCard: React.FC<{
 }> = ({ workout, useImperial, emphasis = 'lead', onOpen }) => {
   const boom = boomLineOf(workout);
   const sport = displayDisciplineOf(workout as never);
-  const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
   const headline = doneHeadline(workout);
   void useImperial; // the headline arrives in the athlete's unit (2026-09-16, Stage 7 session 1)
@@ -547,13 +546,14 @@ export const CompletedSessionCard: React.FC<{
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        {/* ⚠️ THE SPORT COLOUR, FULL STRENGTH (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md). It was
-            the sport colour at 55% / 43% — "done, not gone" — and measured 2.2–2.6:1, under WCAG 2.2's 4.5:1.
-            The ✓ beside it says done; a flat grey title would lose which sport this was. */}
+        {/* ⛔ A FINISHED TITLE IS PRIMARY WHITE, NOT THE SPORT COLOUR (Michael, 2026-09-18). The sport colour
+            belongs to work still ahead; the ✓ says done. `--label` is #fff on the dark card, well over WCAG
+            2.2's 4.5:1. (Before: the sport colour, first at 55% / 43% — 2.2–2.6:1 — then full strength;
+            docs/AUDIT-type-legibility-2026-09-18.md.) */}
         {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
         <div
           className={`${emphasis === 'lead' ? 'text-title3' : 'text-body'} font-semibold leading-tight min-w-0`}
-          style={{ color: colour }}
+          style={{ color: 'var(--label)' }}
         >
           {deriveWorkoutTitle(workout as never)}
         </div>
