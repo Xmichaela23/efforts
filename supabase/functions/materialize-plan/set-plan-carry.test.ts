@@ -82,7 +82,7 @@ Deno.test('a standing-plan barbell row gets its warm-up sets in front of the wor
 Deno.test('an old stored ramp is replaced, not scaled — the empty bar stays the bar', () => {
   const ex = { name: 'Deadlift', set_plan: [{ weight: 45, reps: 5, warmup: true }, { weight: 165, reps: 5, warmup: true }, { weight: 300, reps: 3 }] };
   const out = carrySetPlan(ex, 315, { name: 'Deadlift', metric: false })!;
-  assertEquals(out.map((s: any) => `${s.warmup ? 'w' : ''}${s.weight}x${s.reps}`).join(' '), 'w135x5 w180x5 w225x5 w270x5 315x3');
+  assertEquals(out.map((s: any) => `${s.warmup ? 'w' : ''}${s.weight}x${s.reps}`).join(' '), 'w65x5 w110x5 w155x5 w200x5 w245x5 w290x5 315x3');
 });
 
 Deno.test('no warm-up sets on a lift with no bar, and none without the standing-plan flag', () => {

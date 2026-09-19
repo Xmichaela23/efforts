@@ -166,6 +166,8 @@ Which lifts get them:
 The rules:
 - **Squat, bench, overhead press and every other barbell lift:** 2 × 5 with the empty bar. That is 45 lb, or
   the 20 kg bar on a metric account.
+> ⛔ Superseded later on 2026-09-18 (Michael): deadlift and row start at 65 lb / 30 kg (the lowest of StrongLifts' "65-135lb" the plates allow), every step is 45 lb / 20 kg, and a set is kept only 25 lb / 10 kg or more under the work weight. `warmup.ts` and STATE-SOURCES carry the new rule; the lines below are history.
+
 - **Deadlift and row:** 1 × 5 at 135 lb / 60 kg.
 - **Then:** sets of 5, adding at most 45 lb / 20 kg per set, evenly stepped.
 - **Never:** a warm-up set at or above the work weight.
