@@ -2903,6 +2903,7 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            ...(((ex as any)?.target_rir_band && typeof (ex as any).target_rir_band === 'object') ? { target_rir_band: (ex as any).target_rir_band } : {}), // p218's reserve band
             // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
             // stamp passes through; a row no composer wrote gets the same rule's numbers here.
             ...restFieldsForRow({ ...(ex as any), name, reps, set_plan: carrySetPlan(ex, finalWeight) }),
@@ -3334,6 +3335,7 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            ...(((ex as any)?.target_rir_band && typeof (ex as any).target_rir_band === 'object') ? { target_rir_band: (ex as any).target_rir_band } : {}), // p218's reserve band
             // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
             // stamp passes through; a row no composer wrote gets the same rule's numbers here.
             ...restFieldsForRow({ ...(ex as any), name, reps, set_plan: carrySetPlan(ex, finalWeight) }),
