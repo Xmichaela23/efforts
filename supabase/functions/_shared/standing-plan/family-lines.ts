@@ -111,13 +111,10 @@ export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively d
  */
 export const RUN_MLSS_DRAWER_NOTE = 'Athletes may perform any of these work intervals on hills and adjust pace accordingly to maintain target intensity.';
 
-/**
- * ⛔ THE ERG NOTE ON THE ANAEROBIC RIDE, IN THE DRAWER AFTER THE LINE (approved by Michael, 2026-09-18). ⚠️ NOT A PAGE
- * LINE, KEPT AS A LINE THAT OPERATES THE ATHLETE'S DEVICE: p237 asks for a power floor rather than a target, and ERG
- * holds a target. It says how to set Zwift, not how to ride.
- * The session note goes to the Planned tab, the Garmin workout description and the Intervals.icu description.
- */
-export const RIDE_ANAEROBIC_DRAWER_NOTE = 'On Zwift, turn ERG off.';
+// ⛔ "On Zwift, turn ERG off." (RIDE_ANAEROBIC_DRAWER_NOTE) CAME OFF (2026-09-18, round 3). It is on no page. The
+// endurance fix report and STATE-SOURCES say it was approved on 2026-09-18, but neither quotes Michael and no commit,
+// workorder or decision records him approving that exact line (searched git log -S "ERG off" and docs/ for "ERG").
+// Where the book gives no words, nothing prints.
 
 /**
  * p247: "If within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25

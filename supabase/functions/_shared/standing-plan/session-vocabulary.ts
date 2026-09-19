@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, RACE_TEMPO_LINE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, wrapperToken } from '../endurance-library/index.ts';
 
@@ -895,8 +895,8 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   if (line) parts.push(line);
   // ⛔ THE PEDALLING NOTE, UNDER THE LINE, IN THE DRAWER ONLY (2026-09-10, p239).
   if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);
-  // ⛔ p237 — ERG off on the anaerobic ride, after its line (2026-09-18).
-  if (session.family === 'ride_anaerobic') parts.push(RIDE_ANAEROBIC_DRAWER_NOTE);
+  // ⛔ "On Zwift, turn ERG off." CAME OFF the anaerobic ride (2026-09-18, round 3): on no page, and no record of
+  // Michael approving that line was found (see `family-lines.ts`).
   // ⛔ p231 — the hills note, after the MLSS line, in the drawer only. One owner: `family-lines.ts`.
   if (session.family === 'run_mlss') parts.push(RUN_MLSS_DRAWER_NOTE);
   // ⛔ p235's own sentences for the easy and the long run, in the drawer after the line (pass 5, 2026-09-18).
