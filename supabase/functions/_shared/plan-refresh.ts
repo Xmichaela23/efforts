@@ -40,8 +40,11 @@ import { localDateInTz } from './local-date.ts';
 //   "By feel" weight, p210's strides, the test day's p215 lines, one band rule for a single percentage.
 // 10 (2026-09-18): walking lunge, reverse lunge and Bulgarian split squat read "each" with dumbbells and carry the dumbbell
 //   how-to.
+// 11 (2026-09-18): book-language round 4 — "On Zwift or a smart trainer, turn ERG off." on the anaerobic ride; one ±10%
+//   band (TrainingPeaks) for watts and run pace; p247's sentence on each ME lower session its reduction touches, in every
+//   program; StrongLifts warm-up sets in front of plan barbell lifts; the count-up rest timer fields on plan rows.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 10;
+export const PLAN_WRITER_VERSION = 11;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
