@@ -307,3 +307,34 @@ export function plannedTestSession(
     return barbellTestRow(standing ? rowName : liftName, steps, onFile, standing ? String(ex?.notes || '').trim() : '', roundTo, metric);
   }), metric);
 }
+
+/**
+ * ⛔⛔ THE PLANNED LINES FOR A TESTED LIFT — WHAT THE TEST SESSION PRINTS, SET FOR SET (2026-09-18, round 3). ONE
+ * OWNER: the planned session sheet, the Today drawer and the plan export print the row the logger opens
+ * (`plannedTestSession`), in p215's words, off this function. The planned line read "ME · Back Squat 3×6, 5, max @
+ * 245 lb (Perform the maximum…)" — the last set's weight beside all three counts, and an ME label p215 does not give
+ * the test.
+ *
+ * Each set: its weight in the athlete's unit, "× reps" where the page gives a count, and the set's own p215 words.
+ * The last set prints its words, no count (p215 step 8: "Perform the maximum number of repetitions possible with
+ * this weight"). The row's name leads; the row's note is not repeated (it is the last set's words).
+ */
+export function testRowLines(row: TestSessionRow): string[] {
+  const unit = row.unit ?? 'lb';
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  const setLine = (st: TestSessionSet): string => {
+    const w = st.weight > 0 ? `${fmt(st.weight_in_unit ?? st.weight)} ${unit}` : '';
+    const reps = !st.amrap && Number(st.reps) > 0 ? `× ${st.reps}` : '';
+    const dose = [w, reps].filter(Boolean).join(' ');
+    const words = st.set_hint ?? (st.amrap ? TEST_LAST_SET_LINE : '');
+    return [dose, words].filter(Boolean).join(' · ');
+  };
+  return [row.name, ...row.sets.map(setLine).filter(Boolean)];
+}
+
+/** The lines for one planned tested-lift row, as the test session builds it (`plannedTestSession`, standing rows). */
+export function plannedTestRowLines(ex: Record<string, unknown>, tags: unknown, metric: boolean): string[] | null {
+  if (!isTestedLift(ex)) return null;
+  const row = plannedTestSession([ex], tags, null, TEST_ROUND_TO_LB, metric)[0];
+  return row ? testRowLines(row) : null;
+}

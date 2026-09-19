@@ -135,3 +135,27 @@ Deno.test('⛔ A METRIC ACCOUNT READS KILOGRAMS: every step keeps its pounds and
   assertEquals(dead.anchor_round_to, 2.5);
   assertEquals(launcherTestSession('lower', {})[1].anchor_round_to, 5);
 });
+
+/**
+ * ⛔ THE TEST DAY'S PLANNED LINES ARE THE TEST SESSION'S (2026-09-18, round 3). The planned line read "ME · Back Squat
+ * 3×6, 5, max @ 245 lb": the last set's weight beside all three counts, and an ME label. It now prints each set at its
+ * own weight, in p215's words, off the row the logger opens.
+ */
+Deno.test('a planned test row prints p215\'s steps at their own weights, no ME label', async () => {
+  const { plannedTestRowLines, TEST_LAST_SET_LINE } = await import('./test-session.ts');
+  const row = {
+    name: 'Back Squat', sets: 3, reps: '6, 5, max', weight: 245, load_prescribed: true, slot_intent: 'ME',
+    notes: TEST_LAST_SET_LINE,
+    set_plan: [{ weight: 215, reps: 6 }, { weight: 235, reps: 5 }, { weight: 245, reps: 1, amrap: true }],
+  };
+  const lines = plannedTestRowLines(row, ['standing_plan', 'test_week', '1rm_test'], false)!;
+  assertEquals(lines[0], 'Back Squat');
+  assertEquals(lines.length, 5);
+  assert(lines[1].startsWith('45 lb · Perform a regular warm-up'), lines[1]);
+  assert(lines[2].startsWith('215 lb × 6 · A weight where you can comfortably perform 8 repetitions'), lines[2]);
+  assertEquals(lines[3], '235 lb × 5 · Perform 5 repetitions with this weight.');
+  assertEquals(lines[4], `245 lb · ${TEST_LAST_SET_LINE}`);
+  assert(!lines.some((l) => /^ME\b/.test(l)), 'the test is labelled ME');
+  // An accessory on the test day is not a tested lift and keeps the ordinary line.
+  assertEquals(plannedTestRowLines({ name: 'Leg Press', sets: 3, reps: '6-12', slot_intent: 'HYP' }, [], false), null);
+});

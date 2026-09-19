@@ -148,7 +148,12 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
  * The session's lines. Consecutive rows sharing `superset_group` print as ONE line (p274), and each
  * pair's sentence comes first, in the words the logger uses.
  */
-export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb'): string[] {
+export function formatStrengthExerciseLines(
+  items: any[],
+  unit: WeightUnit = 'lb',
+  /** A row that prints its own lines (a tested lift on a test day: `plannedTestRowLines`), or null. */
+  ownLines?: (row: any, index: number) => string[] | null,
+): string[] {
   const out: string[] = [];
   const list = Array.isArray(items) ? items : [];
   const seen = new Set<string>();
@@ -174,6 +179,8 @@ export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb
       i += 1;
       continue;
     }
+    const own = ownLines ? ownLines(e, i) : null;
+    if (own && own.length) { out.push(...own); continue; }
     out.push(formatStrengthExercise(e, unit));
   }
   return out;
