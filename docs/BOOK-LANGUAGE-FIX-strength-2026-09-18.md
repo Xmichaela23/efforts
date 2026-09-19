@@ -12,6 +12,7 @@ Committed, **not pushed, not deployed, not verified on a device.**
 | 4 | `c4d3a048a` | section 3 strength items |
 | 5 | `1f24f2d6d` | reverse check: what the book gives that no screen showed |
 | 6 | `58d671de6` | the page photos are the book: the pages' own words restored; State judges the reserve band |
+| 7 | `38f42daf1` | every other reserve judge reads p218's band |
 
 **The word rule as applied.** Passes 1–5: book words = text inside quotation marks in
 `docs/SOURCE-viada-hybrid-athlete.md`, or the photos `book-sources/p210–p215`. **Pass 6 (Michael's ruling, via
@@ -225,7 +226,46 @@ Photos read this pass: `p078`, `p084`, `p125`, `p139`, `p140`, `p218`, `p219`, `
 
 - `_shared/longitudinal-signals.ts` (`detectStrengthRirGap`, the State line "Recent sets are landing below the planned reps in reserve"): a planned row with a p218 intent is judged against p218's band, read from the row's `slot_intent` through `strength-grid/intents.ts` `rirBandFor`. Below means under the band's bottom and above means over its top. HYP 0–2: a logged 0 is in the band. DE/SKILL 3–4: a logged 2.5 is below. A row with no intent keeps its own number and the old tolerances (ours). Pinned by `_shared/longitudinal-rir-band.test.ts`.
 - **Why the band is not a new stamped field.** `materialize-plan` copies planned rows through a whitelist that keeps `slot_intent` and drops unknown fields. The judge reads `planned_workouts.strength_exercises`, so the intent is the field that reaches it. A stamped band field would need a whitelist line in `materialize-plan/index.ts`, which is the run/ride/export agent's file.
-- **Still reading the single stamped number** (`compose.ts` `targetRirForIntent`: HYP 1, DE/SKILL 3.5, ours): `_shared/athlete-snapshot/body-response.ts:166-205` (session observations such as "RIR vs target 1"), `daily-ledger.ts:114, 232`, `response-model/weekly.ts:335`, and `analyze-strength-workout/index.ts:540`. Each compares against one number. Moving them to the band is the same change, one reader at a time. Not done in this pass.
+- **Superseded by pass 7.** Pass 6 record: **still reading the single stamped number** (`compose.ts` `targetRirForIntent`: HYP 1, DE/SKILL 3.5, ours): `_shared/athlete-snapshot/body-response.ts:166-205` (session observations such as "RIR vs target 1"), `daily-ledger.ts:114, 232`, `response-model/weekly.ts:335`, and `analyze-strength-workout/index.ts:540`. Each compares against one number. Moving them to the band is the same change, one reader at a time. Not done in this pass.
+
+---
+
+## Pass 7 — every reserve judge reads p218's band (`38f42daf1`)
+
+**One rule, one owner** (`_shared/strength-grid/intents.ts`): `rirTargetFor(row)` returns p218's band for a row
+with a p218 intent (HYP 0–2, DE/SKILL 3–4), no target for ME ("no RIR target", p218), and the row's own number
+for a row with no intent. `rirOffTarget` is 0 inside a band, negative under it, positive over it. `rirTargetText`
+prints "0 to 2" or the number. The intent is read off `slot_intent`, which the planned rows keep and the logger
+saves on each logged exercise.
+
+| reader | before | after |
+|---|---|---|
+| `_shared/longitudinal-signals.ts` (State: "below the planned reps in reserve") | own band code (pass 6) | the shared helper |
+| `_shared/athlete-snapshot/daily-ledger.ts` | `rir_delta = avg − target_rir` (HYP: avg − 1); plan line "RIR 1" | `rir_delta` off the band (0 inside); ME none; rows gain `target_rir_band`, `target_rir_text`; plan line "RIR 0 to 2" |
+| `_shared/athlete-snapshot/body-response.ts` | session delta `avgActual − avgTarget`; "…RIR against target 1", "vs target 1", "(0.0 vs 1 RIR)" | delta = mean of each lift's off-target distance (same as before for rows with no band); prints "target 0 to 2" |
+| `_shared/response-model/weekly.ts` `computeLiftVerdict`, fed by `coach/index.ts` | `rir − target_rir`, the target taken from the protocol default | new optional `targetBand` argument: deviation off the band. Coach passes the band of the lift's newest logged intent, and no target for an ME lift |
+| `analyze-strength-workout/index.ts` | `rir_adherence = read − target_rir` (HYP 1) | off the band; ME no target; adherence carries `target_rir_band`, `target_rir_text`; the fact packet's delta is the mean of the banded rows' distances |
+| `_shared/session-detail/strength-slots.ts` + `src/components/StrengthCompareTable.tsx` | completed-session table "0.0 / 1 RIR" | "0.0 / 0 to 2 RIR" (`target_rir_text`) |
+| `_shared/standing-plan/compose.ts` | stamps `target_rir` 1 on HYP | also stamps `target_rir_band: { lo, hi }` on every p218 row. `target_rir` stays the band's midpoint (ours) for readers that take one number |
+
+Rows with no intent keep their old rule in every reader. Tests: `_shared/rir-band-readers.test.ts` (6),
+`_shared/longitudinal-rir-band.test.ts` (3); the existing athlete-snapshot, response-model, session-detail and coach
+suites pass unchanged.
+
+**The materialize-plan line (the run/ride/export owner adds it).** No reader needs it: all of them read the band
+from `slot_intent`, which the whitelist already carries. It lets the stamped band itself reach
+`planned_workouts`. In `supabase/functions/materialize-plan/index.ts`, directly under each of the two identical
+`slot_intent` whitelist lines (line 2905 and line 3339 on this branch):
+
+```ts
+            ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+```
+
+add:
+
+```ts
+            ...(((ex as any)?.target_rir_band && typeof (ex as any).target_rir_band === 'object') ? { target_rir_band: (ex as any).target_rir_band } : {}), // p218's reserve band (book-language fix, pass 7)
+```
 
 ---
 
@@ -242,7 +282,9 @@ Changed shared files: `_shared/strength-grid/intents.ts`, `_shared/strength/stre
 `materialize-plan`, `planning-context`, `post-import-athlete-pipeline`, `refresh-goal-race-projections`,
 `rematerialize-standing-block`, `strava-webhook`, `strength-test-session`, `swap-list`, `swap-session`,
 `workout-detail` (29). Pass 6 adds `_shared/longitudinal-signals.ts` and `_shared/standing-plan/plyo.ts`; every
-function that imports them is already in this list. The phone changes need a client build.
+function that imports them is already in this list. **Pass 7 adds `analyze-strength-workout` (30 functions).** Its other files
+(`daily-ledger.ts`, `body-response.ts`, `weekly.ts`, `strength-slots.ts`, `coach/index.ts`) reach only `coach` and
+`workout-detail`, which are already listed. The phone changes need a client build.
 
 ⚠️ Rows already written to the database keep their old `rest_seconds`, warm-up sets, notes and carry words
 until the plan is rebuilt (Adjust > Rebuild upcoming sessions, or the server refresh).
