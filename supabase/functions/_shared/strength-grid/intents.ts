@@ -271,14 +271,41 @@ export function rirBandText(intent: string | null | undefined): string | null {
   return b ? (b.lo === b.hi ? String(b.lo) : `${b.lo} to ${b.hi}`) : null;
 }
 
-/** The line itself: `"6 to 12 reps, 0 to 2 in reserve."` (p218), plus SKILL's two quotes. */
+/**
+ * The line itself — p218's row, in the page's order: reps, percent, reserve, sets (pass 5 of the fix added
+ * the percent and the set band, which the page gives and no screen printed). Then SKILL's two quotes.
+ *   ME    "1 to 5 reps, 90 to 100%, 1 to 3 sets."
+ *   DE    "2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets."
+ *   SKILL "3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep… STOP."
+ *   HYP   "6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets."   (p218 gives HYP no percent)
+ */
 export function intentLine(intent: string | null | undefined): string | null {
   const k = String(intent ?? '').toUpperCase() as ViadaIntent;
   const p = BARBELL[k];
   if (!p) return null;
+  const band = (r: Range) => (r.lo === r.hi ? String(r.lo) : `${r.lo} to ${r.hi}`);
   const rir = rirBandText(k);
-  const head = `${p.reps.lo} to ${p.reps.hi} reps${rir ? `, ${rir} in reserve` : ''}.`; // p218
-  return [head, ...(INTENT_QUOTES[k] ?? [])].join(' ');
+  const parts = [
+    `${band(p.reps)} reps`,
+    ...(p.pctOf1RM ? [`${band({ lo: Math.round(p.pctOf1RM.lo * 100), hi: Math.round(p.pctOf1RM.hi * 100) })}%`] : []),
+    ...(rir ? [`${rir} in reserve`] : []),
+    `${band(p.setsBand)} sets`,
+  ];
+  return [`${parts.join(', ')}.`, ...(INTENT_QUOTES[k] ?? [])].join(' '); // p218
+}
+
+/**
+ * p218's first sentence, quoted in the SOURCE doc (Part J6). The set band's own rule, printed once — on the
+ * logger's set-type sheet, beside the band.
+ */
+export const SETS_START_LOW_LINE = 'Sets should always remain on the lower end when starting a program, increasing only '
+  + 'if an athlete is finding that they are progressing well and seem to have recovery to spare!';
+
+/** The page's rest rule for an intent: p84 for HYP, p78 for the other three. Null for anything else. */
+export function restRuleFor(intent: string | null | undefined): string | null {
+  const k = String(intent ?? '').toUpperCase();
+  if (k === 'HYP') return REST_BETWEEN_SETS_RULE_HYP.cue;
+  return k === 'ME' || k === 'DE' || k === 'SKILL' ? REST_BETWEEN_SETS_RULE.cue : null;
 }
 
 /**

@@ -154,7 +154,7 @@ Deno.test('the day-reaching chips name real days, read off the frame', () => {
 Deno.test('the dose line agrees with the rows', () => {
   // ⛔ 2026-09-18: the rows this step lists are HYP slots printed at p218's 6 to 12, 0 to 2; the line is
   // the same prescription from the same owner (`strength-grid/intents.ts`). "8 to 10" (p86) is gone.
-  assertEquals(ACCESSORY_DOSE_LINE, '6 to 12 reps, 0 to 2 in reserve.');
+  assertEquals(ACCESSORY_DOSE_LINE, '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.');
   assert(!/8 to 10|left in the tank|next main lift/.test(ACCESSORY_DOSE_LINE), 'a retired dose clause is back');
 });
 

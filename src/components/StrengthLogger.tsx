@@ -21,7 +21,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
 type AlternativeOption = { name: string; display?: string };
 import { reserveTextFor, reserveIntegersFor, reserveSeedFor, intentRowLine, supersetLabel } from '@shared/strength/strength-display-lines';
-import { intentLine as bookIntentLine } from '@shared/strength-grid/intents';
+import { intentLine as bookIntentLine, restRuleFor, SETS_START_LOW_LINE } from '@shared/strength-grid/intents';
+import { WARM_UP_LINE } from '@shared/standing-plan/warmup';
 import {
   getExerciseConfig,
 } from '@/lib/exercise-config';
@@ -587,13 +588,16 @@ const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: 
  * numbers, and for SKILL the p76 and p143 quotes.
  * ⚠️ THE SPELLED-OUT NAMES STAY — p219's own abbreviations, and Michael asked for the words.
  */
-const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; text: string }> = {
-  // ⛔ 2026-09-18: the text is `intentLine`, the one owner (`strength-grid/intents.ts`) — p218's numbers
-  // and the SOURCE doc's quoted words. The names are p219's own expansions.
-  ME: { name: 'Maximum effort', text: bookIntentLine('ME') ?? '' },
-  DE: { name: 'Dynamic effort', text: bookIntentLine('DE') ?? '' },
-  SKILL: { name: 'Skill', text: bookIntentLine('SKILL') ?? '' },
-  HYP: { name: 'Hypertrophy', text: bookIntentLine('HYP') ?? '' },
+// ⛔ 2026-09-18: the lines are the one owner's (`strength-grid/intents.ts`) — p218's row, then the page's rest
+// rule for the intent (p78, or p84 for HYP), then p218's own sentence on the set band. The rest rule had no
+// other place on screen once the countdown came off a book row. The names are p219's own expansions.
+const setTypeLines = (k: 'ME' | 'DE' | 'SKILL' | 'HYP'): string[] =>
+  [bookIntentLine(k), restRuleFor(k), SETS_START_LOW_LINE].filter((l): l is string => !!l);
+const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; lines: string[] }> = {
+  ME: { name: 'Maximum effort', lines: setTypeLines('ME') },
+  DE: { name: 'Dynamic effort', lines: setTypeLines('DE') },
+  SKILL: { name: 'Skill', lines: setTypeLines('SKILL') },
+  HYP: { name: 'Hypertrophy', lines: setTypeLines('HYP') },
 };
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
@@ -4828,6 +4832,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const cardGlow = isMainLiftCard || isMobilityMode ? [0.40, 0.05] : [0.22, 0.035];
           return (
           <React.Fragment key={exercise.id}>
+          {/* ⛔ THE WARM-UP'S ONE QUOTED SENTENCE (pp139-140, SOURCE Part C2), ONCE, above the session's first
+              ME / DE / SKILL row on a standing-plan lifting day (2026-09-18). The ramp of warm-up sets that used
+              to sit here was ours and came off; this is the page's own instruction, from `warmup.ts`. */}
+          {!isBaselineTestWorkout(scheduledWorkout || {})
+            && Array.isArray(scheduledWorkout?.tags)
+            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+            && ['ME', 'DE', 'SKILL'].includes(String((exercise as any)?.slot_intent || '').toUpperCase())
+            && exercises.findIndex((e) => ['ME', 'DE', 'SKILL'].includes(String((e as any)?.slot_intent || '').toUpperCase())) === exerciseIndex && (
+            <p className="mx-3 mb-1.5 mt-2 text-caption font-medium text-label-secondary leading-snug">
+              {WARM_UP_LINE}
+            </p>
+          )}
           {/* 2026-09-03 (Michael: supersets are the book's layout, p274). The first row of a pair opens the
               block with the pair's label. ⛔ 2026-09-18: "· one set of each, rest, then again" came off — no
               page prints how a superset is done. The label is the plan's own (`supersetLabel`). */}
@@ -6803,7 +6819,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <SheetHeader>
             <SheetTitle className="text-center">{setTypeFor ? `${setTypeFor} · ${SET_TYPE_INFO[setTypeFor].name}` : ''}</SheetTitle>
           </SheetHeader>
-          <div className="py-4 text-body leading-relaxed text-label">{setTypeFor ? SET_TYPE_INFO[setTypeFor].text : ''}</div>
+          <div className="py-4 text-body leading-relaxed text-label space-y-3">{setTypeFor ? SET_TYPE_INFO[setTypeFor].lines.map((l) => <p key={l}>{l}</p>) : null}</div>
           <button onClick={() => setSetTypeFor(null)} className="w-full py-3 text-label-secondary hover:text-white">Close</button>
         </SheetContent>
       </Sheet>

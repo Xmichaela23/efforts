@@ -709,3 +709,24 @@ Deno.test('every category carries the definition it was built from', () => {
   assert(r.notes.some((n) => n.kind === 'source' && n.text.includes('Single-joint')),
     'the slot does not carry the definition of the category it came from');
 });
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// THE ATHLETE-FACING LINE PER INTENT — one owner (book-language fix, 2026-09-18)
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔⛔ intentLine prints p218\'s row in the page\'s order, and SKILL\'s two quotes', async () => {
+  const { intentLine, rirBandText, restRuleFor, SETS_START_LOW_LINE } = await import('./intents.ts');
+  assertEquals(intentLine('ME'), '1 to 5 reps, 90 to 100%, 1 to 3 sets.');
+  assertEquals(intentLine('DE'), '2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.');
+  assertEquals(intentLine('SKILL'), "3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep either improves movement quality or degrades it! Perfect practice makes perfect… if you're performing the movement poorly, STOP.");
+  assertEquals(intentLine('HYP'), '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.');
+  assertEquals(intentLine('carry'), null);
+  // ⛔ HYP's reserve is the band, never the stamped midpoint.
+  assertEquals(rirBandText('HYP'), '0 to 2');
+  assertEquals(rirBandText('ME'), null);
+  // The page's rest rule per intent: p84 for HYP, p78 for the rest.
+  assert(restRuleFor('HYP')!.includes('may well be a crucial part of the training session itself'));
+  assert(restRuleFor('ME')!.startsWith('Rest periods between sets should be sufficient'));
+  assertEquals(restRuleFor('carry'), null);
+  assert(SETS_START_LOW_LINE.startsWith('Sets should always remain on the lower end when starting a program'));
+});

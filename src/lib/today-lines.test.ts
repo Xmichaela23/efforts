@@ -39,18 +39,18 @@ Deno.test('the four intents print the book’s word and its cue', () => {
     { slot_intent: 'HYP', name: 'dumbbell curl' },
   ]), bar);
   assertEquals(rows[0].kind, 'Maximum effort');
-  assertEquals(rows[0].cue, '1 to 5 reps.'); // p218, numbers only
+  assertEquals(rows[0].cue, '1 to 5 reps, 90 to 100%, 1 to 3 sets.'); // p218, numbers only
   assertEquals(rows[1].kind, 'Skill');
-  assertEquals(rows[1].cue, "3 to 5 reps, 3 to 4 in reserve. Every rep either improves movement quality or degrades it! Perfect practice makes perfect… if you're performing the movement poorly, STOP."); // p218, p76, p143
+  assertEquals(rows[1].cue, "3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep either improves movement quality or degrades it! Perfect practice makes perfect… if you're performing the movement poorly, STOP."); // p218, p76, p143
   assertEquals(rows[2].kind, 'Hypertrophy');
-  assertEquals(rows[2].cue, '6 to 12 reps, 0 to 2 in reserve.');
+  assertEquals(rows[2].cue, '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.');
 });
 
 Deno.test('⛔ THE DE CUE IS p218\'S NUMBERS ON A BAR AND OFF IT — "Bar slows, set is over" is on no page', () => {
   const onBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), bar)[0];
   const offBar = liftLinesFor(lift([{ slot_intent: 'DE', name: 'dumbbell reverse lunge' }]), bar)[0];
-  assertEquals(onBar.cue, '2 to 4 reps, 3 to 4 in reserve.');
-  assertEquals(offBar.cue, '2 to 4 reps, 3 to 4 in reserve.');
+  assertEquals(onBar.cue, '2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.');
+  assertEquals(offBar.cue, '2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.');
 });
 
 Deno.test('the cue repeats when the kind repeats', () => {
@@ -102,7 +102,7 @@ Deno.test('⛔ A SUPERSET PAIR IS ONE LINE — names joined, the kind word once,
   ]), bar);
   assertEquals(lines.map((l) => l.movement), ['barbell bench press', 'tate press + drag curl', 'lateral raise']);
   assertEquals(lines[1].kind, 'Hypertrophy superset');
-  assertEquals(lines[1].cues, ['6 to 12 reps, 0 to 2 in reserve.']);
+  assertEquals(lines[1].cues, ['6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.']);
   assertEquals(lines[1].rows, [1, 2]);
   assertEquals(lines[0].rows, [0]);
   assertEquals(lines[2].rows, [3]);
@@ -115,8 +115,8 @@ Deno.test('a pair of two kinds names both kinds and carries both cues', () => {
   ]), bar);
   assertEquals(line.kind, 'Dynamic effort + Hypertrophy superset');
   assertEquals(line.cues, [
-    '2 to 4 reps, 3 to 4 in reserve.',
-    '6 to 12 reps, 0 to 2 in reserve.',
+    '2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.',
+    '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.',
   ]);
 });
 
