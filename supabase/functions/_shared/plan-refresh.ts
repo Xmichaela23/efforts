@@ -24,13 +24,22 @@ import { STANDING_PLAN_PROTOCOL_ID } from './standing-plan/protocol-id.ts';
 import { fetchAthleteTimezone, resolveAthleteTimezone } from './athlete-timezone.ts';
 import { localDateInTz } from './local-date.ts';
 
-// OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
 // 2 (2026-09-18): one name per movement (83 spellings merged), every movement filed by its page, the pull-up leads the primary pull cell.
-// 3 (2026-09-18): the book-language fix — every instruction the page's own words; warm-up boxes line by line, the page's
-// words on steps, p235's long run and p278's Standard rides as printed; p218's reserve band on HYP/DE/SKILL rows.
-// 4 (2026-09-18): book-language round 3 — no "By feel" weight, p210's strides, the test day's p215 lines, one band rule
-// for a single percentage, the p247 sentence on Run + Strength only, no "by feel this week" note.
-export const PLAN_WRITER_VERSION = 4;
+// 3 (2026-09-18): decline bench to Secondary push, bodyweight dips off Braced push, sandbag throw only with a sandbag,
+//   the kit's own name for the stiff-legged deadlift.
+// 4 (2026-09-18): a commercial gym has a sandbag; one name per movement on a kit (a dumbbell kit's Romanian deadlift reads
+//   DB Romanian Deadlift; the rear delt fly and the home rear delt machine are one option).
+// 5 (2026-09-18): on a dumbbell kit the pullover machine is not offered (it is p220's DB pullover).
+// 6 (2026-09-18): how-tos for DB Romanian Deadlift, Single Leg Calf Raise and Weighted Single Leg Calf Raise ride on the rows.
+// 7 (2026-09-18): tricep extension folded into skull crusher (Dumbbell Skull Crusher on a dumbbell kit, its own how-to);
+//   how-tos for DB Shoulder Press, Dumbbell Curl, Lunge, Reverse Flyes (bodyweight); p219's Deadlift and p220's forward
+//   Lunge offered again.
+// 8 (2026-09-18): a row done with two dumbbells carries `weight_per: 'each'` (the logger reads "LB EACH").
+// 9 (2026-09-18): the book-language fix — every instruction the page's own words; warm-up boxes line by line, the page's
+//   words on steps, p235's long run and p278's Standard rides as printed; p218's reserve band on HYP/DE/SKILL rows; no
+//   "By feel" weight, p210's strides, the test day's p215 lines, one band rule for a single percentage.
+// OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
+export const PLAN_WRITER_VERSION = 9;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

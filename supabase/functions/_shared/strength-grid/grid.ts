@@ -26,6 +26,7 @@ import {
   allGridMovements,
   canPerform,
   CATEGORY_DEFINITION,
+  filingOf,
   STAND_INS,
   HIP_THRUST_STAND_IN,
   isAsymmetrical,
@@ -93,9 +94,11 @@ export type ResolvedSlot = {
  * ⚠️ They are excluded from the offered pool only. Nothing about their classification changes, and
  * `viadaCategoryOf('press')` still answers, because the composer may still hand one over.
  */
+// ⚠️ `deadlift` AND `lunge` LEFT THIS LIST 2026-09-18: since one name per movement they are the entries p219's
+// "Deadlift" and p220's "Forward lunge" are filed under, not loose stubs.
 const OFFER_STOPLIST = new Set([
-  'press', 'bench', 'row', 'rows', 'squat', 'squats', 'lunge', 'lunges',
-  'incline bench', 'shoulder press', 'core work', 'core circuit', 'deadlift',
+  'press', 'bench', 'row', 'rows', 'squat', 'squats', 'lunges',
+  'incline bench', 'shoulder press', 'core work', 'core circuit',
 ]);
 
 /**
@@ -232,7 +235,22 @@ function poolFor(
   let pool = movementsIn(category, pattern).filter(OFFERABLE);
   if (asymmetrical) pool = pool.filter((m) => m.asymmetrical);
   if (gated) pool = pool.filter((m) => reachable(m.name, equipment));
-  const ranked = rank(pool, equipment);
+  // ⛔ ONE NAME, ONE MOVEMENT, ON THIS KIT (2026-09-18): two entries the kit does the same way (the name it will do,
+  // `executionName`) are one option, in its own place in the builder's order. The one the page prints is kept (p222's
+  // rear delt machine over the rear delt fly, p220's Romanian deadlift over its dumbbell version), so a pick naming it holds.
+  const ranked: GridMovement[] = [];
+  const at = new Map<string, number>();
+  for (const m of rank(pool, equipment)) {
+    const k = executionName(m.name, equipment).toLowerCase();
+    const i = at.get(k);
+    if (i == null) { at.set(k, ranked.length); ranked.push(m); continue; }
+    if (filingOf(ranked[i].name)?.basis !== 'printed' && filingOf(m.name)?.basis === 'printed') {
+      ranked.splice(i, 1);
+      for (const [key, idx] of at) if (idx > i) at.set(key, idx - 1);
+      at.set(k, ranked.length);
+      ranked.push(m);
+    }
+  }
   // ⛔ THE PULL-UP LEADS THE PRIMARY PULL CELL (Michael, 2026-09-18) — p218 prints it first, and with the barbell
   // row filed beside it (p218) a week built the row twice and no vertical pull. Every other cell keeps its order.
   if (category === 'primary' && pattern === 'pull_upper') {
@@ -264,6 +282,42 @@ export function hipThrustStandIn(equipment: string[] | null | undefined): GridMo
   if (HIP_THRUST_STAND_IN.printed.some((n) => reachable(n, equipment))) return null;
   if (!reachable(HIP_THRUST_STAND_IN.name, equipment)) return null;
   return { name: HIP_THRUST_STAND_IN.name, category: 'focused', pattern: 'hinge_lower', asymmetrical: false, standIn: true };
+}
+
+/**
+ * ⛔ TWO DUMBBELLS, ONE PER HAND (Michael, 2026-09-18): the logger's weight column reads "LB EACH" / "KG EACH" on these
+ * rows when the kit does them with dumbbells; barbell, machine and one-dumbbell rows keep "LB" / "KG". Read off each
+ * movement's approved how-to ("a dumbbell in each hand", "two dumbbells"). One-dumbbell movements (DB row, Kroc row, DB
+ * pullover, goblet squat, the swings, the concentration curl, the dumbbell leg curl, the behind-the-neck extension,
+ * single-leg RDL, suitcase carry) are not here.
+ */
+const TWO_DUMBBELLS = new Set([
+  'db bench press', 'db incline press', 'db floor press', 'db shoulder press', 'db push press', 'seated db press',
+  'arnold press', 'chest fly', 'lateral raise', 'front raise', 'rear delt fly', 'rear delt machine', 'tate press',
+  'skull crusher', 'dumbbell curl', 'hammer curl', 'spider curl', 'drag curl', 'db romanian deadlift',
+  'romanian deadlift', 'stiff-legged deadlift', 'weighted single leg calf raise', 'farmers carry', 'gorilla row',
+  // ACE's lunge: "grip one dumbbell in each hand" — bodyweight on a kit with no dumbbells.
+  'lunge',
+]);
+/**
+ * Does this row use two dumbbells on this kit? A movement done only with dumbbells always does. One the kit could
+ * do another way does when the kit's route for it is dumbbells: the first route of `gearRoutesFor` the kit reaches,
+ * and never when the kit owns the machine (a gym does the rear delt machine on the machine, as `executionName` says).
+ */
+export function usesTwoDumbbellsOnKit(name: string, equipment: string[] | null | undefined): boolean {
+  const f = foldExerciseName(name);
+  const key = SAME_MOVEMENT[String(name ?? '').toLowerCase().trim()] ?? SAME_MOVEMENT[f] ?? f;
+  const listed = [...TWO_DUMBBELLS].some((k) => foldExerciseName(k) === foldExerciseName(key));
+  if (!listed) return false;
+  const routes = gearRoutesFor(name);
+  if (routes.length > 0 && routes.every((r) => r.includes('dumbbells'))) return true;
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return false;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  if (routes.some((r) => r.includes('machine') && r.every((k) => keys.has(k)))) return false;
+  const first = routes.find((r) => r.every((k) => keys.has(k)));
+  if (first != null && first.length === 0) return keys.has('dumbbells'); // needs nothing: dumbbells if the kit has them
+  return first != null && first.includes('dumbbells');
 }
 
 /** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
@@ -521,7 +575,9 @@ export function executionName(name: string, equipment: string[] | null | undefin
   const keys = athleteEquipmentToKeys(equipment as string[]);
   const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
   if (hasStation) return name;
-  return byRoute(free, keys, name);
+  const named = byRoute(free, keys, name);
+  // A route whose name IS the movement's own (the barbell skull crusher, the barbell Romanian deadlift) is no rename.
+  return foldExerciseName(named) === foldExerciseName(name) ? name : named;
 }
 
 /**
@@ -614,11 +670,27 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
     { route: ['dumbbells', 'incline_bench'], value: 'Chest-Supported Rear Delt Fly' },
     { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
   ],
-  /**
-   * ⛔ THE FLAT-BENCH DUMBBELL PULLOVER (Michael, 2026-09-10, same addendum): p222's pullover machine
-   * has a home route now, and the name says what the athlete will lie across.
-   */
-  'pullover machine': 'Flat-Bench Dumbbell Pullover',
+  // ⛔ THE PULLOVER MACHINE'S HOME NAME IS GONE (2026-09-18): at home it is p220's DB pullover (`strength-gear.ts`).
+  // ⛔ ONE NAME FOR ONE MOVEMENT AT HOME (Michael, 2026-09-18): on a dumbbell kit the Romanian deadlift IS the DB Romanian
+  // deadlift, and a rear delt fly IS the bent-over dumbbell rear delt fly the rear delt machine becomes. Same words, one
+  // option (the swap list shows a name once; the builder places a name once).
+  'romanian deadlift': [
+    { route: ['barbell'], value: 'Romanian Deadlift' },
+    { route: ['dumbbells'], value: 'DB Romanian Deadlift' },
+  ],
+  'rear delt fly': [
+    { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
+  ],
+  // ⛔ THE DUMBBELL SKULL CRUSHER (Michael, 2026-09-18): the lying dumbbell extension, folded into p222's skull crushers.
+  'skull crusher': [
+    { route: ['barbell'], value: 'Skull Crusher' },
+    { route: ['dumbbells'], value: 'Dumbbell Skull Crusher' },
+  ],
+  // ⛔ ON A DUMBBELL KIT, THE DUMBBELL VERSION BY THAT NAME (Michael, 2026-09-18); with a barbell, his name.
+  'stiff legged deadlift': [
+    { route: ['barbell'], value: 'Stiff-Legged Deadlift' },
+    { route: ['dumbbells'], value: 'Dumbbell Stiff-Legged Deadlift' },
+  ],
   /**
    * ⛔ THE CONCENTRATION CURL (Michael, 2026-09-10 — the third home route in the same addendum:
    * "a bench, a rack and dumbbells is a pretty standard home gym"). The preacher curl's station
@@ -942,8 +1014,7 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
   'pullover machine': [
     { route: ['machine'], value: { text: 'Set the seat so your shoulders line up with the machine\'s pivot. Sit with your back against the pad and hold the handles or bar above and behind your head. Pull it down in an arc until it reaches your stomach, then let it go back up until you feel a stretch.',
       source: 'ExRx, "Lever Pullover" — https://exrx.net/WeightExercises/LatissimusDorsi/LVPullover' } },
-    { route: ['dumbbells', 'bench'], value: { text: 'Lie on your back on a flat bench, feet on the floor, holding one dumbbell in both hands above your chest. With a slight bend in the elbows, lower the dumbbell in an arc behind your head until you feel a stretch, then pull it back over your chest. Keep your hips down on the bench.',
-      source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' } },
+    // The flat-bench dumbbell route left 2026-09-18: at home this is p220's DB pullover, which carries the same words.
   ],
   'push up': { text: 'Start with your hands on the floor a little wider than your shoulders and your body in a straight line from head to heels. Lower your chest to just above the floor, elbows at about 45 degrees from your body, then push back up. Keep your hips in line with your shoulders.',
     source: 'ExRx, "Push-up" — https://exrx.net/WeightExercises/PectoralSternal/BWPushup' },
@@ -995,8 +1066,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Single Leg Squat (pistol)" — https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSquat' },
   'skater hops': { text: 'Stand with your feet hip-width apart. Leap sideways to the right and land lightly on your right foot, knee bent, swinging your left leg behind your right. Push off your right foot and leap to the left, landing on your left foot and swinging your right leg behind you. Swing your arms with each leap.',
     source: 'Jesse Zucker, CPT / BarBend, "The 12 Best Cardiovascular Exercises" (Skater) — https://barbend.com/best-cardiovascular-exercises/' },
-  'skull crusher': { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
-    source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' },
+  // ⛔ TWO ROUTES SINCE 2026-09-18 (Michael): the dumbbell skull crusher is the lying dumbbell extension, ACE's words.
+  'skull crusher': [
+    { route: ['barbell'], value: { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
+      source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' } },
+    { route: ['dumbbells'], value: { text: 'Lie on your back with your knees bent and feet on the floor, a dumbbell in each hand and your arms straight up over your chest. Bend your elbows to lower the dumbbells toward your ears, keeping your shoulders still. Straighten your arms to bring the dumbbells back up.',
+      source: 'ACE, Sabrena Jo, "Tone Up Your Triceps with These Three Exercises" — https://www.acefitness.org/resources/everyone/blog/4930/tone-up-your-triceps-with-these-three-exercises/' } },
+  ],
   'sled pull': { text: 'Put on a shoulder harness attached to the sled and face away from it. Lean forward and walk or run forward with short, quick steps, heels off the ground. Keep your back flat.',
     source: 'ExRx, "Sled Pull" — https://exrx.net/WeightExercises/Power/WTPullSprint' },
   'sled push': { text: 'Hold the sled\'s handles with your feet staggered and your hips low. Lean your body weight into the sled with your heels off the ground. Step forward as fast as you can, staying low.',
@@ -1035,6 +1111,23 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ACE, "Prone Scapular (Shoulder) Stabilization Exercises" — https://www.acefitness.org/resources/everyone/exercise-library/249/prone-scapular-shoulder-stabilization-series-i-y-t-w-o-formation/' },
   'zercher squat': { text: 'Set a bar in a rack at about the height of your breastbone. Rest the bar in the crooks of your arms, just below the elbows, hands apart or clasped. Stand up, take a few small steps back, and squat down with your upper arms vertical and the bar over the middle of your feet. Stand back up, keeping your shoulders down.',
     source: 'Dave Tate / elitefts, "A Beginner\'s Guide to the Zercher Squat" — https://elitefts.com/blogs/training/a-beginners-guide-to-the-zercher-squat; Viada p220 names it' },
+  // ⛔ THREE MORE, APPROVED BY MICHAEL 2026-09-18 AS WRITTEN — movements the filing places that had no words.
+  'db romanian deadlift': { text: 'Stand with your feet hip-width apart, a dumbbell in each hand at your sides, palms facing in. With your knees slightly bent and your back flat, push your hips back and lower the dumbbells until you feel a stretch in your hamstrings, about mid-shin. Push your hips forward to stand up, stopping just short of fully straight at the hips.',
+    source: 'NASM, "Dumbbell Romanian Deadlift" — https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift' },
+  'single leg calf raise': { text: 'Stand 6 to 12 inches from a wall with your hands on it at chest height, and lift your left foot off the floor. Raise your right heel as high as you can with your knee straight, pause, then lower it slowly. Finish your reps, then do the other leg.',
+    source: 'ACE, "Standing Calf Raises - Wall" (single-leg version) — https://www.acefitness.org/resources/everyone/exercise-library/73/standing-calf-raises-wall/' },
+  'weighted single leg calf raise': { text: 'Stand on the edge of a step with a dumbbell in each hand at your sides, and cross your left foot behind your right ankle. Lower your right heel below the step until you feel a stretch, then rise onto your toes as high as you can and pause. Finish your reps, then do the other leg.',
+    source: 'PureGym, "Single Leg Calf Raises" (with weight) — https://www.puregym.com/exercises/legs/calf-exercises/single-leg-calf-raises/' },
+  // ⛔ FOUR MORE, THE SOURCE'S OWN WORDS, APPROVED BY MICHAEL 2026-09-18. A how-to is the page's exact words; side
+  // switching and rep counting come from the row's "target … per side" line, not from here.
+  'db shoulder press': { text: 'Stand with your feet shoulder-width apart. Hold two dumbbells at shoulder height with your elbows bent and palms facing away. Press the dumbbells overhead until your elbows are fully extended. Squeeze the contraction, then slowly return the weights to the starting position.',
+    source: 'Garage Gym Reviews, Christopher Covello, with coaching from Amanda Capritto, CPT, "How to Do the Dumbbell Shoulder Press" — https://www.garagegymreviews.com/dumbbell-shoulder-press' },
+  'dumbbell curl': { text: 'Hold a dumbbell in each hand with your palms facing away from you and your arms hanging at your sides. Stand up straight with your feet shoulder-width apart. Without twisting your wrist, curl your right hand toward your right shoulder until your forearm is roughly perpendicular to the floor. Lower the dumbbell and return to the starting position, then repeat with your left hand.',
+    source: 'Legion, Michael Matthews, CPT (reviewed by Dr. Brian Grant, DPT, CSCS), "How to Do the Dumbbell Curl" — https://legionathletics.com/dumbbell-curl/' },
+  'lunge': { text: 'Stand with the feet hip-width apart and grip one dumbbell in each hand with the palms facing each other and the arms straight down by the side. Keep the back straight and step forward with the right leg. As the right foot hits the floor, lower the left knee towards the floor. Descend to a comfortable range of motion; push the right foot into the ground to stand up by bringing both feet back together at the starting position.',
+    source: 'ACE, "Lunge" — https://www.acefitness.org/resources/everyone/exercise-library/363/lunge/' },
+  'reverse flyes (bodyweight)': { text: "Lie face down on the ground. Raise your head and chest slightly and extend your arms out on the ground on either side of your chest to form a 'T' shape. Twist your hands so that your pinkie/little fingers are facing the ground. Raise your arms off the ground and squeeze your shoulder blades together. Lower your arms and repeat for the desired number of reps.",
+    source: 'Thrive Personal Training, "Bodyweight Prone Reverse Fly" — https://thrivept.net/exercises/body-weight-prone-reverse-fly' },
 };
 
 /**
@@ -1069,7 +1162,7 @@ export function executionHowTo(name: string, equipment: string[] | null | undefi
  * names and the same station test.
  */
 const HOME_ROUTE_MOVEMENTS = new Set([
-  'rear delt machine', 'pullover machine', 'preacher curl', 'back extension', 'leg curl', 'leg curls', 'lying leg curl',
+  'rear delt machine', 'preacher curl', 'back extension', 'leg curl', 'leg curls', 'lying leg curl',
   'hamstring curl', 'chest supported row', 'reverse hyper', 'calf raise', 'calf raises', 'ghd back extension',
   'weighted reverse hyper',
 ]);

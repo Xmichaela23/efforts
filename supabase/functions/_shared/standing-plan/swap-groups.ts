@@ -15,12 +15,13 @@
  * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
  * movement it holds.
  */
-import { cellOptions, builderReaches } from '../strength-grid/grid.ts';
+import { cellOptions, builderReaches, executionName, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { movementLabel } from './accessory-picks.ts';
 
-export type SwapOption = { name: string; display: string };
+/** `weight_per: 'each'` when the kit does it with two dumbbells, so a swap carries the logger's "LB EACH" with it. */
+export type SwapOption = { name: string; display: string; weight_per?: 'each' };
 export type SwapGroup = { heading: string; page: string; options: SwapOption[] };
 
 /** The page's heading for each level. */
@@ -46,17 +47,26 @@ export function swapGroupsFor(
   if (!filed) return [];
   const now = canonicalize(rowNow || slotName);
   const seen = new Set<string>();
+  const shown = new Set<string>();
   const options: SwapOption[] = [];
+  // ⛔ THE NAME THE KIT WILL DO (Michael, 2026-09-18): without the machine, Pullover Machine and Rear Delt Machine
+  // read as their home versions, never the machine; a dumbbell kit reads "Dumbbell Stiff-Legged Deadlift".
+  const label = (name: string) => {
+    const exec = executionName(name, equipment);
+    return exec !== name ? exec : movementLabel(name);
+  };
   for (const m of cellOptions(filed.category, filed.pattern, equipment)) {
     const k = canonicalize(m.name);
-    if (k === now || seen.has(k)) continue;
+    const display = label(m.name);
+    if (k === now || seen.has(k) || shown.has(display.toLowerCase())) continue;
     seen.add(k);
-    options.push({ name: m.name, display: movementLabel(m.name) });
+    shown.add(display.toLowerCase());
+    options.push({ name: m.name, display, ...(usesTwoDumbbellsOnKit(m.name, equipment) ? { weight_per: 'each' as const } : {}) });
   }
   // The slot's own movement comes back after a swap, if the kit reaches it.
   if (rowNow && canonicalize(rowNow) !== canonicalize(slotName) && !seen.has(canonicalize(slotName))
     && builderReaches(slotName, equipment)) {
-    options.unshift({ name: slotName, display: movementLabel(slotName) });
+    options.unshift({ name: slotName, display: label(slotName), ...(usesTwoDumbbellsOnKit(slotName, equipment) ? { weight_per: 'each' as const } : {}) });
   }
   return options.length > 0
     ? [{ heading: HEADING[filed.category], page: CATEGORY_DEFINITION[filed.category].cite, options }]

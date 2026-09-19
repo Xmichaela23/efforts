@@ -211,7 +211,6 @@ const F = (category: ViadaCategory, pattern: ViadaPattern | null, basis: Filed['
 export const FILING: Readonly<Record<string, Filed>> = {
   // PRIMARY — p218 push upper, pull; p219 hinge, push lower
   'bench press': F('primary', 'push_upper', 'printed', 'p218'),
-  'decline bench press': F('primary', 'push_upper', 'variant', 'p218 — bench press, setup modified'),
   'military press': F('primary', 'push_upper', 'printed', 'p218'),
   'push press': F('primary', 'push_upper', 'printed', 'p218'),
   'pull up': F('primary', 'pull_upper', 'printed', 'p218'),
@@ -231,6 +230,8 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'jm press': F('secondary', 'push_upper', 'printed', 'p220'),
   'seated db press': F('secondary', 'push_upper', 'printed', 'p220'),
   'arnold press': F('secondary', 'push_upper', 'printed', 'p220'),
+  // p220 files the incline bench here; the decline is the same bench press on another angle (Michael, 2026-09-18).
+  'decline bench press': F('secondary', 'push_upper', 'variant', 'p220 — incline bench press, other angle'),
   'db bench press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell bench press'),
   'db incline press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell incline bench press'),
   'db shoulder press': F('secondary', 'push_upper', 'variant', 'p220 — dumbbell military press'),
@@ -267,7 +268,7 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'smith machine press': F('braced', 'push_upper', 'printed', 'p221'),
   'machine chest press': F('braced', 'push_upper', 'printed', 'p221'),
   'dip machine': F('braced', 'push_upper', 'printed', 'p221 — dip machine/pressdown'),
-  'dips': F('braced', 'push_upper', 'variant', 'p221 — dip machine/pressdown (Michael, 2026-09-18)'),
+  // ⛔ BODYWEIGHT DIPS ARE ON NO PAGE (Michael, 2026-09-18): p221 prints the dip machine, which stays.
   'chest supported row': F('braced', 'pull_upper', 'printed', 'p221'),
   'lat pulldown': F('braced', 'pull_upper', 'printed', 'p221 — single or double, any grip'),
   'explosive lat pull down': F('braced', 'pull_upper', 'printed', 'p221 — lat pulldown'),
@@ -287,7 +288,6 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'skull crusher': F('focused', 'push_upper', 'printed', 'p222'),
   'pec deck': F('focused', 'push_upper', 'printed', 'p222'),
   'lateral raise': F('focused', 'push_upper', 'printed', 'p222'),
-  'tricep extension': F('focused', 'push_upper', 'variant', 'p222 — single-joint triceps'),
   'band tricep pushdown': F('focused', 'push_upper', 'variant', 'p222 — triceps pushdown, band'),
   'chest fly': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),
   'cable crossover': F('focused', 'push_upper', 'variant', 'p222 — single-joint chest'),

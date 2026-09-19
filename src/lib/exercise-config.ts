@@ -2311,15 +2311,6 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
-  'tricep extension': {
-    pattern: 'horizontal_push',
-    armIsolation: true,
-    primaryRef: 'bench',
-    ratio: 0.21,
-    confidence: 'low',
-    displayFormat: 'perHand',
-    isUnilateral: false,
-  },
   'turkish get up': {
     pattern: 'core',
     primaryRef: null,
@@ -2707,7 +2698,8 @@ export interface ConfigResolution {
  * entry it names, so a stored row, a log or a hand-typed name that uses it still resolves — to one config, one ratio,
  * one place in the grid. Two of the merged spellings carried different numbers: `reverse fly` / `reverse flye` /
  * `bent over reverse flye` were priced at 0.20 of the overhead press, `rear delt fly` by feel; the merged entry is
- * `rear delt fly`'s, by feel, as the composer prescribes accessories. `rows` (0.85) is left as it is: the name does
+ * `rear delt fly`'s, by feel, as the composer prescribes accessories. `tricep extension` (two dumbbells, lying) is the
+ * dumbbell skull crusher (Michael, 2026-09-18; p222 prints "skull crushers"): it logs per dumbbell on a dumbbell kit. `rows` (0.85) is left as it is: the name does
  * not say which row.
  */
 export const SAME_MOVEMENT: Record<string, string> = {
@@ -2787,9 +2779,10 @@ export const SAME_MOVEMENT: Record<string, string> = {
   "step ups": "step up",
   "tricep dip": "dips",
   "tricep dips": "dips",
-  "tricep extensions": "tricep extension",
+  "tricep extension": "skull crusher",
+  "tricep extensions": "skull crusher",
   "tricep pushdown": "triceps pushdown",
-  "triceps extension": "tricep extension",
+  "triceps extension": "skull crusher",
   "turkish getup": "turkish get ups",
   "walking lunges": "walking lunge",
   "prone y t w raise": "ytw raise",

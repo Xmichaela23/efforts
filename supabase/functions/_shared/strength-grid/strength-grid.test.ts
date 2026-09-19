@@ -450,9 +450,12 @@ Deno.test('⛔ FILED BY WHAT IT IS, NOT BY WORDS IN ITS NAME (Michael, 2026-09-1
   // p222 prints the Tate press and skull crushers under FOCUSED PUSH/ARMS.
   assertEquals(viadaCategoryOf('tate press'), 'focused');
   assertEquals(viadaCategoryOf('skull crusher'), 'focused');
-  // Dips with the dip machine/pressdown, p221 braced push.
-  assertEquals(viadaCategoryOf('dips'), 'braced');
-  assertEquals(viadaCategoryOf('tricep dips'), 'braced');
+  // p221 prints the dip machine; bodyweight dips are on no page (Michael, 2026-09-18).
+  assertEquals(viadaCategoryOf('dip machine'), 'braced');
+  assertEquals(viadaCategoryOf('dips'), null);
+  assertEquals(viadaCategoryOf('tricep dips'), null);
+  // The decline bench sits with p220's incline bench, not with the primary bench press.
+  assertEquals(viadaCategoryOf('decline bench press'), 'secondary');
   // p220's definition reaches a dumbbell or kettlebell version of a printed movement, and nothing of another kind.
   assertEquals(viadaCategoryOf('db bench press'), 'secondary');
   assertEquals(viadaCategoryOf('kettlebell press'), 'secondary');
@@ -534,7 +537,8 @@ Deno.test('the grid has no duplicate offers, and no bare catalogue stubs', () =>
       const r = resolveSlot({ ...slot.req, equipment: kit.equipment });
       // ⛔ ABSENT FROM THE LIST, not merely unchosen. A stub sitting second in the options is still
       // offered — a swap sheet reads the whole list, and "Press" is not a movement anyone can perform.
-      for (const stub of ['press', 'bench', 'row', 'rows', 'squat', 'deadlift', 'lunge', 'incline bench']) {
+      // ⚠️ `deadlift` and `lunge` left the stub list 2026-09-18: they are p219's Deadlift and p220's forward lunge.
+      for (const stub of ['press', 'bench', 'row', 'rows', 'squat', 'incline bench']) {
         assert(!r.options.some((o) => o.name === stub),
           `${slot.label} [${kit.label}] offered the bare stub "${stub}"`);
       }

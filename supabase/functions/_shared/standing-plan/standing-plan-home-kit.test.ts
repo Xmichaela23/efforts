@@ -86,9 +86,8 @@ Deno.test('⛔ THE TWO HOME ROUTES (workorder addendum, 2026-09-10): his rear de
   const rearDelt = a.find((o) => o.name.toLowerCase() === 'rear delt machine');
   assert(rearDelt, `the rear delt work is missing from ${a.map((o) => o.name).join(', ')}`);
   assertEquals(rearDelt!.display, 'Bent-Over Dumbbell Rear Delt Fly');
-  const pullover = a.find((o) => o.name.toLowerCase() === 'pullover machine');
-  assert(pullover, `the pullover is missing from ${a.map((o) => o.name).join(', ')}`);
-  assertEquals(pullover!.display, 'Flat-Bench Dumbbell Pullover');
+  // ⛔ THE PULLOVER LEFT THIS ROW 2026-09-18 (Michael): at home it is p220's DB pullover, done on the Secondary pull row.
+  assert(!a.some((o) => o.name.toLowerCase() === 'pullover machine'), 'the machine pullover is still offered at home');
   // With the incline chip the rear delt work is chest-supported, which is closer to his position.
   const incl = pickOptions('iso_pull_a', INCLINE, null, null).find((o) => o.name.toLowerCase() === 'rear delt machine');
   assertEquals(incl?.display, 'Chest-Supported Rear Delt Fly');

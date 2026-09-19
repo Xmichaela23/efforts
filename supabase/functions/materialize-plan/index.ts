@@ -54,7 +54,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
-import { executionHowTo, executionName, homeRouteOnKit } from '../_shared/strength-grid/grid.ts';
+import { executionHowTo, executionName, homeRouteOnKit, usesTwoDumbbellsOnKit } from '../_shared/strength-grid/grid.ts';
 import { canPerform } from '../../../src/lib/strength-gear.ts';
 import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
 import { liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
@@ -2872,6 +2872,9 @@ export function expandTokensForRow(
              * the ORIGINAL movement's execution and would be a lie on the replacement. Dropped rather
              * than re-derived — this seam does not own the naming rule.
              */
+            // ⛔ "EACH" RIDES ON THE ROW (Michael, 2026-09-18): two dumbbells, one per hand, on this kit → the logger's
+            // weight column reads "LB EACH". Worked out for the movement the row is now, swap or not.
+            ...(usesTwoDumbbellsOnKit(name, userEquipment) ? { weight_per: 'each' } : {}),
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
               // A swapped or substituted row is re-labelled for the movement it became (2026-09-08).
@@ -3304,6 +3307,9 @@ export function expandTokensForRow(
              * the ORIGINAL movement's execution and would be a lie on the replacement. Dropped rather
              * than re-derived — this seam does not own the naming rule.
              */
+            // ⛔ "EACH" RIDES ON THE ROW (Michael, 2026-09-18): two dumbbells, one per hand, on this kit → the logger's
+            // weight column reads "LB EACH". Worked out for the movement the row is now, swap or not.
+            ...(usesTwoDumbbellsOnKit(name, userEquipment) ? { weight_per: 'each' } : {}),
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
               // A swapped or substituted row is re-labelled for the movement it became (2026-09-08).

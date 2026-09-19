@@ -93,7 +93,10 @@ export type GearKey =
   | 'back_extension_bench'
   // ⛔ THE SLED (D-479, 2026-09-16) — ON MICHAEL'S RULING FROM THE PAGE, the stated exception to the ownership
   // bar (no survey number). p226 CARRY/DRAG/PICK prints "sled push" and "sled pull" under push/pull variants.
-  | 'sled';
+  | 'sled'
+  // ⛔ THE SANDBAG (Michael, 2026-09-18): p220's sandbag throw is offered only to a kit with a sandbag. Passes the
+  // one-test-per-chip rule: a sandbag is gear a person names, and it unlocks a movement the page prints.
+  | 'sandbag';
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -114,6 +117,7 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   stability_ball: 'Stability Ball',
   back_extension_bench: 'Back Extension Bench',
   sled: 'Sled',
+  sandbag: 'Sandbag',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -255,6 +259,8 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       // The app already treats a commercial gym as having a sled (`substituteExerciseForEquipment` keeps
       // sled push and sled pull there); the key says the same thing here.
       out.add('sled');
+      // A commercial gym has a sandbag, as it has a sled (Michael, 2026-09-18).
+      out.add('sandbag');
     }
     // ⛔ THE TWO CHIPS ADDED 2026-08-26 — see the GearKey note. Matched by SUBSTRING, like every
     // clause above, so "TRX / suspension trainer" and "Stability ball" both land.
@@ -266,6 +272,7 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
     if (s.includes('back extension')) out.add('back_extension_bench');
     // ⛔ THE SLED CHIP (D-479, 2026-09-16) — see the key's note in `GearKey`.
     if (s.includes('sled')) out.add('sled');
+    if (s.includes('sandbag')) out.add('sandbag');
   }
   return out;
 }
@@ -754,9 +761,8 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'stiff legged deadlift': [['barbell'], ['dumbbells']],
   'zercher squat': [['barbell', 'rack']],
 
-  // ⛔ UNGATED, ON THE `leg curl` PRECEDENT. A sandbag is required and is NOT commonly declarable —
-  // no inventory chip produces one — so a route would delete the movement instead of swapping it.
-  'sandbag throw': ALWAYS,
+  // ⛔ ONLY WITH A SANDBAG (Michael, 2026-09-18) — it was ungated on the `leg curl` precedent.
+  'sandbag throw': [['sandbag']],
   // A KETTLEBELL SWING NEEDS A KETTLEBELL. It was untagged, so `gearRoutesFor` returned ALWAYS and
   // warned - and it is one of his secondary hinge movements, so it was being offered to everyone.
   // Same route as `kettlebell swing` and `kb swings` (2026-09-18): with no kettlebell the p220 hinge row
@@ -775,7 +781,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // the rear delt above): "a flat-bench dumbbell pullover for the pullover machine (same pattern as
   // the incline dumbbell chest-supported row)". The station route stays; the execution name says
   // which one the kit resolved to.
-  'pullover machine': [['dumbbells', 'bench'], ['machine']],
+  // ⛔ STATION ONLY SINCE 2026-09-18 (Michael): the flat-bench dumbbell pullover is p220's DB pullover, the same movement,
+  // so a dumbbell kit does it on the Secondary pull row and the Focused pull row no longer offers it.
+  'pullover machine': [['machine']],
   'hip adduction machine': [['machine']],
   /**
    * ⛔ THE SLED (D-479, 2026-09-16, Michael's ruling from the page). p226 prints both under CARRY/DRAG/PICK,
