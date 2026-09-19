@@ -45,8 +45,10 @@ import { localDateInTz } from './local-date.ts';
 //   program; StrongLifts warm-up sets in front of plan barbell lifts; the count-up rest timer fields on plan rows.
 // 12 (2026-09-18): warm-up sets — deadlift and row start at 65 lb / 30 kg, 45 lb / 20 kg steps, a set kept only 25 lb /
 //   10 kg or more under the work weight.
+// 13 (2026-09-18): round 5 — every ride and run step has a top except sprints: sweet spot tops at FTP, the anaerobic
+//   floor shows (and sends) up to 130% of FTP, the "never over FTP" extension to other rides is gone.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 12;
+export const PLAN_WRITER_VERSION = 13;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
