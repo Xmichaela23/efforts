@@ -22,7 +22,7 @@ Deno.test('⛔ THE LAUNCHER WITH A MAX ON FILE — the empty bar, then p215\'s t
   // p215's own words (2026-09-18).
   assertEquals(bench.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Use this set of 6 to confirm that this feels about right.');
   assertEquals(bench.sets[2].set_hint, 'Perform 5 repetitions with this weight.');
-  assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.');
+  assertEquals(bench.notes, 'Bench Press on file: 185 lb (typed in your baselines).');
   // The press's empty bar is the bar, not 0.
   assertEquals(ohp.sets[0].weight, 45);
   assertEquals(weights(ohp), [45, 85, 95, 100]);
@@ -35,7 +35,7 @@ Deno.test('⛔ THE LAUNCHER WITH NO MAX ON FILE — the anchor rows, not a 45/95
   for (const r of [squat, dead]) {
     assertEquals(weights(r), [45, 0, 0, 0], `${r.name} was given a starting weight`);
     assertEquals(r.sets[1].pretest_anchor, true);
-    assertEquals(r.sets[1].set_hint, 'A weight for 8 to 10 reps near failure. Enter it here.');
+    assertEquals(r.sets[1].set_hint, 'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. Enter this weight here.'); // p215, 2026-09-18
     assertEquals(r.sets.map((s) => s.reps ?? null), [null, 6, 5, null]);
     assertEquals(r.anchor_round_to, 5);
     assertEquals(r.notes, undefined);
@@ -57,9 +57,10 @@ Deno.test('⛔⛔ A PLAN\'S TEST ROW IS BUILT AS THE PLAN WROTE IT — its own w
   // p215 step 8 (2026-09-18) — the plan row's note and the set's hint are one line from one owner.
   const P215_LAST = 'Perform the maximum number of repetitions possible with this weight.';
   assertEquals(bench.sets[bench.sets.length - 1].set_hint, P215_LAST);
-  assertEquals(bench.notes, `Bench Press on file: 160 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat. ${P215_LAST}`);
+  // 2026-09-18: "the last one is what you are trying to beat" is not how p215 works, and came off.
+  assertEquals(bench.notes, `Bench Press on file: 160 lb (typed in your baselines). ${P215_LAST}`);
   const ohp = rows.find((r) => r.name === 'Overhead Press')!;
-  assertEquals(ohp.notes, `The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat. ${P215_LAST}`);
+  assertEquals(ohp.notes, P215_LAST);
 
   // By feel (no seed) → the anchor rows.
   const noSeed = composeWeek({

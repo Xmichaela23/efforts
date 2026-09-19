@@ -144,8 +144,8 @@ export const LEGACY_LADDER_IS_OURS =
 
 /** The rest fields a planned row carries. Absent keys mean "no number". */
 export type RestFields = {
-  /** Seconds after a work set. */
-  rest_seconds: number;
+  /** Seconds after a work set. ⛔ Absent on a row with a p218 intent (2026-09-18) — see `restFieldsForRow`. */
+  rest_seconds?: number;
   /** Seconds after a warm-up set. Present only when the row's `set_plan` has a warm-up set. */
   warmup_rest_seconds?: number;
   /** The sentence beside the countdown. Present only when the row declares a slot intent. */
@@ -182,14 +182,24 @@ function workRepsOf(row: Record<string, unknown>): number | undefined {
 export function restFieldsForRow(row: Record<string, unknown>): RestFields {
   const intent = typeof row?.slot_intent === 'string' ? row.slot_intent : null;
   const name = String(row?.name ?? '');
-  const out: RestFields = {
-    rest_seconds: positive(row?.rest_seconds) ?? restSecondsFor(name, workRepsOf(row), intent),
-  };
-  const plan = Array.isArray(row?.set_plan) ? row.set_plan as Array<Record<string, unknown>> : [];
-  if (plan.some((s) => s?.warmup === true)) {
-    out.warmup_rest_seconds = positive(row?.warmup_rest_seconds) ?? WARMUP_REST_SEC;
-  }
   const bucket = restBucketForIntent(intent);
+  const out: RestFields = {};
+  /**
+   * ⛔⛔ NO COUNTDOWN ON A BOOK ROW (book-language fix, 2026-09-18). A row with a p218 intent took 3:00 /
+   * 2:00 / 1:30 (and 1:00 after a warm-up set) — every number ours; p78 and p84 give a rule and no minutes.
+   * Michael's rule: rest is a training instruction, and what the book does not say comes off. The row
+   * carries the page's rule (`rest_cue`) and no seconds, so the logger starts no timer on it.
+   * ⚠️ A row with no intent (no standing composer wrote it) keeps the ladder below — ours, unchanged, and
+   * not a book prescription.
+   */
+  // ⛔ AND NONE ON A PLYOMETRIC DRILL (2026-09-18): p227 says "ample rest" and gives no number; 2:30 was ours.
+  if (!bucket && !isPlyometricMovement(name)) {
+    out.rest_seconds = positive(row?.rest_seconds) ?? restSecondsFor(name, workRepsOf(row), intent);
+    const plan = Array.isArray(row?.set_plan) ? row.set_plan as Array<Record<string, unknown>> : [];
+    if (plan.some((s) => s?.warmup === true)) {
+      out.warmup_rest_seconds = positive(row?.warmup_rest_seconds) ?? WARMUP_REST_SEC;
+    }
+  }
   const cue = typeof row?.rest_cue === 'string' && row.rest_cue.trim()
     ? row.rest_cue
     : (bucket ? restCueForBucket(bucket) : null);

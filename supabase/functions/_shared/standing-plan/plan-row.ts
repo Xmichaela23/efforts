@@ -512,35 +512,11 @@ const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
 
 
 /**
- * ⛔⛔ WHY THE SETS STOP SHORT — SAID ONCE, ON THE BLOCK, AND NOT AGAIN (2026-08-27).
- *
- * p125: *"A higher pain tolerance may be an excellent adaptation for endurance athletes because the
- * ability to manage increasingly uncomfortable sensations during various endurance-dependent events
- * may be directly related to their overall performance in their sport. **For strength athletes,
- * however, it may be less clear; a higher tolerance may be of negligible benefit or even
- * counterproductive to longer-term health.**"*
- *
- * ⛔ IT IS THIS CUSTOMER EXACTLY — a runner or rider who has spent years training themselves to push
- * through discomfort, now handed a barbell where that trained instinct is the wrong one. It is the
- * argument UNDER the per-session rule (`SET_END_CUE`, p82/p83), which is why the two are separated:
- * the rule is on every lifting session because it applies to every set, and the REASON is here
- * because a reason repeated twelve weeks running stops being read.
- *
- * ⚠️ IT IS A FACT, NOT AN INSTRUCTION, and it carries NO SECOND PERSON — the block description's
- * own gate is stricter than the app-wide one (`standing-plan-live.test.ts`: "The", not "Your", voice
- * rule 1). A first draft read *"teaches you to push through discomfort"* and the gate caught it.
- * ⚠️ THE SESSION-LEVEL RULE IS DIFFERENT AND THAT IS DELIBERATE: `SET_END_CUE` is Michael's own
- * wording, addresses the athlete directly and opens on a verb. It is his, it is final, and it sits
- * on a surface this gate does not read.
- * ⚠️ AND IT IS THE BLOCK'S OWN DESCRIPTION rather than a new surface. The Focus tab's block card is
- * a phase name, a week counter, session counts and a progress bar — there is no home for a sentence
- * on it, and inventing one was not worth doing when the block already has a description that is
- * authored once and read on the plan.
+ * ⛔⛔ `PAIN_TOLERANCE_NOTE` IS DELETED (book-language fix, 2026-09-18). It cited p125, and p125 is not in
+ * the SOURCE doc (grepped `pain`, `p125`: 0 hits); against the code's own quote it also dropped the page's
+ * hedge "may be". The block description no longer carries it. (p125's photo exists in the local page
+ * folder; the line can come back in the page's own words if Michael adds the quote to the SOURCE doc.)
  */
-export const PAIN_TOLERANCE_NOTE =
-  'Endurance training rewards pushing through discomfort. Under a bar that instinct is the wrong '
-  + 'one: a higher pain tolerance is of negligible benefit to a strength athlete and can work '
-  + 'against long-term health.';
 
 function describeBlock(
   weeks: number,
@@ -606,7 +582,6 @@ function describeBlock(
         + 'on. Log those two and the weights fill in from there, including the rest of week one.'
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
-    PAIN_TOLERANCE_NOTE,
     ...sourced,
   ].join(' ');
 }

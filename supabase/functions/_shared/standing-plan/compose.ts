@@ -1062,9 +1062,15 @@ function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
 export const HAIRCUT_LINE = 'A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction '
   + 'can be gradually phased out in eight to ten weeks.';
 
-/** ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226, and only the wording Michael approved (2026-09-13). */
+/**
+ * ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226's SKILL cell, whole (book-language fix, 2026-09-18). It read
+ * "medium weight, no fatigue, full rest": "full rest" for the page's "ample rest", and "emphasis is speed and
+ * quality" dropped. Checked against the page photo p226.jpg (local page folder): "SKILL: Medium weight,
+ * emphasis is speed and quality, no fatigue accumulation, ample rest".
+ * ⚠️ The SOURCE doc carries this cell as a list item, not inside quotation marks; the photo is the evidence.
+ */
 export const CARRY_ROW_WORDS: Partial<Record<ViadaIntent, string>> = {
-  SKILL: 'medium weight, no fatigue, full rest',
+  SKILL: 'medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest',
 };
 
 function exerciseForSlot(
@@ -2174,7 +2180,8 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
   return {
     day: dayNameFor(args, day.day),
     type: 'strength',
-    name: 'Plyometrics',
+    // ⛔ 2026-09-18: the page's name for the day — p246, p274 and p278 print "Plyo warm-up" (was "Plyometrics").
+    name: 'Plyo warm-up',
     // ⛔ 2026-09-09 (§B2): the stop rule is on every drill row already, in his approved words. Saying
     // it a fourth time at the session level is the wallpaper this order exists to remove.
     description: '',

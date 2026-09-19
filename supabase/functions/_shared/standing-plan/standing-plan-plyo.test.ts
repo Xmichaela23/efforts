@@ -213,7 +213,7 @@ Deno.test('the drills never enter the dosing ledger', () => {
   const wk = composeWeek({ ...BASE, week: 2, column: 'standard' } as never);
   const drills = new Set(everyDrill());
   for (const line of wk.ledger.perSession) {
-    assert(line.label !== 'Plyometrics', 'the plyo session reached the dosing ledger');
+    assert(line.label !== 'Plyo warm-up', 'the plyo session reached the dosing ledger');
   }
   // And no drill is attributed to a muscle, in either direction.
   for (const m of wk.ledger.perMuscle) {

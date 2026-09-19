@@ -33,7 +33,6 @@ import { NumericKeypadSheet } from '@/components/ui/numeric-keypad-sheet';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
   topSetIndex,
-  barSpeedLineFor,
   type SetDifficulty,
 } from '@/lib/strength-focus-copy';
 // ⛔ SLICE b — the calibration sentences, shared with State and Performance. One signal, three
@@ -1869,47 +1868,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return roleForExercise(String(exercise?.name || '')) === 'accessory';
   };
 
-  /**
-   * The bar-speed cue for one set. Built and specced on 2026-07-27 (D-326 era) and rendered NOWHERE
-   * until now — `barSpeedLineFor` was reachable only from its own test. Same starvation the engine
-   * banner warns about: the thing existed, was correct, was pinned, and never once reached a screen.
-   *
-   * ⛔ `isValiditySet` IS DELIBERATELY NEVER PASSED. Its line — "Five at ninety-five. This one
-   * decides the number." — is TRUE only once `verdictFrom95Set` is wired, and it is not. Until then
-   * the plan advances on the calendar, so telling an athlete this set decides their working number
-   * would be a promise the engine does not keep. Same gate as `STRENGTH_ADVANCE_COPY`. When that
-   * lands, pass the flag here and the copy is already written.
-   *
-   * ⚠️ Deload comes from the SESSION NAME, which is the tell the deload pill above already uses —
-   * one signal, not a second derivation that could disagree with the pill on the same screen.
-   */
-  const barSpeedCueFor = (exercise: LoggedExercise, set: LoggedSet): string | null => {
-    // ⛔ THE FOUR MAIN LIFTS ONLY (2026-08-01). The first cut gated on "not assistance", which let
-    // the cue onto everything the block prescribes that is not an accessory — Michael's Box Jump
-    // read "Every rep at the same speed as the first", which is advice for a barbell set under a
-    // percentage of a training max, not for a jump. `isMainBarbellLift` is an explicit curated list and
-    // MISSES TO FALSE, so an unmapped lift gets no cue rather than the wrong one. Accessories get
-    // the section note above the block; plyos get nothing.
-    if (!isMainBarbellLift(exercise?.name || '')) return null;
-    if (equipmentForExercise(exercise?.name || '') === 'plyo') return null;
-    if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
-    return barSpeedLineFor({
-      isWarmup: set?.setType === 'warmup',
-      isAmrap: set?.amrap === true,
-      /**
-       * ⛔ THE STANDING PLAN'S PRETEST IS NOT THE PREVIOUS PROGRAM'S AMRAP, AND THEY SHARE A FLAG (2026-08-24).
-       * Both stamp `amrap: true`, so this screen showed *"Grind it out"* on a set whose entire job
-       * is a clean measurement. ⚠️ KEYED ON THE SESSION'S OWN TAG rather than on a new field: the
-       * composer already tags that session `test_week`, and adding a set-level flag would put a
-       * second answer to "which kind of set is this" into stored JSON.
-       */
-      isPretest: Array.isArray(scheduledWorkout?.tags)
-        && scheduledWorkout.tags.some((t: unknown) => String(t) === 'test_week'),
-      // server-word: get-week's `is_deload` (2026-09-17, WORKORDER Stage C), not a parse of the display name.
-      isDeload: (scheduledWorkout as any)?.is_deload === true,
-      // isValiditySet: intentionally omitted — see the note above.
-    });
-  };
+  // ⛔ 2026-09-18 (book-language fix): `barSpeedCueFor` is deleted. It printed the previous program's
+  // bar-speed lines ("Every rep explosive and controlled.", "Grind it out. Stop before failure.", "Light on
+  // purpose. Move it fast.", …) above sets on a main barbell lift. None is on a page of the book.
 
   const parseTimerInput = (raw: string): number | null => {
     if (!raw) return null;
@@ -6008,7 +5969,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — its words are the target line.
                         const targetHint = exIsPlyo ? null : (exercise.prescription_words
                           ?? ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null));
-                        const cue = barSpeedCueFor(exercise, set);
+                        const cue: string | null = null; // the bar-speed lines are gone (2026-09-18)
                         const platesOpen = !isDurationBased && !exIsBodyweight && exBarLoaded
                           && expandedPlates[`${exercise.id}-${setIndex}`];
 

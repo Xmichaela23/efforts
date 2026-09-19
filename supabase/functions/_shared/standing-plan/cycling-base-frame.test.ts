@@ -170,15 +170,15 @@ Deno.test('⛔ the 4-ride week leaves out the Day 2 easy ride and nothing else, 
   assertEquals(fenced.rideCount, 4);
 });
 
-Deno.test('⛔ the carry row reads "Farmers Carry · medium weight, no fatigue, full rest" — no sets, no reps', async () => {
+Deno.test('⛔ the carry row reads p226\'s SKILL cell whole — no sets, no reps', async () => {
   const { formatStrengthExercise } = await import('../strength/strength-display-lines.ts');
   const day4 = composeWeek(baseArgs(2) as never).sessions.find((s) => s.name === 'DE: Full');
   const carry = (day4?.strength_exercises ?? []).find((e) => /carry/i.test(String(e.name)));
   assert(carry, 'no carry row on day 4');
   assertEquals(carry!.sets, undefined);
   assertEquals(carry!.reps, '');
-  assertEquals((carry as { prescription_words?: string }).prescription_words, 'medium weight, no fatigue, full rest');
-  assertEquals(formatStrengthExercise(carry), 'Farmers Carry · medium weight, no fatigue, full rest');
+  assertEquals((carry as { prescription_words?: string }).prescription_words, 'medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest'); // p226, 2026-09-18
+  assertEquals(formatStrengthExercise(carry), 'Farmers Carry · medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest');
   // ⚠️ Deload day 4 prints no carry (p278).
   const taper4 = composeWeek(baseArgs(3, 'taper') as never).sessions.find((s) => s.name === 'DE: Full');
   assert(!(taper4?.strength_exercises ?? []).some((e) => /carry/i.test(String(e.name))));

@@ -25,7 +25,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       ME     Back Squat                     -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
       ME     Deadlift                       -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
   [Tuesday] ride     Anaerobic Ride — 65 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
       -      Pogo Hops                      1x           @ Bodyweight    | how-to
@@ -76,7 +76,7 @@ WEEK 02  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to
@@ -125,7 +125,7 @@ WEEK 03  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to
       -      Lunge Hops                     1x           @ Bodyweight    | how-to
@@ -174,7 +174,7 @@ WEEK 04  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to
@@ -223,7 +223,7 @@ WEEK 05  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
       -      Skater Hops                    1x           @ Bodyweight    | how-to
@@ -272,7 +272,7 @@ WEEK 06  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to
       -      Pogo Hops                      1x           @ Bodyweight    | how-to
@@ -321,7 +321,7 @@ WEEK 07  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to
@@ -370,7 +370,7 @@ WEEK 08  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to
       -      Lunge Hops                     1x           @ Bodyweight    | how-to
@@ -419,7 +419,7 @@ WEEK 09  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to
@@ -468,7 +468,7 @@ WEEK 10  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to
       -      Skater Hops                    1x           @ Bodyweight    | how-to
@@ -517,7 +517,7 @@ WEEK 11  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to
       -      Pogo Hops                      1x           @ Bodyweight    | how-to
@@ -566,7 +566,7 @@ WEEK 12  column=standard
       HYP    Hip Thrust                     3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
-  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to

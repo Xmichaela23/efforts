@@ -15,7 +15,7 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { ACCESSORY_FATIGUE_CUE, composeWeek, defaultCompetitionLifts, SET_END_CUE, SPEED_SET_END_CUE } from './index.ts';
-import { buildStandingPlanRow, PAIN_TOLERANCE_NOTE } from './plan-row.ts';
+import { buildStandingPlanRow } from './plan-row.ts';
 import { PLYO_DOSE } from './frames.ts';
 import { FAMILIES } from '../endurance-library/source-rules.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
@@ -196,39 +196,13 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
   }
 });
 
-Deno.test('⛔⛔ THE REASON IS ON THE BLOCK, ONCE — and never on a session', () => {
-  /**
-   * ⛔ p125, AND IT IS THIS CUSTOMER EXACTLY: *"A higher pain tolerance may be an excellent
-   * adaptation for endurance athletes… For strength athletes, however, it may be less clear; a
-   * higher tolerance may be of negligible benefit or even counterproductive to longer-term health."*
-   * A runner or rider who has trained themselves for years to push through discomfort now has the
-   * wrong instinct under a bar.
-   *
-   * ⚠️ ONCE. Said on every session for twelve weeks it stops being read, which is the whole reason
-   * the rule and the reason live on different surfaces.
-   */
+Deno.test('⛔⛔ THE p125 PAIN-TOLERANCE LINE IS OFF THE BLOCK — p125 is not in the SOURCE doc (2026-09-18)', () => {
   const row = buildStandingPlanRow({
     compose: { ...BASE, week: 2, column: 'standard' } as never,
     weeks: 12,
     taperWeeks: [],
   } as never) as { description: string };
-  const hits = row.description.split(PAIN_TOLERANCE_NOTE).length - 1;
-  assertEquals(hits, 1, `the block reason appears ${hits} times in its own description`);
-
-  for (const s of week(2).sessions) {
-    assertEquals(s.description.includes(PAIN_TOLERANCE_NOTE), false,
-      `${s.name} repeats the block's reason`);
-  }
-
-  /**
-   * ⚠️ NO SECOND PERSON, and the block description's gate is stricter than the app-wide one
-   * (`standing-plan-live.test.ts`: "The", not "Your"). A first draft read "teaches you to push
-   * through discomfort" and was caught there.
-   */
-  assertEquals(voiceViolation(PAIN_TOLERANCE_NOTE), null);
-  assertEquals(/\byou\b|\byour\b/i.test(PAIN_TOLERANCE_NOTE), false);
-  // ⛔ AND IT STATES THE PAGE'S OWN CLAIM, not a softened one.
-  assert(/negligible benefit/.test(PAIN_TOLERANCE_NOTE));
+  assertEquals(/pain tolerance|pushing through discomfort/i.test(row.description), false, row.description);
 });
 
 Deno.test('⛔⛔ NO WORD NAMES TWO DIFFERENT SESSIONS — the wizard and the plan agree', () => {

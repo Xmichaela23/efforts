@@ -112,8 +112,15 @@ const EMPTY_BAR_HINT =
  */
 export const TEST_LAST_SET_LINE = 'Perform the maximum number of repetitions possible with this weight.';
 const TEST_LAST_SET_HINT = TEST_LAST_SET_LINE;
-// OURS — `ANCHOR_HINT` "8 to 10 reps near failure": a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count
-const ANCHOR_HINT = 'A weight for 8 to 10 reps near failure. Enter it here.';
+/**
+ * ⛔ THE STARTING WEIGHT WITH NO MAX ON FILE — p215 steps 1 and 2, cut (2026-09-18). "A weight for 8 to 10
+ * reps near failure" squeezed the page's "comfortably 8, approaching failure at 10" into one band.
+ * p215: "…it's a weight where you can comfortably perform 8 repetitions but are approaching failure if you
+ * had to push to 10." and step 2 "Enter this weight here:".
+ */
+const ANCHOR_HINT =
+  'A weight where you can comfortably perform 8 repetitions but are approaching failure if you had to push to 10. '
+  + 'Enter this weight here.';
 // ⛔ 2026-09-18: the pull-up test's three hints (scap pulls; "2–3 easy pull-ups, then rest ~2 min"; "ONE
 // all-out set: strict, full range, no kipping…") and its two warm-up sets (5 scap pulls, 3 easy pull-ups)
 // came off — no page gives a pull-up test, and every count was ours. The one set that records the count stays.
@@ -131,12 +138,15 @@ const P215_STEP_ONE =
 const stepHint = (i: number, reps?: number): string =>
   i === 0 ? P215_STEP_ONE : `Perform ${Number(reps) > 0 ? reps : 5} repetitions with this weight.`;
 
-const fileNoteFor = (name: string, onFile: number | undefined, hasSteps: boolean, metric: boolean): string =>
+/**
+ * The number on file, as app state. ⛔ 2026-09-18: "The steps below are a share of that number; the last one
+ * is what you are trying to beat." came off — nothing on p215 is a number to beat; the steps say what p215
+ * says on their own rows.
+ */
+const fileNoteFor = (name: string, onFile: number | undefined, _hasSteps: boolean, metric: boolean): string =>
   onFile && onFile > 0
-    ? `${name} on file: ${Math.round(liftInAthletesUnit(onFile, metric))} ${metric ? 'kg' : 'lb'} (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
-    : hasSteps
-      ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
-      : '';
+    ? `${name} on file: ${Math.round(liftInAthletesUnit(onFile, metric))} ${metric ? 'kg' : 'lb'} (typed in your baselines).`
+    : '';
 
 /** The typed max on file for a lift, as stored (the alias keys the logger read, moved unchanged). */
 export function typedMaxFor(name: string, perf: Record<string, unknown> | null | undefined): number | undefined {
