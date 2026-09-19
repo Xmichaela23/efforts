@@ -7,7 +7,7 @@
  * beside an easy session no longer says "lift first and keep it easy" (p143 rule 5 is about muscles already worked).
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { spacingLineFor } from './spacing-line.ts';
+import { liftGoesFirst, spacingLineFor } from './spacing-line.ts';
 
 const PLAN = 'plan-1';
 const lift = (rows: unknown[], tags: string[] = ['standing_plan']) => ({
@@ -31,27 +31,25 @@ Deno.test('one session, two endurance sessions, or a session not from the plan: 
   assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL' }]), { type: 'ride', workout_status: 'completed' } as never]), null);
 });
 
-Deno.test('lower day with skill or speed sets, easy session: both halves', () => {
+Deno.test('lower day with skill or speed sets, easy session: lift first, both sentences, no hours', () => {
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('vt1_or_easier')]),
-    { lead: LEAD, closer: `${EASY} ${SKILL}` });
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), run('vt1_or_easier')])?.closer,
-    `${EASY} ${SKILL}`);
+    { lead: `${EASY} ${SKILL}` });
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), { ...run('vt1_or_easier'), duration: 30 }]),
+    { lead: `${EASY} ${SKILL}` });
 });
 
-Deno.test('lower day with skill or speed sets, hard session: the order and its cost', () => {
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('above')])?.closer,
-    SKILL);
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), run('near')])?.closer,
-    SKILL);
+Deno.test('lower day with skill or speed sets, hard session: lift first, the skill sentence only', () => {
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('above')]), { lead: SKILL });
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), run('near')]), { lead: SKILL });
   // no band counts as not easy
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), { type: 'ride', training_plan_id: PLAN, tags: ['sport:ride'] }])?.closer,
-    SKILL);
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), { type: 'ride', training_plan_id: PLAN, tags: ['sport:ride'] }]),
+    { lead: SKILL });
 });
 
-Deno.test('lower day with heavy or hypertrophy sets only: the easy half, or nothing', () => {
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), ride('vt1_or_easier')])?.closer, EASY);
+Deno.test('lower day with heavy or hypertrophy sets only: easy session lift first, hard session the hours', () => {
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), ride('vt1_or_easier')]), { lead: EASY });
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), run('above')]), { lead: LEAD });
-  assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('vt1_or_easier')])?.closer, EASY);
+  assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('vt1_or_easier')]), { lead: EASY });
   assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('above')]), { lead: LEAD });
 });
 
@@ -61,8 +59,14 @@ Deno.test('⛔ THE FRAME\'S UPPER DAY: the lead only, whatever the session', () 
 });
 
 Deno.test('a day with no frame tag (test week, plyometrics) counts as working the legs', () => {
-  assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL' }]), ride('vt1_or_easier')])?.closer,
-    `${EASY} ${SKILL}`);
+  assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL' }]), ride('vt1_or_easier')]), { lead: `${EASY} ${SKILL}` });
+});
+
+Deno.test('the plyo warm-up day: listed first, so no hours; an easy session keeps its sentence', () => {
+  const plyo = lift([], ['standing_plan', 'plyo']);
+  assertEquals(spacingLineFor([plyo, run('near')]), null);
+  assertEquals(liftGoesFirst([plyo, run('near')]) != null, true);
+  assertEquals(spacingLineFor([plyo, ride('vt1_or_easier')]), { lead: EASY });
 });
 
 Deno.test('a swim day: the lead only', () => {
@@ -71,13 +75,27 @@ Deno.test('a swim day: the lead only', () => {
 
 Deno.test('⛔ UPPER OR LOWER IS NEVER READ OFF THE NAME', () => {
   const namedUpper = { ...lowerLift([{ slot_intent: 'SKILL' }], 'me'), name: 'Upper body: Push' };
-  assertEquals(spacingLineFor([namedUpper, ride('vt1_or_easier')])?.closer,
-    `${EASY} ${SKILL}`);
+  assertEquals(spacingLineFor([namedUpper, ride('vt1_or_easier')]), { lead: `${EASY} ${SKILL}` });
 });
 
 Deno.test('⛔ NO HEADING WITHOUT A PAGE: "If they have to be closer" is gone', () => {
   const out = spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('above')]);
-  assertEquals(Object.keys(out ?? {}).sort(), ['closer', 'lead']);
+  assertEquals(Object.keys(out ?? {}).sort(), ['lead']);
+});
+
+Deno.test('⛔ p143 rule 6: the hours sentence prints exactly when the ride or run is listed first', () => {
+  const days = [
+    [upperLift([{ slot_intent: 'ME' }]), { ...run('vt1_or_easier'), duration: 30 }],
+    [upperLift([{ slot_intent: 'SKILL' }]), ride('above')],
+    [lowerLift([{ slot_intent: 'DE' }]), ride('above')],
+    [lowerLift([{ slot_intent: 'ME' }], 'me'), run('vt1_or_easier')],
+    [lowerLift([{ slot_intent: 'ME' }], 'me'), run('above')],
+    [lift([{ slot_intent: 'HYP' }]), ride('above')],
+  ];
+  for (const d of days) {
+    const hours = (spacingLineFor(d)?.lead ?? '').includes('6 to 8 hours');
+    assertEquals(hours, liftGoesFirst(d) == null);
+  }
 });
 
 Deno.test('⛔ p143: a VT1 session under an hour adds the page\'s 4-to-6-hour sentence; an hour or more does not', () => {

@@ -24,7 +24,7 @@
  * ⛔ SHARED = DEPLOY TRAP: grep -rln "day-order" supabase/functions --include=index.ts
  */
 
-import { liftGoesFirst } from './standing-plan/spacing-line.ts';
+import { isPlyoWarmUp as plyoTagged, liftGoesFirst } from './standing-plan/spacing-line.ts';
 
 export type DayOrderRow = {
   type?: string | null;
@@ -53,7 +53,7 @@ export function dayTimings<T>(rows: readonly T[], read: (r: T) => DayOrderRow): 
 
 /** Rule 0: the plan's plyo session (`compose.ts` tags it `plyo`), which the book names a warm-up. */
 function isPlyoWarmUp(r: DayOrderRow): boolean {
-  return Array.isArray(r.tags) && r.tags.some((t) => String(t).toLowerCase() === 'plyo');
+  return plyoTagged(r as never);
 }
 
 function storedTiming(r: DayOrderRow): 'AM' | 'PM' | null {

@@ -23,8 +23,11 @@ const hardRide = session('ride', 'Anaerobic Ride', 'above');
 const easyRide = session('ride', 'Ride', 'vt1_or_easier');
 const swim = { type: 'swim', name: 'Swim', training_plan_id: PLAN, tags: ['sport:swim'] };
 
-/** The lift is listed first exactly when Today prints the order sentence. */
-const sentenceSaysLiftFirst = (rows: DayOrderRow[]) => spacingLineFor(rows as never)?.closer != null;
+/** The lift is listed first exactly when Today's line is not the 6-to-8-hours sentence (2026-09-19). */
+const sentenceSaysLiftFirst = (rows: DayOrderRow[]) => {
+  const lead = spacingLineFor(rows as never)?.lead;
+  return lead != null && !lead.includes('6 to 8 hours');
+};
 
 Deno.test('a leg day with speed sets goes before a hard ride, whichever way the rows arrive, and the sentence prints', () => {
   assertEquals(orderDay([hardRide, lowerME], id).map((w) => w.type), ['strength', 'ride']);
