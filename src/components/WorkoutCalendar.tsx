@@ -1516,15 +1516,18 @@ export default function WorkoutCalendar({
                           opacity: done ? 0.6 : 1,
                         }}
                       />
+                      {/* ⛔ A FINISHED ROW READS LIKE TODAY'S DONE CARD (Michael, 2026-09-18): the name in
+                          primary white and its numbers at the same weight as a planned row's, never the
+                          36% grey it had, which measured about 3:1. The ✓ and the dimmed dot say done. */}
                       <span
                         className="truncate"
-                        style={{ color: missed ? STATUS_COLORS.risk : done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,1)' }}
+                        style={{ color: missed ? STATUS_COLORS.risk : done ? 'var(--label)' : 'rgba(242,240,236,1)' }}
                       >
                         {name}
                       </span>
                       <span
                         className="text-[14px] tabular-nums flex-shrink-0 inline-flex items-baseline gap-1.5"
-                        style={{ color: done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,0.62)' }}
+                        style={{ color: 'rgba(242,240,236,0.62)' }}
                       >
                         {/* ⛔ NO PER-ROW ATTRIBUTION HERE ANY MORE (2026-09-09). "Garmin Forerunner
                             965" after every set of numbers doubled the width of a line whose whole
@@ -1540,7 +1543,7 @@ export default function WorkoutCalendar({
                           is done, and that is the fact worth the pixels. */}
                       <span className="text-[14px] text-right flex-shrink-0" style={{ width: 16 }}>
                         {done ? (
-                          <span aria-label="Done" style={{ color: getDisciplineColor('ride') }}>✓</span>
+                          <span aria-label="Done" style={{ color: 'var(--label-secondary)' }}>✓</span>
                         ) : swapped ? (
                           <ArrowLeftRight
                             aria-label="Swapped"
