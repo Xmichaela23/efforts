@@ -2254,6 +2254,9 @@ function expandBikeToken(
    * own easy steps are: nothing marks a rider down for going easier.
    * ⛔ EVERY EASY RIDE STEP, NOT ONLY `ride_endurance` (2026-09-18, book-language pass 1, audit item 17 / M8). A row
    * with no family tag got Coggan's 56–75% here — a second answer to the same easy ride, with a floor no page prints.
+   * ⛔ N IN "under N W" IS p239's 75% OF THE PLAN'S FTP (round 4, 2026-09-18, traced): `baselines.ftp` comes from
+   * `resolveCurrentFtp` (or the plan's snapshot of it), which returns the athlete's ACCEPTED FTP first
+   * (`ride_ftp_accepted`). Pinned in `easy-ride-ceiling.test.ts`.
    */
   const easyRange = () => (ftp ? { lower: 0, upper: Math.round(EASY_RIDE_CEILING_PCT_OF_FTP * ftp) } : undefined);
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
