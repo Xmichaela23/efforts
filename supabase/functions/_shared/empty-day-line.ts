@@ -13,6 +13,14 @@
  *   · anything else                                            → "No effort scheduled"
  */
 
+/**
+ * ⛔ THE REST DAY'S WORD (Michael approved 2026-09-19). The book prints "REST" on its rest days (p278, p279, p281: Day
+ * 7, full width). Written here once; get-week (Today, the calendar), the sample week's summary (the week grid) and
+ * plan-overview (the Plan screen) all print this constant. A day the athlete marked off has no session on it, so it
+ * is a rest day too.
+ */
+export const REST_DAY_LINE = 'Rest';  // p278 — "REST"
+
 export type EmptyDayInput = {
   /** ISO date of the day, YYYY-MM-DD. */
   date: string;
@@ -33,7 +41,7 @@ function dayWords(iso: string): string | null {
 }
 
 export function emptyDayLine(input: EmptyDayInput): string {
-  if (input.hasPlan) return 'Rest';
+  if (input.hasPlan) return REST_DAY_LINE;
   if (input.date < input.today) return 'No effort logged';
   const starts = input.upcomingPlanStartsOn ?? null;
   if (starts && input.date < starts) {

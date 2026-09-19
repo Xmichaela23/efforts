@@ -8,6 +8,7 @@
  */
 import { WEEK_DAYS, isEnduranceSession, type WeekSession } from '../../../src/lib/week-budget.ts';
 import { sessionTypeFor } from './standing-plan/family-lines.ts';
+import { REST_DAY_LINE } from './empty-day-line.ts';
 
 export type WeekOneSummary = {
   training_days: number;
@@ -26,6 +27,8 @@ export type WeekOneSummary = {
    * It claims the spacing's purpose, never per-session freshness (p130, p131, p247).
    */
   balance_note: string | null;
+  /** The line under each day with no session on it — "Rest" (2026-09-19, `empty-day-line.ts`); days with a session are absent. */
+  day_lines: Record<string, string>;
 };
 
 /** OURS — the old grid's cut-off for "a long session", 75 minutes. No source. */
@@ -78,5 +81,7 @@ export function weekOneSummary(
     total_minutes: totalMinutes,
     press_days_note: adjacentPressDays ? 'Press days sit together on purpose — no recovery gap needed.' : null,
     balance_note: balanceNote,
+    // The same days `rest_days` counts, named.
+    day_lines: Object.fromEntries(WEEK_DAYS.filter((d) => !sessions.some((s) => s.day === d)).map((d) => [d, REST_DAY_LINE])),
   };
 }

@@ -138,7 +138,7 @@ no-deploy.**
 | `easy-hr.ts` | `analyze-running-workout` · `compute-facts` · `compute-session-boom` · `compute-workout-analysis` · `export-data` · `learn-fitness-profile` · `save-baselines` |
 | `efficiency-index.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-core-verdict` · `compute-facts` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-weather` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `workout-detail` |
 | `effort-words.ts` | `check-feedback-needed` · `workout-detail` |
-| `empty-day-line.ts` | `get-week` |
+| `empty-day-line.ts` | `create-goal-and-materialize-plan` · `get-week` · `plan-overview` |
 | `end-plan-core.ts` | `complete-race` · `end-plan` |
 | `execution-score.ts` | `analyze-cycling-workout` · `analyze-running-workout` |
 | `exercise-registry-lookup.ts` | `compute-facts` |

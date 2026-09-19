@@ -1759,7 +1759,7 @@ Deno.serve(async (req)=>{
     };
     /**
      * ⛔ THE EMPTY-DAY LINE IS THE SERVER'S (2026-09-17, WORKORDER Stage C) — `_shared/empty-day-line.ts`.
-     * One line per date in the window, whether the day has items or not; the phone prints the one for the day it
+     * One line per date in the window that has nothing on it (a day with items gets none, 2026-09-19); the phone prints the one for the day it
      * is showing and chooses nothing. `upcomingPlanStartsOn` is the start of an active plan whose first week has
      * not arrived, which is the only case that names a date.
      */
@@ -1778,8 +1778,12 @@ Deno.serve(async (req)=>{
           .filter((it: any) => it?.planned_workout?.training_plan_id || it?.training_plan_id)
           .map((it: any) => String(it?.date ?? '').slice(0, 10)),
       );
+      // ⛔ ONLY A DAY WITH NOTHING ON IT GETS A LINE (2026-09-19): a day with a session never prints "Rest", and the
+      // phone no longer has to decide which days are empty.
+      const datesWithItems = new Set((itemsWithPlannedWorkout as any[]).map((it: any) => String(it?.date ?? '').slice(0, 10)));
       const lines: Record<string, string> = {};
       for (let d = fromISO; d <= toISO; d = addDays(d, 1)) {
+        if (datesWithItems.has(d)) continue;
         lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: datesWithPlan.has(d) || !!trainingPlanContext, upcomingPlanStartsOn });
       }
       (responseData as any).empty_day_lines = lines;

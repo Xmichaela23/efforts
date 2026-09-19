@@ -169,7 +169,9 @@ export default function WeekGrid({
               <span className="text-white/75 w-9 shrink-0">{d.slice(0, 3)}</span>
               <span className="flex-1 min-w-0">
                 {ordered.length === 0 ? (
-                  <span className="text-white/40">—</span>
+                  // ⛔ THE SERVER NAMES THE REST DAY (2026-09-19, the week summary's `day_lines`); the dash stays only where
+                  // no summary came with the week.
+                  <span className="text-white/40">{summary?.day_lines?.[d] ?? '—'}</span>
                 ) : (
                   /* One span per session so each carries its own sport colour; the separator stays
                      neutral so the row still reads as one line, not a legend. */

@@ -94,6 +94,8 @@ export type EnduranceIntakeReadout = {
 export type WeekOneSummary = {
   training_days: number;
   rest_days: number;
+  /** "Rest" under each day with no session (server, 2026-09-19); days with a session are absent. */
+  day_lines?: Record<string, string>;
   lift_days: number;
   total_minutes: number;
   press_days_note: string | null;

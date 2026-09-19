@@ -1890,8 +1890,27 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         const d = w.day || 'Unscheduled';
                         groups[d] = groups[d] ? [...groups[d], w] : [w];
                       });
-                      const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
+                      // ⛔ THE REST DAYS ARE THE SERVER'S (2026-09-19): plan-overview names each day of the week with no session
+                      // and its line ("Rest"); the phone prints it and works out nothing.
+                      const restByDay: Record<string, { date: string | null; line: string }> = {};
+                      for (const r of ((selectedPlanDetail as any)?.overview?.weeks ?? []).find((x: any) => x?.week === selectedWeek)?.rest_days ?? []) {
+                        if (r?.day && !groups[r.day]) restByDay[r.day] = { date: r.date ?? null, line: String(r.line ?? '') };
+                      }
+                      const keys = dayOrder.filter(d => groups[d] || restByDay[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
                       return keys.map(day => {
+                        if (!groups[day] && restByDay[day]) {
+                          const rest = restByDay[day];
+                          const restDate = rest.date ? new Date(rest.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                          return (
+                            <div key={day} className="bg-white/[0.03] border border-white/12 rounded-xl overflow-hidden">
+                              <div className="px-3 py-2 text-sm font-medium text-white flex items-center gap-2">
+                                <span>{day}</span>
+                                {restDate && <span className="text-white/50 font-normal">{restDate}</span>}
+                              </div>
+                              <div className="px-3 pb-3 text-sm italic text-white/50">{rest.line}</div>
+                            </div>
+                          );
+                        }
                         // The server's `day_order` (plan-overview) lists the day.
                         const dayWorkouts = listByDayOrder(groups[day], dayOrderOf(selectedPlanDetail));
                         const firstWorkout = dayWorkouts[0];

@@ -29,6 +29,7 @@
 import { planHasStarted, resolvePlanWeekIndex, resolveWeekStartDowFromPlanConfig, weekStartOf } from './plan-week.ts';
 import { resolvePlanPhase } from './plan-phase.ts';
 import { resolvePlannedDurationSeconds } from './planned-duration.ts';
+import { REST_DAY_LINE } from './empty-day-line.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
@@ -43,6 +44,7 @@ export type PlanRowLike = {
 
 export type PlannedRowLike = {
   week_number?: number | null;
+  date?: string | null;
   type?: string | null;
   name?: string | null;
   tags?: unknown;
@@ -64,6 +66,11 @@ export type PlanWeekTotals = {
   miles: number | null;
   /** Sessions that are neither rest nor optional. */
   sessions: number;
+  /**
+   * The week's days with no session on them, each with its line — "Rest" (2026-09-19, `empty-day-line.ts`). A day the
+   * athlete marked off has no session, so it is here too. `date` is the day's date when the plan has a start date.
+   */
+  rest_days: { day: string; date: string | null; line: string }[];
 };
 
 export type PlanPhaseTotals = {
@@ -178,6 +185,40 @@ function sessionMinutes(s: Json, fromRow: boolean): number {
 }
 
 /** Every week's phase and totals, each phase's totals, and the plan's totals. */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MON_FIRST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+function isoPlusDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function dayNameOf(iso: string): string {
+  return DAY_NAMES[new Date(`${iso}T00:00:00Z`).getUTCDay()];
+}
+
+/**
+ * The days of plan week `w` with no session on them. A session's day is its row's date, else the plan's `day` word;
+ * a `type: 'rest'` row is a rest day, not a session.
+ */
+function restDaysOf(plan: PlanRowLike, w: number, sessions: Json[]): PlanWeekTotals['rest_days'] {
+  const busy = new Set<string>();
+  for (const s of sessions) {
+    if (String(s?.type ?? '').toLowerCase() === 'rest') continue;
+    const iso = typeof s?.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s.date) ? s.date.slice(0, 10) : null;
+    const day = iso ? dayNameOf(iso) : (typeof s?.day === 'string' ? s.day : null);
+    if (day) busy.add(day);
+  }
+  if (busy.size === 0) return [];  // a week with nothing in it is not a week of rest days; it is an unbuilt week
+  const start = planStartsOn(plan);
+  const dates: Record<string, string> = {};
+  if (start) for (let i = 0; i < 7; i += 1) { const d = isoPlusDays(start, (w - 1) * 7 + i); dates[dayNameOf(d)] = d; }
+  // A day before the plan's own first day is not one of its rest days.
+  const opens = String(plan?.config?.user_selected_start_date || plan?.config?.start_date || '').slice(0, 10);
+  return MON_FIRST
+    .filter((d) => !busy.has(d) && !(dates[d] && /^\d{4}-\d{2}-\d{2}$/.test(opens) && dates[d] < opens))
+    .map((d) => ({ day: d, date: dates[d] ?? null, line: REST_DAY_LINE }));
+}
+
 export function buildPlanOverview(args: {
   plan: PlanRowLike;
   rows: PlannedRowLike[] | null | undefined;
@@ -213,7 +254,7 @@ export function buildPlanOverview(args: {
     }
     const summary = summaries[String(w)] ?? {};
     const miles = typeof summary?.total_miles === 'number' && Number.isFinite(summary.total_miles) ? summary.total_miles : null;
-    weeks.push({ week: w, phase: planPhaseWord(plan, w), minutes, training_minutes: training, miles, sessions: count });
+    weeks.push({ week: w, phase: planPhaseWord(plan, w), minutes, training_minutes: training, miles, sessions: count, rest_days: restDaysOf(plan, w, sessions) });
   }
 
   const phases: PlanPhaseTotals[] = [];
