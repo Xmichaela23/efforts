@@ -20,7 +20,7 @@
 // code (`_shared/plan-refresh.ts` → `rematerialize-standing-block` on the job queue), so the plan is rewritten
 // once, not twice. The per-row loop, its 29-call budget and its hand-off to a fresh request are deleted with it.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { isRefreshable, queuePlanRefresh } from '../_shared/plan-refresh.ts';
+import { athleteToday, isRefreshable, queuePlanRefresh } from '../_shared/plan-refresh.ts';
 import { requireUser } from '../_shared/require-user.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import { STANDING_PLAN_PROTOCOL_ID } from '../_shared/standing-plan/index.ts';
@@ -51,11 +51,12 @@ Deno.serve(async (req: Request) => {
     const p = await req.json().catch(() => ({}));
     const willWrite = p?.apply === true;
     const decision: 'accept' | 'keep' = p?.decision === 'keep' ? 'keep' : 'accept';
-    const today = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : new Date().toISOString().slice(0, 10);
-
     const url = Deno.env.get('SUPABASE_URL')!;
     const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(url, key, { global: { headers: { Authorization: `Bearer ${key}` } } });
+    // ⛔ THE ATHLETE'S DAY, NOT UTC (2026-09-18) — the plan week, whether the checkpoint is due, and the count of
+    // sessions a re-price updates, on the same day the refresh uses (`athleteToday`). `as_of` still wins.
+    const today = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : await athleteToday(supabase, userId);
 
     // ── THE BLOCK ──────────────────────────────────────────────────────────
     let planQ = supabase.from('plans').select('id, name, config, duration_weeks, status').eq('user_id', userId);

@@ -1814,7 +1814,8 @@ Deno.serve(async (req)=>{
      * not arrived, which is the only case that names a date.
      */
     try {
-      const todayISO = new Date().toISOString().slice(0, 10);
+      // ⛔ The athlete's day, not UTC (2026-09-18): at 6 pm Pacific today is not yet a past day on Today.
+      const todayISO = await athleteToday(supabase, userId);
       const { data: allPlans } = await supabase.from('plans')
         .select('config,status').eq('user_id', userId).eq('status', 'active');
       const starts = (Array.isArray(allPlans) ? allPlans : [])
