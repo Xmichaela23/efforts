@@ -21,11 +21,46 @@
  * ⚠️ EVERY LINE HERE IS THE PAGE'S WORDS (2026-09-18). Changing one changes it on Today AND in the drawer, and a
  * change is a new quote off the page, never a rewording.
  */
+import { FAMILIES } from '../endurance-library/source-rules.ts';
+
+/**
+ * ⛔ THE FIVE HARD FAMILIES WHOSE TITLE IS THE WORKOUT'S OWN NAME (Michael approved 2026-09-19). The session's title is
+ * the option's `label` in `endurance-library/source-rules.ts` ("Surge and Float"); the small line under it is the
+ * family's `label` there, the book's heading without the bracketed abbreviation ("Maximal Lactate Steady State",
+ * p231). Both are read from that one file — the row's `name` is written from it (`session-vocabulary.ts`), and every
+ * screen and send reads the type through `sessionTypeFor` below. Other families keep their plain names.
+ */
+export const NAMED_WORKOUT_FAMILIES: readonly string[] = ['run_mlss', 'run_near_threshold', 'ride_anaerobic', 'ride_vo2', 'ride_sweet_spot'];
+
+/** The type line for a family ("Maximal Lactate Steady State"), or null for a family that prints none. */
+export function sessionTypeForFamily(family: string | null | undefined): string | null {
+  if (!family || !NAMED_WORKOUT_FAMILIES.includes(family)) return null;
+  return (FAMILIES as Record<string, { label?: string }>)[family]?.label ?? null;
+}
+
+/** The type line for a planned row, off its `family:` tag. */
+export function sessionTypeFor(row: { tags?: unknown } | null | undefined): string | null {
+  const tags = Array.isArray(row?.tags) ? (row!.tags as unknown[]).map(String) : [];
+  const fam = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null;
+  return sessionTypeForFamily(fam);
+}
+
+/**
+ * The description a device receives (Garmin, Intervals.icu / Zwift): the type line, then the description, one per
+ * line — the order Today and the session sheet print them.
+ */
+export function sendDescription(row: { tags?: unknown; description?: unknown } | null | undefined): string {
+  const desc = typeof row?.description === 'string' ? row.description : '';
+  const type = sessionTypeFor(row);
+  return [type, desc].filter((x) => x && String(x).trim()).join('\n');
+}
+
 /**
  * ⛔⛔ EVERY LINE IS THE PAGE'S OWN WORDS (2026-09-18, book-language pass 2 — Michael's rule: "no paraphrasing; quote
  * the book's words; if a line must be shorter, cut the book's words down, never reword them"). Read off the page
  * photographs (book-sources/viada-hybrid-athlete/p231.jpg … p239.jpg). Where a line is shorter than the page, words
  * were dropped and the order kept; the full sentence is quoted beside it.
+ * ⚠️ ONE EXCEPTION: `run_mlss` is a rewording of p231 that Michael approved word for word (2026-09-19).
  */
 export const FAMILY_LINE: Readonly<Record<string, string>> = {
   // p237: "With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor
@@ -33,9 +68,10 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   ride_anaerobic: 'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
   // p239: "60- to 100-minute easy ride below 75%" — the length is the row's own, so it is cut.
   ride_endurance: 'Easy ride below 75%.',
-  // p231: "Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized
-  // fatigue." It printed p233's near-threshold sentence until 2026-09-18 (audit item 14).
-  run_mlss: 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.',
+  // p231, reworded (Michael approved the words 2026-09-19): "The objective is accruing maximum time with equalized
+  // fatigue." and "Note that athletes may perform any of these work intervals on hills and adjust pace accordingly to
+  // maintain target intensity." One line, both sentences; the separate hills note is gone.
+  run_mlss: 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.',
   // p233, whole (pass 5, 2026-09-18: it was cut to its first and last words): "Workouts that maximize time
   // near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are
   // designed to maximize total time spent at this intensity while controlling fatigue."
@@ -104,12 +140,6 @@ export const RUN_VT1_DRAWER_NOTE = 'The precise percentage of threshold that an 
  * modified extensively depending on your needs and the training conditions."
  */
 export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively depending on your needs and the training conditions.';
-
-/**
- * ⛔ THE MLSS HILLS NOTE, IN THE DRAWER AFTER THE LINE. p231: "Note that athletes may perform any of these work
- * intervals on hills and adjust pace accordingly to maintain target intensity." — "Note that" cut.
- */
-export const RUN_MLSS_DRAWER_NOTE = 'Athletes may perform any of these work intervals on hills and adjust pace accordingly to maintain target intensity.';
 
 /**
  * ⛔ THE ERG LINE ON THE ANAEROBIC RIDE, IN THE SESSION NOTE AFTER THE FAMILY LINE (Michael approved these exact words,

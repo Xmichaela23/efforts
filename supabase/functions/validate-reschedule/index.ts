@@ -16,6 +16,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { getRescheduleEngine } from '../_shared/coaching/index.ts';
 import { buildTimeline, findDayIndex } from './timeline-builder.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
+import { sessionTypeFor } from '../_shared/standing-plan/family-lines.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,8 @@ function isLongSession(workout: any): boolean {
   // Check plan tags/description first
   const desc = String(workout.description || '').toLowerCase();
   const name = String(workout.name || '').toLowerCase();
-  if (desc.includes('long') || name.includes('long')) {
+  // ⚠️ NOT ON A HARD WORKOUT (2026-09-19): "Long Surge and Float" is titled by its workout's name and is not the long session.
+  if ((desc.includes('long') || name.includes('long')) && sessionTypeFor(workout) == null) {
     return true;
   }
   

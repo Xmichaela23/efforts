@@ -40,9 +40,11 @@ Deno.test('⛔ THE PAGE IS THE NARROWEST TRUE ONE, NOT THE PROGRAMME\'S FOR EVER
    */
   const s = week('all_rounder', 2).sessions;
   const by = (n: string) => s.find((x) => x.name === n)?.cite;
-  assertEquals(by('Hard Run'), 'Viada pp231-232');
-  assertEquals(by('Near-threshold Run'), 'Viada pp233-234');
-  assertEquals(by('Anaerobic Ride'), 'Viada p237');
+  // The hard sessions are titled by their workout's own name since 2026-09-19, so they are found by family.
+  const byFamily = (f: string) => s.find((x) => (x.tags ?? []).includes(`family:${f}`))?.cite;
+  assertEquals(byFamily('run_mlss'), 'Viada pp231-232');
+  assertEquals(byFamily('run_near_threshold'), 'Viada pp233-234');
+  assertEquals(byFamily('ride_anaerobic'), 'Viada p237');
   assertEquals(by('Long Run'), 'Viada p235');
   assertEquals(by('Plyo warm-up'), 'Viada p227');
   // ⛔ AND THE LIFTING DAYS DO take the programme's page, because that is genuinely where they come

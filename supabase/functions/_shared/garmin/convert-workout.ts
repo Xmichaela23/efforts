@@ -6,6 +6,7 @@ import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
 import { singleTargetBand } from '../plan-tokens/quality-work.ts'
 import { oneSidedPowerText } from '../ride-power.ts'
+import { sendDescription } from '../standing-plan/family-lines.ts'
 import { judgedPowerRange, shownPowerRange } from '../ride-power.ts'
 
 
@@ -829,7 +830,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
    * ⛔ AND WITH A RUN, THE SAME WAY (2026-09-18, book-language pass 4, audit §4): the talk test (p235), the MLSS hills
    * line (p231), the race-tempo sentence (p247) and the run test's protocol (p210) stayed in the app. Swims unchanged.
    */
-  const sessionNote = sport === 'CYCLING' || sport === 'RUNNING' ? String((workout as any)?.description ?? '').trim() : ''
+  // ⛔ THE TYPE LINE LEADS IT (2026-09-19) — "Maximal Lactate Steady State", then the description (`sendDescription`).
+  const sessionNote = sport === 'CYCLING' || sport === 'RUNNING' ? sendDescription(workout as any).trim() : ''
   return {
     workoutName: workout.name,
     ...(sessionNote ? { description: sessionNote } : {}),

@@ -12,6 +12,7 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { VENUE_LABEL } from '@shared/session-swap/copy.ts';
 import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
+import { sessionTypeFor } from '@shared/standing-plan/family-lines.ts';
 import type { SpacingLine } from '@shared/standing-plan/spacing-line.ts';
 import {
   liftLinesFor,
@@ -411,7 +412,9 @@ export const SessionCard: React.FC<{
   emphasis?: CardEmphasis;
   onOpen?: () => void;
   venueLabel?: string | null;
-}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, onOpen }) => {
+  /** The type under the title ("Maximal Lactate Steady State"); the time joins it there instead of the name line. */
+  typeLine?: string | null;
+}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, typeLine, onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
   return (
@@ -439,12 +442,18 @@ export const SessionCard: React.FC<{
             </span>
           ) : null}
         </div>
-        {meta ? (
+        {meta && !typeLine ? (
           <div className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
             {meta}
           </div>
         ) : null}
       </div>
+      {/* ⛔ THE TYPE LINE, UNDER THE WORKOUT'S NAME, WITH THE TIME (2026-09-19): "Maximal Lactate Steady State · 39:00". */}
+      {typeLine ? (
+        <div className="text-footnote tabular-nums" style={{ marginTop: 2, color: 'var(--label-secondary)' }}>
+          {meta ? `${typeLine} · ${meta}` : typeLine}
+        </div>
+      ) : null}
       {lines.map((line, i) => (
         <div
           key={line}
@@ -673,6 +682,7 @@ const TodaySession: React.FC<{
       sport={sport}
       emphasis={emphasis}
       venueLabel={VENUE_LABEL[venueOf(session as never) ?? ''] ?? null}
+      typeLine={sessionTypeFor(session as never)}
       onOpen={onOpen}
     />
   );

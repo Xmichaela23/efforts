@@ -31,6 +31,7 @@
 // Run: deno test --no-check --allow-read supabase/functions/_shared/standing-plan/fuzz-builder.test.ts
 // ============================================================================
 
+import { sessionTypeFor } from './family-lines.ts';
 import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   FRAMES,
@@ -586,7 +587,7 @@ function checkComposer(c: Case): string[] {
     //    moves. Criterion 2 already covers where it may not go.
     const isEnd = isEndurance;
     if (c.longDay && !c.blocked.includes(c.longDay)) {
-      const long = ss.find((s) => isEnd(s) && /long/i.test(s.name));
+      const long = ss.find((s) => isEnd(s) && /long/i.test(s.name) && sessionTypeFor(s as never) == null);  // not "Long VO2 Repeats"
       if (long && long.day !== c.longDay) {
         fails.push(`week ${wk}: long pinned ${c.longDay}, landed ${long.day}`);
       }

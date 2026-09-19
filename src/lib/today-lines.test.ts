@@ -145,7 +145,7 @@ Deno.test('each named family gets its line, and only that line — the page\'s o
 });
 
 Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p233 for near-threshold (2026-09-18)', () => {
-  assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
+  assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
   assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
 });
 

@@ -167,8 +167,8 @@ Deno.test('⛔ p238 VO2 and p236 sprints at level 1 build the page and reach the
 
 Deno.test('⛔ the one-fewer-ride week leaves out the Day 2 easy ride and nothing else, in both columns', () => {
   const expectAll = {
-    standard: ['Monday|Hard Ride', 'Tuesday|Ride', 'Wednesday|VO2 Ride', 'Wednesday|Hard Ride', 'Friday|Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
-    taper: ['Monday|Hard Ride', 'Tuesday|Ride', 'Wednesday|VO2 Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
+    standard: ['Monday|Medium Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Short VO2 Repeats', 'Wednesday|Medium Sweet Spot Repeats', 'Friday|Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
+    taper: ['Monday|Long Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Micro-Intervals', 'Friday|Sprint Ride', 'Saturday|Ride'],
   };
   for (const [week, column] of [[2, 'standard'], [3, 'taper']] as const) {
     const all = composeWeek(baseArgs(week, column) as never);

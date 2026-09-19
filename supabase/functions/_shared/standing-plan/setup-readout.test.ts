@@ -2,6 +2,7 @@
 // THE SETUP BLOCK — rows, defaults, options and words the server sends the plan setup (2026-09-13).
 //   deno test --allow-read --no-check supabase/functions/_shared/standing-plan/setup-readout.test.ts
 // ============================================================================
+import { sessionTypeFor } from './family-lines.ts';
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { setupBlock } from './setup-readout.ts';
 import { defaultViadaPicks, picksForFrame } from './accessory-picks.ts';
@@ -72,8 +73,8 @@ Deno.test('⛔ Rides screen and runs screen — rows and words from the server',
   // ⛔ p278's Standard column (2026-09-18, book-language pass 4): seven rides; one fewer drops Day 2's easy ride.
   assertEquals(ride.default_count, 7);
   assertEquals(ride.counts.map((c) => [c.label, c.rows.map((r) => r.line)]), [
-    ['Six rides', ['Day 1 · Hard Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
-    ['Seven rides', ['Day 1 · Hard Ride', 'Day 2 · Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Six rides', ['Day 1 · Sweet Spot', 'Day 3 · VO2', 'Day 3 · Sweet Spot', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Seven rides', ['Day 1 · Sweet Spot', 'Day 2 · Ride', 'Day 3 · VO2', 'Day 3 · Sweet Spot', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
   ]);
   // The screen and the composed week agree, both counts (this pin moved here from the phone's test).
   const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
@@ -84,7 +85,9 @@ Deno.test('⛔ Rides screen and runs screen — rows and words from the server',
       workingNumbers: {}, baselines: { performance_numbers: { ftp: 250 } },
       sportMix: { runs: 0, rides: 5, swimDays: 0, rideCount: c.count },
     } as never);
-    assertEquals(w.sessions.filter((s) => s.type === 'ride').map((s) => s.name), c.rows.map((r) => r.line.split(' · ')[1]));
+    // The hard rides are titled by their workout's own name, which rotates week to week (2026-09-19); the wizard row names
+    // the type, so a hard ride is compared by its type.
+    assertEquals(w.sessions.filter((s) => s.type === 'ride').map((s) => sessionTypeFor(s) ?? s.name), c.rows.map((r) => r.line.split(' · ')[1]));
   }
   assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).ride_strength_week, null);
   const run = enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).run_strength_week!;

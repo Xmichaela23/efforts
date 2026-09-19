@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, NAMED_WORKOUT_FAMILIES, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, wrapperToken } from '../endurance-library/index.ts';
 
@@ -434,25 +434,30 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
    * another family's session name, which is the rule the cues test now enforces. What could not
    * stand was one WORD naming two different sessions.
    */
-  run_mlss: 'Hard Run',
-  run_near_threshold: 'Near-threshold Run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+  /**
+   * ⛔ THE FIVE HARD FAMILIES ARE NAMED BY THEIR TYPE HERE (2026-09-19) — read from `FAMILIES[…].label`, the book's
+   * heading, never a second copy. A built row's title is its workout's own name (`translateEnduranceSession`); this
+   * is the name where no workout is known yet (the wizard's ride rows).
+   */
+  run_mlss: FAMILIES.run_mlss.label,
+  run_near_threshold: FAMILIES.run_near_threshold.label,
   run_vt1: 'Easy Run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
   run_lsd: 'Long Run',
   // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
   // says "sweet spot" or "MLSS" at an athlete, and the description carries the intensity.
-  ride_sweet_spot: 'Hard Ride',
+  ride_sweet_spot: FAMILIES.ride_sweet_spot.label,
   /**
    * ⛔ p237'S OWN WORD, and it has to differ from the sweet-spot label or the week shows two rows
    * called "Hard Ride" that are 90% and 110%+ of FTP. ⚠️ "Anaerobic" is the source's term for the
    * session, not a coined one; the register rule bans OUR jargon ("sweet spot", "MLSS"), not his
    * name for a session.
    */
-  ride_anaerobic: 'Anaerobic Ride',
+  ride_anaerobic: FAMILIES.ride_anaerobic.label,
   /**
    * ⚠️ PROPOSED, NOT APPROVED (2026-09-13) — the names for p278's two new rides, each p236/p238's own
    * heading word. Without them both fell through to "Ride", the easy ride's name. Held for Michael.
    */
-  ride_vo2: 'VO2 Ride',
+  ride_vo2: FAMILIES.ride_vo2.label,
   ride_sprints: 'Sprint Ride',  // not-instruction: session name; no page names it; Michael's call
   ride_endurance: 'Ride',
   swim_endurance: 'Easy Swim',  // not-instruction: session name; no page names it; Michael's call
@@ -823,7 +828,15 @@ export function translateEnduranceSession(
       throw new Error(`no session-vocabulary translation for family: ${session.family}`);
   }
 
-  const label = FAMILY_LABEL[session.family] ?? (sport === 'ride' ? 'Ride' : sport === 'swim' ? 'Swim' : 'Run');
+  /**
+   * ⛔ THE FIVE HARD FAMILIES ARE TITLED BY THE WORKOUT'S OWN NAME (Michael approved 2026-09-19) — the option's `label`
+   * in `source-rules.ts` ("Surge and Float"). The type prints under it, read off the `family:` tag
+   * (`family-lines.ts` `sessionTypeFor`). Every other family keeps its plain name.
+   */
+  const workoutName = NAMED_WORKOUT_FAMILIES.includes(session.family)
+    ? FAMILIES[session.family]?.archetypes?.find((a) => a.id === session.archetype)?.label
+    : undefined;
+  const label = workoutName ?? FAMILY_LABEL[session.family] ?? (sport === 'ride' ? 'Ride' : sport === 'swim' ? 'Swim' : 'Run');
   const raceTempo = opts?.raceTempo === true;
   /**
    * ⛔⛔ THE RACE-TEMPO ROW BUILDS WHAT ITS SENTENCE SAYS (2026-09-18, book-language pass 4, audit item 22). p247: "If
@@ -897,8 +910,7 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);
   // ⛔ p237 — the ERG line on the anaerobic ride, after its line (Michael's words, 2026-09-18, round 4; `family-lines.ts`).
   if (session.family === 'ride_anaerobic') parts.push(RIDE_ANAEROBIC_DRAWER_NOTE);
-  // ⛔ p231 — the hills note, after the MLSS line, in the drawer only. One owner: `family-lines.ts`.
-  if (session.family === 'run_mlss') parts.push(RUN_MLSS_DRAWER_NOTE);
+  // p231's hills sentence is part of the MLSS line itself since 2026-09-19 (`family-lines.ts`), on Today and here.
   // ⛔ p235's own sentences for the easy and the long run, in the drawer after the line (pass 5, 2026-09-18).
   if (session.family === 'run_vt1') parts.push(RUN_VT1_DRAWER_NOTE);
   if (session.family === 'run_lsd') parts.push(RUN_LSD_DRAWER_NOTE);

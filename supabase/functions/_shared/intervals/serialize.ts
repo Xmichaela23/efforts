@@ -17,6 +17,7 @@
 //   category WORKOUT · start_date_local `YYYY-MM-DDT00:00:00` · type · name · description · external_id
 
 import { oneSidedPowerText, shownPowerRange } from '../ride-power.ts';
+import { sendDescription } from '../standing-plan/family-lines.ts';
 
 export class IntervalsSerializeError extends Error {
   constructor(message: string) {
@@ -42,6 +43,7 @@ type PlannedRideRow = {
   type: string;
   name?: string | null;
   description?: string | null;
+  tags?: unknown;
   computed?: { steps?: unknown; anchors?: { ftp_w?: unknown } | null } | null;
 };
 
@@ -131,7 +133,8 @@ export function serializeRide(row: PlannedRideRow): IntervalsEvent {
   }
 
   const lines = steps.map((s, i) => stepLine(s, i, ftp));
-  const note = String(row.description ?? '').trim();
+  // ⛔ THE TYPE LINE LEADS THE NOTE (2026-09-19) — the order Today and the session sheet print them (`sendDescription`).
+  const note = sendDescription(row).trim();
   // A line that does not start with "-" is a heading; a heading ending in "Nx" starts a repeat.
   if (note && note.split('\n').some((l) => /\b\d+x\s*$/i.test(l.trim()))) {
     throw new IntervalsSerializeError(`planned workout ${row.id}: session note has a line ending in "Nx", which Intervals would read as a repeat`);

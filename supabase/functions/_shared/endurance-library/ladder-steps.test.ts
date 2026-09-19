@@ -51,9 +51,9 @@ Deno.test('⛔ THE RECOVERY FALLS WITH THE WORK — two thirds, exactly', () => 
    * ⚠️ EXACTLY TWO THIRDS, NOT 0.67. The rounded constant put 121 seconds where the source's step is
    * two minutes, and a ladder is the one shape where every step is read individually.
    */
-  assertEquals(recoveries(1), [120, 80, 40, 30], 'the ladder recoveries are no longer two-thirds of the work');
-  // ⛔ AND THE LAST RUNG HAS NO TRAILING RECOVERY — it runs into the cooldown, not into a rest step.
-  assertEquals(recoveries(1).length, rungs(1).length - 1);
+  assertEquals(recoveries(1), [120, 80, 40, 30, 20], 'the ladder recoveries are no longer two-thirds of the work');
+  // ⛔ AND THE LAST RUNG KEEPS ITS RECOVERY (2026-09-19) — p232 prints "20 seconds @ 60%" before the cool-down.
+  assertEquals(recoveries(1).length, rungs(1).length);
 });
 
 Deno.test('⛔ IT IS NOT DOSE-DRIVEN ANY MORE — the same ladder whatever the week asks for', () => {

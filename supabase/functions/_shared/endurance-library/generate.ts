@@ -819,8 +819,9 @@ function buildDescending(ctx: BuildContext): Block[] {
       round.forEach((work, i) => {
         steps.push(step('work', `Rung ${i + 1}`, work, a.work, sport, anchor));
         const rest = recoveryStep(a, work, sport, anchor);
-        // ⚠️ THE LAST RUNG OF THE LAST ROUND ENDS THE BLOCK — no trailing recovery into the cooldown.
-        if (rest && !(r === rounds.length - 1 && i === round.length - 1)) steps.push(rest);
+        // ⛔ EVERY RUNG KEEPS ITS RECOVERY, THE LAST ONE TOO (2026-09-19) — p232 prints "20 seconds @ 60%" at the end
+        // of each round, the final one included, before the cool-down.
+        if (rest) steps.push(rest);
       });
       if (r < rounds.length - 1 && a.ladderRoundRest) {
         steps.push(step('recovery', 'Between rounds', a.ladderRoundRest, { kind: 'easy' }, sport, anchor));

@@ -111,7 +111,7 @@ const built = (family: string, level: 1 | 2 | 3, archetype: string, opts?: { rac
 };
 
 Deno.test('each family line is the page\'s own words (p231, p233, p235, p237, p238, p239)', () => {
-  assertEquals(familyLineFor('run_mlss'), 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
+  assertEquals(familyLineFor('run_mlss'), 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
   assertEquals(familyLineFor('run_near_threshold'), 'Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling fatigue.');
   assertEquals(familyLineFor('ride_sweet_spot'), 'These workouts are intended to push you as close as possible to threshold without exceeding it, giving you plenty of time in the zone with far less fatigue than you would experience riding at or above.');
   assertEquals(familyLineFor('ride_endurance', 'steady'), 'Easy ride below 75%.');

@@ -105,6 +105,7 @@ import {
  * is untouched. The two screens sit in one file and read two different tables on purpose.
  */
 import type { ViadaAccessoryPrefs, ViadaPickKey } from '@shared/standing-plan/accessory-picks.ts';
+import { sessionTypeFor } from '@shared/standing-plan/family-lines.ts';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import {
   PULLUP_TEST_PROMPT, pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor,
@@ -2755,8 +2756,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
        * target would be a shortfall note about two different sessions.
        */
       const wantType = scheduleRunShown ? 'run' : 'ride';
+      // ⚠️ A HARD WORKOUT NAMED "Long …" ("Long VO2 Repeats", 2026-09-19) is not the long session — skipped by its type.
       const longSession = (previewWeek ?? []).find((x) =>
         /Long/i.test(String((x as { name?: string }).name ?? ''))
+        && sessionTypeFor(x as never) == null
         && String((x as { type?: string }).type ?? '') === wantType);
       const target = Number((longSession as { duration?: number } | undefined)?.duration ?? 0);
       const shortBy = target - state.longClubMinutes;

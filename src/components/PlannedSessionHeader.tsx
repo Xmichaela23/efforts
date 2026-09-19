@@ -3,6 +3,7 @@ import { SPORT_COLORS } from '@/lib/context-utils';
 // ⛔ ONE VOCABULARY (D-403). See `src/lib/discipline.ts`.
 import { normalizeSessionType } from '@/lib/discipline';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+import { sessionTypeFor } from '@shared/standing-plan/family-lines.ts';
 // ⛔ ONE TAG-KEYED SEAM between the wire type and what an athlete sees — the plyo day's colour.
 // The calendar already colours by it.
 import { displayDisciplineOf } from '@/lib/utils';
@@ -150,6 +151,12 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
    * others is exactly the divergence this file was written to end.
    */
   const duration = formatSessionDuration(w);
+  /**
+   * ⛔ THE TYPE LINE (2026-09-19). A hard run or ride is titled by its workout's own name ("Surge and Float"); the
+   * type prints small under it with the time — "Maximal Lactate Steady State · 39:00" — and the description below.
+   * Read off the row's `family:` tag through the shared file the server writes from.
+   */
+  const typeLine = sessionTypeFor(w);
 
   const titleSize = size === 'card' ? 'text-body' : 'text-body';
   const descSize = size === 'card' ? 'text-footnote' : 'text-subhead';
@@ -168,15 +175,22 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
           {title}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {duration ? (
+          {duration && !typeLine ? (
             <span className="text-caption font-normal tabular-nums" style={{ color: 'var(--label-secondary)' }}>
               {duration}
             </span>
           ) : null}
-          {durationExtra}
+          {typeLine ? null : durationExtra}
           {action}
         </div>
       </div>
+
+      {typeLine ? (
+        <div className="flex items-center gap-2 text-caption font-normal tabular-nums" style={{ color: 'var(--label-secondary)' }}>
+          <span>{duration ? `${typeLine} · ${duration}` : typeLine}</span>
+          {durationExtra}
+        </div>
+      ) : null}
 
       {/* ⛔ ROW 2 — THE DESCRIPTION, ONCE. */}
       {description ? (

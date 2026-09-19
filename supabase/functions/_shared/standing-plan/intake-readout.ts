@@ -232,6 +232,14 @@ export function enduranceIntakeReadout(args: {
     };
   })();
 
+  // ⛔ A RIDE ROW IS NAMED THE WAY THE BUILT ROW WILL BE (2026-09-19): the workout's own name when the frame names one,
+  // its type otherwise. Both read from `source-rules.ts` through `FAMILY_LABEL` / the option's label.
+  const rideRowName = (family: string, archetype: string | null): string => {
+    const a = archetype
+      ? (FAMILIES as Record<string, { archetypes?: { id: string; label?: string }[] }>)[family]?.archetypes?.find((x) => x.id === archetype)
+      : null;
+    return a?.label ?? (FAMILY_LABEL as Record<string, string>)[family] ?? '';
+  };
   const rideStrengthWeek = (() => {
     const f = FRAMES[frame];
     const fewer = f?.fewerRidesDropsSlot;
@@ -241,7 +249,7 @@ export function enduranceIntakeReadout(args: {
       .filter((row) => !(count === fewer.rideCount && row.frameKey === `${fewer.day}:${fewer.index}`))
       .map((row) => ({
         key: row.key,
-        line: fill(RIDES_COPY.row, { day: row.frameDay, name: (FAMILY_LABEL as Record<string, string>)[row.family] ?? '' }),
+        line: fill(RIDES_COPY.row, { day: row.frameDay, name: rideRowName(row.family, row.archetype ?? null) }),
       }));
     return {
       count_label: RIDES_COPY.count_label,

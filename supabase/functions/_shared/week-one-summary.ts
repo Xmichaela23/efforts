@@ -7,6 +7,7 @@
  * The sentences are moved from `WeekGrid.tsx` word for word. Nothing is added.
  */
 import { WEEK_DAYS, isEnduranceSession, type WeekSession } from '../../../src/lib/week-budget.ts';
+import { sessionTypeFor } from './standing-plan/family-lines.ts';
 
 export type WeekOneSummary = {
   training_days: number;
@@ -51,7 +52,9 @@ export function weekOneSummary(
   const balanceNote = (() => {
     if (compromiseCount > 0) return null;
     const endur = sessions.filter(isEnduranceSession);
-    const hardN = endur.filter((s) => /^Hard\b/i.test(String(s.name ?? ''))).length;
+    // ⛔ HARD BY ITS FAMILY (2026-09-19): the hard sessions are titled by their workout's own name now ("Surge and
+    // Float"), so the old "Hard …" name test is kept only for rows with no family tag.
+    const hardN = endur.filter((s) => sessionTypeFor(s) != null || /^Hard\b/i.test(String(s.name ?? ''))).length;
     const longest = endur.reduce<WeekSession | null>(
       (a, s) => ((Number(s.duration) || 0) > (Number(a?.duration) || 0) ? s : a), null);
     const hasLong = !!longest && (Number(longest.duration) || 0) >= LONG_SESSION_MIN;

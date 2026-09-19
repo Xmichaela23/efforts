@@ -19,18 +19,18 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       tags: standing_plan, test_week, 1rm_test
       ME     Bench Press                    -x6, 5, max  @               | how-to · note: Perform the maximum number of repetitions possible with this weight.
       ME     Overhead Press                 -x6, 5, max  @               | how-to · note: Perform the maximum number of repetitions possible with this weight.
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Test: Lower   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
       ME     Back Squat                     -x6, 5, max  @               | how-to · note: Perform the maximum number of repetitions possible with this weight.
       ME     Deadlift                       -x6, 5, max  @               | how-to · note: Perform the maximum number of repetitions possible with this weight.
-  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 37 min
+  [Wednesday] run      Short Threshold Repeats — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -67,7 +67,7 @@ WEEK 02  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 34 min
+  [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -75,13 +75,13 @@ WEEK 02  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 33 min
+  [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 31 min
+  [Wednesday] run      Race-Specific Repeats — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -117,7 +117,7 @@ WEEK 03  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 41 min
+  [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -125,13 +125,13 @@ WEEK 03  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 46 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 40 min
+  [Wednesday] run      Sub-Threshold Repeats — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -167,7 +167,7 @@ WEEK 04  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -175,13 +175,13 @@ WEEK 04  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 38 min
+  [Wednesday] run      Long Sub-Threshold Repeats — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -217,7 +217,7 @@ WEEK 05  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -225,13 +225,13 @@ WEEK 05  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 33 min
+  [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 46 min
+  [Wednesday] run      Threshold with a Surge — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -267,7 +267,7 @@ WEEK 06  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 34 min
+  [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -275,13 +275,13 @@ WEEK 06  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 46 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 48 min
+  [Wednesday] run      Surge into Steady — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -317,7 +317,7 @@ WEEK 07  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 41 min
+  [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -325,13 +325,13 @@ WEEK 07  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 37 min
+  [Wednesday] run      Short Threshold Repeats — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -367,7 +367,7 @@ WEEK 08  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -375,13 +375,13 @@ WEEK 08  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 33 min
+  [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 31 min
+  [Wednesday] run      Race-Specific Repeats — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -417,7 +417,7 @@ WEEK 09  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -425,13 +425,13 @@ WEEK 09  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 46 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 40 min
+  [Wednesday] run      Sub-Threshold Repeats — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -467,7 +467,7 @@ WEEK 10  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 34 min
+  [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -475,13 +475,13 @@ WEEK 10  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 38 min
+  [Wednesday] run      Long Sub-Threshold Repeats — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -517,7 +517,7 @@ WEEK 11  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 41 min
+  [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -525,13 +525,13 @@ WEEK 11  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 33 min
+  [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 46 min
+  [Wednesday] run      Threshold with a Surge — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
@@ -567,7 +567,7 @@ WEEK 12  column=standard
       HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Monday] run      Hard Run — 30 min
+  [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
@@ -575,13 +575,13 @@ WEEK 12  column=standard
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Anaerobic Ride — 46 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
       -      Hopscotch                      1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.
-  [Wednesday] run      Near-threshold Run — 48 min
+  [Wednesday] run      Surge into Steady — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to

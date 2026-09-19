@@ -102,14 +102,14 @@ Deno.test('⛔⛔ THE SWEEP — every tap builds as tapped, and every stacked da
         if (s.type !== 'strength' && blockedSet.has(s.day)) throw new Error(`${tag}: ${s.name} built on the day off ${s.day}`);
       }
       // 2. an unblocked long tap lands on its day
-      const longS = sessions.filter((s) => s.type !== 'strength' && /Long/i.test(s.name) || (s.type === 'ride' && s.name === 'Ride' && s.day === long));
+      const longS = sessions.filter((s) => s.type !== 'strength' && /Long/i.test(s.name) && !HARD_FAMILIES.has(familyOf(s)) || (s.type === 'ride' && s.name === 'Ride' && s.day === long));
       if (!blockedSet.has(long)) assert(longS.some((s) => s.day === long), `${tag}: long ${longSlotSport} missed its tapped day`);
       // 3. an unblocked hard tap lands on its day, as a hard session
       const hardS = sessions.filter((s) => HARD_FAMILIES.has(familyOf(s)));
       hard.forEach((h) => { if (h && !blockedSet.has(h)) assert(hardS.some((s) => s.day === h), `${tag}: hard tap on ${h} not honoured`); });
       // 4. two hard/long anchors on one day → a two_hard_one_day compromise naming that day
       const anchorsByDay = new Map<string, number>();
-      for (const s of [...hardS, ...sessions.filter((s) => s.type !== 'strength' && /Long/i.test(s.name))]) anchorsByDay.set(s.day, (anchorsByDay.get(s.day) ?? 0) + 1);
+      for (const s of [...hardS, ...sessions.filter((s) => s.type !== 'strength' && /Long/i.test(s.name) && !HARD_FAMILIES.has(familyOf(s)))]) anchorsByDay.set(s.day, (anchorsByDay.get(s.day) ?? 0) + 1);
       for (const [d, k] of anchorsByDay) {
         if (k < 2) continue;
         const c = compromises.find((x) => x.rule === 'two_hard_one_day' && (x.days ?? []).includes(d));
@@ -144,6 +144,8 @@ Deno.test('the device case, 2026-09-03: long ride Saturday, nothing tapped — t
   const ride = (week.sessions as Array<{ day: string; name: string; tags?: string[] }>).find((s) => familyOf(s) === 'ride_anaerobic');
   assert(ride, 'no anaerobic ride built');
   assertEquals(ride!.day, 'Tuesday');
-  assert(!/Hard|Hill|Threshold|Intervals|Repeat|Club/i.test(ride!.name), `the old name regex would have matched "${ride!.name}" — the tag path is not what is being tested`);
+  // The hard ride is titled by its workout's own name since 2026-09-19 ("One-to-One Repeats"), which the old name regex
+  // would match — so the tag path is proved with the name taken off.
+  assertEquals(familyOf({ ...ride!, name: 'Ride' }), 'ride_anaerobic');
   assert(isHardSlot({ family: 'ride_anaerobic' as never }));
 });

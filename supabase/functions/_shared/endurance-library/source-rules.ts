@@ -738,7 +738,7 @@ export const FAMILIES: Record<FamilyId, {
      * The exact replacement is his to change — "Above threshold" is page-true and plain, and it is
      * ours.
      */
-    label: 'Above threshold',  // not-instruction: family name, a label for the session, not an instruction; no page names it; Michael's call
+    label: 'Maximal Lactate Steady State',  // not-instruction: type name — the book's heading (p231) without the bracketed abbreviation (2026-09-19)
     workFloorPct: 1.0,
     intent: 'Maximum time in zone 4 with equalised fatigue.',  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
     cite: 'Viada pp231-232',
@@ -775,7 +775,7 @@ export const FAMILIES: Record<FamilyId, {
          * did not move with it. **"Surge and float" is Viada's phrasing, lifted verbatim** — that
          * was already recorded in the note above; it is now what the athlete reads.
          */
-        label: 'Surge and float',
+        label: 'Surge and Float',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         /**
          * ⛔⛔⛔ THE BANDS ARE BOUND TO ONE SHAPE NOW, AND THIS IS A TRAINING-DOSE FIX FOUND ON A REAL
          * ATHLETE'S BUILT PLAN (2026-08-31).
@@ -816,7 +816,7 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'forty_twenty',
         shape: 'intervals',
-        label: 'Forty-twenty repeats',
+        label: 'Forty-Twenty Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 40, hi: 40 },
         repsBand: { lo: 12, hi: 20 },
         work: pct(1.30),
@@ -851,7 +851,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 2, rounds: 4, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
           3: { sets: 3, rounds: 4, round: [W(45, 1.25, 'Surge'), W(60, 1.15, 'Near-threshold float'), W(60, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
-        label: 'Long surge with a near-threshold float',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Long Surge and Float',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 45, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.25),
@@ -874,7 +874,7 @@ export const FAMILIES: Record<FamilyId, {
         // book's words; "cut-downs" is the one a runner would recognise. Id and body unchanged.
         // ⛔ THE BOOK'S WORDS, same ruling as `surge_float` above (2026-08-31). "The descending
         // ladder" is how p231-232 prints it; "cut-downs" was the field's name for it. Id unchanged.
-        label: 'The descending ladder',
+        label: 'Descending Ladder',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         /**
          * ⛔ THE RUNGS ARE THE SOURCE'S, PER LEVEL — see `ladderByLevel`. Level one runs the ladder
          * once; level two runs it again from partway down; level three runs it three times.
@@ -897,7 +897,7 @@ export const FAMILIES: Record<FamilyId, {
 
   run_near_threshold: {
     sport: 'run',
-    label: 'Near-threshold',
+    label: 'Near-Threshold',  // not-instruction: type name — the book's heading (p233) without the bracketed abbreviation (2026-09-19)
     workFloorPct: 0.85,
     intent: 'Maximum time near threshold, whether from shorter above-threshold intervals or longer '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'below-threshold ones, while controlling fatigue.',
@@ -917,7 +917,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 3, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
           3: { sets: 4, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
         },
-        label: 'Short above-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Short Threshold Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 60, hi: 90 },
         repsBand: { lo: 8, hi: 16 },
         work: pct(1.00, 1.05),
@@ -951,7 +951,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 1, rounds: 4, round: [W(240, 1.05)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
           3: { sets: 1, rounds: 4, round: [W(300, 1.05)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
         },
-        label: 'Race-specific repeats',
+        label: 'Race-Specific Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         // ⚠️ FIVE TO EIGHT MINUTES. The floor is the shortest repeat this shape reaches, and it sits
         // ABOVE the embedded-surge block's length deliberately: two shapes of equal length with
         // different counts trips the library's own pairing property, and they are not equal on the
@@ -978,7 +978,7 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'below_threshold',
         shape: 'intervals',
-        label: 'Sustained sub-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Sub-Threshold Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 210, hi: 240 },
         repsBand: { lo: 5, hi: 8 },
         repsByLevel: { 1: { lo: 5, hi: 5 }, 2: { lo: 6, hi: 6 }, 3: { lo: 8, hi: 8 } },
@@ -1029,7 +1029,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'sustained_5min_90',
         shape: 'intervals',
-        label: 'Eight sustained five-minute repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: '8 × 5 min Threshold',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 300, hi: 300 },
         repsBand: { lo: 8, hi: 8 },
         repsByLevel: { 3: { lo: 8, hi: 8 } },
@@ -1041,7 +1041,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'sustained_6min_88',
         shape: 'intervals',
-        label: 'Six sustained six-minute repeats',
+        label: '6 × 6 min Threshold',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 360, hi: 360 },
         repsBand: { lo: 6, hi: 6 },
         repsByLevel: { 3: { lo: 6, hi: 6 } },
@@ -1053,7 +1053,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'sustained_8min30_85',
         shape: 'intervals',
-        label: 'Four sustained eight-and-a-half-minute repeats',
+        label: '4 × 8:30 Threshold',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 510, hi: 510 },
         repsBand: { lo: 4, hi: 4 },
         repsByLevel: { 3: { lo: 4, hi: 4 } },
@@ -1067,7 +1067,7 @@ export const FAMILIES: Record<FamilyId, {
          *  steps down with it. Split so the two can no longer be combined. */
         id: 'below_threshold_long',
         shape: 'intervals',
-        label: 'Long sub-threshold repeats',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Long Sub-Threshold Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 360, hi: 510 },
         repsBand: { lo: 3, hi: 6 },
         repsByLevel: { 1: { lo: 3, hi: 3 }, 2: { lo: 5, hi: 5 }, 3: { lo: 4, hi: 6 } },
@@ -1107,7 +1107,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 2, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
           3: { sets: 3, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
         },
-        label: 'Threshold block with an embedded surge',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Threshold with a Surge',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 240, hi: 300 },
         repsBand: { lo: 4, hi: 12 },
         repsByLevel: { 1: { lo: 4, hi: 4 }, 2: { lo: 8, hi: 8 }, 3: { lo: 12, hi: 12 } },
@@ -1132,7 +1132,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 1, rounds: 6, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)] },
           3: { sets: 2, rounds: 4, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
         },
-        label: 'Long steady effort opened by a sharp surge',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Surge into Steady',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         // ⚠️ THE BLOCK IS THE SURGE PLUS THE STEADY EFFORT, and it sits BELOW the short race repeat's
         // length deliberately: two shapes of equal length with different counts trip the library's
         // own pairing property, and these two are not equal on the page either.
@@ -1358,7 +1358,7 @@ export const FAMILIES: Record<FamilyId, {
 
   ride_anaerobic: {
     sport: 'ride',
-    label: 'Anaerobic',
+    label: 'Anaerobic',  // not-instruction: type name — the book's heading (p237) without the bracketed abbreviation (2026-09-19)
     workFloorPct: 1.0,
     floorOnly: true,
     intent: 'Anaerobic repeatability. Best done by feel against a power FLOOR rather than a specific '
@@ -1378,7 +1378,7 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'progressive_repeats',
         shape: 'intervals',
-        label: 'Progressive repeats',
+        label: 'Progressive Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 45, hi: 90 },
         // ⛔ p237 PRINTS ONE LENGTH PER LEVEL — 45 seconds, 1 minute, 1:30 (2026-09-11). The band
         // above stays as the bracket; the level's own number is what builds.
@@ -1404,7 +1404,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 2, rounds: 7, round: [W(60, 1.10), { seconds: 60, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 300 },
           3: { sets: 2, rounds: 8, round: [W(60, 1.20), { seconds: 60, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 300 },
         },
-        label: 'One-to-one repeats',
+        label: 'One-to-One Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 60, hi: 60 },
         repsBand: { lo: 10, hi: 16 },
         work: pct(1.10, 1.20),
@@ -1426,9 +1426,10 @@ export const FAMILIES: Record<FamilyId, {
         printedIntervalsByLevel: {
           1: { sets: 1, rounds: 5, round: [W(30, 1.20, 'Surge'), W(150, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
           2: { sets: 1, rounds: 6, round: [W(30, 1.20, 'Surge'), W(240, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
-          3: { sets: 2, rounds: 4, round: [W(30, 1.20, 'Surge'), W(330, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240, betweenSetsSeconds: 300 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          // p237 L3: the round's "4-minute easy spin" PLUS the "5-minute additional spin/recovery between sets" — 9 minutes.
+          3: { sets: 2, rounds: 4, round: [W(30, 1.20, 'Surge'), W(330, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240, betweenSetsSeconds: 240 + 300 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
-        label: 'Surge, sustain, surge',
+        label: 'Surge, Sustain, Surge',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 30, hi: 30 },
         repsBand: { lo: 5, hi: 8 },
         work: pct(1.20),
@@ -1441,7 +1442,7 @@ export const FAMILIES: Record<FamilyId, {
 
   ride_vo2: {
     sport: 'ride',
-    label: 'VO2',
+    label: 'VO2',  // not-instruction: type name — the book's heading (p238) without the bracketed abbreviation (2026-09-19)
     workFloorPct: 1.10,
     intent: 'Push maximum aerobic intake. More metabolically taxing than the anaerobic work, and to '
       + 'be controlled more carefully rather than ridden on the "more power is better" principle.',
@@ -1450,7 +1451,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'long_vo2',
         shape: 'intervals',
-        label: 'Long VO2 repeats',
+        label: 'Long VO2 Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 180, hi: 300 },
         repsBand: { lo: 5, hi: 5 },
         work: pct(1.10, 1.20),
@@ -1460,18 +1461,27 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'short_vo2',
         shape: 'intervals',
-        label: 'Short VO2 repeats',
+        label: 'Short VO2 Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 90, hi: 90 },
         repsBand: { lo: 12, hi: 20 },
         work: pct(1.15),
         recovery: { kind: 'proportional', factor: 1, intensity: easy },
         set: { repeatsPerSet: { lo: 6, hi: 10 }, restBand: { lo: 300, hi: 300 }, intensity: easy },
+        /**
+         * ⛔ p238 AS PRINTED (2026-09-19) — fixed per level, not sized by session length:
+         *   L1 / L2 / L3  2 sets of 6 / 8 / 10 rounds of 1:30 @ 115% / 1:30 @ easy spin, 5 minutes between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 2, rounds: 6, round: [W(90, 1.15), { seconds: 90, role: 'recovery', intensity: easy }], betweenSetsSeconds: 300 },
+          2: { sets: 2, rounds: 8, round: [W(90, 1.15), { seconds: 90, role: 'recovery', intensity: easy }], betweenSetsSeconds: 300 },
+          3: { sets: 2, rounds: 10, round: [W(90, 1.15), { seconds: 90, role: 'recovery', intensity: easy }], betweenSetsSeconds: 300 },
+        },
         cite: 'Viada p238',
       },
       {
         id: 'micro',
         shape: 'intervals',
-        label: 'Micro-intervals',
+        label: 'Micro-Intervals',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 30, hi: 40 },
         repsBand: { lo: 20, hi: 32 },
         work: pct(1.25),
@@ -1495,7 +1505,7 @@ export const FAMILIES: Record<FamilyId, {
 
   ride_sweet_spot: {
     sport: 'ride',
-    label: 'Sweet spot',
+    label: 'Sweet Spot',  // not-instruction: type name — the book's heading (p238) without the bracketed abbreviation (2026-09-19)
     workFloorPct: 0.80,
     underThreshold: true,
     intent: 'As close to threshold as possible without exceeding it — plenty of time in the zone '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
@@ -1518,7 +1528,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 4, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
           3: { sets: 4, rounds: 8, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
-        label: 'Sweet-spot blocks with a surge on the minute',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+        label: 'Sweet Spot with Surges',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 360, hi: 480 },
         repsBand: { lo: 3, hi: 4 },
         work: pct(0.90),
@@ -1538,7 +1548,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 1, rounds: 8, round: [W(240, 0.95)], betweenRoundsSeconds: 120 },
           3: { sets: 1, rounds: 8, round: [W(120, 0.95), W(120, 1.00)], betweenRoundsSeconds: 120 },
         },
-        label: 'Medium sweet-spot repeats',
+        label: 'Medium Sweet Spot Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 120, hi: 240 },
         repsBand: { lo: 6, hi: 8 },
         work: pct(0.95, 1.00),
@@ -1557,7 +1567,7 @@ export const FAMILIES: Record<FamilyId, {
           2: { sets: 1, rounds: 4, round: [W(480, 0.90)], betweenRoundsSeconds: 240 },
           3: { sets: 1, rounds: 4, round: [W(600, 0.90)], betweenRoundsSeconds: 240 },
         },
-        label: 'Long sweet-spot repeats',
+        label: 'Long Sweet Spot Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 480, hi: 600 },
         repsBand: { lo: 3, hi: 4 },
         work: pct(0.90),
@@ -1567,7 +1577,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'tempo',
         shape: 'intervals',
-        label: 'Tempo blocks',
+        label: 'Tempo Blocks',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 900, hi: 1200 },
         repsBand: { lo: 3, hi: 3 },
         work: pct(0.80),

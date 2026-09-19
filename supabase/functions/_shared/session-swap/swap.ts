@@ -122,6 +122,8 @@ export type Venue = (typeof RIDE_VENUES)[number] | (typeof RUN_VENUES)[number];
  */
 export { VENUE_PREFIX } from '../indoor-session.ts';
 import { VENUE_PREFIX } from '../indoor-session.ts';
+import { NAMED_WORKOUT_FAMILIES } from '../standing-plan/family-lines.ts';
+import { FAMILIES } from '../endurance-library/source-rules.ts';
 
 /**
  * ⛔ THE SHEET'S LINES ARE KEYS, NOT SENTENCES. Every athlete-facing line in this work order is
@@ -381,7 +383,10 @@ export function intensityOf(s: SwappableSession): IntensityBand {
   const family = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length);
   if (family === 'run_lsd' || family === 'ride_long') return 'long';
 
-  if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('long') || /\blong\b/.test(name)) {
+  // ⚠️ THE WORD "long" IN A NAME IS NOT READ ON A HARD WORKOUT (2026-09-19): those are titled by the workout's own
+  // name now, and "Long Surge and Float" / "Long VO2 Repeats" are hard sessions, not the long one.
+  if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('long')
+    || (/\blong\b/.test(name) && !NAMED_WORKOUT_FAMILIES.includes(family ?? ''))) {
     return 'long';
   }
 
@@ -842,13 +847,20 @@ export function revertOptions(session: SwappableSession, planId?: string | null)
   } else if (workoutFromOf(session) && planId && from && String(session.name ?? '').trim()) {
     /**
      * ⛔ A CHOSEN WORKOUT GOES BACK THE SAME WAY (2026-09-11): the row the plan authored for that
-     * week, read out of `sessions_by_week` at write time by `resolveSwapWrite`. Choosing a workout
-     * never renames the session, so the row's own name is the plan's.
+     * week, read out of `sessions_by_week` at write time by `resolveSwapWrite`.
+     * ⛔ THE LABEL IS THE PLAN'S WORKOUT'S NAME (2026-09-19). A hard session is titled by its workout's own name now, so
+     * a chosen workout renames the row ("Forty-Twenty Repeats"); the way back is named by the `workout_from:`
+     * archetype ("Surge and Float"), read from the same option labels. The row's name only when that is not found.
      */
+    const family = (session.tags ?? []).map(String).find((t) => t.startsWith('family:'))?.slice('family:'.length);
+    const plannedName = family
+      ? (FAMILIES as Record<string, { archetypes?: { id: string; label: string }[] }>)[family]?.archetypes
+        ?.find((a) => a.id === workoutFromOf(session))?.label
+      : undefined;
     out.push({
       kind: 'revert',
       to: from,
-      label: String(session.name).trim(),
+      label: plannedName ?? String(session.name).trim(),
       copyKey: 'swap.back_to_plan',
       patch: {},
       needsMaterialize: true,
