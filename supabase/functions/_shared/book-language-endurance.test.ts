@@ -151,3 +151,54 @@ Deno.test('the swapped row and the builder card say what the app did, and nothin
   assertEquals(hardCardLabel('run', null, 'run_mlss', 'top-end'), 'Hard run');
   assertEquals(hardCardLabel('bike', null, 'ride_sweet_spot', 'threshold'), 'Hard ride');
 });
+
+// ── Pass 4: the page's warm-ups, the race tempo, the p278 week, run notes on the watch ────────────
+
+import { composeWeek } from './standing-plan/compose.ts';
+import { FRAMES } from './standing-plan/frames.ts';
+
+Deno.test('the run\'s warm-up box reaches the row and the watch line by line: jog, lunges, Cossack squats (p233)', () => {
+  const { row, v3, lines } = built('run_near_threshold', 1, 'below_threshold');
+  assertEquals(lines.slice(0, 3), [
+    '10:00 warm-up · 10-minute easy jog',
+    'warm-up · 3 sets of 20m walking lunges',
+    'warm-up · 2 sets of 10 (per side) Cossack squats',
+  ]);
+  assertEquals(lines[lines.length - 1], '8:00 cool-down · 8-minute easy jog');
+  const g = garminSteps({ ...row, computed: { steps: v3 } });
+  const lunges = g.find((s: any) => /walking lunges/.test(String(s.description)));
+  assertEquals(lunges?.durationType, 'OPEN');
+  // No easy pace the page does not print on the jog.
+  assert(!/easy pace/.test(lines[0]), lines[0]);
+});
+
+Deno.test('the VO2 ride\'s warm-up is p238\'s three lines, the middle one at 95%, not one 55–70% block', () => {
+  const { row, v3, lines } = built('ride_vo2', 1, 'long_vo2');
+  assertEquals(lines.slice(0, 3), [
+    '15:00 warm-up · 15-minute easy spin',
+    '5:00 warm-up · 214–261 W · 5 minutes @ 95%',
+    '5:00 warm-up · 5-minute easy spin',
+  ]);
+  const ev = serializeRide({ ...row, computed: { steps: v3, anchors: { ftp_w: 250 } } } as any);
+  assert(ev.description.includes('5 minutes @ 95%\n- Warmup 5m 86-104%'), ev.description);
+  assert(!/55-70%/.test(ev.description), ev.description);
+});
+
+Deno.test('the race-tempo row runs at race pace with its recoveries a quarter longer (p247)', () => {
+  const { row, lines } = built('run_near_threshold', 1, 'below_threshold', { raceTempo: true });
+  assert((row.steps_preset as string[]).some((t) => /racepace-r75svt1/.test(t)), JSON.stringify(row.steps_preset));
+  assert(lines.some((l) => l.startsWith('5 × 3:30 race pace, 1:15')), lines.join(' | '));
+});
+
+Deno.test('Ride + Strength\'s standard week is p278\'s Standard column: seven rides, the long ride at level 2', () => {
+  const std = FRAMES.cycling_base.columns.standard.flatMap((d) => d.endurance.map((e) => `${d.day}:${e.family}:${e.level}`));
+  assertEquals(std, ['1:ride_sweet_spot:1', '2:ride_endurance:1', '3:ride_vo2:1', '3:ride_sweet_spot:1', '5:ride_endurance:1', '5:ride_sprints:1', '6:ride_endurance:2']);
+  const taper = FRAMES.cycling_base.columns.taper.flatMap((d) => d.endurance.map((e) => `${d.day}:${e.family}:${e.level}`));
+  assertEquals(taper, ['1:ride_sweet_spot:1', '2:ride_endurance:1', '3:ride_vo2:1', '5:ride_sprints:1', '6:ride_endurance:1']);
+});
+
+Deno.test('a run\'s session note reaches the watch, as a ride\'s does', () => {
+  const { row, v3 } = built('run_vt1', 1, 'continuous');
+  const g = convertWorkoutToGarmin({ ...row, computed: { steps: v3 } } as any);
+  assert(/talk test/.test(String((g as any).description)), JSON.stringify((g as any).description));
+});

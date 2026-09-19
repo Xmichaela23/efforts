@@ -33,12 +33,14 @@ export const PROGRAM_COPY = {
     blurb: 'You get stronger. Four lifting days, four runs. The long run stays under 100 minutes.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
-  // Viada p278: three lifting days; five rides are its Deload column's five. OURS — `PROGRAM_COPY` the four-ride option (`fewerRidesDropsSlot`).
+  // Viada p278: three lifting days and seven rides in the Standard column. OURS — `PROGRAM_COPY` the six-ride option (`fewerRidesDropsSlot`).
+  // Viada p280: "These programs are included as training options for intermediate to advanced cyclists" — cut.
+  // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
+  // strength progress together." (no page).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'For newer riders and riders coming back. Cycling and strength progress together. '
-      + 'Four or five rides, three lifting days.',
+    blurb: 'Training options for intermediate to advanced cyclists. Six or seven rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
@@ -142,10 +144,18 @@ export const BUILD_FOCUS_COPY = {
 
 export const RIDES_COPY = {
   count_label: 'Rides a week',
-  // Viada p278 Deload column prints five rides; OURS — `RIDES_COPY` the four-ride choice (see `PROGRAM_COPY`).
-  count_chip: { 4: 'Four rides', 5: 'Five rides' } as Record<number, string>,
+  // Viada p278 Standard column prints seven rides; OURS — `RIDES_COPY` the six-ride choice (see `PROGRAM_COPY`).
+  count_chip: { 6: 'Six rides', 7: 'Seven rides' } as Record<number, string>,
   row: 'Day {day} · {name}',
-  easy_line: 'If easy rides are kept conversational, use your own judgement to go longer.',
+  /**
+   * Viada p281, the Base program's cycling note, cut: "Over a 1-month cycle, the Tuesday and Friday endurance rides
+   * should be the same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise
+   * progress, increasing the volume gradually over the entire base season every 1 to 2 weeks." The weekday names are
+   * cut (the athlete's week may not start on Monday). It replaces "If easy rides are kept conversational, use your own
+   * judgement to go longer." (2026-09-18, book-language pass 4) — p281 prescribes the progression; it prints no amount,
+   * so the rides are built at their printed level and the sentence is the page's.
+   */
+  easy_line: 'Over a 1-month cycle, the endurance rides should be the same duration, but each cycle can increase the overall duration. The long ride can likewise progress, increasing the volume gradually over the entire base season every 1 to 2 weeks.',
 } as const;
 
 // ── Run + Strength runs screen ────────────────────────────────────────────────────────────────

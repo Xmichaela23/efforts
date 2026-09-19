@@ -56,8 +56,9 @@ export type StepLineOptions = {
  * which the planned screens print above these steps; it came off. The all-out line stays for p229's run
  * sprints, whose steps carry no target.
  */
-// Viada p229–231 (Sprint / Power): "All-out" = "best possible speed for the day".
-export const ALL_OUT_LINE = 'All-out: the best speed you have today.';
+// Viada p229 (Sprint / Power), whole sentence read off the page: "“All-out” indicates “best possible speed” for the
+// day." (2026-09-18, book-language pass 4; it was reworded as "All-out: the best speed you have today.")
+export const ALL_OUT_LINE = '"All-out" indicates "best possible speed" for the day.';
 const ALL_OUT_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_sprint_power']);
 
 const kindOf = (s: PlannedStep) => String(s?.kind || '').toLowerCase();

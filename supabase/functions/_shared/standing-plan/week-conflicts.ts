@@ -73,6 +73,8 @@ export type WeekConflict = {
   sessions: string[];
   /** Hours of clearance still outstanding, where the law gives one. Absent for the frame rule. */
   shortBy?: number;
+  /** The page the sentence is quoted from, where it is not p130 / p131 (2026-09-18). */
+  cite?: string;
   text: string;
 };
 
@@ -468,6 +470,7 @@ export function weekConflicts(args: {
           // ⛔ p86's own words (2026-09-18, book-language pass 2): the cost depends on the lifting day's work sets, which
           // "The run is on legs that have not recovered" stated for every heavy day.
           : `${bDay} heavy legs, ${sDay} long run. ${P86_SET_COST}`,
+        ...(apart === 'same' ? {} : { cite: 'Viada p86' }),
       });
       continue;
     }

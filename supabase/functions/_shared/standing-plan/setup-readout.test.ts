@@ -69,10 +69,11 @@ Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the a
 Deno.test('⛔ Rides screen and runs screen — rows and words from the server', () => {
   const ride = enduranceIntakeReadout({ frame: 'cycling_base', answers: {} }).ride_strength_week!;
   assertEquals(ride.count_label, 'Rides a week');
-  assertEquals(ride.default_count, 5);
+  // ⛔ p278's Standard column (2026-09-18, book-language pass 4): seven rides; one fewer drops Day 2's easy ride.
+  assertEquals(ride.default_count, 7);
   assertEquals(ride.counts.map((c) => [c.label, c.rows.map((r) => r.line)]), [
-    ['Four rides', ['Day 1 · Hard Ride', 'Day 3 · VO2 Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
-    ['Five rides', ['Day 1 · Hard Ride', 'Day 2 · Ride', 'Day 3 · VO2 Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Six rides', ['Day 1 · Hard Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Seven rides', ['Day 1 · Hard Ride', 'Day 2 · Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
   ]);
   // The screen and the composed week agree, both counts (this pin moved here from the phone's test).
   const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];

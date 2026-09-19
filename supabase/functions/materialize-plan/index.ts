@@ -44,7 +44,7 @@ import {
 // names the family; the library states the rule, so the materializer does not carry a second list.
 import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
 import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
-import { SWIM_ENDURANCE_PRINTED } from '../_shared/endurance-library/source-rules.ts';
+import { SWIM_ENDURANCE_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -1542,6 +1542,19 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // FIELD — definition (1 mi = 1609.344 m, written 1609.34)
   const milesToMeters = (mi: number) => Math.round(mi * 1609.34);
   
+  /**
+   * ⛔⛔ ONE LINE OF THE PAGE'S WARM-UP OR COOL-DOWN BOX (2026-09-18, book-language pass 4, audit item 12) — p229, p231,
+   * p233. The words, the clock (none on a drill: the athlete ends it with the lap button) and the easy intensity are
+   * the library's (`WRAPPERS`); no pace goes with an easy jog, because the page prints none, and the watch gets time only.
+   */
+  const wrapRun = wrapperStepForToken(lower);
+  if (wrapRun) {
+    out.push({
+      id: uid(), kind: wrapRun.kind, label: wrapRun.label, page_label: true, watch_target: 'none',
+      ...(wrapRun.seconds != null && wrapRun.seconds > 0 ? { duration_s: wrapRun.seconds } : { lap_button: true }),
+    });
+    return out;
+  }
   // OURS — `expandRunToken` defaults when a token carries no number: 10 min warm-up/cool-down, 30 min easy,
   // 25 min tempo. No page, kept as found.
   // warmup/cooldown - TIME based
@@ -2235,6 +2248,23 @@ function expandBikeToken(
     return result;
   };
   
+  /**
+   * ⛔⛔ ONE LINE OF THE PAGE'S RIDE WARM-UP BOX (2026-09-18, book-language pass 4, audit item 12) — p236, p237, p238.
+   * An "easy spin" goes with no power target (the page prints none — Intervals.icu gets `freeride`); p238's "5 minutes @
+   * 95%" goes at 95% of FTP, sent as the one sourced band around a single printed number (`wattsAt`,
+   * `SINGLE_PERCENT_BAND`, TrainingPeaks); p236's cadence sprints carry no power (cadence only).
+   */
+  const wrapRide = wrapperStepForToken(lower);
+  if (wrapRide) {
+    const pct = wrapRide.intensity.kind === 'pct_threshold' ? (wrapRide.intensity as { hi: number }).hi : null;
+    const power = pct != null ? wattsAt(pct, pct, ftp) : undefined;
+    out.push({
+      id: uid(), kind: wrapRide.kind, label: wrapRide.label, page_label: true,
+      ...(wrapRide.seconds != null && wrapRide.seconds > 0 ? { duration_s: wrapRide.seconds } : { lap_button: true }),
+      ...(power ? { power_range: power } : {}),
+    });
+    return out;
+  }
   // Warmup tokens with proper FTP-based power ranges
   // OURS — `expandBikeToken` warm-up bands 55–70% (fast pedal) and 50–65% of FTP; 15-min default. No page.
   if (/warmup_bike_quality_\d+min_fastpedal/.test(lower)) { 

@@ -34,8 +34,22 @@ const P278_LIFTING = {
   },
 } as const;
 
-/** ⛔ p278's DELOAD RIDES, the week's rides in BOTH columns (work order §3). Day → family. */
-const P278_RIDES: Record<number, string> = { 1: 'ride_sweet_spot', 2: 'ride_endurance', 3: 'ride_vo2', 5: 'ride_sprints', 6: 'ride_endurance' };
+/**
+ * ⛔ p278's RIDES, per column (2026-09-18, book-language pass 4 — the standard week is the STANDARD column; it took
+ * the Deload column's five until then). Day → [family, level] in printed order. SOURCE Part E2a.
+ */
+const P278_RIDES: Record<'standard' | 'taper', Record<number, [string, number][]>> = {
+  standard: {
+    1: [['ride_sweet_spot', 1]], // printed "level 1-2"; the frame takes 1
+    2: [['ride_endurance', 1]],
+    3: [['ride_vo2', 1], ['ride_sweet_spot', 1]],
+    5: [['ride_endurance', 1], ['ride_sprints', 1]],
+    6: [['ride_endurance', 2]],
+  },
+  taper: {
+    1: [['ride_sweet_spot', 1]], 2: [['ride_endurance', 1]], 3: [['ride_vo2', 1]], 5: [['ride_sprints', 1]], 6: [['ride_endurance', 1]],
+  },
+};
 
 const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
 const tested = (lift: string, oneRm: number) => ({
@@ -60,18 +74,16 @@ Deno.test('⛔ p278 — no lifting row the page does not print, and every row it
   }
 });
 
-Deno.test('⛔ p278 — rides only, the five deload-column rides, every one level 1', () => {
+Deno.test('⛔ p278 — rides only: the Standard column\'s seven, the Deload column\'s five at level 1', () => {
   for (const column of ['standard', 'taper'] as const) {
-    const rides: Record<number, string> = {};
+    const rides: Record<number, [string, number][]> = {};
     for (const d of FRAMES.cycling_base.columns[column]) {
       for (const e of d.endurance) {
         assert(String(e.family).startsWith('ride_'), `${column} day ${d.day}: ${e.family} is not a ride`);
-        assertEquals(e.level, 1, `${column} day ${d.day}: ${e.family} is not level 1`);
-        rides[d.day] = e.family;
+        (rides[d.day] ??= []).push([String(e.family), e.level]);
       }
-      assert(d.endurance.length <= 1, `${column} day ${d.day} carries more than one ride`);
     }
-    assertEquals(rides, P278_RIDES);
+    assertEquals(rides, P278_RIDES[column], column);
   }
   assertEquals(FRAMES.cycling_base.enduranceSports, ['ride']);
 });
@@ -90,7 +102,7 @@ Deno.test('⛔ a composed p278 week builds the page and nothing else — no runs
     const shape = (w: ReturnType<typeof composeWeek>) => w.sessions.map((s) => `${s.day}|${s.type}|${s.name}|${s.duration}`);
     assertEquals(shape(pushed), shape(plain), `week ${week} ${column}`);
     for (const s of plain.sessions) assert(s.type !== 'run' && s.type !== 'swim', `week ${week}: a ${s.type} session`);
-    assertEquals(plain.sessions.filter((s) => s.type === 'ride').length, 5, `week ${week}: five rides`);
+    assertEquals(plain.sessions.filter((s) => s.type === 'ride').length, column === 'standard' ? 7 : 5, `week ${week}: rides`);
   }
 });
 
@@ -153,21 +165,25 @@ Deno.test('⛔ p238 VO2 and p236 sprints at level 1 build the page and reach the
   assert(surges.every((s) => s.duration_s === 30 && s.power_range == null));
 });
 
-Deno.test('⛔ the 4-ride week leaves out the Day 2 easy ride and nothing else, in both columns', () => {
+Deno.test('⛔ the one-fewer-ride week leaves out the Day 2 easy ride and nothing else, in both columns', () => {
+  const expectAll = {
+    standard: ['Monday|Hard Ride', 'Tuesday|Ride', 'Wednesday|VO2 Ride', 'Wednesday|Hard Ride', 'Friday|Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
+    taper: ['Monday|Hard Ride', 'Tuesday|Ride', 'Wednesday|VO2 Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
+  };
   for (const [week, column] of [[2, 'standard'], [3, 'taper']] as const) {
-    const five = composeWeek(baseArgs(week, column) as never);
-    const four = composeWeek({ ...baseArgs(week, column), sportMix: { rideCount: 4 } } as never);
+    const all = composeWeek(baseArgs(week, column) as never);
+    const fewer = composeWeek({ ...baseArgs(week, column), sportMix: { rideCount: 6 } } as never);
     const rides = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type === 'ride').map((s) => `${s.day}|${s.name}`);
-    assertEquals(rides(five), ['Monday|Hard Ride', 'Tuesday|Ride', 'Wednesday|VO2 Ride', 'Friday|Sprint Ride', 'Saturday|Ride']);
-    assertEquals(rides(four), ['Monday|Hard Ride', 'Wednesday|VO2 Ride', 'Friday|Sprint Ride', 'Saturday|Ride']);
+    assertEquals(rides(all).sort(), [...expectAll[column]].sort(), `${column}: all rides`);
+    assertEquals(rides(fewer).sort(), expectAll[column].filter((r) => r !== 'Tuesday|Ride').sort(), `${column}: one fewer`);
     const lifting = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type !== 'ride');
-    assertEquals(lifting(four), lifting(five), `week ${week}: the lifting moved`);
+    assertEquals(lifting(fewer), lifting(all), `week ${week}: the lifting moved`);
   }
   // ⚠️ A count the frame does not declare changes nothing.
   const three = composeWeek({ ...baseArgs(2), sportMix: { rideCount: 3 } } as never);
-  assertEquals(three.sessions.filter((s) => s.type === 'ride').length, 5);
-  const fenced = fenceMixToFrame('cycling_base', { runs: 2, rides: 4, rideCount: 4 } as never) as { rideCount: number };
-  assertEquals(fenced.rideCount, 4);
+  assertEquals(three.sessions.filter((s) => s.type === 'ride').length, 7);
+  const fenced = fenceMixToFrame('cycling_base', { runs: 2, rides: 4, rideCount: 6 } as never) as { rideCount: number };
+  assertEquals(fenced.rideCount, 6);
 });
 
 Deno.test('⛔ the carry row reads "Farmers Carry · medium weight, no fatigue, full rest" — no sets, no reps', async () => {

@@ -14,7 +14,7 @@ import type { EnduranceIntakeReadout } from '@/lib/builder-readout';
 type Props = {
   readout: EnduranceIntakeReadout['ride_strength_week'];
   rideCount: number;
-  onRideCount: (n: 4 | 5) => void;
+  onRideCount: (n: number) => void;
 };
 
 export default function RideStrengthWeekCard(props: Props) {
@@ -34,7 +34,7 @@ export default function RideStrengthWeekCard(props: Props) {
               shape="chip"
               variant={props.rideCount === c.count ? 'primary' : 'secondary'}
               data-testid={`ride-count-${c.count}`}
-              onClick={() => props.onRideCount(c.count as 4 | 5)}
+              onClick={() => props.onRideCount(c.count)}
             >
               {c.label}
             </GalaxyButton>

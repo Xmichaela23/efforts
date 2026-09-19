@@ -4178,7 +4178,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   });
   for (const c of conflicts) {
     if (!notes.some((n) => n.text === c.text)) {
-      notes.push({ kind: 'warning', text: c.text, cite: 'Viada p130, p131' });
+      notes.push({ kind: 'warning', text: c.text, cite: c.cite ?? 'Viada p130, p131' });
     }
   }
 

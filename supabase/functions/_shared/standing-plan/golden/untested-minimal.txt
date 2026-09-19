@@ -56,7 +56,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 02  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ WEEK 02  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 03  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -156,7 +156,7 @@ WEEK 03  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 04  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -206,7 +206,7 @@ WEEK 04  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 05  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ WEEK 05  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 06  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -306,7 +306,7 @@ WEEK 06  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 07  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -356,7 +356,7 @@ WEEK 07  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -406,7 +406,7 @@ WEEK 08  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -456,7 +456,7 @@ WEEK 09  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 10  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -506,7 +506,7 @@ WEEK 10  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 11  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -556,7 +556,7 @@ WEEK 11  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 12  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -606,4 +606,4 @@ WEEK 12  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)

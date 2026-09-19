@@ -358,7 +358,8 @@ Deno.test('a ride never reaches the watch wearing a run warm-up', () => {
   const wk = week2({ runs: 1, rides: 3 });
   for (const s of wk.sessions) {
     const pre = (s.steps_preset ?? [])[0] ?? '';
-    if (s.type === 'ride' && pre) assert(/bike/.test(pre), `a ride opened with "${pre}"`);
+    // ⛔ Since 2026-09-18 a warm-up is its family's own box line (`wrap_{family}_warm{i}`), so the family names the sport.
+    if (s.type === 'ride' && pre) assert(/bike|^wrap_ride_/.test(pre), `a ride opened with "${pre}"`);
     if (s.type === 'run' && pre) assert(/run/.test(pre), `a run opened with "${pre}"`);
     if (s.type === 'swim' && pre) assert(/swim/.test(pre), `a swim opened with "${pre}"`);
   }

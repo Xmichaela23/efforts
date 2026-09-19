@@ -96,7 +96,7 @@ Deno.test('Sprint / Power: the all-out line when a work step carries no target, 
   const sprint: PlannedStep = { kind: 'work', seconds: 10, label: 'Sprint' };
   const walk: PlannedStep = { kind: 'recovery', seconds: 90, label: 'Walk back' };
   const lines = plannedStepLines([easyWrap('warmup', 600), sprint, walk, sprint, walk, sprint, easyWrap('cooldown', 300)], { sport: 'run', family: 'run_sprint_power' });
-  assertEquals(lines[lines.length - 2], 'All-out: the best speed you have today.');
+  assertEquals(lines[lines.length - 2], '"All-out" indicates "best possible speed" for the day.');
   assertEquals(lines.filter((l) => /RPE/.test(l)), []);
   const paced = plannedStepLines([W(300, 490, 510), R(90, 513, 581), W(300, 490, 510)], { sport: 'run', family: 'run_sprint_power' });
   assertEquals(paced, ['2 × 5:00 @ 8:10–8:30/mi, 1:30 @ 8:33–9:41/mi between']);

@@ -26,6 +26,8 @@ import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volum
 import { zonesForBaselinesRow } from '../save-baselines/zones.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { displayFormat, M_PER_MI } from '../_shared/display-format.ts';
+// The one server title for a planned session (`_shared/session-title.ts`) — plans.csv's session name.
+import { sessionTitle } from '../_shared/session-title.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

@@ -623,8 +623,9 @@ Deno.test('a quality session never reaches the watch cold', () => {
      * was written for.
      */
     if (/^(longrun|run_easy)_/.test(steps[0] ?? '')) continue;
-    assert(/^warmup_/.test(steps[0]), `${s.name} starts on "${steps[0]}", not a warm-up`);
-    assert(steps.some((t) => /^cooldown_/.test(t)), `${s.name} has no cooldown`);
+    // ⛔ The page's box, line by line, since 2026-09-18 (`wrap_{family}_warm{i}` / `_cool{i}`).
+    assert(/^(warmup_|wrap_[a-z0-9_]+_warm\d+$)/.test(steps[0]), `${s.name} starts on "${steps[0]}", not a warm-up`);
+    assert(steps.some((t) => /^(cooldown_|wrap_[a-z0-9_]+_cool\d+$)/.test(t)), `${s.name} has no cooldown`);
   }
 });
 

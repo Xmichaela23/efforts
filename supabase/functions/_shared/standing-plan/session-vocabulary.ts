@@ -18,7 +18,7 @@
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
 import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
-import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED } from '../endurance-library/index.ts';
+import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, wrapperToken } from '../endurance-library/index.ts';
 
 /** The `type` field on a plan row. Unchanged vocabulary. */
 export type SessionType = 'run' | 'ride' | 'swim' | 'strength';
@@ -338,10 +338,18 @@ function wrapperTokens(session: EnduranceSession, sport: SessionType): { pre: st
    * ⚠️ THE SWIM WRAPPER IS DISTANCE-PRESCRIBED, not clocked, because that is what its expander reads.
    * The distance is the session's own warm-up metres — stage 1 built them; nothing here invents one.
    */
-  if (sport === 'ride') {
+  /**
+   * ⛔⛔ THE BOX TRAVELS LINE BY LINE (2026-09-18, book-language pass 4, audit item 12). Run and ride warm-ups and
+   * cool-downs were summed into ONE timed token — `warmup_run_{n}min_easy`, `warmup_bike_quality_{n}min_fastpedal` —
+   * so p231/p233's walking lunges and Cossack squats never reached the row (they carry no clock, and only seconds were
+   * summed), and every ride warm-up became one block at an OURS 55–70% of FTP: p238's "5 minutes @ 95%" and p236's
+   * cadence sprints were lost. Each line of the family's box is now its own token, which the materializer reads back
+   * from `WRAPPERS` (`wrapperStepForToken`) with its words, its clock or the lap button, and its intensity.
+   */
+  if (sport === 'ride' || sport === 'run') {
     return {
-      pre: warm > 0 ? [`warmup_bike_quality_${minutes(warm)}min_fastpedal`] : [],
-      post: cool > 0 ? [`cooldown_bike_${minutes(cool)}min`] : [],
+      pre: session.warmup.map((_, i) => wrapperToken(session.family, 'warmup', i)),
+      post: session.cooldown.map((_, i) => wrapperToken(session.family, 'cooldown', i)),
     };
   }
   if (sport === 'swim') {
@@ -355,10 +363,7 @@ function wrapperTokens(session: EnduranceSession, sport: SessionType): { pre: st
       post: cm > 0 ? [`swim_cooldown_${cm}m`] : [],
     };
   }
-  return {
-    pre: warm > 0 ? [`warmup_run_${minutes(warm)}min_easy`] : [],
-    post: cool > 0 ? [`cooldown_run_${minutes(cool)}min_easy`] : [],
-  };
+  return { pre: [], post: [] };
 }
 
 /** ⛔ THE SPORT A FAMILY BELONGS TO, read off its own prefix — the library's own naming, not a table. */
@@ -376,6 +381,34 @@ function repMinutes(session: EnduranceSession): { reps: number; workMin: number;
     workMin: Math.max(1, Math.round(repSeconds / 60)),
     restMin: Math.max(1, Math.round(restSeconds / 60)),
   };
+}
+
+// Viada p247: "extend recovery periods by 25 percent".
+const RACE_TEMPO_RECOVERY_FACTOR = 1.25;
+/** One work token at p247's race tempo: work at race pace, recoveries 25 percent longer. Others pass through. */
+function raceTempoToken(tok: string): string {
+  const longer = (sec: number) => Math.round(sec * RACE_TEMPO_RECOVERY_FACTOR);
+  const iv = tok.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_R(\d+)s)?$/);
+  if (iv) {
+    const reps = Number(iv[1]), work = Number(iv[2]), rest = iv[4] ? Number(iv[4]) : 0;
+    const segs: string[] = [];
+    for (let i = 0; i < reps; i++) {
+      segs.push(`${work}sracepace`);
+      if (rest > 0 && i < reps - 1) segs.push(`r${longer(rest)}svt1`);
+    }
+    return `round_1x_${segs.join('-')}`;
+  }
+  const rd = tok.match(/^round_(\d+)x_([^_]+(?:-[^_]+)*)(?:_R(\d+)s)?$/);
+  if (rd) {
+    const segs = rd[2].split('-').map((seg) => {
+      const m = seg.match(/^(r?)(\d+)s(.+)$/);
+      if (!m) return seg;
+      const recovery = m[1] === 'r' || m[3] === 'vt1' || m[3] === 'easy';
+      return recovery ? `${m[1]}${longer(Number(m[2]))}s${m[3]}` : `${m[2]}sracepace`;
+    });
+    return `round_${rd[1]}x_${segs.join('-')}${rd[3] ? `_R${longer(Number(rd[3]))}s` : ''}`;
+  }
+  return tok;
 }
 
 /**
@@ -769,6 +802,14 @@ export function translateEnduranceSession(
   const label = FAMILY_LABEL[session.family] ?? (sport === 'ride' ? 'Ride' : sport === 'swim' ? 'Swim' : 'Run');
   const raceTempo = opts?.raceTempo === true;
   /**
+   * ⛔⛔ THE RACE-TEMPO ROW BUILDS WHAT ITS SENTENCE SAYS (2026-09-18, book-language pass 4, audit item 22). p247: "If
+   * within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25 percent." Only
+   * the name and the sentence changed before; the steps stayed p233's 90% with 60 s rests. Every work step now goes at
+   * race pace (no number: race pace is the race's, and an unresolved target stays unresolved) and every recovery runs
+   * 25 percent longer, rounded to the second.
+   */
+  if (raceTempo && sport === 'run') work = work.map(raceTempoToken);
+  /**
    * ⛔ THE ARCHETYPE'S PAGE WHERE THERE IS ONE, THE FAMILY'S OTHERWISE — see `TranslatedSession.cite`.
    * ⚠️ Read off the same tables the session was BUILT from, never a second list: a citation kept
    * beside the thing it cites cannot drift from it.
@@ -848,8 +889,8 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
  * failing in a car park.
  */
 export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
-  { shape: /^warmup_run_\d+min_easy$/, example: 'warmup_run_10min_easy' },
-  { shape: /^cooldown_run_\d+min_easy$/, example: 'cooldown_run_8min_easy' },
+  // ⛔ ONE BOX LINE PER TOKEN (2026-09-18) — `wrap_{family}_warm{i}` / `_cool{i}`, read back from `WRAPPERS`.
+  { shape: /^wrap_[a-z0-9_]+?_(?:warm|cool)\d+$/, example: 'wrap_ride_vo2_warm1' },
   { shape: /^run_easy_\d+min$/, example: 'run_easy_30min' },
   { shape: /^longrun_\d+min_easypace$/, example: 'longrun_90min_easypace' },
   // ⛔ `cruise_` IS NO LONGER EMITTED (2026-09-08) — `run_near_threshold` prescribes SECONDS and now
@@ -861,8 +902,7 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   // Plan existed; it emits one untargeted work step per stride and a walk/jog between.
   { shape: /^strides_\d+x\d+s$/, example: 'strides_6x20s' },
   // ⛔ SLICE 4 — the ride and swim tokens, all of them already parsed by the materializer.
-  { shape: /^warmup_bike_quality_\d+min_fastpedal$/, example: 'warmup_bike_quality_15min_fastpedal' },
-  { shape: /^cooldown_bike_\d+min$/, example: 'cooldown_bike_10min' },
+
   { shape: /^bike_ss_\d+x\d+min_R\d+min$/, example: 'bike_ss_3x12min_R4min' },
   { shape: /^bike_thr_\d+x\d+min_R\d+min$/, example: 'bike_thr_4x8min_R5min' },
   // ⛔ THE ANAEROBIC RIDE (2026-08-30) — the 110-120% band, `expandBikeToken`'s `bike_vo2_` rule.
@@ -890,6 +930,7 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
  * if their regexes move, this list is stale and the gate that reads it is the tripwire.
  */
 export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
+  /^wrap_([a-z0-9_]+?)_(warm|cool)(\d+)$/,
   /warmup_bike_quality_\d+min_fastpedal/,
   /cooldown_bike_\d+min/,
   /bike_ss_(\d+)x(\d+)min_r(\d+)min/i,
@@ -914,6 +955,7 @@ export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
  * if the expander's regexes move, this list is stale and the test that reads it is the tripwire.
  */
 export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
+  /^wrap_([a-z0-9_]+?)_(warm|cool)(\d+)$/,
   /warmup_.*_\d+min/,
   /cooldown.*\d+min/,
   /run_easy_\d+min/,

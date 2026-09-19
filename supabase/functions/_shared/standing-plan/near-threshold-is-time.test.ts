@@ -33,6 +33,7 @@ import { archetypesFor } from '../endurance-library/index.ts';
 import { parseQualityWork } from '../plan-tokens/quality-work.ts';
 import { composeWeek } from './compose.ts';
 import { defaultCompetitionLifts } from './frame-resolver.ts';
+import { wrapperStepForToken } from '../endurance-library/source-rules.ts';
 
 /** ⛔ NO THRESHOLD ON FILE — the designed state after 2026-09-02, and the one that produced the 25. */
 const NO_THRESHOLD = {
@@ -53,10 +54,9 @@ const tokensFor = (family: string, level: number, archetype?: string) =>
 
 /** Minutes a token block accounts for, the way `expandRunToken` and the row's duration sum do. */
 function minutesOf(token: string): number {
-  const warm = token.match(/^warmup_run_(\d+)min_easy$/);
-  if (warm) return Number(warm[1]);
-  const cool = token.match(/^cooldown_run_(\d+)min_easy$/);
-  if (cool) return Number(cool[1]);
+  // ⛔ ONE LINE OF THE PAGE'S BOX PER TOKEN since 2026-09-18 (book-language pass 4); a drill has no clock.
+  const wrap = wrapperStepForToken(token);
+  if (wrap) return (wrap.seconds ?? 0) / 60;
   // ⛔ THE TIME-INTERVAL SHAPE — reps of work, the rest skipped after the last, as the expander does.
   const iv = token.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_[rR](\d+)s)?$/);
   if (iv) {
@@ -91,7 +91,7 @@ Deno.test('⛔⛔ EVERY NEAR-THRESHOLD VARIANT TRAVELS AS TIME, WITH ITS OWN REP
     const offered = archetypesFor('run_near_threshold' as never, level as never).map((a) => a.id);
     for (const archetype of [undefined, ...offered]) {
       const t = tokensFor('run_near_threshold', level, archetype);
-      const work = t.steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
+      const work = t.steps_preset.find((x) => !/^(warmup|cooldown|wrap)_/.test(x))!;
       const label = `${archetype ?? 'rotation default'} @L${level}`;
       assert(!/cruise_/.test(work), `${label}: back on the distance token — ${work}`);
       /**
@@ -164,7 +164,7 @@ Deno.test('⛔ AND EVERY FRAME\'S NEAR-THRESHOLD SLOT IS COVERED — both column
         for (const slot of (day.endurance ?? []) as { family: string; level: number; archetype?: string }[]) {
           if (slot.family !== 'run_near_threshold') continue;
           const work = tokensFor(slot.family, slot.level, slot.archetype)
-            .steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
+            .steps_preset.find((x) => !/^(warmup|cooldown|wrap)_/.test(x))!;
           // ⚠️ A ROUND IS TIME TOO (2026-09-11) — the compound shapes travel on the round grammar.
           assert(/^(interval_\d+x\d+s_\d+pct|round_\d+x_)/.test(work),
             `${frame}/${column} day ${day.day}: ${work}`);
@@ -179,7 +179,7 @@ Deno.test('⛔ AND EVERY FRAME\'S NEAR-THRESHOLD SLOT IS COVERED — both column
 Deno.test('⛔ THE MLSS SLOT SHARES THE PATH AND WAS ALREADY TIME-BASED — asserted, not assumed', () => {
   // p231's surge and float is several intensities inside one round; `round_` carries seconds.
   const t = tokensFor('run_mlss', 2);
-  const work = t.steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
+  const work = t.steps_preset.find((x) => !/^(warmup|cooldown|wrap)_/.test(x))!;
   assert(/^round_\d+x_/.test(work), `the MLSS slot stopped being time-based: ${work}`);
   assert(!/mi_/.test(work), `the MLSS slot gained a distance: ${work}`);
 });
@@ -224,7 +224,11 @@ Deno.test('⛔⛔ WEDNESDAY ROTATES p234\'S THREE QUALIFYING LEVEL-3 SESSIONS, A
   };
   for (const [id, [token, minutes]] of Object.entries(expected)) {
     const t = tokensFor('run_near_threshold', 3, id);
-    assertEquals(t.steps_preset, ['warmup_run_10min_easy', token, 'cooldown_run_8min_easy'], id);
+    // p233's box, line by line: the 10-minute jog, the lunges, the Cossack squats; the 8-minute jog after.
+    assertEquals(t.steps_preset, [
+      'wrap_run_near_threshold_warm0', 'wrap_run_near_threshold_warm1', 'wrap_run_near_threshold_warm2',
+      token, 'wrap_run_near_threshold_cool0',
+    ], id);
     assertEquals(t.duration, minutes, `${id} is not ${minutes} minutes`);
   }
 

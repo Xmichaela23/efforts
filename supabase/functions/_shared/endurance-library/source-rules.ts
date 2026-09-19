@@ -134,28 +134,47 @@ export type WrapperSpec = {
 const easy: Intensity = { kind: 'easy' };
 const drill: Intensity = { kind: 'drill' };
 
+/**
+ * ⛔⛔ EVERY LABEL IS THE BOX'S OWN LINE (2026-09-18, book-language pass 4), read off the page photographs. The labels
+ * were short names of ours ("Easy jog", "Steady effort") and the whole box reached the row as ONE timed warm-up step —
+ * the lunges and Cossack squats never reached the athlete, and every ride warm-up became one block at an OURS 55–70%
+ * of FTP. Each line now travels as its own step (`session-vocabulary.ts` `wrapperTokens`, `wrapperStepForToken`
+ * below), with these words on the screen and the watch.
+ */
+
 /** p229 — the running sprint/power box. */
 const RUN_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy jog', seconds: 5 * 60, intensity: easy },
-    { label: 'Walking lunges, 3 sets of 20 m', seconds: null, intensity: drill },
-    { label: 'Butt kicks, 2 rounds of 30 seconds', seconds: 2 * 30, intensity: drill },
-    { label: 'Arm-pump drills, 3 rounds of seated / standing / high elbows, 10 seconds each',
+    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy },
+    { label: '3 sets of 20 meter walking lunges', seconds: null, intensity: drill },
+    { label: '2 x 30-second rounds of butt kicks', seconds: 2 * 30, intensity: drill },
+    { label: 'Perform 3 rounds of the following: 10 seconds seated arm pump drill, 10 seconds standing arm pump drill, 10 seconds "high elbows"',
       seconds: 3 * 30, intensity: drill },
   ],
-  cooldown: [{ label: 'Easy jog or cross-training spin', seconds: 5 * 60, intensity: easy }],
+  cooldown: [{ label: '5-minute easy jog or cross-training/bike', seconds: 5 * 60, intensity: easy }],
   cite: 'Viada p229',
 };
 
-/** p231 (MLSS) and p233 (near-threshold) print the same box. */
-const RUN_THRESHOLD_WRAPPER: WrapperSpec = {
+/** p231 (MLSS). */
+const RUN_MLSS_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy jog', seconds: 10 * 60, intensity: easy },
-    { label: 'Walking lunges, 3 sets of 20 m', seconds: null, intensity: drill },
-    { label: 'Cossack squats, 2 sets of 10 per side', seconds: null, intensity: drill },
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
+    { label: '2 sets of 10 per side Cossack squats', seconds: null, intensity: drill },
   ],
-  cooldown: [{ label: 'Easy jog', seconds: 8 * 60, intensity: easy }],
-  cite: 'Viada p231, p233',
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cite: 'Viada p231',
+};
+
+/** p233 (near-threshold) prints the same box, with "(per side)" in brackets. */
+const RUN_NT_WRAPPER: WrapperSpec = {
+  warmup: [
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
+    { label: '2 sets of 10 (per side) Cossack squats', seconds: null, intensity: drill },
+  ],
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cite: 'Viada p233',
 };
 
 /**
@@ -165,20 +184,26 @@ const RUN_THRESHOLD_WRAPPER: WrapperSpec = {
  */
 const NO_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada p235 — no wrapper printed' };
 
-/** p236 — cycling sprints. ⚠️ No cooldown box is printed for ANY cycling family. */
+/**
+ * p236 — cycling sprints. ⚠️ No cooldown box is printed for ANY cycling family. The cadence sprints are one step of
+ * the four sprints and the three 3-minute rests between them (600 s), carrying the page's whole line.
+ */
 const RIDE_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy spin', seconds: 10 * 60, intensity: easy },
-    { label: 'Cadence-only sprints, 4 x 15 seconds, 3-minute rest between', seconds: 4 * 15 + 3 * 3 * 60,
-      intensity: drill },
+    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy },
+    { label: '4 cadence only 15-second sprints to build up the leg speed and focus on timing and technique with 3-minute rest between',
+      seconds: 4 * 15 + 3 * 3 * 60, intensity: drill },
   ],
   cooldown: [],
   cite: 'Viada p236',
 };
 
-/** p237 (anaerobic) and p238 (sweet spot) print the same 10-15 minute box. */
+/**
+ * p237 (anaerobic) and p238 (sweet spot) print the same box: "10- to 15-minute easy spin". The watch needs one length;
+ * 12:30 is the middle of the page's range — OURS, the pick inside it (the label prints the page's range).
+ */
 const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
-  warmup: [{ label: 'Easy spin', seconds: 12 * 60 + 30, intensity: easy }],
+  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy }],
   cooldown: [],
   cite: 'Viada p237, p238 — "10- to 15-minute easy spin"; the midpoint of his own range',
 };
@@ -186,9 +211,9 @@ const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
 /** p238 — the VO2 box, the only cycling warm-up with an effort in it. */
 const RIDE_VO2_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy spin', seconds: 15 * 60, intensity: easy },
-    { label: 'Steady effort', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },
-    { label: 'Easy spin', seconds: 5 * 60, intensity: easy },
+    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy },
+    { label: '5 minutes @ 95%', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },
+    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy },
   ],
   cooldown: [],
   cite: 'Viada p238',
@@ -205,8 +230,8 @@ const SWIM_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada pp240
 
 export const WRAPPERS: Record<FamilyId, WrapperSpec> = {
   run_sprint_power: RUN_SPRINT_WRAPPER,
-  run_mlss: RUN_THRESHOLD_WRAPPER,
-  run_near_threshold: RUN_THRESHOLD_WRAPPER,
+  run_mlss: RUN_MLSS_WRAPPER,
+  run_near_threshold: RUN_NT_WRAPPER,
   run_vt1: NO_WRAPPER,
   run_lsd: NO_WRAPPER,
   ride_sprints: RIDE_SPRINT_WRAPPER,
@@ -218,6 +243,27 @@ export const WRAPPERS: Record<FamilyId, WrapperSpec> = {
   swim_speed: SWIM_WRAPPER,
   swim_open_water: SWIM_WRAPPER,
 };
+
+/**
+ * ⛔ ONE BOX LINE AS ITS OWN TOKEN (2026-09-18, book-language pass 4): `wrap_{family}_warm{i}` / `wrap_{family}_cool{i}`
+ * names line i of the family's box above. The materializer reads the line back from here — its seconds (null = the
+ * lap button; the page times no drill), its intensity and its words — so the page's box reaches the row and the watch
+ * line by line, from this one place.
+ */
+export const WRAPPER_TOKEN = /^wrap_([a-z0-9_]+?)_(warm|cool)(\d+)$/;
+export function wrapperToken(family: FamilyId, part: 'warmup' | 'cooldown', index: number): string {
+  return `wrap_${family}_${part === 'warmup' ? 'warm' : 'cool'}${index}`;
+}
+export function wrapperStepForToken(token: string): {
+  kind: 'warmup' | 'cooldown'; seconds: number | null; label: string; intensity: Intensity;
+} | null {
+  const m = String(token ?? '').toLowerCase().match(WRAPPER_TOKEN);
+  if (!m) return null;
+  const spec = (WRAPPERS as Record<string, WrapperSpec>)[m[1]];
+  const kind = m[2] === 'warm' ? 'warmup' : 'cooldown';
+  const line = spec?.[kind]?.[Number(m[3])];
+  return line ? { kind, seconds: line.seconds, label: line.label, intensity: line.intensity } : null;
+}
 
 // ── THE WORK-VOLUME BAND, PER FAMILY x LEVEL ────────────────────────────────────────────────────
 

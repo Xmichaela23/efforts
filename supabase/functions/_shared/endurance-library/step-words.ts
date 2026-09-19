@@ -46,6 +46,8 @@ export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = 
     race_repeats: { between: 'recovery walk/jog' },
     // p233 / p234: "1-minute easy jog".
     surge_opener: { inRound: 'easy jog' },
+    // p247, the race-tempo row (any shape): "increase the pace here to race pace".
+    '*': { racePace: 'race pace' },
   },
   run_lsd: {
     // p235: "5 minutes @ race pace finish", "10 minutes @ race pace finish", "15 minutes @ race pace finish".
@@ -100,7 +102,9 @@ export function stepWordFor(
   which: keyof StepWords,
 ): string | null {
   if (!family || !archetype) return null;
-  const w = (STEP_WORDS as Record<string, Record<string, StepWords>>)[family]?.[archetype]?.[which];
+  const fam = (STEP_WORDS as Record<string, Record<string, StepWords>>)[family];
+  // `*` is a word the page gives the family whatever its shape (p247's race pace on the near-threshold run).
+  const w = fam?.[archetype]?.[which] ?? fam?.['*']?.[which];
   if (w == null) return null;
   if (typeof w === 'string') return w;
   const lv = Number(level);

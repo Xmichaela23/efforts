@@ -829,12 +829,14 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   })()
   /**
    * ⛔ THE SESSION NOTE GOES WITH A RIDE (Michael, 2026-09-18) — the row's `description`, the same note the Planned
-   * tab shows and the Intervals.icu send carries. One note, one more destination; runs and swims unchanged.
+   * tab shows and the Intervals.icu send carries.
+   * ⛔ AND WITH A RUN, THE SAME WAY (2026-09-18, book-language pass 4, audit §4): the talk test (p235), the MLSS hills
+   * line (p231), the race-tempo sentence (p247) and the run test's protocol (p210) stayed in the app. Swims unchanged.
    */
-  const rideNote = sport === 'CYCLING' ? String((workout as any)?.description ?? '').trim() : ''
+  const sessionNote = sport === 'CYCLING' || sport === 'RUNNING' ? String((workout as any)?.description ?? '').trim() : ''
   return {
     workoutName: workout.name,
-    ...(rideNote ? { description: rideNote } : {}),
+    ...(sessionNote ? { description: sessionNote } : {}),
     sport,
     ...(isSwimSport ? poolFields : {}),
     ...(typeof estSecs === 'number' ? { estimatedDurationInSecs: estSecs } : {}),
