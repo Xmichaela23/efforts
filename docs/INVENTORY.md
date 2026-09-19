@@ -462,13 +462,13 @@ no-deploy.**
 |---|---|
 | `index.ts` | `adapt-plan` · `generate-run-plan` |
 
-### `supabase/functions/_shared/plan-tokens/` — 1 file · anything in it → 18 functions
+### `supabase/functions/_shared/plan-tokens/` — 1 file · anything in it → 19 functions
 
-`analyze-cycling-workout` · `calendar-sync` · `coach` · `compute-session-boom` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `ingest-phone-workout` · `materialize-plan` · `rematerialize-standing-block` · `send-workout-to-garmin` · `swap-list` · `swap-session` · `workout-detail`
+`analyze-cycling-workout` · `analyze-running-workout` · `calendar-sync` · `coach` · `compute-session-boom` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `ingest-phone-workout` · `materialize-plan` · `rematerialize-standing-block` · `send-workout-to-garmin` · `swap-list` · `swap-session` · `workout-detail`
 
 | touch this file | redeploy these |
 |---|---|
-| `quality-work.ts` | `analyze-cycling-workout` · `calendar-sync` · `coach` · `compute-session-boom` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `ingest-phone-workout` · `materialize-plan` · `rematerialize-standing-block` · `send-workout-to-garmin` · `swap-list` · `swap-session` · `workout-detail` |
+| `quality-work.ts` | `analyze-cycling-workout` · `analyze-running-workout` · `calendar-sync` · `coach` · `compute-session-boom` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-arc-context` · `ingest-phone-workout` · `materialize-plan` · `rematerialize-standing-block` · `send-workout-to-garmin` · `swap-list` · `swap-session` · `workout-detail` |
 
 ### `supabase/functions/_shared/race-readiness/` — 2 files · anything in it → 11 functions
 

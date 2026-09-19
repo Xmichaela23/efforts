@@ -160,6 +160,31 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
  */
 export const SINGLE_PERCENT_BAND = 0.10;
 
+/**
+ * ⛔⛔ THE ONE BAND AROUND A SINGLE TARGET NUMBER — WATTS AND RUN PACE (round 4, 2026-09-18, Michael approved).
+ * FIELD — TrainingPeaks help, "Workout Builder" (help.trainingpeaks.com, article 115001844087): "the range on your
+ * device will show +/- 10% from the interval target … to avoid triggering device alerts/beeps". Every place that
+ * turns one number into a range reads this function: the plan's watts (`wattsAt`), the plan's run pace
+ * (`materialize-plan toV3Step`, which replaced our ±2% work / ±6% other steps), the ride score
+ * (`ride-power.ts judgedPowerRange`), the Garmin send (power and pace, `garmin/convert-workout.ts`) and the
+ * analyzers' token fallback (`token-parser.ts`, which replaced our ±5% / ±10%). A run pace is banded in seconds per
+ * mile, the unit the plan writes it in.
+ *
+ * `capAt`: the top never passes this number — the FTP cap on a single percentage at or below 100% (`wattsAt`, OURS).
+ * `round: false` keeps the raw ends, for a caller that converts them further (a pace to a speed in m/s).
+ */
+export function singleTargetBand(
+  value: number,
+  opts: { capAt?: number | null; round?: boolean } = {},
+): { lower: number; upper: number } {
+  const r = opts.round === false ? (x: number) => x : Math.round;
+  const top = value * (1 + SINGLE_PERCENT_BAND);
+  return {
+    lower: r(value * (1 - SINGLE_PERCENT_BAND)),
+    upper: r(opts.capAt != null && Number.isFinite(opts.capAt) ? Math.min(top, opts.capAt) : top),
+  };
+}
+
 // ⛔ `FLOOR_ONLY_SENT_CEILING_PCT_OF_FTP` (130% of FTP, filled in as the ceiling of p237's floor on the Garmin and
 // Intervals.icu sends) IS DELETED (2026-09-18, round 3, audit item 16): the sends print the floor's words and hold no
 // ceiling, the same as the screen (`ride-power.ts oneSidedPowerText`).
@@ -209,11 +234,8 @@ export function wattsAt(
      * 100% keeps its own band. The cap is pp238–239's "as close to threshold as possible without exceeding it";
      * OURS — applying it to every single number at or below 100%, not only sweet spot, so one percentage is one range.
      */
-    const top = lo <= 1 ? Math.min(lo * (1 + SINGLE_PERCENT_BAND), 1) : lo * (1 + SINGLE_PERCENT_BAND);
-    return {
-      lower: Math.round(lo * f * (1 - SINGLE_PERCENT_BAND)),
-      upper: Math.round(top * f),
-    };
+    // OURS — `wattsAt` the FTP cap on every single percentage at or below 100% (pp238–239 extended); ledger row in docs/STATE-SOURCES.md
+    return singleTargetBand(lo * f, { capAt: lo <= 1 ? f : null });
   }
   return { lower: Math.round(lo * f), upper: Math.round(hi * f) };
 }

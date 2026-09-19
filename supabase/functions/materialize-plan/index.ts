@@ -41,6 +41,7 @@ import {
   qualityRunSteps,
   wattsAt,
   EASY_RIDE_CEILING_PCT_OF_FTP,
+  singleTargetBand,
 } from '../_shared/plan-tokens/quality-work.ts';
 // ⛔ THE RIDE TYPE'S OWN RULE — p237 floor, pp238–239 never over threshold (`ridePowerRuleOf`). The tag on the row
 // names the family; the library states the rule, so the materializer does not carry a second list.
@@ -4071,19 +4072,13 @@ export function toV3Step(st: any, row?: any): any {
       // Race day: fixed pace, no range (exact M pace target)
       out.pace_range = { lower: st.pace_sec_per_mi, upper: st.pace_sec_per_mi };
     } else {
-      // Calculate pace range with appropriate tolerance
-      // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
-      // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
-      const paceSec = st.pace_sec_per_mi;
-      // OURS — `toV3Step` `tolerance` ±2% work / ±6% other steps. The "Garmin/TrainingPeaks standards" line above
-      // names no document; grep of STATE-SOURCES and DECISIONS-LOG finds no such figure. Kept as found.
-      const tolerance = (st?.kind === 'work') 
-        ? 0.02   // ±2% for quality work (~10-20s for most paces)
-        : 0.06;  // ±6% for easy runs (~30-60s for most paces)
-      
-      const lower = Math.round(paceSec * (1 - tolerance));
-      const upper = Math.round(paceSec * (1 + tolerance));
-      out.pace_range = { lower, upper };
+      /**
+       * ⛔ A SINGLE PACE GETS THE ONE BAND (round 4, 2026-09-18, Michael approved): FIELD — TrainingPeaks' ±10% of the
+       * interval target, `singleTargetBand` in `_shared/plan-tokens/quality-work.ts`, the same band the watts get.
+       * Replaces our ±2% on work steps and ±6% on the rest (OURS, no source). A step with its own range (the easy
+       * pace range, below) keeps it.
+       */
+      out.pace_range = singleTargetBand(st.pace_sec_per_mi);
     }
   }
   if (Array.isArray(st?.pace_range) && st.pace_range.length===2) {

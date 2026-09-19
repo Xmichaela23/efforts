@@ -9,6 +9,9 @@
 // =============================================================================
 
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
+// ⛔ EVERY PACE BAND HERE IS THE ONE BAND (round 4, 2026-09-18): FIELD — TrainingPeaks ±10% of the target
+// (`singleTargetBand`). Replaces our ±10% easy / long and ±5% interval / tempo bands.
+import { SINGLE_PERCENT_BAND, singleTargetBand } from './plan-tokens/quality-work.ts';
 
 export interface ParsedRunStructure {
   segments: RunSegment[];
@@ -99,12 +102,10 @@ function parseToken(token: string, baselines: UserBaselines): RunSegment[] {
 function easyPaceTarget(baselines: UserBaselines): RunSegment['target_pace'] | undefined {
   const targetPace = parsePaceString(baselines.easyPace) ?? null;
   if (targetPace == null || !(targetPace > 0)) return undefined;   // unknown -> no target. Never a literal.
-  // OURS — `easyPaceTarget` ±10 % pace band: no source, kept as found
-  const tolerance = 0.10;
+  const tolerance = SINGLE_PERCENT_BAND;
   return {
     target: targetPace,
-    lower: Math.round(targetPace * (1 - tolerance)),
-    upper: Math.round(targetPace * (1 + tolerance)),
+    ...singleTargetBand(targetPace),
     tolerance,
   };
 }
@@ -143,10 +144,9 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
     const restSeconds = (restUnit === 'm' || restUnit === 'min') ? restDuration * 60 : restDuration;
     const targetPace = getPaceFromReference(paceRef, baselines);
     if (!targetPace) return segments;
-    // OURS — interval ±5 % pace band: no source, kept as found
-    const tolerance = 0.05;
+    const tolerance = SINGLE_PERCENT_BAND;
     for (let i = 0; i < reps; i++) {
-      segments.push({ type: 'work', distance, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } });
+      segments.push({ type: 'work', distance, target_pace: { target: targetPace, ...singleTargetBand(targetPace), tolerance } });
       if (i < reps - 1) segments.push({ type: 'rest', duration: restSeconds });
     }
     return segments;
@@ -162,11 +162,10 @@ function parseIntervalToken(token: string, baselines: UserBaselines): RunSegment
   const restSeconds = (restUnit === 'm' || restUnit === 'min') ? restDuration * 60 : restDuration;
   const targetPace = getPaceFromReference(paceRef, baselines);
   if (!targetPace) return segments;
-  // OURS — interval ±5 % pace band: no source, kept as found
-  const tolerance = 0.05;
+  const tolerance = SINGLE_PERCENT_BAND;
   for (let i = 0; i < reps; i++) {
     const expectedDuration = Math.round((distance / 1609) * targetPace);
-    segments.push({ type: 'work', distance, duration: expectedDuration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } });
+    segments.push({ type: 'work', distance, duration: expectedDuration, target_pace: { target: targetPace, ...singleTargetBand(targetPace), tolerance } });
     if (i < reps - 1) segments.push({ type: 'rest', duration: restSeconds });
   }
   return segments;
@@ -179,9 +178,8 @@ function parseTempoToken(token: string, baselines: UserBaselines): RunSegment | 
     const basePace = getPaceFromReference(durationMatch[2], baselines);
     if (!basePace) return null;
     const targetPace = basePace + parseInt(durationMatch[3]) * 60 + parseInt(durationMatch[4]);
-    // OURS — ±5 % pace band: no source, kept as found
-    const tolerance = 0.05;
-    return { type: 'work', duration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
+    const tolerance = SINGLE_PERCENT_BAND;
+    return { type: 'work', duration, target_pace: { target: targetPace, ...singleTargetBand(targetPace), tolerance } };
   }
   const distanceMatch = token.match(/tempo_(\d+)mi_(\w+)_plus(\d+):(\d+)/);
   if (distanceMatch) {
@@ -189,9 +187,8 @@ function parseTempoToken(token: string, baselines: UserBaselines): RunSegment | 
     const basePace = getPaceFromReference(distanceMatch[2], baselines);
     if (!basePace) return null;
     const targetPace = basePace + parseInt(distanceMatch[3]) * 60 + parseInt(distanceMatch[4]);
-    // OURS — ±5 % pace band: no source, kept as found
-    const tolerance = 0.05;
-    return { type: 'work', distance, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
+    const tolerance = SINGLE_PERCENT_BAND;
+    return { type: 'work', distance, target_pace: { target: targetPace, ...singleTargetBand(targetPace), tolerance } };
   }
   return null;
 }
@@ -202,9 +199,8 @@ function parseLongRunToken(token: string, baselines: UserBaselines): RunSegment 
   const duration = parseInt(durationMatch[1]) * 60;
   const targetPace = getPaceFromReference(durationMatch[2], baselines);
   if (!targetPace) return null;
-  // OURS — `parseLongRunToken` ±10 % pace band: no source, kept as found
-  const tolerance = 0.10;
-  return { type: 'work', duration, target_pace: { target: targetPace, lower: Math.round(targetPace * (1 - tolerance)), upper: Math.round(targetPace * (1 + tolerance)), tolerance } };
+  const tolerance = SINGLE_PERCENT_BAND;
+  return { type: 'work', duration, target_pace: { target: targetPace, ...singleTargetBand(targetPace), tolerance } };
 }
 
 function parseEasyRunToken(token: string, baselines: UserBaselines): RunSegment | null {

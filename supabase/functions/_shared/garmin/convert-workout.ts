@@ -4,7 +4,7 @@
 import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
 // ⛔ ONE BAND AROUND A SINGLE PERCENTAGE, DEFINED ONCE (2026-09-15) — see the note on the constant.
 // The floor-only ceiling (p237's own top, 130% of FTP) is defined there too, once, for both senders.
-import { SINGLE_PERCENT_BAND } from '../plan-tokens/quality-work.ts'
+import { singleTargetBand } from '../plan-tokens/quality-work.ts'
 import { oneSidedPowerText } from '../ride-power.ts'
 import { judgedPowerRange } from '../ride-power.ts'
 
@@ -181,20 +181,11 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           step.targetValueHigh = toSpeed(rangeLow) // faster pace → higher speed
           delete (step as any).targetValue
         } else if (typeof secPerMi === 'number') {
-          // Prefer a range: widen around the single pace based on intensity/duration
-          const paceStr = secPerMiToPaceStr(secPerMi)
-          const widened = widenPaceToRangeMetersPerSecond(
-            paceStr,
-            step.intensity || '',
-            {
-              durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any,
-              distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any
-            }
-          )
-          const center = toSpeed(secPerMi)
-          // OURS — `applyComputedTargetIfMissing` a single pace with no widening goes as ±3% speed (×0.97 / ×1.03); no source, kept as found
-          step.targetValueLow = widened ? widened.low : center * 0.97
-          step.targetValueHigh = widened ? widened.high : center * 1.03
+          // A single pace: the one band (FIELD — TrainingPeaks ±10%, `singleTargetBand`), in seconds per mile as the
+          // plan writes it. Replaces our duration-bucket widening and ×0.97 / ×1.03 (round 4, 2026-09-18).
+          const band = singleTargetBand(secPerMi, { round: false })
+          step.targetValueLow = toSpeed(band.upper) // slower pace → lower speed
+          step.targetValueHigh = toSpeed(band.lower)
           delete (step as any).targetValue
         }
       }
@@ -247,8 +238,9 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           const center = parseW((cs as any)?.target_watts ?? (cs as any)?.targetWatts ?? (cs as any)?.target_value ?? (cs as any)?.powerTarget)
           if (typeof center === 'number' && isFinite(center)) {
             step.targetType = 'POWER'
-            step.targetValueLow = Math.round(center * (1 - SINGLE_PERCENT_BAND))
-            step.targetValueHigh = Math.round(center * (1 + SINGLE_PERCENT_BAND))
+            const band = singleTargetBand(center)
+            step.targetValueLow = band.lower
+            step.targetValueHigh = band.upper
           } else {
             // Try % of FTP → watts
             const pctLow = parsePct((cs as any)?.power_pct_range?.lower ?? (cs as any)?.powerPercentRange?.lower ?? (cs as any)?.pct_low ?? (cs as any)?.powerPctLow)
@@ -260,8 +252,9 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               step.targetValueHigh = Math.round(userFTP * pctHigh)
             } else if (userFTP && typeof pct === 'number') {
               step.targetType = 'POWER'
-              step.targetValueLow = Math.round(userFTP * pct * (1 - SINGLE_PERCENT_BAND))
-              step.targetValueHigh = Math.round(userFTP * pct * (1 + SINGLE_PERCENT_BAND))
+              const band = singleTargetBand(userFTP * pct)
+              step.targetValueLow = band.lower
+              step.targetValueHigh = band.upper
             }
           }
         }
@@ -937,54 +930,6 @@ function parsePaceToMetersPerSecond(pace: string): { value?: number; low?: numbe
   return null
 }
 
-function widenPaceToRangeMetersPerSecond(pace: string, intensity: string, opts?: { durationSec?: number; distanceMeters?: number }): { low: number; high: number } | null {
-  // Accepts pace like "7:00/mi" or "4:20/km"; returns m/s bounds with science-based tolerances
-  if (!pace) return null
-  const mi = pace.includes('/mi')
-  const km = pace.includes('/km')
-  if (!mi && !km) return null
-  const parts = pace.replace('/mi','').replace('/km','').split(':').map(p=>parseInt(p.trim(),10))
-  if (parts.some(n=>Number.isNaN(n))) return null
-  let secs = 0
-  if (parts.length === 2) secs = parts[0]*60 + parts[1]
-  else if (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2]
-  if (secs <= 0) return null
-  // Science-based tolerances
-  const upper = (intensity || '').toUpperCase()
-  const d = Math.max(0, Number(opts?.durationSec || 0))
-  const distM = Math.max(0, Number(opts?.distanceMeters || 0))
-
-  // Determine bucket: short reps, tempo/threshold, or endurance
-  let bucket: 'short' | 'tempo' | 'endurance' = 'endurance'
-  if (d > 0) {
-    // OURS — `widenPaceToRangeMetersPerSecond` buckets: a rep of 5 min or 1200 m or less is short, 10–30 min or 3200–10000 m is tempo, else endurance; no source (the "science-based" note above cites nothing), kept as found
-    if (d <= 5 * 60) bucket = 'short'
-    else if (d >= 10 * 60 && d <= 30 * 60) bucket = 'tempo'
-    else bucket = 'endurance'
-  } else if (distM > 0) {
-    if (distM <= 1200) bucket = 'short'
-    else if (distM >= 3200 && distM <= 10000) bucket = 'tempo'
-    else bucket = 'endurance'
-  } else {
-    // Fallback to intensity label if no duration/distance
-    if (upper.includes('INTERVAL') || upper.includes('VO2')) bucket = 'short'
-    else if (upper.includes('TEMPO') || upper.includes('THRESHOLD')) bucket = 'tempo'
-    else bucket = 'endurance'
-  }
-
-  let delta = 0
-  // OURS — `widenPaceToRangeMetersPerSecond` a single pace widened ±4 / 7 / 12 s per mile (±3 / 5 / 8 s per km) by bucket; no source, kept as found
-  if (bucket === 'short') delta = mi ? 4 : 3
-  else if (bucket === 'tempo') delta = mi ? 7 : 5
-  else delta = mi ? 12 : 8
-
-  // FIELD — definition (1 mi = 1609.344 m; 1.60934 / 1609.34 as written)
-  const unitMeters = mi ? 1609.34 : 1000
-  const lowSpeed = unitMeters / (secs + delta) // slower pace -> lower speed
-  const highSpeed = unitMeters / (secs - delta) // faster pace -> higher speed
-  return { low: Math.min(lowSpeed, highSpeed), high: Math.max(lowSpeed, highSpeed) }
-}
-
 function parseRangeNumber(text: string): { value?: number; low?: number; high?: number } {
   // Accepts "250W", "250-300W", "150-160", "85"
   const cleaned = text.replace(/[^0-9\-\.]/g, '')
@@ -1010,11 +955,11 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
         step.targetValueLow = parsed.low
         step.targetValueHigh = parsed.high
       } else if (parsed.value != null) {
-        const widened = widenPaceToRangeMetersPerSecond(pace, step.intensity || '', { durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any, distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any })
-        const v = parsed.value
-        // OURS — `applyTargets` a single text pace with no widening goes as ±3% speed (×0.97 / ×1.03); no source, kept as found
-        step.targetValueLow = widened ? widened.low : v * 0.97
-        step.targetValueHigh = widened ? widened.high : v * 1.03
+        // A single text pace: the one band (FIELD — TrainingPeaks ±10%, `singleTargetBand`) on the pace, then back
+        // to speed. Replaces our duration-bucket widening and ×0.97 / ×1.03 (round 4, 2026-09-18).
+        const band = singleTargetBand(1 / parsed.value, { round: false })
+        step.targetValueLow = 1 / band.upper
+        step.targetValueHigh = 1 / band.lower
       }
       delete (step as any).targetValue
       delete (step as any).targetValueType
@@ -1028,12 +973,10 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       step.targetValueLow = pow.low
       step.targetValueHigh = pow.high
     } else if (pow.value != null) {
-      // A single wattage: SINGLE_PERCENT_BAND either side (TrainingPeaks ±10%, `plan-tokens/quality-work.ts`)
-      const base = pow.value
-      // OURS — `applyTargets` the at-least-±1 floor on the single power band; no source, kept as found
-      const band = Math.max(1, Math.round(base * SINGLE_PERCENT_BAND))
-      step.targetValueLow = base - band
-      step.targetValueHigh = base + band
+      // A single wattage: the one band (FIELD — TrainingPeaks ±10%, `singleTargetBand` in `plan-tokens/quality-work.ts`)
+      const band = singleTargetBand(pow.value)
+      step.targetValueLow = band.lower
+      step.targetValueHigh = band.upper
     }
     delete (step as any).targetValue
     delete (step as any).targetValueType
