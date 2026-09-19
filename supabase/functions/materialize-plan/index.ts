@@ -25,6 +25,7 @@ import {
   type SwimDistanceTally,
 } from '../_shared/swim/swim-plan-summary.ts';
 import { formatStrengthExercise, formatStrengthExerciseLines, isStandingDay, loggerStampsForStep, type WeightUnit } from '../_shared/strength/strength-display-lines.ts'
+import { shownName } from '../_shared/strength/shown-name.ts'
 import { plannedTestRowLines } from '../_shared/strength/test-session.ts';
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { plannedStepLines } from '../_shared/planned-step-lines.ts';
@@ -4714,7 +4715,20 @@ Deno.serve(async (req) => {
               testDay && authored?.[i] ? plannedTestRowLines(authored[i], (row as any)?.tags, weightUnit === 'kg') : null;
             // The logger's reserve words and numbers and its intent line (`loggerStampsForStep`), so the phone prints them.
             const standingDay = isStandingDay((row as any)?.tags);
+            // ⛔ ONE SHOWN NAME PER MOVEMENT (2026-09-18, `strength/shown-name.ts`): a row the kit renamed keeps that name
+            // (in the book's "DB" spelling); every other row prints the movement's one name. `name` stays the matching key.
+            const kit: string[] = Array.isArray((baselines as any)?.equipment?.strength) ? (baselines as any).equipment.strength : [];
+            const shownFor = (x: any): string | undefined => {
+              const nm = String(x?.name ?? '').trim();
+              if (!nm) return undefined;
+              const shown = typeof x?.execution_name === 'string' && x.execution_name.trim()
+                ? x.execution_name.trim().replace(/\bdumbbell\b/gi, 'DB')
+                : shownName(nm, kit);
+              return shown && shown !== nm ? shown : undefined;
+            };
             strengthRows.forEach((s: any, i: number) => {
+              const shown = shownFor(s);
+              if (shown) s.execution_name = shown; else delete s.execution_name;
               const own = testLines(i);
               s.display_line = own ? own.join(' · ') : formatStrengthExercise(s, weightUnit);
               delete s.reserve_text; delete s.reserve_lit; delete s.reserve_seed; delete s.intent_line;
@@ -4724,9 +4738,11 @@ Deno.serve(async (req) => {
             if (authored && authored.length && strengthRows.length >= authored.length
               && !strengthRows.some((s: any) => s?.name === 'strength block')) {
               update.strength_exercises = authored.map((ex: any, i: number) => {
-                const { weight_display: _stale, ...rest } = ex ?? {};
+                const { weight_display: _stale, execution_name: _oldShown, ...rest } = ex ?? {};
                 const d = strengthRows[i]?.weight_display;
-                return typeof d === 'string' && d.trim() ? { ...rest, weight_display: d } : rest;
+                // The same shown name as the step (Today's deck and the week grid read these rows).
+                const shown = shownFor(ex);
+                return { ...rest, ...(typeof d === 'string' && d.trim() ? { weight_display: d } : {}), ...(shown ? { execution_name: shown } : {}) };
               });
             }
           }

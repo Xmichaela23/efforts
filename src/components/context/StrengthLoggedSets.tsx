@@ -8,7 +8,7 @@ import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
  * `weekly_state_v1.strength_logged_sets`: which lifts are main, each main lift's last five sessions with
  * the "best" tag, the e1RM only where the reps can be trusted (D-417), and every other lift's heaviest
  * set. This file used to work those out from its own `exercise_log` query and `trustedMaxReps`.
- * The names are `canonicalDisplayName`'s, sent with the rows (FIXLIST 1d — one lift, one name).
+ * The names are `shownName`'s (strength/shown-name.ts), sent with the rows (FIXLIST 1d — one lift, one name).
  *
  * ⛔ THE EMPTY GATE STAYS IN THE CALLER, ON PURPOSE. `StatePerformanceSection` tests
  * `strengthDetail` for TRUTHINESS to decide whether to draw a standalone detail block. An element that

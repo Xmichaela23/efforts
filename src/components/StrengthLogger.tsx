@@ -277,6 +277,8 @@ interface LoggedExercise {
   // matched by name, so the planned lift read as a SKIP and the work read as an unplanned EXTRA.
   // Undefined on hand-added exercises — those were never prescribed, so they can never be a swap.
   planned_name?: string;
+  /** The movement's one shown name as the row printed it before any swap (the swap panel's title, 2026-09-18). */
+  planned_display?: string;
   /** `false` = one of the block's assistance slots (never priced). Absent on every other row. */
   /**
    * ⛔ THE NAME THE ATHLETE READS, where it differs from the canonical one (2026-09-01, Michael:
@@ -2204,6 +2206,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             target_reps: targetReps, // Target reps from prescription (e.g. "4-6")
             planned_percent_1rm: plannedPct, // D-322: authored intensity, for the swap seed
             planned_name: name, // Q-181: remember what was PRESCRIBED, so a rename reads as a swap
+            // The name the row printed for that movement, as the server sent it — the swap panel's title (2026-09-18).
+            planned_display: typeof s?.execution_name === 'string' && s.execution_name.trim() ? s.execution_name.trim() : name,
             // The composer's slot intent, as data (2026-08-26). New rows carry it; rows
             // materialized before then fall back to the notes regex in the cue detection.
             slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
@@ -5041,12 +5045,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             ) : (
             <>
             <div className="p-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-1 min-[400px]:gap-2">
                 <div className="flex-1 min-w-0 relative">
                   <div className="flex items-center border-2 border-white/20 bg-white/[0.08] backdrop-blur-md rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-                    <div className="pl-3 text-label-secondary">
-                      <Search className="h-4 w-4" />
-                    </div>
+                    {/* The magnifier marks an empty box as a search; a named row gives its width to the name (2026-09-18). */}
+                    {!(exercise.execution_name || exercise.name) && (
+                      <div className="pl-3 text-label-secondary">
+                        <Search className="h-4 w-4" />
+                      </div>
+                    )}
                     {/* 2026-09-18 — a long name WRAPS to a second line; it is never shortened and never
                         given a second name ("Weighted Reverse Hyper" was cut off in a one-line input).
                         A one-row textarea that grows to fit; Enter finishes instead of adding a line. */}
@@ -5085,7 +5092,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         updateExerciseName(exercise.id, typed);
                         setActiveDropdown(typed.length > 0 ? exercise.id : null);
                       }}
-                      className="block w-full min-w-0 min-h-10 px-3 py-2 resize-none overflow-hidden leading-snug break-words text-body font-medium border-0 bg-transparent text-label placeholder:text-label-secondary focus:outline-none"
+                      // Under 400 px the name drops one step in the type scale (subhead) so the longest names hold two lines.
+                      className="block w-full min-w-0 min-h-10 px-3 py-2 resize-none overflow-hidden leading-snug break-words text-subhead min-[400px]:text-body font-medium border-0 bg-transparent text-label placeholder:text-label-secondary focus:outline-none"
                       onFocus={() => {
                         if (exercise.name.length > 0) {
                           setActiveDropdown(exercise.id);
@@ -5095,7 +5103,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         maybePersistTypedSwap(exercise.id, exercise.name);
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
-                      style={{ fontSize: 'var(--type-body)', fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em' }}
+                      style={{ fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em' }}
                     />
                     {/* The how-to for a home version of a machine movement (2026-09-08). Only rows the
                         server stamped get it; it goes with the display name when the athlete types. */}
@@ -5105,7 +5113,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         aria-label="How to do this exercise"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setHowToFor(exercise.id)}
-                        className="pr-3 pl-1 text-label hover:text-white"
+                        className="pr-2 pl-0.5 min-[400px]:pr-3 min-[400px]:pl-1 text-label hover:text-white"
                       >
                         <Info className="h-5 w-5" />
                       </button>
@@ -5141,7 +5149,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     aria-label="Swap this exercise"
                   >
                     <Repeat className="h-4 w-4" />
-                    <span>Swap</span>
+                    {/* The word shows where the row has room; under 400 px the icon alone keeps the name on two lines. */}
+                    <span className="hidden min-[400px]:inline">Swap</span>
                   </button>
                 )}
                 {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
@@ -5168,7 +5177,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 )}
                 <button
                   onClick={() => toggleExerciseExpanded(exercise.id)}
-                  className="p-2 text-label-secondary hover:text-label transition-colors"
+                  className="p-1.5 min-[400px]:p-2 text-label-secondary hover:text-label transition-colors"
                 >
                   {expandedExercises[exercise.id] ? 
                     <ChevronUp className="h-4 w-4" /> : 
@@ -5183,6 +5192,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     existing pattern), which is also where Strong/Hevy keep exercise deletion:
                     behind intent, never beside navigation. `deleteExercise`'s confirm stays as the
                     second guard. */}
+              </div>
+              {/* ⛔ THE PANELS SIT BELOW THE NAME ROW, FULL WIDTH (2026-09-18). They were children of the row's
+                  flex line, so an open swap panel took the width and the name collapsed to one letter per line. */}
 
 
               {/* ── Q-181 — THE SWAP SHEET ────────────────────────────────────────────────────────
@@ -5220,7 +5232,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="text-caption uppercase tracking-wide text-label-secondary">
-                        Swap {exercise.planned_name || exercise.name}
+                        Swap {exercise.planned_display || exercise.name}
                       </span>
                       <button
                         onClick={() => { setSwapRestOfPlan(false); setSwapFor(null); }}
@@ -5394,7 +5406,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </div>
                 </div>
               )}
-              </div>
             </div>
 
             {(expandedExercises[exercise.id] !== false) && (

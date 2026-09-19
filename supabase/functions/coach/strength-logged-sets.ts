@@ -11,7 +11,7 @@
  * tab; this is the logged-sets copy of the rule, and the two are the same predicate over the same rows.
  */
 import { capabilitiesForExercise } from '../../../src/lib/exercise-role.ts';
-import { canonicalDisplayName } from '../_shared/canonicalize.ts';
+import { shownName } from '../_shared/strength/shown-name.ts';
 import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 import type { LoggedLift, LoggedSetRow } from '../_shared/state-trend/logged-sets.ts';
 
@@ -65,7 +65,7 @@ export function buildStrengthLoggedSets(
       const sets: LoggedSetRow[] = byCanonical.get(l.canonical_name)?.recent ?? [];
       return {
         canonical: l.canonical_name,
-        display_name: canonicalDisplayName(l.canonical_name),
+        display_name: shownName(l.canonical_name),
         sets,
         // ⛔ A LOGGED SET READS THROUGH THE ONE RULE the logger's box and Performance's rows read (Stage 4
         // session 4) — whole numbers printed a typed 82.5 kg as 83 here.
@@ -82,7 +82,7 @@ export function buildStrengthLoggedSets(
       .slice(0, OTHER_LIFTS_SHOWN)
       .map((l) => ({
         canonical: l.canonical,
-        display_name: canonicalDisplayName(l.canonical),
+        display_name: shownName(l.canonical),
         weight: l.heaviest!.weight,
         reps: l.heaviest!.reps,
         sessions: l.sessions,

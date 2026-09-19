@@ -49,8 +49,10 @@ import { localDateInTz } from './local-date.ts';
 //   floor shows (and sends) up to 130% of FTP, the "never over FTP" extension to other rides is gone.
 // 14 (2026-09-18): strength rows carry the logger's reserve words and numbers and its intent line (`reserve_text`,
 //   `reserve_lit`, `reserve_seed`, `intent_line`), so the phone prints them and works nothing out.
+// 15 (2026-09-18): one shown name per movement on every row (`execution_name`, `strength/shown-name.ts`) — the book's
+//   "DB" spelling, Overhead Press, never "Kb/db Swings".
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 14;
+export const PLAN_WRITER_VERSION = 15;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

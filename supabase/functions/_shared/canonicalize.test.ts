@@ -13,7 +13,7 @@
  *   deno test supabase/functions/_shared/canonicalize.test.ts --no-check
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { canonicalize, canonicalDisplayName } from './canonicalize.ts';
+import { canonicalize } from './canonicalize.ts';
 
 Deno.test('back-squat synonyms all fold into squat (Q-197)', () => {
   for (const raw of [
@@ -64,21 +64,7 @@ Deno.test('plural fallback never over-merges an unmapped name', () => {
   assertEquals(canonicalize('Hack Squat'), 'hack_squat');
 });
 
-Deno.test('canonicalDisplayName gives one clean label per lift, regardless of raw name', () => {
-  // Every raw squat synonym canonicalizes to the same clean label.
-  for (const raw of ['Barbell Back Squat', 'back squat', 'Squat', 'BB Squat']) {
-    assertEquals(canonicalDisplayName(canonicalize(raw)), 'Back Squat');
-  }
-  assertEquals(canonicalDisplayName(canonicalize('Conventional Deadlift')), 'Deadlift');
-  assertEquals(canonicalDisplayName(canonicalize('Standing Barbell Overhead Press')), 'Overhead Press');
-  assertEquals(canonicalDisplayName(canonicalize('Hip Thrusts')), 'Hip Thrust');
-  // Title-case fallback for unmapped canonicals.
-  assertEquals(canonicalDisplayName('front_squat'), 'Front Squat');
-  assertEquals(canonicalDisplayName('hack_squat'), 'Hack Squat');
-  // Abbreviation cases title-case can't do.
-  assertEquals(canonicalDisplayName('db_row'), 'DB Row');
-  assertEquals(canonicalDisplayName('single_leg_rdl'), 'Single Leg RDL');
-});
+// (2026-09-18) The one-label-per-lift pins moved to `strength/shown-name.test.ts` with `shownName`.
 
 Deno.test('pre-existing explicit plurals are unchanged by the fallback', () => {
   assertEquals(canonicalize('Pushups'), 'pushup');

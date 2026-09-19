@@ -68,11 +68,11 @@
  * separately). This file is the card.
  */
 
-// ⛔ ONE NAME MAP, NOT A SECOND ONE. `canonicalDisplayName` already exists to answer exactly this
+// ⛔ ONE NAME MAP, NOT A SECOND ONE. `shownName` (strength/shown-name.ts, one shown name per movement on every screen) already exists to answer exactly this
 // ("a lift logged under many raw names always shows ONE clear label"), so the slot's label is read
 // from it rather than restated here. A second map beside the first is how this screen ended up
 // showing "Squat" and "Back Squat" for the same lift — see FIXLIST 1d.
-import { canonicalDisplayName } from '../canonicalize.ts';
+import { shownName } from '../strength/shown-name.ts';
 // ⛔ THE SLOT MAP LIVES IN ONE PLACE and `strength.ts` reads the same file — see `lift-slots.ts`.
 import { VARIANT_SLOT_BY_CANONICAL } from '../../../../src/lib/lift-slots.ts';
 
@@ -156,7 +156,7 @@ function asSlot<T extends FoldableLift>(l: T, slot: string): T {
   if (l.canonical === slot) return l;
   // ⚠️ The origin rides along privately so `merge` can tell the slot's own row from a variant after
   // both have been relabelled. Not rendered.
-  return { ...l, canonical: slot, displayName: canonicalDisplayName(slot), __variantOf: l.canonical } as T;
+  return { ...l, canonical: slot, displayName: shownName(slot), __variantOf: l.canonical } as T;
 }
 
 const isVariantRow = (l: FoldableLift) => (l as { __variantOf?: string }).__variantOf != null;

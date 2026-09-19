@@ -15,11 +15,11 @@
  * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
  * movement it holds.
  */
-import { cellOptions, builderReaches, executionHowTo, executionName, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
+import { cellOptions, builderReaches, executionHowTo, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
+import { shownNameOnKit } from '../strength/shown-name.ts';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from './plyo.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
-import { movementLabel } from './accessory-picks.ts';
 
 /**
  * `weight_per: 'each'` when the kit does it with two dumbbells, so a swap carries the logger's "LB EACH" with it.
@@ -30,11 +30,14 @@ export type SwapOption = { name: string; display: string; weight_per?: 'each'; e
 /** `heading` is null on a plyo drill's list, which prints no heading. */
 export type SwapGroup = { heading: string | null; page: string; options: SwapOption[] };
 
-/** The row's name and how-to for an option on this kit (`executionName`, `executionHowTo`). */
+/**
+ * The row's name and how-to for an option on this kit. The name is the movement's ONE shown name
+ * (`shownNameOnKit`, 2026-09-18) — the same one the option prints and the row prints once it is picked.
+ */
 function kitWords(name: string, equipment: string[] | null | undefined): Pick<SwapOption, 'execution_name' | 'how_to'> {
-  const exec = executionName(name, equipment);
+  const shown = shownNameOnKit(name, equipment);
   const how = executionHowTo(name, equipment);
-  return { ...(exec !== name ? { execution_name: exec } : {}), ...(how != null ? { how_to: how } : {}) };
+  return { ...(shown !== name ? { execution_name: shown } : {}), ...(how != null ? { how_to: how } : {}) };
 }
 
 // ⛔ THE PLYO ROW'S LIST, MOVED FROM THE LOGGER (2026-09-18) word for word: the other drills in the drill's own family
@@ -56,7 +59,7 @@ export function plyoSwapGroups(name: string, equipment: string[] | null | undefi
   const options = fam.drills
     .filter((d) => d.toLowerCase() !== n)
     .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
-    .map((d) => ({ name: d, display: d, ...kitWords(d, equipment ?? []) }));
+    .map((d) => ({ name: d, display: shownNameOnKit(d, equipment ?? []), ...kitWords(d, equipment ?? []) }));
   return options.length > 0 ? [{ heading: null, page: 'p227', options }] : [];
 }
 
@@ -86,11 +89,9 @@ export function swapGroupsFor(
   const shown = new Set<string>();
   const options: SwapOption[] = [];
   // ⛔ THE NAME THE KIT WILL DO (Michael, 2026-09-18): without the machine, Pullover Machine and Rear Delt Machine
-  // read as their home versions, never the machine; a dumbbell kit reads "Dumbbell Stiff-Legged Deadlift".
-  const label = (name: string) => {
-    const exec = executionName(name, equipment);
-    return exec !== name ? exec : movementLabel(name);
-  };
+  // read as their home versions, never the machine; a dumbbell kit reads "DB Stiff-Legged Deadlift". One shown name
+  // per movement (`shownNameOnKit`): the option, the row and State print the same words.
+  const label = (name: string) => shownNameOnKit(name, equipment);
   for (const m of cellOptions(filed.category, filed.pattern, equipment)) {
     const k = canonicalize(m.name);
     const display = label(m.name);

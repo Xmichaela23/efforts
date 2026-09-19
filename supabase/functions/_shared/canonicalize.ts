@@ -310,44 +310,5 @@ export function bandMeansAssistance(canonical: string): boolean {
   return BAND_MEANS_ASSISTANCE.has(canonical);
 }
 
-/**
- * Clean, unambiguous display label for a canonical lift — so a lift logged under many raw
- * names ("Barbell Back Squat", "back squat", "Squat") always shows ONE clear label. Explicit
- * entries handle abbreviations/hyphenation/variant-clarity that title-case can't; everything
- * else falls back to Title Case of the canonical key (squat→"Squat", hip_thrust→"Hip Thrust").
- */
-const DISPLAY_NAME: Record<string, string> = {
-  // Big-4 + anchors — name the VARIANT so it reads clearly next to front/goblet/RDL/trap-bar.
-  squat: 'Back Squat',
-  deadlift: 'Deadlift',
-  bench_press: 'Bench Press',
-  overhead_press: 'Overhead Press',
-  trap_bar_deadlift: 'Trap Bar Deadlift',
-  hip_thrust: 'Hip Thrust',
-  barbell_row: 'Barbell Row',
-  romanian_deadlift: 'Romanian Deadlift',
-  // Casing/abbreviation cases title-case gets wrong.
-  db_bench_press: 'DB Bench Press',
-  db_row: 'DB Row',
-  db_shoulder_press: 'DB Shoulder Press',
-  single_leg_rdl: 'Single Leg RDL',
-  close_grip_bench_press: 'Close Grip Bench Press',
-  turkish_getup: 'Turkish Get Up',
-  l_sit: 'L Sit',
-  med_ball_throw: 'Med Ball Throw',
-  swimmers_pull: "Swimmer's Pull",
-};
-
-export function canonicalDisplayName(canonical: string): string {
-  if (!canonical) return 'Unknown';
-  /**
-   * ⚠️ SPLIT ON SPACES TOO, NOT ONLY UNDERSCORES (2026-08-31). This was written for snake_case keys
-   * and is also reached with names that already carry spaces — and there the `_` split returns ONE
-   * token, so only the first letter was raised. Michael saw the result in his own plan: a row reading
-   * **"Dumbbell lateral raise"** in a list where every other movement was lower case.
-   * ⚠️ Nothing changes for a genuine snake_case key, and `DISPLAY_NAME` still wins outright.
-   */
-  return DISPLAY_NAME[canonical]
-    ?? canonical.split(/[_\s]+/).filter(Boolean)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
+// (2026-09-18) `canonicalDisplayName` and its `DISPLAY_NAME` table are deleted: every screen prints the movement's one
+// shown name, `shownName` in `strength/shown-name.ts`.

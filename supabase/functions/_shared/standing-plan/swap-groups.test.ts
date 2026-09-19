@@ -59,9 +59,10 @@ Deno.test('⛔ THE KIT\'S OWN NAME: no machine name without the machine; the dum
   const home = swapGroupsFor('Preacher Curl', HOME).flatMap((g) => g.options.map((o) => o.display));
   assert(!home.includes('Pullover Machine') && !home.includes('Rear Delt Machine'), home.join(', '));
   // The pullover is p220's DB pullover at home, on the Secondary pull row, not here (Michael, 2026-09-18).
-  assert(!home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
+  assert(!home.includes('Flat-Bench DB Pullover') && !home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
   const hinge = swapGroupsFor('Romanian Deadlift', HOME).flatMap((g) => g.options.map((o) => o.display));
-  assert(hinge.includes('Dumbbell Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
+  // The book's "DB" habit on every dumbbell name (Michael, 2026-09-18, `strength/shown-name.ts`).
+  assert(hinge.includes('DB Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
   assert(swapGroupsFor('Romanian Deadlift', [...HOME, 'Sandbag']).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });
 
@@ -70,7 +71,7 @@ Deno.test('⛔ ONE NAME PER MOVEMENT ON A KIT (Michael, 2026-09-18)', () => {
   const hinge = swapGroupsFor('Single Leg RDL', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
   assertEquals(hinge.filter((d) => /romanian deadlift/i.test(d)), ['DB Romanian Deadlift']);
   const pull = swapGroupsFor('Drag Curl', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
-  assertEquals(pull.filter((d) => /rear delt/i.test(d)), ['Bent-Over Dumbbell Rear Delt Fly']);
+  assertEquals(pull.filter((d) => /rear delt/i.test(d)), ['Bent-Over DB Rear Delt Fly']);
   // A commercial gym has a sandbag, as it has a sled.
   assert(swapGroupsFor('KB Swing', GYM).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });

@@ -10,7 +10,8 @@ import {
   intentRowLine, loggerRowStamps, loggerStampsForStep, reserveIntegersFor, reserveSeedFor, reserveTextFor,
 } from './strength-display-lines.ts';
 import { plyoSwapGroups, swapGroupsFor } from '../standing-plan/swap-groups.ts';
-import { executionHowTo, executionName } from '../strength-grid/grid.ts';
+import { executionHowTo } from '../strength-grid/grid.ts';
+import { shownNameOnKit } from './shown-name.ts';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS } from '../standing-plan/plyo.ts';
 
 /** Every src file, so an import moved to another component is caught too. */
@@ -28,7 +29,7 @@ Deno.test('⛔⛔ NO PHONE FILE IMPORTS THE RESERVE, INTENT, KIT-NAME, HOW-TO OR
   const files = await srcFiles(new URL('../../../../src/', import.meta.url));
   assert(files.length > 50, 'the src walk found almost nothing');
   const banned = ['reserveTextFor', 'reserveIntegersFor', 'reserveSeedFor', 'reserveNumberText', 'intentRowLine',
-    'loggerRowStamps', 'executionHowTo', 'executionName', 'pretestStepWeights'];
+    'loggerRowStamps', 'executionHowTo', 'executionName', 'pretestStepWeights', 'shownName', 'shownNameOnKit'];
   for (const f of files) {
     for (const imp of f.text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"]([^'"]+)['"]/g)) {
       if (!/@shared\/|supabase\/functions\//.test(imp[2])) continue;
@@ -81,7 +82,8 @@ Deno.test('⛔ EVERY SWAP OPTION CARRIES THE KIT NAME AND HOW-TO THE PHONE USED 
     for (const kit of KITS) {
       for (const g of swapGroupsFor(slot, kit)) {
         for (const o of g.options) {
-          const d = executionName(o.name, kit ?? []);
+          // The row's name after the pick is the option's one shown name (`shownNameOnKit`, 2026-09-18).
+          const d = shownNameOnKit(o.name, kit ?? []);
           assertEquals(o.execution_name, d !== o.name ? d : undefined, `${slot} / ${o.name}`);
           assertEquals(o.how_to, executionHowTo(o.name, kit ?? []) ?? undefined, `${slot} / ${o.name}`);
           checked += 1;

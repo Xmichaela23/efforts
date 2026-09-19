@@ -14,7 +14,7 @@
  * inflates its own estimate, so it still lists, carries no e1RM, and cannot win "best".
  */
 import { trustedMaxReps } from '../../../../src/lib/estimate-1rm.ts';
-import { canonicalDisplayName } from '../canonicalize.ts';
+import { shownName } from '../strength/shown-name.ts';
 
 /** OURS — the State list's window: the last 8 weeks of logged sets (was `useExerciseLog(8)` on the screen). */
 export const LOGGED_SETS_WEEKS = 8;
@@ -80,7 +80,7 @@ export function buildLoggedLifts(rows: ReadonlyArray<Row>, asOf: string): Logged
       );
       return {
         canonical,
-        displayName: canonicalDisplayName(canonical),
+        displayName: shownName(canonical),
         sessions: entries.length,
         recent: recentEntries.map((e, i) => ({
           date: e.date, weight: e.weight, reps: e.reps,

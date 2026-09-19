@@ -29,7 +29,8 @@ import { computeAdherenceState } from './adherence.ts';
 import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSummary } from './discipline.ts';
 import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
-import { canonicalDisplayName, canonicalize } from '../canonicalize.ts';
+import { canonicalize } from '../canonicalize.ts';
+import { shownName } from '../strength/shown-name.ts';
 // Audit 2026-09-10 (item 17): the slot fold, the chart trendlines and the logged-sets list, each moved
 // off the State screen — see each file's header.
 import { foldVariantSlots } from './fold-lift-slots.ts';
@@ -590,8 +591,8 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
       return {
         canonical,
         // Clean canonical label (not whichever raw name was logged first) — one lift, one name,
-        // even when it was logged under several variations. See canonicalDisplayName.
-        displayName: canonicalDisplayName(canonical),
+        // even when it was logged under several variations. See shownName (strength/shown-name.ts).
+        displayName: shownName(canonical),
         points: sorted.map((r) => {
           const phase = phaseByDate?.[r.date] ?? null;
           const isMeasured = measured.has(r.date);
