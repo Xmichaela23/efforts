@@ -130,20 +130,20 @@ export const TodaySpacingLine: React.FC<{ spacing: SpacingLine | null }> = ({ sp
   const [open, setOpen] = React.useState(false);
   if (!spacing?.note) return null;
   return (
-    <div
-      className="text-footnote font-normal leading-snug flex items-start justify-end gap-2"
-      style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 8px' }}
-    >
-      {open ? <span className="flex-1">{spacing.note}</span> : null}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-label="If the order changes"
-        className="shrink-0 bg-transparent border-none p-0 cursor-pointer text-white/40 hover:text-white/70 transition-colors"
-      >
-        <Info className="h-4 w-4" aria-hidden="true" />
-      </button>
+    <div className="text-footnote font-normal leading-snug" style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 8px' }}>
+      {/* "Workout order", the headline Michael approved (2026-09-19); the note opens underneath. */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-1.5 bg-transparent border-none p-0 cursor-pointer text-white/40 hover:text-white/70 transition-colors"
+        >
+          <span>Workout order</span>
+          <Info className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+      {open ? <div style={{ marginTop: 4 }}>{spacing.note}</div> : null}
     </div>
   );
 };
