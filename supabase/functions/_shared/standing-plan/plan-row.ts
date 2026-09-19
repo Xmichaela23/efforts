@@ -512,11 +512,16 @@ const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
 
 
 /**
- * ⛔⛔ `PAIN_TOLERANCE_NOTE` IS DELETED (book-language fix, 2026-09-18). It cited p125, and p125 is not in
- * the SOURCE doc (grepped `pain`, `p125`: 0 hits); against the code's own quote it also dropped the page's
- * hedge "may be". The block description no longer carries it. (p125's photo exists in the local page
- * folder; the line can come back in the page's own words if Michael adds the quote to the SOURCE doc.)
+ * ⛔⛔ THE p125 LINE, IN p125's OWN WORDS (pass 6, 2026-09-18, read off p125.jpg). It had been a paraphrase that
+ * dropped the page's "may"; pass 4 took it off because p125 was not in the SOURCE doc. The page photo is the
+ * book, so it comes back as the page prints it. Said once, on the block description. No second person (the
+ * description's voice gate).
  */
+export const PAIN_TOLERANCE_NOTE =
+  'A higher pain tolerance may be an excellent adaptation for endurance athletes because the ability to manage '
+  + 'increasingly uncomfortable sensations during various endurance-dependent events may be directly related to their '
+  + 'overall performance in their sport. For strength athletes, however, it may be less clear; a higher tolerance may '
+  + 'be of negligible benefit or even counterproductive to longer-term health.';
 
 function describeBlock(
   weeks: number,
@@ -582,6 +587,7 @@ function describeBlock(
         + 'on. Log those two and the weights fill in from there, including the rest of week one.'
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
+    PAIN_TOLERANCE_NOTE, // p125
     ...sourced,
   ].join(' ');
 }

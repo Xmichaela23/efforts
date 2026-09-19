@@ -21,7 +21,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import type { SwapGroup } from '@shared/standing-plan/swap-groups.ts';
 type AlternativeOption = { name: string; display?: string };
 import { reserveTextFor, reserveIntegersFor, reserveSeedFor, intentRowLine, supersetLabel } from '@shared/strength/strength-display-lines';
-import { intentLine as bookIntentLine, restRuleFor, SETS_START_LOW_LINE } from '@shared/strength-grid/intents';
+import { intentLine as bookIntentLine, intentMeaning, restRuleFor, RIR_NOTE, SETS_START_LOW_LINE } from '@shared/strength-grid/intents';
 import { WARM_UP_LINE } from '@shared/standing-plan/warmup';
 import {
   getExerciseConfig,
@@ -82,7 +82,7 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { pretestStepWeights } from '@shared/standing-plan/working-number';
 // The plyo name test, for how a plyo row is drawn. Rest lengths are the server's (`rest_seconds` on the row).
 import { isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
-import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
+import { PLYO_FAMILIES, PLYO_FAMILY_IDS, P227_DRILL_LINE, P227_SESSION_LINE, type PlyoFamily } from '@shared/standing-plan/plyo';
 import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 
 // ⛔ THE PLYO ROW IS A DRILL, NOT A SET (WORKORDER-plyo-screen-2026-09-02, p227). No weight, no rep
@@ -591,8 +591,10 @@ const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: 
 // ⛔ 2026-09-18: the lines are the one owner's (`strength-grid/intents.ts`) — p218's row, then the page's rest
 // rule for the intent (p78, or p84 for HYP), then p218's own sentence on the set band. The rest rule had no
 // other place on screen once the countdown came off a book row. The names are p219's own expansions.
+// Pass 6 (2026-09-18): p218's row and p219's whole paragraph (`intentMeaning`, off the page photos), p219's RIR
+// definition, the rest rule, the set rule.
 const setTypeLines = (k: 'ME' | 'DE' | 'SKILL' | 'HYP'): string[] =>
-  [bookIntentLine(k), restRuleFor(k), SETS_START_LOW_LINE].filter((l): l is string => !!l);
+  [...intentMeaning(k), RIR_NOTE, restRuleFor(k), SETS_START_LOW_LINE].filter((l): l is string => !!l);
 const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; lines: string[] }> = {
   ME: { name: 'Maximum effort', lines: setTypeLines('ME') },
   DE: { name: 'Dynamic effort', lines: setTypeLines('DE') },
@@ -5646,11 +5648,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </span>
                         </div>
                       )}
-                      {exIsPlyo && (
-                        <div className="px-1.5 pb-1.5">
-                          <p className="text-caption text-label-secondary leading-snug">Efforts are a record, not a target.</p>
-                        </div>
-                      )}
+                      {exIsPlyo && (() => {
+                        // Pass 6 (2026-09-18): p227's own words (p227.jpg, `plyo.ts`) — the session line once,
+                        // above the first drill; the drill line on every drill card.
+                        const firstPlyoIdx = exercises.findIndex((e) => isPlyometric(e.name) || equipmentForExercise(e.name) === 'plyo');
+                        return (
+                          <div className="px-1.5 pb-1.5">
+                            {firstPlyoIdx === exerciseIndex && (
+                              <p className="text-caption text-label-secondary leading-snug mb-1.5">{P227_SESSION_LINE}</p>
+                            )}
+                            <p className="text-caption text-label-secondary leading-snug">{P227_DRILL_LINE} Efforts are a record, not a target.</p>
+                          </div>
+                        );
+                      })()}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
                         <span className={labelCls}>{exIsPlyo ? '' : 'Set'}</span>
                         <span className={labelCls}>{exIsPlyo ? '' : 'Previous'}</span>

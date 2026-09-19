@@ -168,3 +168,22 @@ export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: str
   const w = Math.max(1, Math.round(week));
   return order[(w - 1) % order.length];
 }
+
+/**
+ * ⛔ p227's OWN WORDS FOR THE DRILLS (pass 6 of the book-language fix, 2026-09-18, read off p227.jpg). One owner:
+ * the plan's drill rows and plan description, and the logger's plyo cards, read these.
+ *   Page: "What is important here is that these drills are all done separately. Throwing more than three or four
+ *   plyometric movements together on a given day is likely a waste of time. Each drill should be performed
+ *   multiple times with ample rest, with a full focus on technique and balance, as well as consistent quality.
+ *   Each drill should be done until the movement is optimized for the day and the athlete develops confidence in
+ *   it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's here!"
+ * ⚠️ No number of efforts: the page says "multiple times" and gives none, so the row still carries no count.
+ */
+export const P227_SESSION_LINE = 'What is important here is that these drills are all done separately. Each drill '
+  + 'should be performed multiple times with ample rest, with a full focus on technique and balance, as well as '
+  + 'consistent quality.';
+// ⚠️ Cut after "no-no's" (the page ends "…no-no's here!"): the line also reaches the plan description, whose voice
+// gate bars an exclamation mark.
+export const P227_DRILL_LINE = 'Each drill should be done until the movement is optimized for the day and the athlete '
+  + "develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all "
+  + "absolute no-no's.";

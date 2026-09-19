@@ -13,7 +13,7 @@
 
 export type WeightUnit = 'lb' | 'kg';
 
-import { rirBandFor, rirBandText } from '../strength-grid/intents.ts';
+import { P218_TEMPO, rirBandFor, rirBandText, type ViadaIntent } from '../strength-grid/intents.ts';
 
 // (2026-09-18) `RESERVE_WHEN_NO_TARGET` ("1 to 2", ours, no caller) is deleted.
 
@@ -79,7 +79,9 @@ export function intentRowLine(row: { slot_intent?: unknown; target_rir?: unknown
   if (!BOOK_WORDS.has(intent) || intent === 'ME' || !row?.target_reps) return null;
   const reps = String(row.target_reps).replace(/\+$/, '');
   const rir = reserveTextFor(row);
-  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}`;
+  // p218's tempo words for the intent, as printed (p218.jpg): "maximum velocity", "controlled eccentric, …".
+  const tempo = P218_TEMPO[intent as ViadaIntent];
+  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;
 }
 
 /** `Superset · A with B` — the one label for a printed pair (p274 prints the word "superset"). */

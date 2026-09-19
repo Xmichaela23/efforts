@@ -716,10 +716,10 @@ Deno.test('every category carries the definition it was built from', () => {
 
 Deno.test('⛔⛔ intentLine prints p218\'s row in the page\'s order, and SKILL\'s two quotes', async () => {
   const { intentLine, rirBandText, restRuleFor, SETS_START_LOW_LINE } = await import('./intents.ts');
-  assertEquals(intentLine('ME'), '1 to 5 reps, 90 to 100%, 1 to 3 sets.');
-  assertEquals(intentLine('DE'), '2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets.');
-  assertEquals(intentLine('SKILL'), "3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep either improves movement quality or degrades it! Perfect practice makes perfect… if you're performing the movement poorly, STOP.");
-  assertEquals(intentLine('HYP'), '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.');
+  assertEquals(intentLine('ME'), '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets. Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.');
+  assertEquals(intentLine('DE'), '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets. Velocity and consistent bar path are the major objectives.');
+  assertEquals(intentLine('SKILL'), '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets. The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.');
+  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
   assertEquals(intentLine('carry'), null);
   // ⛔ HYP's reserve is the band, never the stamped midpoint.
   assertEquals(rirBandText('HYP'), '0 to 2');

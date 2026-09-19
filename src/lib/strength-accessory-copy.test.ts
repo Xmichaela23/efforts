@@ -24,7 +24,7 @@ Deno.test('⛔ THE PHONE\'S OWN ACCESSORY / ME / DE CUES ARE GONE AND MAY NOT CO
 });
 
 Deno.test('the accessory line is p218\'s HYP numbers, from the one owner', () => {
-  assertEquals(intentLine('HYP'), '6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets.');
+  assertEquals(intentLine('HYP'), '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.');
   assert(!Object.values(BAR_SPEED_COPY).includes(intentLine('HYP')!));
 });
 
@@ -41,5 +41,5 @@ Deno.test('deload line — states the fact before the instruction, and concedes 
 Deno.test('pass 5: the logger prints the warm-up quote and the set-type sheet carries the rest rule and the set rule', () => {
   const logger = Deno.readTextFileSync(new URL('../components/StrengthLogger.tsx', import.meta.url));
   assertStringIncludes(logger, '{WARM_UP_LINE}');
-  assertStringIncludes(logger, '[bookIntentLine(k), restRuleFor(k), SETS_START_LOW_LINE]');
+  assertStringIncludes(logger, '[...intentMeaning(k), RIR_NOTE, restRuleFor(k), SETS_START_LOW_LINE]');
 });

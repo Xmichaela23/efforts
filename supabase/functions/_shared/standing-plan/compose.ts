@@ -85,6 +85,7 @@ import {
   PLYO_FAMILIES,
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_MIX_IS_OURS,
+  P227_DRILL_LINE,
 } from './plyo.ts';
 /**
  * ⛔ THE SERVER'S CANONICALIZER, NOT THE CLIENT MIRROR, AND THE DIFFERENCE IS THE BUG.
@@ -1067,7 +1068,7 @@ export const HAIRCUT_LINE = 'A 3 to 4 percent reduction in working 1RM should be
  * "medium weight, no fatigue, full rest": "full rest" for the page's "ample rest", and "emphasis is speed and
  * quality" dropped. Checked against the page photo p226.jpg (local page folder): "SKILL: Medium weight,
  * emphasis is speed and quality, no fatigue accumulation, ample rest".
- * ⚠️ The SOURCE doc carries this cell as a list item, not inside quotation marks; the photo is the evidence.
+ * The page photos are the book (pass 6); this cell is read off p226.jpg.
  */
 export const CARRY_ROW_WORDS: Partial<Record<ViadaIntent, string>> = {
   SKILL: 'medium weight, emphasis is speed and quality, no fatigue accumulation, ample rest',
@@ -2135,7 +2136,8 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
 function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
-    // ⛔ 2026-09-18: `PLYO_DOSE.stopRule` (a paraphrase of p227) no longer reaches the plan description.
+    // ⛔ 2026-09-18 (pass 6): p227's own words (p227.jpg), one owner `plyo.ts`, replace the old paraphrase.
+    notes.push({ kind: 'source', text: P227_DRILL_LINE, cite: PLYO_DOSE.stopRuleIsHis });
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
   return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) })).map(({ family, name }) => ({
@@ -2160,8 +2162,9 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
      * absolute no-nos (p227).
      * ⚠️ THE BENEFIT PHRASE LEADS, as it does today — it is his table's own column and it stays.
      */
-    // ⛔ 2026-09-18: the row note ("{benefit}. Repeat until it feels right… Full rest between. Tired or sloppy,
-    // stop.") came off — a paraphrase of p227, and the SOURCE doc quotes none of p227's words. No note.
+    // ⛔ 2026-09-18: the row note was a paraphrase ("{benefit}. Repeat until it feels right… Full rest between.
+    // Tired or sloppy, stop."). Pass 6: p227's own words, read off p227.jpg (`plyo.ts`, one owner).
+    notes: P227_DRILL_LINE,
 
   }));
 }

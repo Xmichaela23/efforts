@@ -1462,8 +1462,6 @@ export const PLYO_DOSE = {
   effortCountIsOurs:
     'The source says each drill is performed "multiple times with ample rest" and gives no number, '
     + 'so a drill row carries none; the efforts are recorded after.',
-  stopRule:
-    'Stop each drill when the movement is optimised for the day and it feels confident — not on a '
-    + 'rep count. Fatigue, poor form and imprecise movements are the signal to move on.',
+  // ⛔ 2026-09-18: `stopRule` is deleted — the drill words are p227's own, owned by `plyo.ts` P227_DRILL_LINE.
   stopRuleIsHis: 'Viada p227',
 };

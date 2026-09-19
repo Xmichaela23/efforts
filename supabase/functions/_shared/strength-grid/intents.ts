@@ -230,9 +230,10 @@ export const REST_BETWEEN_SETS_RULE_HYP = {
 } as const;
 
 /** RIR, defined on p219 — carried so a surface can explain the number rather than just print it. */
+// ⛔ 2026-09-18 (pass 6): p219's own words, cut (p219.jpg) — the lines now print "RIR", so the sheet says what it is.
 export const RIR_NOTE =
-  'Reps in reserve. A 2 RIR set stops with two reps left in the tank. 0 RIR is not failure: the last '
-  + 'rep still completes, though very slowly.';
+  'RIR refers to "reps in reserve (before failure)." It\'s important to note, therefore, that 0 RIR is not failure '
+  + "but refers to a set where you'd still complete the final repetition (even though it would be very slow).";
 
 /**
  * ⛔⛔ THE ATHLETE-FACING LINE FOR EACH INTENT — ONE OWNER (book-language fix, 2026-09-18).
@@ -242,21 +243,61 @@ export const RIR_NOTE =
  * Today card, and the plan builder. The phone kept four copies of its own, with three different
  * answers for HYP (`8 to 12` / `6-12` / `8 to 10` reps; `1 to 2` / `1` / `a rep or two` in reserve).
  *
- * ⛔ THE RULE (Michael, 2026-09-18): the book's numbers, and the book's words only where
- * `docs/SOURCE-viada-hybrid-athlete.md` quotes them. Cut, never reworded.
- *   · The reps and the reserve are p218's numbers, read off `BARBELL` above — never retyped.
- *   · ME has no reserve: p218 gives "no RIR target".
- *   · SKILL carries two quoted sentences:
- *       p76  *"…every rep either improves movement quality or degrades it!"* (cut at the front)
- *       p143 *"Perfect practice makes perfect… if you're performing the movement poorly, STOP."*
- *   · p218's tempo clauses and p219's meanings are NOT quoted in the SOURCE doc (only in its tables
- *     and summaries), so no clause from them prints.
+ * ⛔ THE RULE (Michael, 2026-09-18): the book's words and numbers, cut, never reworded. Pass 6: the page
+ * photos (`Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`) ARE the book, so the lines below are
+ * read off `p218.jpg` and `p219.jpg` directly. Pinned against `BARBELL`'s numbers in `strength-grid.test.ts`.
  */
-const INTENT_QUOTES: Partial<Record<ViadaIntent, string[]>> = {
-  SKILL: [
+
+/** p218 "REPETITION/SET GUIDELINES", each row as printed (p218.jpg). */
+export const P218_ROW: Record<ViadaIntent, string> = {
+  ME: '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets',
+  DE: '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets',
+  SKILL: '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets',
+  HYP: '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets',
+};
+
+/** p218's tempo words per intent, as printed in the same rows. The logger's row line carries them. */
+export const P218_TEMPO: Partial<Record<ViadaIntent, string>> = {
+  DE: 'maximum velocity',
+  SKILL: 'controlled eccentric, fast concentric',
+  HYP: 'controlled eccentric, controlled concentric',
+};
+
+/** p219 "Abbreviations", one sentence per intent, cut — the card's line (p219.jpg). */
+const P219_SENTENCE: Record<ViadaIntent, string> = {
+  ME: 'Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.',
+  DE: 'Velocity and consistent bar path are the major objectives.',
+  SKILL: 'The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.',
+  HYP: 'Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',
+};
+
+/**
+ * p219 "Abbreviations", each intent's whole paragraph (p219.jpg), for the logger's set-type sheet. DE adds
+ * p218's own paragraph on dynamic effort; SKILL adds the p76 and p143 quotes it carried before.
+ */
+const P219_MEANING: Record<ViadaIntent, string[]> = {
+  ME: ["ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal "
+    + "weight. It's typically an intentionally heavy set focused on peak force over the course of each repetition. "
+    + 'Bar speed is still important for this work but is secondary to simply moving the weight well. Each set should '
+    + 'be stopped short of failure because technical/form breakdown here can be counterproductive.'],
+  DE: ['DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement. Velocity and '
+    + 'consistent bar path are the major objectives, and you should treat every repetition as though the bar were '
+    + 'loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount.',
+    // p218
+    'For dynamic effort, while both the load and the rep range are lower, the emphasis on peak output/velocity '
+    + 'should make the movement more challenging than similar skill work. The chief difference here is that skill '
+    + 'work is focused primarily on "movement perfection," whereas DE work should aim for good form (of course), '
+    + 'but with bar speed being the primary objective.'],
+  SKILL: ['SKILL work is somewhat unique in that the objective is purely patterning and movement practice. The weight '
+    + 'should be heavy enough to be a challenge, but form and consistency take priority over velocity.',
     'Every rep either improves movement quality or degrades it!', // p76
-    "Perfect practice makes perfect… if you're performing the movement poorly, STOP.", // p143
-  ],
+    "Perfect practice makes perfect… if you're performing the movement poorly, STOP."], // p143
+  HYP: ['HYP refers to hypertrophy work, and these sets are more of the standard "bodybuilding"-style work. Maximum '
+    + 'motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet powerful. Fatigue '
+    + 'is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted, and the '
+    + 'fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as discussed in Chapter 4) '
+    + 'because some fatigue of all motor units is practically necessary to ensure maximum tension in all these '
+    + 'units is reached.'],
 };
 
 /** p218's reserve band for an intent, or null (ME, and anything not a barbell intent). */
@@ -272,26 +313,21 @@ export function rirBandText(intent: string | null | undefined): string | null {
 }
 
 /**
- * The line itself — p218's row, in the page's order: reps, percent, reserve, sets (pass 5 of the fix added
- * the percent and the set band, which the page gives and no screen printed). Then SKILL's two quotes.
- *   ME    "1 to 5 reps, 90 to 100%, 1 to 3 sets."
- *   DE    "2 to 4 reps, 70 to 80%, 3 to 4 in reserve, 4 to 6 sets."
- *   SKILL "3 to 5 reps, 75 to 85%, 3 to 4 in reserve, 3 to 5 sets. Every rep… STOP."
- *   HYP   "6 to 12 reps, 0 to 2 in reserve, 3 to 4 sets."   (p218 gives HYP no percent)
+ * The card's line: p218's row as printed, then p219's sentence for the intent.
+ *   HYP "6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets. Fatigue is not
+ *        the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted."
  */
 export function intentLine(intent: string | null | undefined): string | null {
   const k = String(intent ?? '').toUpperCase() as ViadaIntent;
-  const p = BARBELL[k];
-  if (!p) return null;
-  const band = (r: Range) => (r.lo === r.hi ? String(r.lo) : `${r.lo} to ${r.hi}`);
-  const rir = rirBandText(k);
-  const parts = [
-    `${band(p.reps)} reps`,
-    ...(p.pctOf1RM ? [`${band({ lo: Math.round(p.pctOf1RM.lo * 100), hi: Math.round(p.pctOf1RM.hi * 100) })}%`] : []),
-    ...(rir ? [`${rir} in reserve`] : []),
-    `${band(p.setsBand)} sets`,
-  ];
-  return [`${parts.join(', ')}.`, ...(INTENT_QUOTES[k] ?? [])].join(' '); // p218
+  if (!P218_ROW[k]) return null;
+  return `${P218_ROW[k]}. ${P219_SENTENCE[k]}`; // p218, p219
+}
+
+/** The set-type sheet's paragraphs: p218's row, then p219's paragraph (and the extra quotes above). */
+export function intentMeaning(intent: string | null | undefined): string[] {
+  const k = String(intent ?? '').toUpperCase() as ViadaIntent;
+  if (!P218_ROW[k]) return [];
+  return [`${P218_ROW[k]}.`, ...P219_MEANING[k]];
 }
 
 /**
