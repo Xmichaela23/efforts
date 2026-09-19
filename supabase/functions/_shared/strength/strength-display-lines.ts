@@ -81,7 +81,7 @@ export function intentRowLine(row: { slot_intent?: unknown; target_rir?: unknown
   const rir = reserveTextFor(row);
   // p218's tempo words for the intent, as printed (p218.jpg): "maximum velocity", "controlled eccentric, …".
   const tempo = P218_TEMPO[intent as ViadaIntent];
-  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;
+  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}${tempo ? ` · ${tempo}` : ''}`;  // p218 ("0 to 2 RIR", the tempo words); p219 — RIR refers to "reps in reserve (before failure)."
 }
 
 /** `Superset · A with B` — the one label for a printed pair (p274 prints the word "superset"). */

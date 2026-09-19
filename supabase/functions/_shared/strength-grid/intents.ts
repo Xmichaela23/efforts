@@ -78,9 +78,8 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     rir: null,
     setsBand: { lo: 1, hi: 3 },
     tempo: null,
-    objective: 'Move maximal or near-maximal weight. An intentionally heavy set focused on peak force '
-      + 'per rep. Bar speed still matters but is secondary to moving the weight well. Each set stops '
-      + 'short of failure — technical breakdown here is counterproductive.',
+    // p219's own words, cut (2026-09-18 rule 7 triage; the reworded line that stood here never printed — `objective` has no reader outside tests)
+    objective: 'ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal weight.', // p219
     cite: 'Viada p218, p219',
   },
   DE: {
@@ -90,8 +89,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     rir: { lo: 3, hi: 4 },
     setsBand: { lo: 4, hi: 6 },
     tempo: 'Maximum velocity.',  // p218 — the DE row's words
-    objective: 'Bar speed and quality of movement. Velocity and a consistent bar path are the '
-      + 'objectives; treat every rep as though the bar were loaded to a maximum. Fatigue is discouraged.',
+    objective: 'DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement.', // p219
     cite: 'Viada p218, p219',
   },
   SKILL: {
@@ -101,8 +99,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     rir: { lo: 3, hi: 4 },
     setsBand: { lo: 3, hi: 5 },
     tempo: 'Controlled eccentric, fast concentric.',  // p218 — the SKILL row's words
-    objective: 'Purely patterning and movement practice. Heavy enough to be a challenge, but form '
-      + 'and consistency take priority over velocity.',
+    objective: 'SKILL work is somewhat unique in that the objective is purely patterning and movement practice.', // p219
     cite: 'Viada p218, p219',
   },
   HYP: {
@@ -113,9 +110,7 @@ const BARBELL: Record<ViadaIntent, Omit<BarbellPrescription, 'kind' | 'sets'>> =
     rir: { lo: 0, hi: 2 },
     setsBand: { lo: 3, hi: 4 },
     tempo: 'Controlled eccentric, controlled concentric.',  // p218 — the HYP row's words
-    objective: 'Standard bodybuilding-style work. Maximum motor-unit recruitment is the goal; steady '
-      + 'tempo, controlled yet powerful. Fatigue is not the enemy — reps inevitably slow as fast-twitch '
-      + 'fibres tire and fatigue-resistant fibres engage, and that is desirable.',
+    objective: 'Maximum motor unit recruitment is the goal, and repetitions should be a steady tempo—controlled yet powerful.', // p219
     cite: 'Viada p218, p219',
   },
 };
@@ -211,9 +206,8 @@ export const REST_BETWEEN_SETS_RULE = {
   // hit the next set when you know you can complete it without getting crushed."
   cue: 'Rest periods between sets should be sufficient to allow nearly full recovery (though not so long as '
     + 'to allow you to cool down). Hit the next set when you know you can complete it without getting crushed.',
-  /** ⛔ WHY ANY CLOCK BESIDE IT IS OURS. */
-  provenance: 'A strength session should not accumulate fatigue. The source gives this as a rule '
-    + 'and no number of minutes.',
+  // ⛔ `provenance` ("A strength session should not accumulate fatigue. The source gives this as a rule and no number
+  // of minutes.") DELETED 2026-09-18 (rule 7 triage): nothing read it — every caller reads `.cue`.
 } as const;
 
 /**
@@ -226,7 +220,7 @@ export const REST_BETWEEN_SETS_RULE_HYP = {
   cue: 'Strength and power training typically dictate that this point of reduced capacity represents the end '
     + 'of a productive session, but in hypertrophy training, this may well be a crucial part of the training '
     + 'session itself!',
-  provenance: 'The source gives this as a rule and no number of minutes.',
+  // ⛔ `provenance` DELETED 2026-09-18 (rule 7 triage): nothing read it — every caller reads `.cue`.
 } as const;
 
 /** RIR, defined on p219 — carried so a surface can explain the number rather than just print it. */
@@ -250,25 +244,25 @@ export const RIR_NOTE =
 
 /** p218 "REPETITION/SET GUIDELINES", each row as printed (p218.jpg). */
 export const P218_ROW: Record<ViadaIntent, string> = {
-  ME: '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets',
-  DE: '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets',
-  SKILL: '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets',
-  HYP: '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets',
+  ME: '1 to 5 reps, 90 to 100% (no RIR target), 1 to 3 sets',  // p218
+  DE: '2 to 4 reps, 70 to 80%, maximum velocity (3 to 4 RIR), 4 to 6 sets',  // p218
+  SKILL: '3 to 5 reps, 75 to 85%, controlled eccentric, fast concentric (3 to 4 RIR), 3 to 5 sets',  // p218
+  HYP: '6 to 12 reps, controlled eccentric, controlled concentric (0 to 2 RIR), 3 to 4 sets',  // p218
 };
 
 /** p218's tempo words per intent, as printed in the same rows. The logger's row line carries them. */
 export const P218_TEMPO: Partial<Record<ViadaIntent, string>> = {
-  DE: 'maximum velocity',
-  SKILL: 'controlled eccentric, fast concentric',
-  HYP: 'controlled eccentric, controlled concentric',
+  DE: 'maximum velocity',  // p218
+  SKILL: 'controlled eccentric, fast concentric',  // p218
+  HYP: 'controlled eccentric, controlled concentric',  // p218
 };
 
 /** p219 "Abbreviations", one sentence per intent, cut — the card's line (p219.jpg). */
 const P219_SENTENCE: Record<ViadaIntent, string> = {
-  ME: 'Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.',
-  DE: 'Velocity and consistent bar path are the major objectives.',
-  SKILL: 'The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.',
-  HYP: 'Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',
+  ME: 'Each set should be stopped short of failure because technical/form breakdown here can be counterproductive.',  // p219
+  DE: 'Velocity and consistent bar path are the major objectives.',  // p219
+  SKILL: 'The weight should be heavy enough to be a challenge, but form and consistency take priority over velocity.',  // p219
+  HYP: 'Fatigue is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted.',  // p219
 };
 
 /**
@@ -279,17 +273,17 @@ const P219_MEANING: Record<ViadaIntent, string[]> = {
   ME: ["ME, or maximum effort, is a movement designed to improve your ability to move maximal or near maximal "
     + "weight. It's typically an intentionally heavy set focused on peak force over the course of each repetition. "
     + 'Bar speed is still important for this work but is secondary to simply moving the weight well. Each set should '
-    + 'be stopped short of failure because technical/form breakdown here can be counterproductive.'],
+    + 'be stopped short of failure because technical/form breakdown here can be counterproductive.'],  // p219
   DE: ['DE, or dynamic effort sets, should have an emphasis on bar speed and quality of movement. Velocity and '
     + 'consistent bar path are the major objectives, and you should treat every repetition as though the bar were '
-    + 'loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount.',
+    + 'loaded to a maximum weight. Fatigue is likewise discouraged because movement quality is paramount.',  // p219
     // p218
     'For dynamic effort, while both the load and the rep range are lower, the emphasis on peak output/velocity '
     + 'should make the movement more challenging than similar skill work. The chief difference here is that skill '
     + 'work is focused primarily on "movement perfection," whereas DE work should aim for good form (of course), '
     + 'but with bar speed being the primary objective.'],
   SKILL: ['SKILL work is somewhat unique in that the objective is purely patterning and movement practice. The weight '
-    + 'should be heavy enough to be a challenge, but form and consistency take priority over velocity.',
+    + 'should be heavy enough to be a challenge, but form and consistency take priority over velocity.',  // p219
     'Every rep either improves movement quality or degrades it!', // p76
     "Perfect practice makes perfect… if you're performing the movement poorly, STOP."], // p143
   HYP: ['HYP refers to hypertrophy work, and these sets are more of the standard "bodybuilding"-style work. Maximum '
@@ -297,7 +291,7 @@ const P219_MEANING: Record<ViadaIntent, string[]> = {
     + 'is not the enemy because repetitions will inevitably slow as fast-twitch fibers become exhausted, and the '
     + 'fatigue-resistant fibers start to engage heavily. In fact, this is desirable (as discussed in Chapter 4) '
     + 'because some fatigue of all motor units is practically necessary to ensure maximum tension in all these '
-    + 'units is reached.'],
+    + 'units is reached.'],  // p219
 };
 
 /** p218's reserve band for an intent, or null (ME, and anything not a barbell intent). */

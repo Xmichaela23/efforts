@@ -347,7 +347,7 @@ export type BarSpeedMoment =
   | 'validity_set'; // week 3 of a cycle: the 95% set that decides the working number
 
 export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
-  warmup: 'Light weight, heavy intent. Move it fast.',
+  warmup: 'Light weight, heavy intent. Move it fast.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // ⛔ NO REP-CHASING LINE, AND NO "GRIND" WORD, ANYWHERE NEAR A PRESCRIBED SET.
   // the previous program's working-set instruction is EXPLOSIVE AND UNDER CONTROL on the concentric — speed in
   // reserve, no grinding; grinding is reserved for the "+" set (the previous program). "Grind" lives
@@ -355,22 +355,22 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   work_set: 'Every rep explosive and controlled.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
   // are real reps; the ceiling is failure, not slowness.
-  amrap: 'Grind it out. Stop before failure.',
+  amrap: 'Grind it out. Stop before failure.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // ⛔ MAX CLEAN REPS, AND THE STOP RULE IS FORM — not failure, and not grinding. This set sets the
   // number the whole block is prescribed from (p215), so a rep the athlete could not repeat with the
   // same shape is a rep that makes every weight after it wrong.
-  pretest: 'As many clean reps as possible. The set ends when the form changes.',
-  rest: "Rest until the speed's back.",
+  pretest: 'As many clean reps as possible. The set ends when the form changes.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
+  rest: "Rest until the speed's back.",  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // ⚠️ REWRITTEN 2026-08-01 (Michael), from "Nothing to prove. Move it fast anyway." The old line
   // conceded something first ("nothing to prove", "anyway") and the concession is the part an
   // athlete reads — it frames the session as a write-off rather than as a prescribed light day.
   // The replacement states the FACT (the plan chose this weight) and then the instruction, which is
   // the same shape every other line in this table uses.
-  deload: 'Light on purpose. Move it fast.',
+  deload: 'Light on purpose. Move it fast.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // The gate announces itself BEFORE the unrack, not after. It is the one set in the cycle whose
   // rep count changes the plan, and an athlete who finds that out afterwards was not given the
   // chance to treat it as the measurement it is.
-  validity_set: 'Five at ninety-five. This one decides the number.',
+  validity_set: 'Five at ninety-five. This one decides the number.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
 };
 
 /**

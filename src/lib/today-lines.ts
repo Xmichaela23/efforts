@@ -97,10 +97,10 @@ const intentOf = (ex: TodayStrengthRow | null | undefined): 'ME' | 'DE' | 'SKILL
 
 /** The book's own word for the slot, spelled out (p219: "ME, or maximum effort"; "DE, or dynamic effort"). */
 export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
-  ME: 'Maximum effort',
-  DE: 'Dynamic effort',
-  SKILL: 'Skill',
-  HYP: 'Hypertrophy',
+  ME: 'Maximum effort',  // p219 — "ME, or maximum effort"
+  DE: 'Dynamic effort',  // p219 — "DE, or dynamic effort sets"
+  SKILL: 'Skill',  // p219 — "SKILL work"
+  HYP: 'Hypertrophy',  // p219 — "HYP refers to hypertrophy work"
 };
 
 
