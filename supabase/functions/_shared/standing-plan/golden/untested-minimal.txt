@@ -17,13 +17,13 @@ WEEK 01  column=standard  ⟵ TEST WEEK
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Test: Upper   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Bench Press                    -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
-      ME     Overhead Press                 -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
+      ME     Bench Press                    -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Overhead Press                 -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Test: Lower   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Back Squat                     -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
-      ME     Deadlift                       -x6, 5, max  @ By feel       | how-to · note: Last set as many reps as possible. It sets your numbers.
+      ME     Back Squat                     -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Deadlift                       -x6, 5, max  @ By feel       | how-to · note: Perform the maximum number of repetitions possible with this weight.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo

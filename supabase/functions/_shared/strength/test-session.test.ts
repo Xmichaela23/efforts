@@ -52,11 +52,12 @@ Deno.test('⛔⛔ A PLAN\'S TEST ROW IS BUILT AS THE PLAN WROTE IT — its own w
   const bench = rows.find((r) => r.name === 'Bench Press')!;
   const planned = upper.strength_exercises.find((e) => e.name === 'Bench Press')!.set_plan as Array<{ weight: number }>;
   assertEquals(weights(bench), [45, ...planned.map((p) => p.weight)], 'the plan\'s step weights changed on the way to the logger');
-  assertEquals(bench.sets[bench.sets.length - 1].set_hint,
-    'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.');
-  assertEquals(bench.notes, 'Bench Press on file: 160 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat. Last set as many reps as possible. It sets your numbers.');
+  // p215 step 8 (2026-09-18) — the plan row's note and the set's hint are one line from one owner.
+  const P215_LAST = 'Perform the maximum number of repetitions possible with this weight.';
+  assertEquals(bench.sets[bench.sets.length - 1].set_hint, P215_LAST);
+  assertEquals(bench.notes, `Bench Press on file: 160 lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat. ${P215_LAST}`);
   const ohp = rows.find((r) => r.name === 'Overhead Press')!;
-  assertEquals(ohp.notes, 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat. Last set as many reps as possible. It sets your numbers.');
+  assertEquals(ohp.notes, `The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat. ${P215_LAST}`);
 
   // By feel (no seed) → the anchor rows.
   const noSeed = composeWeek({

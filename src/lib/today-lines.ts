@@ -16,6 +16,7 @@
  */
 
 import { familyLineFor, sprintEveryMinutesFromTokens } from '@shared/standing-plan/family-lines';
+import { intentLine } from '@shared/strength-grid/intents';
 
 /** The rows a session carries. Only the fields this file reads. */
 export type TodayStrengthRow = {
@@ -103,24 +104,12 @@ export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
 };
 
 
-/** p218, p219. */
-const ME_CUE = '1 to 5 reps, stop short of failure.';
-
 /**
- * p218, p219. ⛔ THE SECOND SENTENCE FOLLOWS THE LOAD (approved 2026-09-09, the rule the logger
- * already keeps): a barbell row says "Bar", a dumbbell, kettlebell, band or bodyweight row says
- * "Move". Telling someone to watch the bar on a bodyweight jump is the defect this closes.
+ * ⛔ THE FOUR CUES ARE NOT WRITTEN HERE (book-language fix, 2026-09-18). They are
+ * `intentLine` in `@shared/strength-grid/intents` — p218's numbers and the SOURCE doc's quoted words,
+ * one owner for the logger, this card and the plan builder. The phone's own copies said "8 to 12
+ * reps, 1 to 2 in reserve" for HYP (p218: 6 to 12, 0 to 2) and carried a DE stop rule no page prints.
  */
-const DE_CUE_BAR = 'As fast as possible on every rep. Bar slows, set is over.';
-const DE_CUE_MOVE = 'As fast as possible on every rep. Move slows, set is over.';
-
-/** p219, p76, p143. */
-const SKILL_CUE =
-  'Form and consistency over speed. Weight heavy enough to be a challenge. '
-  + 'Every rep either improves the movement or degrades it. Performed poorly, stop.';
-
-/** p86, p218. */
-const HYP_CUE = '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.';
 
 export type LiftLine = { key: string; movement: string; kind: string | null; cue: string | null };
 
@@ -131,13 +120,12 @@ export type LiftLine = { key: string; movement: string; kind: string | null; cue
  *
  * ⛔ NO SETS, NO REPS AS A PRESCRIPTION, NO LOADS, NO WARM-UPS (work order §3). The logger has them.
  *
- * @param barLoaded answers "is this movement loaded on a bar" for one movement name. The caller
- *   passes the app's one classifier (`exercise-config`'s `displayFormat === 'total'`) rather than
- *   this file keeping a second opinion about equipment.
+ * @param _barLoaded unused since 2026-09-18: it chose "Bar slows" / "Move slows", a stop rule on no
+ *   page, which came off. Kept in the signature so the Today screen's call does not change.
  */
 export function liftLinesFor(
   session: TodayRow,
-  barLoaded: (movement: string) => boolean,
+  _barLoaded?: (movement: string) => boolean,
 ): LiftLine[] {
   const rows = rowsOf(session);
 
@@ -166,11 +154,7 @@ export function liftLinesFor(
       return { key, movement, kind: null, cue: null };
     }
 
-    const cue =
-      intent === 'ME' ? ME_CUE
-      : intent === 'DE' ? (barLoaded(String(ex?.name || movement)) ? DE_CUE_BAR : DE_CUE_MOVE)
-      : intent === 'SKILL' ? SKILL_CUE
-      : HYP_CUE;
+    const cue = intentLine(intent);
 
     return { key, movement, kind: KIND_WORD[intent], cue };
   });
@@ -200,10 +184,10 @@ export type LiftCardLine = {
 
 export function liftCardLinesFor(
   session: TodayRow,
-  barLoaded: (movement: string) => boolean,
+  _barLoaded?: (movement: string) => boolean,
 ): LiftCardLine[] {
   const rows = rowsOf(session);
-  const lines = liftLinesFor(session, barLoaded);
+  const lines = liftLinesFor(session);
   const groupOf = (i: number): string | null => {
     const g = rows[i]?.superset_group;
     return typeof g === 'string' && g.trim() ? g.trim() : null;

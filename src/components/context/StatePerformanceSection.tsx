@@ -744,7 +744,9 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
           lives in ONE place. Voice: fact-first, conditional, no imperative (docs/COPY-VOICE.md). */}
       {fatigue && (
         <span className="basis-full text-footnote text-amber-300 leading-snug mt-1">
-          Recent sets are landing below the planned reps in reserve — closer to failure than the plan called for. Held for weeks, that's the fatigue a deload clears.
+          {/* ⛔ 2026-09-18: "Held for weeks, that's the fatigue a deload clears." came off — no page ties a deload
+              to logged reserve (the book's triggers are an event or ME underperforming, J4). */}
+          Recent sets are landing below the planned reps in reserve — closer to failure than the plan called for.
         </span>
       )}
     </Row>

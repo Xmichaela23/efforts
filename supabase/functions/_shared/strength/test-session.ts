@@ -48,6 +48,8 @@ export type TestSessionRow = {
   planned_name?: string;
   target_reps?: string;
   target_rir?: number;
+  /** p218's intent, so the logger prints the reserve band (`reserveTextFor`) rather than the stamped midpoint. */
+  slot_intent?: string;
   notes?: string;
   /** On a row with an anchor set: the increment `pretestStepWeights` rounds A and the steps to, in `unit`. */
   anchor_round_to?: number;
@@ -92,10 +94,24 @@ function inAthletesUnit(rows: TestSessionRow[], metric: boolean): TestSessionRow
   }));
 }
 
-// Moved word for word from StrengthLogger.tsx.
-const EMPTY_BAR_HINT = 'Empty bar — a few easy reps to groove the movement.';
-const TEST_LAST_SET_HINT =
-  'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.';
+/**
+ * ⛔⛔ THE TEST DAY'S WORDS ARE p215's, CUT, NEVER REWORDED (book-language fix, 2026-09-18). Page photo:
+ * `book-sources/p215.png`. ONE OWNER: the plan's test rows (`compose.ts`) import the last-set line from here.
+ *
+ * p215 step 1: "Perform a regular warm-up in your chosen lift, slowly working your way up to a starting
+ * weight of 75 percent or so of your predicted max; perform 6 reps." — the first clause, on the empty bar.
+ * It replaces "Empty bar — a few easy reps to groove the movement." ("easy"; p140 says rapid).
+ */
+const EMPTY_BAR_HINT =
+  'Perform a regular warm-up in your chosen lift, slowly working your way up to a starting weight of 75 percent or so of your predicted max.';
+/**
+ * p215 step 8: "Perform the maximum number of repetitions possible with this weight, and enter the number
+ * of repetitions here:" — cut after "weight". It replaces four wordings of the same set (this file, the plan
+ * row's note, the logger's "All-out set… training max", and a "clean reps" line); "clean" and "stop when
+ * form breaks" are not on p215.
+ */
+export const TEST_LAST_SET_LINE = 'Perform the maximum number of repetitions possible with this weight.';
+const TEST_LAST_SET_HINT = TEST_LAST_SET_LINE;
 // OURS — `ANCHOR_HINT` "8 to 10 reps near failure": a way to find p215's ~75% step without a max; the page prints the 75%, not this rep count
 const ANCHOR_HINT = 'A weight for 8 to 10 reps near failure. Enter it here.';
 const PULLUP_SCAP_HINT = 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.';
@@ -251,6 +267,7 @@ export function plannedTestSession(
           ? { target_reps: plannedReps.trim() }
           : (typeof plannedReps === 'number' && plannedReps > 0 ? { target_reps: String(plannedReps) } : {})),
         ...(typeof ex?.target_rir === 'number' ? { target_rir: ex.target_rir } : {}),
+        ...(typeof ex?.slot_intent === 'string' && ex.slot_intent ? { slot_intent: String(ex.slot_intent) } : {}),
         ...(String(ex?.notes || '').trim() ? { notes: String(ex.notes).trim() } : {}),
         sets: setRows
           .map((st) => ({

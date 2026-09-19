@@ -188,7 +188,8 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {
     assertEquals(s.description, '', `${s.name} grew a session line back`);
-    assert((s.strength_exercises ?? []).every((e) => /It sets your numbers\.$/.test(String(e.notes))),
+    // p215 step 8, the one owner's line (`strength/test-session.ts`, 2026-09-18).
+    assert((s.strength_exercises ?? []).every((e) => String(e.notes) === 'Perform the maximum number of repetitions possible with this weight.'),
       `${s.name} lost the approved row note the session line was deleted in favour of`);
   }
 });

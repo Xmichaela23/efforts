@@ -13,20 +13,78 @@
 
 export type WeightUnit = 'lb' | 'kg';
 
-/**
- * OURS — no source. A row that auto-regulates its load but carries no reserve target reads "leaves 1-2
- * in reserve". The phone's number, moved as it was. ⚠️ It disagrees with materialize-plan's own
- * `fallbackUnresolvedPercentDisplay` ("with 2 in reserve", D-071) on a different kind of row.
- */
-const RESERVE_WHEN_NO_TARGET = '1 to 2'; // matches the approved HYP cue "1 to 2 in reserve" (Michael, 2026-09-10)
+import { rirBandFor, rirBandText } from '../strength-grid/intents.ts';
+
+// (2026-09-18) `RESERVE_WHEN_NO_TARGET` ("1 to 2", ours, no caller) is deleted.
 
 const BOOK_WORDS = new Set(['ME', 'DE', 'SKILL', 'HYP']);
 
-function rirTextOf(exercise: any): string | null {
-  const r = Number(exercise?.target_rir);
-  if (exercise?.target_rir == null || !Number.isFinite(r) || r < 0) return null;
+/**
+ * ⛔⛔ THE ONE RESERVE FORMATTER (book-language fix, 2026-09-18). The logger's `rir-format.ts` printed a
+ * second spelling ("5+" where this printed "5"); it now calls this.
+ *
+ * ⛔ A ROW WITH A p218 INTENT PRINTS p218's BAND — DE / SKILL `3 to 4`, HYP `0 to 2` — read off
+ * `strength-grid/intents.ts`, never off the stamped number. The composer stamps `target_rir` as the
+ * band's midpoint (compose.ts `targetRirForIntent`, OURS), and on HYP that printed `1`, a number the
+ * page does not give. ME prints nothing: p218 gives "no RIR target".
+ * A row with no intent (a row no standing composer wrote) prints its own number, as before.
+ */
+export function reserveTextFor(row: { slot_intent?: unknown; target_rir?: unknown } | null | undefined): string | null {
+  const intent = String(row?.slot_intent ?? '').toUpperCase();
+  if (intent === 'ME') return null;
+  if (BOOK_WORDS.has(intent)) return rirBandText(intent);
+  return reserveNumberText(row?.target_rir);
+}
+
+/** A stamped number as text: `2`, or `1 to 2` for a half-step. Never "1-2". */
+export function reserveNumberText(n: unknown): string | null {
+  const r = Number(n);
+  if (n == null || !Number.isFinite(r) || r < 0) return null;
   const lo = Math.floor(r), hi = Math.ceil(r);
-  return lo === hi ? String(lo) : `${lo} to ${hi}`; // "1 to 2", the approved form, never "1-2"
+  return lo === hi ? String(lo) : `${lo} to ${hi}`;
+}
+
+/** The whole numbers a row's reserve covers — the band's (0, 1, 2) or the stamped number's bracket. */
+export function reserveIntegersFor(row: { slot_intent?: unknown; target_rir?: unknown } | null | undefined): number[] {
+  const intent = String(row?.slot_intent ?? '').toUpperCase();
+  if (intent === 'ME') return [];
+  const band = BOOK_WORDS.has(intent) ? rirBandFor(intent) : null;
+  if (band) return Array.from({ length: band.hi - band.lo + 1 }, (_, i) => band.lo + i);
+  const r = Number(row?.target_rir);
+  if (row?.target_rir == null || !Number.isFinite(r) || r < 0) return [];
+  return Math.floor(r) === Math.ceil(r) ? [r] : [Math.floor(r), Math.ceil(r)];
+}
+
+/**
+ * ⛔ THE NUMBER THE LOGGER MAY SAVE ON "DONE" WITHOUT A TAP — or null, and null on every p218 row.
+ *
+ * The logger auto-saved the stamped midpoint (HYP `1`, DE/SKILL `4`) flagged `rir_autofilled`. The page
+ * gives a band, not a number inside it, so a row with a p218 intent saves no reserve until the athlete
+ * taps one (the strip opens either way). `rir_autofilled` already kept the guess out of e1RM and
+ * adherence, so nothing the engine reads is lost. A row with no intent keeps its own number, rounded.
+ */
+export function reserveSeedFor(row: { slot_intent?: unknown; target_rir?: unknown } | null | undefined): number | null {
+  if (BOOK_WORDS.has(String(row?.slot_intent ?? '').toUpperCase())) return null;
+  const r = Number(row?.target_rir);
+  if (row?.target_rir == null || !Number.isFinite(r)) return null;
+  return Math.min(5, Math.round(r));
+}
+
+/**
+ * ⛔ THE ROW'S INTENT LINE — `HYP · 6-12 reps · 0 to 2 in reserve` — ONE OWNER. The logger printed its
+ * own (with "· move the bar fast", on no page); it now prints this.
+ */
+export function intentRowLine(row: { slot_intent?: unknown; target_rir?: unknown; target_reps?: unknown } | null | undefined): string | null {
+  const intent = String(row?.slot_intent ?? '').toUpperCase();
+  if (!BOOK_WORDS.has(intent) || intent === 'ME' || !row?.target_reps) return null;
+  const reps = String(row.target_reps).replace(/\+$/, '');
+  const rir = reserveTextFor(row);
+  return `${intent} · ${reps} reps${rir ? ` · ${rir} in reserve` : ''}`;
+}
+
+/** `Superset · A with B` — the one label for a printed pair (p274 prints the word "superset"). */
+export function supersetLabel(a: string, b: string): string {
+  return `Superset · ${a} with ${b}`;
 }
 
 const nameOf = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
@@ -45,7 +103,7 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
   }
   const intent = String(exercise?.slot_intent || '').toUpperCase();
   const bookWord = BOOK_WORDS.has(intent) ? intent : null;
-  const rirText = rirTextOf(exercise);
+  const rirText = reserveTextFor(exercise);
   const parts: string[] = [bookWord ? `${bookWord} · ${name}` : name];
   if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
   if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);
@@ -96,7 +154,8 @@ export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb
     const g = typeof list[i]?.superset_group === 'string' ? list[i].superset_group : null;
     if (!g || seen.has(g) || list[i + 1]?.superset_group !== g) continue;
     seen.add(g);
-    out.push(`Superset: ${nameOf(list[i])} with ${nameOf(list[i + 1])} — one set of each, rest, then again.`);
+    // ⛔ "— one set of each, rest, then again" came off 2026-09-18: no page prints how a superset is done.
+    out.push(supersetLabel(nameOf(list[i]), nameOf(list[i + 1])));
   }
   for (let i = 0; i < list.length; i += 1) {
     const e = list[i];
@@ -107,7 +166,7 @@ export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb
       const bookWord = BOOK_WORDS.has(intent) ? `${intent} · ` : '';
       const sets = Number(e?.sets) || 0;
       const reps = e?.reps;
-      const rirText = rirTextOf(e);
+      const rirText = reserveTextFor(e);
       const tail = ''; // the "your call" clause is gone (2026-09-10); the reserve is already on the line
       out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);
       i += 1;

@@ -181,6 +181,7 @@ import {
 } from './working-number.ts';
 import { rampFor, RAMP_NOTE, slotTakesRamp } from './warmup.ts';
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
+import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -2044,7 +2045,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
         weight: 'By feel',
         load_prescribed: false,
         slot_intent: TEST_LIFT_INTENT,
-        notes: 'Last set as many reps as possible. It sets your numbers.',
+        notes: TEST_LAST_SET_LINE, // p215 step 8 — one owner, `strength/test-session.ts`
         ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       });
       continue;
@@ -2059,7 +2060,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
       // 2026-09-09, Michael's words (WORKORDER-kill-ours §B.5, p215): the last set is taken for max
       // reps and the block's numbers come off it. *"Test set —"* was a label for a row that already
       // says Test in its session name, and *"clean"* is the form rule, which lives on the set itself.
-      notes: 'Last set as many reps as possible. It sets your numbers.',
+      notes: TEST_LAST_SET_LINE, // p215 step 8 — one owner, `strength/test-session.ts`
       ...(executionHowTo(names[lift], args.equipment ?? null) ? { how_to: executionHowTo(names[lift], args.equipment ?? null)! } : {}),
       set_plan: steps.map((s) => ({
         weight: s.weight,

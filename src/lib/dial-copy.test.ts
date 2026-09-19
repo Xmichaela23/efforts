@@ -152,11 +152,10 @@ Deno.test('the day-reaching chips name real days, read off the frame', () => {
 });
 
 Deno.test('the dose line agrees with the rows', () => {
-  // ⛔ THE DEFECT THIS CLOSES: the bottom line said 6-12 while the rows said 8-10, one scroll apart.
-  assert(ACCESSORY_DOSE_LINE.includes('8 to 10'), ACCESSORY_DOSE_LINE);
-  assert(!/6\s*(–|-|to)\s*12/.test(ACCESSORY_DOSE_LINE), 'the contradicting dose is back');
-  // And the RIR instruction is the reason it was kept rather than deleted.
-  assert(/left in the tank/.test(ACCESSORY_DOSE_LINE), 'the RIR instruction was dropped');
+  // ⛔ 2026-09-18: the rows this step lists are HYP slots printed at p218's 6 to 12, 0 to 2; the line is
+  // the same prescription from the same owner (`strength-grid/intents.ts`). "8 to 10" (p86) is gone.
+  assertEquals(ACCESSORY_DOSE_LINE, '6 to 12 reps, 0 to 2 in reserve.');
+  assert(!/8 to 10|left in the tank|next main lift/.test(ACCESSORY_DOSE_LINE), 'a retired dose clause is back');
 });
 
 

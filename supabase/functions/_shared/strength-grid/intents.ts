@@ -228,6 +228,53 @@ export const RIR_NOTE =
   + 'rep still completes, though very slowly.';
 
 /**
+ * ⛔⛔ THE ATHLETE-FACING LINE FOR EACH INTENT — ONE OWNER (book-language fix, 2026-09-18).
+ *
+ * Every screen that says what an ME / DE / SKILL / HYP set is prints this and nothing else: the
+ * logger's set-type sheet, the logger's line above the accessory cards, the logger's ME card, the
+ * Today card, and the plan builder. The phone kept four copies of its own, with three different
+ * answers for HYP (`8 to 12` / `6-12` / `8 to 10` reps; `1 to 2` / `1` / `a rep or two` in reserve).
+ *
+ * ⛔ THE RULE (Michael, 2026-09-18): the book's numbers, and the book's words only where
+ * `docs/SOURCE-viada-hybrid-athlete.md` quotes them. Cut, never reworded.
+ *   · The reps and the reserve are p218's numbers, read off `BARBELL` above — never retyped.
+ *   · ME has no reserve: p218 gives "no RIR target".
+ *   · SKILL carries two quoted sentences:
+ *       p76  *"…every rep either improves movement quality or degrades it!"* (cut at the front)
+ *       p143 *"Perfect practice makes perfect… if you're performing the movement poorly, STOP."*
+ *   · p218's tempo clauses and p219's meanings are NOT quoted in the SOURCE doc (only in its tables
+ *     and summaries), so no clause from them prints.
+ */
+const INTENT_QUOTES: Partial<Record<ViadaIntent, string[]>> = {
+  SKILL: [
+    'Every rep either improves movement quality or degrades it!', // p76
+    "Perfect practice makes perfect… if you're performing the movement poorly, STOP.", // p143
+  ],
+};
+
+/** p218's reserve band for an intent, or null (ME, and anything not a barbell intent). */
+export function rirBandFor(intent: string | null | undefined): Range | null {
+  const k = String(intent ?? '').toUpperCase() as ViadaIntent;
+  return BARBELL[k]?.rir ?? null;
+}
+
+/** `"0 to 2"` — p218's reserve band as printed, or null. The one spelling of a band on every screen. */
+export function rirBandText(intent: string | null | undefined): string | null {
+  const b = rirBandFor(intent);
+  return b ? (b.lo === b.hi ? String(b.lo) : `${b.lo} to ${b.hi}`) : null;
+}
+
+/** The line itself: `"6 to 12 reps, 0 to 2 in reserve."` (p218), plus SKILL's two quotes. */
+export function intentLine(intent: string | null | undefined): string | null {
+  const k = String(intent ?? '').toUpperCase() as ViadaIntent;
+  const p = BARBELL[k];
+  if (!p) return null;
+  const rir = rirBandText(k);
+  const head = `${p.reps.lo} to ${p.reps.hi} reps${rir ? `, ${rir} in reserve` : ''}.`; // p218
+  return [head, ...(INTENT_QUOTES[k] ?? [])].join(' ');
+}
+
+/**
  * The prescription for one slot.
  *
  * ⛔ THE CATEGORY IS REQUIRED, and that is the point of the signature. p226's carry intents share

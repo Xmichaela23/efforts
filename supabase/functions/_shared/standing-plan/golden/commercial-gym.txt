@@ -17,13 +17,13 @@ WEEK 01  column=standard  ⟵ TEST WEEK
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Test: Upper   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Bench Press                    3x6, 5, max  @ 195           | how-to · plan 170x6 185x5 195+x1 · note: Last set as many reps as possible. It sets your numbers.
-      ME     Overhead Press                 3x6, 5, max  @ 125           | how-to · plan 110x6 120x5 125+x1 · note: Last set as many reps as possible. It sets your numbers.
+      ME     Bench Press                    3x6, 5, max  @ 195           | how-to · plan 170x6 185x5 195+x1 · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Overhead Press                 3x6, 5, max  @ 125           | how-to · plan 110x6 120x5 125+x1 · note: Perform the maximum number of repetitions possible with this weight.
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Test: Lower   (Viada p215)
       tags: standing_plan, test_week, 1rm_test
-      ME     Back Squat                     3x6, 5, max  @ 260           | how-to · plan 225x6 250x5 260+x1 · note: Last set as many reps as possible. It sets your numbers.
-      ME     Deadlift                       3x6, 5, max  @ 315           | how-to · plan 275x6 305x5 315+x1 · note: Last set as many reps as possible. It sets your numbers.
+      ME     Back Squat                     3x6, 5, max  @ 260           | how-to · plan 225x6 250x5 260+x1 · note: Perform the maximum number of repetitions possible with this weight.
+      ME     Deadlift                       3x6, 5, max  @ 315           | how-to · plan 275x6 305x5 315+x1 · note: Perform the maximum number of repetitions possible with this weight.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
