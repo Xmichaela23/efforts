@@ -162,6 +162,7 @@
    "You won't regret spending several minutes on every long ride practicing pedal stroke and working on position.",
    "The precise percentage of threshold that an athlete should remain at here may vary slightly depending on current level of fatigue, hydration status, and environmental conditions.",
    "Athletes may perform any of these work intervals on hills and adjust pace accordingly to maintain target intensity.",
+   "On Zwift or a smart trainer, turn ERG off.",
    "Increase the pace here to race pace, but extend recovery periods by 25 percent."
   ],
   "supabase/functions/_shared/standing-plan/plyo.ts": [

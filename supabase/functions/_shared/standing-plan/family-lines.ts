@@ -111,10 +111,15 @@ export const RUN_LSD_DRAWER_NOTE = 'These workouts can be modified extensively d
  */
 export const RUN_MLSS_DRAWER_NOTE = 'Athletes may perform any of these work intervals on hills and adjust pace accordingly to maintain target intensity.';
 
-// ⛔ "On Zwift, turn ERG off." (RIDE_ANAEROBIC_DRAWER_NOTE) CAME OFF (2026-09-18, round 3). It is on no page. The
-// endurance fix report and STATE-SOURCES say it was approved on 2026-09-18, but neither quotes Michael and no commit,
-// workorder or decision records him approving that exact line (searched git log -S "ERG off" and docs/ for "ERG").
-// Where the book gives no words, nothing prints.
+/**
+ * ⛔ THE ERG LINE ON THE ANAEROBIC RIDE, IN THE SESSION NOTE AFTER THE FAMILY LINE (Michael approved these exact words,
+ * 2026-09-18, round 4). It came off in round 3 for want of a record of his approval; round 4 restores it with his
+ * wording. ⚠️ A DEVICE INSTRUCTION, NOT A TRAINING ONE: p237 rides these "by feel with a power floor rather than a
+ * specific power target", and ERG holds a target. It says how to set the trainer, not how to ride.
+ * The session note goes to the Planned tab, the Garmin workout description and the Intervals.icu description.
+ */
+// device-instruction: tells the athlete how to set Zwift or a smart trainer for p237's by-feel floor; approved by Michael 2026-09-18
+export const RIDE_ANAEROBIC_DRAWER_NOTE = 'On Zwift or a smart trainer, turn ERG off.';
 
 /**
  * p247: "If within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25

@@ -947,12 +947,24 @@ function rule6() {
  *               A reworded line, or a new one, is not in the pins and fails. A pinned line that no longer exists
  *               fails too, so a rewording shows on both sides.
  * The pins are rewritten only with `--write-book-pins`, and only after Michael has approved the words.
+ *
+ * Two markers stand in for the page, each with a required reason after the colon:
+ *   `// not-instruction: <reason>`     a string that reads like an instruction but is not one (a session NAME, a
+ *                                      label, text that never prints). Not pinned unless it is also an instruction.
+ *   `// device-instruction: <reason>`  a line that tells the athlete how to set a device, not how to train
+ *                                      ("On Zwift or a smart trainer, turn ERG off."). No page is required, and the
+ *                                      line IS found and pinned word for word even when it carries none of the
+ *                                      instruction words, so a reworded device line still fails (round 4,
+ *                                      2026-09-18). The marker counts on the string's own statement: the comment
+ *                                      directly above it, its own line, or the end of its statement.
  */
 const INSTRUCTION_WORDS = /\b(reps?|RIR|reserve|sets?|rest|warm[- ]?up|cool[- ]?down|recover(?:y|ies)?|easy|pace|FTP|VT1|VT2|effort|cadence|tempo|velocity|failure|fatigue|eccentric|concentric|intervals?|strides?|sprints?|jog|lunges?|talk test|deload|taper|drills?|load|percent|RPE|zone|all[- ]out|threshold|minutes?|min)\b|%/i;
 const BOOK_PAGE = /\bpp?\s?\d{2,3}\b/;
 // A string that reads like an instruction but is not one (a session NAME, a label, text that never prints) says so
 // beside it: `// not-instruction: <reason>`. The reason is required.
 const NOT_INSTRUCTION = /not-instruction\s*:\s*\S/;
+// A line that operates the athlete's device (ERG on a trainer) says so beside it: `// device-instruction: <reason>`.
+const DEVICE_INSTRUCTION = /device-instruction\s*:\s*\S/;
 const BOOK_PINS_PATH = resolve(REPO, TRUTH.bookLines || 'scripts/book-lines.pinned.json');
 const WRITE_BOOK_PINS = argv.has('--write-book-pins');
 function instructionStrings(rel) {
@@ -974,17 +986,20 @@ function instructionStrings(rel) {
     }
     if (text !== null) {
       const t = text.trim();
+      // the statement the string belongs to, and the comment directly above it — where a page or a marker sits
+      const li = /\s/.test(t) && !/^[\w:.\/{}-]+$/.test(t) ? lineOf(sf, n) : -1;
+      let top = n;
+      while (top.parent && !ts.isSourceFile(top.parent) && !ts.isBlock(top.parent) && !ts.isObjectLiteralExpression(top.parent)
+        && !ts.isArrayLiteralExpression(top.parent)) top = top.parent;
+      const lead = li < 0 ? '' : (ts.getLeadingCommentRanges(sf.text, top.getFullStart()) || []).map((c) => sf.text.slice(c.pos, c.end)).join('\n');
+      const to = sf.getLineAndCharacterOfPosition(top.getEnd()).line;
+      // a device line (`device-instruction:`) is found whatever its words, so it is pinned too
+      const device = li >= 0 && DEVICE_INSTRUCTION.test(`${lead}\n${lines[li] || ''}\n${lines[to] || ''}`);
       // a sentence-like instruction: two or more words, instruction vocabulary, not an id / key / path
-      if (t.length >= 8 && /\s/.test(t) && INSTRUCTION_WORDS.test(t) && !/^[\w:.\/{}-]+$/.test(t)) {
-        const li = lineOf(sf, n);
+      if (device || (li >= 0 && t.length >= 8 && INSTRUCTION_WORDS.test(t))) {
         // the citation may sit above the whole statement a multi-line string belongs to
-        let top = n;
-        while (top.parent && !ts.isSourceFile(top.parent) && !ts.isBlock(top.parent) && !ts.isObjectLiteralExpression(top.parent)
-          && !ts.isArrayLiteralExpression(top.parent)) top = top.parent;
         const from = lineOf(sf, top);
-        const to = sf.getLineAndCharacterOfPosition(top.getEnd()).line;
         // what may carry the page: the statement itself, its own leading comments, the rest of its last line
-        const lead = (ts.getLeadingCommentRanges(sf.text, top.getFullStart()) || []).map((c) => sf.text.slice(c.pos, c.end)).join('\n');
         // …and, for a row in a table, the row's own header: up to two enclosing object/array literals, each with the
         // comments above it and its opening line (`run_mlss: { // p231`). Not the whole file, not a neighbour.
         const heads = [];
@@ -1021,7 +1036,7 @@ function rule7() {
     written[rel] = [...new Set(found.map((f) => f.text))];
     const want = new Set(pinned[rel] || []);
     for (const f of found) {
-      if (!BOOK_PAGE.test(f.own) && !NOT_INSTRUCTION.test(f.own)) push(7, rel, f.line + 1, JSON.stringify(f.text.slice(0, 90)), parked);
+      if (!BOOK_PAGE.test(f.own) && !NOT_INSTRUCTION.test(f.own) && !DEVICE_INSTRUCTION.test(f.own)) push(7, rel, f.line + 1, JSON.stringify(f.text.slice(0, 90)), parked);
       if (!WRITE_BOOK_PINS && !want.has(f.text)) push('7-pin', rel, f.line + 1, `not pinned: ${JSON.stringify(f.text.slice(0, 90))}`, parked);
     }
     if (!WRITE_BOOK_PINS) {
