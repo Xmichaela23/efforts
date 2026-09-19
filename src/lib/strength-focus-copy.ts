@@ -83,7 +83,7 @@ export function strengthFocusSections(opts: {
       // ⛔ THE STRUCTURE SENTENCE FOLLOWS THE BLOCK, and it was rewritten 2026-08-15 (§1c) because
       // the block's shape changed underneath it. Cycles are three weeks; the light weeks stand alone
       // between them; and a test week is a different thing from a deload, so the copy names both.
-      body:
+      body:  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
         // ⛔ THREE LIFTING DAYS, AND THE PAIRING IS NAMED (§1f-0 / §1f-1, 2026-08-16). This said
         // a FOUR-day count to EVERY athlete, three-day athletes included, and it is the plan's
         // own description — the sentence an athlete reads to find out what they signed up for. The
@@ -109,7 +109,7 @@ export function strengthFocusSections(opts: {
     },
     {
       heading: 'The reality check',
-      body:
+      body:  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
         `Training provides the stimulus. Adaptation happens during recovery. Prioritize how you feel — ` +
         `the math only works if you honor your rest.`,
     },
@@ -178,7 +178,7 @@ export function strengthFocusBufferLine(enduranceNote = '', anchorCycles = 1): s
   // it, which shows three different percentages. It was never describing the SETS: 85% is where the
   // WORKING NUMBER starts. Said plainly now, because the athlete can see both numbers at once.
   const measured = anchorCycles > 1 ? `each cycle` : `the final cycle`;
-  return (
+  return (  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
     // ⛔ "Week one sits well inside you by design" WAS GARBLED (2026-07-29). Read in a real block it
     // is not a sentence — "inside you" is missing its object. It means the loads in week one are
     // below what the athlete can already lift, which is the whole point of the 85% buffer, so it now
@@ -211,7 +211,7 @@ export function strengthFocusCeilingLine(liftNames: readonly string[]): string {
     ? names[0]
     : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const plural = names.length > 1;
-  return (
+  return (  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
     `One thing before you start. ${list} reach${plural ? '' : 'es'} the top of the range the working ` +
     `number is allowed to occupy, so ${plural ? 'those lifts hold' : 'that lift holds'} rather than ` +
     `climbing for the rest of the block. That is usually the max on file being out of date rather ` +
@@ -257,12 +257,12 @@ export function strengthFocusDescription(opts: {
   // ⛔ SAID ONCE, IN THE PLAN, AND NOWHERE ELSE (§1e). A cost the athlete pays and cannot see is not
   // disclosed; a cost repeated on twelve weeks of cards is nagging. ⚠️ COPY-VOICE — states the fact
   // and what it buys, no imperative, no apology for the length.
-  const supplementalLine = opts.supplemental
+  const supplementalLine = opts.supplemental  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
     ? 'On the building cycles the main lift is repeated for five sets of five at its opening weight, '
       + 'which adds about ten minutes to those sessions. It is volume at a weight already lifted that '
       + 'day, so it builds the lift without adding load.'
     : '';
-  const lightBar = (opts.lightBarLifts ?? []).length > 0
+  const lightBar = (opts.lightBarLifts ?? []).length > 0  // not-instruction: never prints — reaches only strengthFocusDescription, whose one caller is composeStrengthPrimaryPlan, the archived strength builder (generate-strength-plan refuses instead of falling back to it); its other callers are tests and scripts/
     ? `Some ${(opts.lightBarLifts ?? []).join(' and ')} sets sit below the 45 lb bar — those are written for a 35 lb bar.`
     : '';
   // ⛔ DROPPED BY `kind`, NEVER BY REGEX ON THE PROSE (fixed 2026-07-29).
@@ -321,7 +321,7 @@ export function strengthFocusDescription(opts: {
 // 95% or the number comes down 10% (`wendler-531.ts:160-200`, `verdictFrom95Set` / `applyVerdict`).
 // ⛔ **Those two functions are written, correct, and CALLED BY NOTHING.** The composer advances the
 // working number by cycle index, unconditionally (`workingNumberForCycle:112`). Until the verdict is
-// wired, `STRENGTH_ADVANCE_COPY` must not be rendered — it would describe an engine that is not
+// wired, no advance/reset line may be rendered (`STRENGTH_ADVANCE_COPY` was deleted 2026-09-18) — it would describe an engine that is not
 // running. Same starvation as `place-week.ts`.
 
 /** Which line an athlete is standing in front of. Derived from the SET, never from the week number. */
@@ -352,7 +352,7 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   // the previous program's working-set instruction is EXPLOSIVE AND UNDER CONTROL on the concentric — speed in
   // reserve, no grinding; grinding is reserved for the "+" set (the previous program). "Grind" lives
   // ONLY on the amrap line so the two don't contradict on the top set (Michael 2026-08-11).
-  work_set: 'Every rep explosive and controlled.',
+  work_set: 'Every rep explosive and controlled.',  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
   // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
   // are real reps; the ceiling is failure, not slowness.
   amrap: 'Grind it out. Stop before failure.',
@@ -379,7 +379,7 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
  * speed-stop the doctrine note above retired, and it contradicted the new opener the moment the
  * opener said to grind. Both lines now name the same ceiling, and this one says why it is there.
  */
-export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
+export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';  // not-instruction: never prints — imported only by tests; bar-speed-copy.test.ts asserts the logger does not use it
 
 /**
  * ⛔⛔ DELETED 2026-09-18 (book-language fix, one owner per prescription): `STANDING_ACCESSORY_SET_CUE`
@@ -389,14 +389,9 @@ export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
  */
 
 /**
- * ⛔ GATED ON `verdictFrom95Set` BEING WIRED. Do not render until the composer reads the verdict
- * instead of advancing by calendar. Both lines state the mechanism that exists — reps at 95% — and
- * neither claims speed decides anything.
+ * ⛔ DELETED 2026-09-18 (rule 7 triage): `STRENGTH_ADVANCE_COPY` ("Five at ninety-five. Number goes up." / "Couldn't
+ * hit five at ninety-five…") — nothing imported it (grepped src, supabase) and no page prints either line.
  */
-export const STRENGTH_ADVANCE_COPY = {
-  advance: 'Five at ninety-five. Number goes up.',
-  reset: "Couldn't hit five at ninety-five. Number comes down ten percent.",
-} as const;
 
 /**
  * The line for a set, given what the set IS.
@@ -577,7 +572,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
   },
   {
     heading: 'What changes',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       'Assistance reps only. Main lifts always run at 85% training max, +5 lb upper / +10 lb lower '
       + 'per cycle. Cardio never touches the bar.',
   },
@@ -589,7 +584,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
    */
   {
     heading: 'The tiers',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       '0 hard days, under 4 hrs \u2192 40\u201350 reps. Full volume.\n'
       + '0 hard days, 4\u20138 hrs \u2192 30\u201340 reps.\n'
       + '1 hard day, 8 hrs or under \u2192 30\u201340 reps.\n'
@@ -598,7 +593,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
   },
   {
     heading: 'Why accessories are what move',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       'Each hard day is a nervous-system hit.\n'
       + 'Assistance reps are the only expendable volume.\n'
       + 'They get cut. Bar weight never does.',
@@ -614,7 +609,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
      * preference is removed, this line is a promise the week stops keeping.
      */
     heading: 'Incline vs flat',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       'Uphill: no impact transient. Top-end aerobic work the legs barely pay for.\n'
       + 'Flat sprints: maximal footfall is mechanical damage \u2014 the one session held 48 hrs clear '
       + 'of heavy squats.\n'
@@ -636,7 +631,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
      * distinction is the whole reason the claim is quotable.
      */
     heading: 'What one hard day holds — and what it does not',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       'Frequency and duration can fall a long way and top-end fitness holds: six days a week down '
       + 'to two, forty-minute sessions down to thirteen, both held for fifteen weeks.\n'
       + 'Cutting how HARD is the one that lost it.\n'
@@ -651,7 +646,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
      * needs when deciding whether to declare one.
      */
     heading: 'A club session counts',
-    body:
+    body:  // not-instruction: never prints — HARD_DAY_WHY is imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
       'A fixed group run or ride lands in this same slot and costs the week the same recovery.\n'
       + 'Naming the day it falls on is what lets the lifting be placed around it rather than on top '
       + 'of it.',
@@ -683,7 +678,7 @@ export const HARD_DAY_WHY: ReadonlyArray<{ heading: string; body: string }> = [
  * modality moderation, and the standing instruction is not to build a new claim on Wilson 2012's
  * split. The two branches describe themselves; neither is priced against the other.
  */
-export const HARD_RIDE_SHAPE =
+export const HARD_RIDE_SHAPE =  // not-instruction: never prints — imported by NonRaceBuilder.tsx and never rendered there (the import line is its only use); otherwise tests only
   'Four 4-minute efforts hard, three minutes easy between them. A climb, a flat road or a trainer '
   + 'all deliver it — on a bike the resistance is your own power, so the ground does not change the '
   + 'session the way it does on foot.';
@@ -744,7 +739,7 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
    */
   {
     heading: 'What the trial found',
-    body:
+    body:  // not-instruction: never prints — VOLUME_WHY renders only on the 'volume' wizard step, and no step list in wizard-steps.ts produces 'volume'
       'Pace is not what competes with strength here — total work is.\n'
       + 'Lifting alone: +38.5% on leg press.\n'
       + 'Hard cycling alongside it: +28.7%.\n'
@@ -754,7 +749,7 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
   },
   {
     heading: 'What it changes',
-    body:
+    body:  // not-instruction: never prints — VOLUME_WHY renders only on the 'volume' wizard step, and no step list in wizard-steps.ts produces 'volume'
       'Assistance reps only. Nothing here touches your training max, your progression, or your '
       + 'AMRAP sets.',
   },
@@ -766,7 +761,7 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
      * the code test in `endurance-tier.test.ts` pins the same thing from the other side.
      */
     heading: 'The tiers',
-    body:
+    body:  // not-instruction: never prints — VOLUME_WHY renders only on the 'volume' wizard step, and no step list in wizard-steps.ts produces 'volume'
       'Under 4 hrs, 0 hard days \u2192 40\u201350 reps. Full volume.\n'
       + '4\u20138 hrs \u2192 30\u201340 reps.\n'
       + 'Over 8 hrs \u2192 25\u201330 reps, even with zero hard days.\n'
@@ -784,7 +779,7 @@ export const VOLUME_WHY: ReadonlyArray<{ heading: string; body: string }> = [
      * intensity varied, so what is measured is that intensity does not mediate.
      */
     heading: 'What it does not say',
-    body:
+    body:  // not-instruction: never prints — VOLUME_WHY renders only on the 'volume' wizard step, and no step list in wizard-steps.ts produces 'volume'
       'The authors point at total work, and call it a possibility rather than a result.\n'
       + 'Work was held constant while intensity varied \u2014 so what the trial measures is that '
       + 'intensity does not mediate.\n'
