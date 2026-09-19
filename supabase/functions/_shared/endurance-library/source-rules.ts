@@ -134,28 +134,47 @@ export type WrapperSpec = {
 const easy: Intensity = { kind: 'easy' };
 const drill: Intensity = { kind: 'drill' };
 
+/**
+ * ⛔⛔ EVERY LABEL IS THE BOX'S OWN LINE (2026-09-18, book-language pass 4), read off the page photographs. The labels
+ * were short names of ours ("Easy jog", "Steady effort") and the whole box reached the row as ONE timed warm-up step —
+ * the lunges and Cossack squats never reached the athlete, and every ride warm-up became one block at an OURS 55–70%
+ * of FTP. Each line now travels as its own step (`session-vocabulary.ts` `wrapperTokens`, `wrapperStepForToken`
+ * below), with these words on the screen and the watch.
+ */
+
 /** p229 — the running sprint/power box. */
 const RUN_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy jog', seconds: 5 * 60, intensity: easy },
-    { label: 'Walking lunges, 3 sets of 20 m', seconds: null, intensity: drill },
-    { label: 'Butt kicks, 2 rounds of 30 seconds', seconds: 2 * 30, intensity: drill },
-    { label: 'Arm-pump drills, 3 rounds of seated / standing / high elbows, 10 seconds each',
+    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy },
+    { label: '3 sets of 20 meter walking lunges', seconds: null, intensity: drill },
+    { label: '2 x 30-second rounds of butt kicks', seconds: 2 * 30, intensity: drill },
+    { label: 'Perform 3 rounds of the following: 10 seconds seated arm pump drill, 10 seconds standing arm pump drill, 10 seconds "high elbows"',
       seconds: 3 * 30, intensity: drill },
   ],
-  cooldown: [{ label: 'Easy jog or cross-training spin', seconds: 5 * 60, intensity: easy }],
+  cooldown: [{ label: '5-minute easy jog or cross-training/bike', seconds: 5 * 60, intensity: easy }],
   cite: 'Viada p229',
 };
 
-/** p231 (MLSS) and p233 (near-threshold) print the same box. */
-const RUN_THRESHOLD_WRAPPER: WrapperSpec = {
+/** p231 (MLSS). */
+const RUN_MLSS_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy jog', seconds: 10 * 60, intensity: easy },
-    { label: 'Walking lunges, 3 sets of 20 m', seconds: null, intensity: drill },
-    { label: 'Cossack squats, 2 sets of 10 per side', seconds: null, intensity: drill },
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
+    { label: '2 sets of 10 per side Cossack squats', seconds: null, intensity: drill },
   ],
-  cooldown: [{ label: 'Easy jog', seconds: 8 * 60, intensity: easy }],
-  cite: 'Viada p231, p233',
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cite: 'Viada p231',
+};
+
+/** p233 (near-threshold) prints the same box, with "(per side)" in brackets. */
+const RUN_NT_WRAPPER: WrapperSpec = {
+  warmup: [
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
+    { label: '2 sets of 10 (per side) Cossack squats', seconds: null, intensity: drill },
+  ],
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cite: 'Viada p233',
 };
 
 /**
@@ -165,20 +184,26 @@ const RUN_THRESHOLD_WRAPPER: WrapperSpec = {
  */
 const NO_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada p235 — no wrapper printed' };
 
-/** p236 — cycling sprints. ⚠️ No cooldown box is printed for ANY cycling family. */
+/**
+ * p236 — cycling sprints. ⚠️ No cooldown box is printed for ANY cycling family. The cadence sprints are one step of
+ * the four sprints and the three 3-minute rests between them (600 s), carrying the page's whole line.
+ */
 const RIDE_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy spin', seconds: 10 * 60, intensity: easy },
-    { label: 'Cadence-only sprints, 4 x 15 seconds, 3-minute rest between', seconds: 4 * 15 + 3 * 3 * 60,
-      intensity: drill },
+    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy },
+    { label: '4 cadence only 15-second sprints to build up the leg speed and focus on timing and technique with 3-minute rest between',
+      seconds: 4 * 15 + 3 * 3 * 60, intensity: drill },
   ],
   cooldown: [],
   cite: 'Viada p236',
 };
 
-/** p237 (anaerobic) and p238 (sweet spot) print the same 10-15 minute box. */
+/**
+ * p237 (anaerobic) and p238 (sweet spot) print the same box: "10- to 15-minute easy spin". The watch needs one length;
+ * 12:30 is the middle of the page's range — OURS, the pick inside it (the label prints the page's range).
+ */
 const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
-  warmup: [{ label: 'Easy spin', seconds: 12 * 60 + 30, intensity: easy }],
+  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy }],
   cooldown: [],
   cite: 'Viada p237, p238 — "10- to 15-minute easy spin"; the midpoint of his own range',
 };
@@ -186,9 +211,9 @@ const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
 /** p238 — the VO2 box, the only cycling warm-up with an effort in it. */
 const RIDE_VO2_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: 'Easy spin', seconds: 15 * 60, intensity: easy },
-    { label: 'Steady effort', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },
-    { label: 'Easy spin', seconds: 5 * 60, intensity: easy },
+    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy },
+    { label: '5 minutes @ 95%', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },
+    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy },
   ],
   cooldown: [],
   cite: 'Viada p238',
@@ -205,8 +230,8 @@ const SWIM_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada pp240
 
 export const WRAPPERS: Record<FamilyId, WrapperSpec> = {
   run_sprint_power: RUN_SPRINT_WRAPPER,
-  run_mlss: RUN_THRESHOLD_WRAPPER,
-  run_near_threshold: RUN_THRESHOLD_WRAPPER,
+  run_mlss: RUN_MLSS_WRAPPER,
+  run_near_threshold: RUN_NT_WRAPPER,
   run_vt1: NO_WRAPPER,
   run_lsd: NO_WRAPPER,
   ride_sprints: RIDE_SPRINT_WRAPPER,
@@ -218,6 +243,27 @@ export const WRAPPERS: Record<FamilyId, WrapperSpec> = {
   swim_speed: SWIM_WRAPPER,
   swim_open_water: SWIM_WRAPPER,
 };
+
+/**
+ * ⛔ ONE BOX LINE AS ITS OWN TOKEN (2026-09-18, book-language pass 4): `wrap_{family}_warm{i}` / `wrap_{family}_cool{i}`
+ * names line i of the family's box above. The materializer reads the line back from here — its seconds (null = the
+ * lap button; the page times no drill), its intensity and its words — so the page's box reaches the row and the watch
+ * line by line, from this one place.
+ */
+export const WRAPPER_TOKEN = /^wrap_([a-z0-9_]+?)_(warm|cool)(\d+)$/;
+export function wrapperToken(family: FamilyId, part: 'warmup' | 'cooldown', index: number): string {
+  return `wrap_${family}_${part === 'warmup' ? 'warm' : 'cool'}${index}`;
+}
+export function wrapperStepForToken(token: string): {
+  kind: 'warmup' | 'cooldown'; seconds: number | null; label: string; intensity: Intensity;
+} | null {
+  const m = String(token ?? '').toLowerCase().match(WRAPPER_TOKEN);
+  if (!m) return null;
+  const spec = (WRAPPERS as Record<string, WrapperSpec>)[m[1]];
+  const kind = m[2] === 'warm' ? 'warmup' : 'cooldown';
+  const line = spec?.[kind]?.[Number(m[3])];
+  return line ? { kind, seconds: line.seconds, label: line.label, intensity: line.intensity } : null;
+}
 
 // ── THE WORK-VOLUME BAND, PER FAMILY x LEVEL ────────────────────────────────────────────────────
 
@@ -366,6 +412,23 @@ export type PrintedRide = {
 };
 
 /**
+ * ⛔⛔ p235's LONG RUN AS PRINTED, PER LEVEL (2026-09-18, book-language pass 5, audit item 21). The shape builder
+ * sized the inserted sets off an average share of the session (`insertShare`) and a band, so level 2 built 3–7 reps
+ * of 2:15 @ 115% with no recovery where the page prints 2 sets of 2 rounds of 1:30 @ 115% / 30 s @ VT1; the race-pace
+ * finish lost its 95% interval in the middle; the fartlek counts and lengths were off at every level.
+ *
+ * `inserts` are the page's sets, each `rounds` rounds of `round`, placed inside the easy running; `finish` is the
+ * race-pace finish. ⚠️ THE EASY RUNNING FILLS THE REST OF THE SESSION the composer sized (the athlete's long-run
+ * length, p247 "runs up to 90 to 100 minutes"), so only the page's own pieces are fixed. ⚠️ WHERE THE INSERTS GO is
+ * the page's "added at any point" / "during the session" / "in the middle": the easy running is split evenly around
+ * them — OURS, the placement is the athlete's on the day.
+ */
+export type PrintedLongRun = {
+  inserts?: { count: number; rounds: number; round: PrintedSegment[] };
+  finish?: PrintedSegment;
+};
+
+/**
  * One segment of a printed round. `role` is the page's own reading: a percentage the family counts
  * as work is `work`; a prescribed effort under the family's floor (MLSS's VT1 minute inside the
  * round) is `float`; the page's "easy jog" / "easy spin" / "recovery" is `recovery`.
@@ -499,6 +562,8 @@ export type Archetype = {
    * The printed structure is therefore carried here verbatim and built as it reads.
    */
   printedByLevel?: Partial<Record<Level, PrintedRide>>;
+  /** p235's long run as printed — see `PrintedLongRun`. Overrides the shape builder at the levels it carries. */
+  printedLongRunByLevel?: Partial<Record<Level, PrintedLongRun>>;
   /** Seconds of easy recovery between ladder rounds, where the source states one. */
   ladderRoundRest?: number;
   /**
@@ -1125,6 +1190,19 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 30, hi: 240 },
         work: pct(0.95, 1.15),
         recovery: { kind: 'stated', band: { lo: 30, hi: 60 }, intensity: vt1 },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18). L1 "45-minute VT1 run with 2 sets added at any point. The sets are 2 rounds
+         * of 30 seconds @ 100% 30 seconds @ 90%"; L2 "1-hour VT1 run with 2 sets added at any point. The sets are 2
+         * rounds of 1 minute, 30 seconds @ 115% 30 seconds @ VT1"; L3 "1.5-hour VT1 run with 3 sets added at any
+         * point. Sets are either 3 rounds of 1 minute @ 115% 30 seconds @ VT1 or 2 rounds of 4 minutes @ 95% 1 minute
+         * @ VT1" — the first of the two.
+         */
+        printedLongRunByLevel: {
+          // ⚠️ The 30 s @ 90% is the easier half of the round, a `float` (`StepRole`): the page prints no rest in it.
+          1: { inserts: { count: 2, rounds: 2, round: [W(30, 1.00), { seconds: 30, role: 'float', intensity: pct(0.90) }] } },
+          2: { inserts: { count: 2, rounds: 2, round: [W(90, 1.15), { seconds: 30, role: 'recovery', intensity: vt1 }] } },
+          3: { inserts: { count: 3, rounds: 3, round: [W(60, 1.15), { seconds: 30, role: 'recovery', intensity: vt1 }] } },
+        },
         // Computed from his three level examples: the inserted sets take 8%, 12% and 13% of the
         // session. The mean is what sizes them here.
         insertShare: 0.11,
@@ -1143,6 +1221,16 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 5 * 60, hi: 15 * 60 },
         work: { kind: 'race_pace' },
         recovery: { kind: 'open' },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18). L1 "30 minutes @ VT1 5 minutes @ race pace finish"; L2 "60 minutes @ VT1
+         * with single 5 minutes @ 95% interval in the middle 10 minutes @ race pace finish"; L3 "90 to 120 minutes @ VT1
+         * with single 10 minutes @ 95% interval in the middle 15 minutes @ race pace finish".
+         */
+        printedLongRunByLevel: {
+          1: { finish: { seconds: 5 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+          2: { inserts: { count: 1, rounds: 1, round: [W(5 * 60, 0.95)] }, finish: { seconds: 10 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+          3: { inserts: { count: 1, rounds: 1, round: [W(10 * 60, 0.95)] }, finish: { seconds: 15 * 60, role: 'work', intensity: { kind: 'race_pace' } } },
+        },
         cite: 'Viada p235',
       },
       {
@@ -1158,6 +1246,16 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 180, hi: 240 },
         work: pct(0.85),
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        /**
+         * ⛔ p235 AS PRINTED (2026-09-18): no fartlek at level 1; L2 "1.5-hour VT1 fartlek, with target of 6 x 3
+         * minutes @ 85% during the session"; L3 "2- to 2.5-hour VT1 fartlek, with target of 6 x 4 minutes @ 85% during
+         * the session".
+         */
+        levels: [2, 3],
+        printedLongRunByLevel: {
+          2: { inserts: { count: 6, rounds: 1, round: [W(3 * 60, 0.85)] } },
+          3: { inserts: { count: 6, rounds: 1, round: [W(4 * 60, 0.85)] } },
+        },
         // Computed from his level 2 and level 3 fartleks: the targeted efforts take 20% and 18% of
         // the session.
         insertShare: 0.19,
@@ -1787,3 +1885,40 @@ export function ridePowerRuleOf(family: string | null | undefined): RidePowerRul
   if (f.underThreshold) return 'under_threshold';
   return null;
 }
+
+
+/**
+ * ⛔⛔ THE ENDURANCE SWIM AS p241 PRINTS IT, LEVEL BY LEVEL (2026-09-18, book-language pass 2, audit item 32).
+ *
+ * The shape builder made level 1 a 300 m opener and ONE 600 m repeat; the page prints 200 m, three 50s and TWO 600s.
+ * The Standing Plan's swim is this family at level 1 (`sport-slots.ts`), so the row now carries the page's own
+ * session, token for token, with the page's words for each piece (`words`, read off p241.jpg). The token list is the
+ * whole session: `session-vocabulary.ts` sends it as it stands, with no wrapper of its own.
+ * ⚠️ Where the page offers two options ("3 x 600m or 2 x 1000m") the first is built.
+ */
+export const SWIM_ENDURANCE_PRINTED: Record<Level, { token: string; words: string }[]> = {
+  // p241 L1: "200m as 25m easy, 25m drill choice · 3 x 50m @ 25m easy, 25m sprint with 10-second rest · 2 x 600m @
+  // easy-to-moderate intensity (race pace) with 2-minute rest"
+  1: [
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_3x50m_r10', words: '25m easy, 25m sprint' },
+    { token: 'swim_aerobic_2x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+  // p241 L2: "100m kick · 200m as 25m easy, 25m drill choice · 4 x 50m @ 25m easy, 25m sprint with 10-second rest ·
+  // 3 x 600m or 2 x 1000m @ easy-to-moderate intensity (race pace) with 2-minute rest"
+  2: [
+    { token: 'swim_kick_1x100m', words: 'kick' },
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_4x50m_r10', words: '25m easy, 25m sprint' },
+    { token: 'swim_aerobic_3x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+  // p241 L3: "100m kick · 100m DPS or glide drill · 200m as 25m easy, 25m drill choice · 8 x 25m sprint with 5-second
+  // rest · 3 x 1200m or 2 x 1600m @ easy-to-moderate intensity (race pace) with 3-minute rest"
+  3: [
+    { token: 'swim_kick_1x100m', words: 'kick' },
+    { token: 'swim_drill_dps_1x100m', words: 'DPS or glide drill' },
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_8x25m_r5', words: 'sprint' },
+    { token: 'swim_aerobic_3x1200m_r180', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+};

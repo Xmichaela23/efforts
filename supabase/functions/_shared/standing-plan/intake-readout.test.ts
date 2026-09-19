@@ -72,10 +72,10 @@ Deno.test('a hard row carries its sport\'s approved line, and no other row carri
     answers: { hard1: 'run', hard2: 'run', hard3: 'run', easy: 'ride', long: 'ride' },
     baselines: BASELINES,
   });
-  assertEquals(r.rows.hard1!.hard_line, 'A series of near-threshold efforts. Choose the workout on the day.');
+  assertEquals(r.rows.hard1!.hard_line, 'Choose the workout on the day.');
   // p274's day 2 is a ride whatever was tapped, so it reads the ride's line.
-  assertEquals(r.rows.hard2!.hard_line, 'A series of efforts near or above threshold. Choose the workout on the day.');
-  assertEquals(r.rows.hard3!.hard_line, 'A series of near-threshold efforts. Choose the workout on the day.');
+  assertEquals(r.rows.hard2!.hard_line, 'Choose the workout on the day.');
+  assertEquals(r.rows.hard3!.hard_line, 'Choose the workout on the day.');
   assertEquals(r.rows.easy!.hard_line, null);
   assertEquals(r.rows.long!.hard_line, null);
   // Every line is the object's own — nothing is composed per row.

@@ -63,11 +63,25 @@ function stepLine(step: any, index: number, ftp: number): string {
   }
   const kind = String(step?.kind ?? '');
   const label = typeof step?.label === 'string' ? step.label.trim() : '';
-  // A cue is free text before the duration. Digits or % in it would be read as a duration or a target.
+  /**
+   * ⛔ A LABEL WITH DIGITS OR % GOES ON ITS OWN LINE ABOVE THE STEP (2026-09-18, book-language pass 4, audit §4).
+   * A cue is free text before the duration, and digits or % in it would be read as a duration or a target — so this
+   * threw, and every ride whose steps carry the page's words ("3 minutes at high intensity. Push yourself at a 9/10
+   * effort", "5 minutes @ 95%") never reached Intervals.icu or Zwift: the FTP test first of all. A line that does not
+   * start with "-" is text in the workout (same Quick Guide as above), so the page's words print over the step and the
+   * step keeps its kind's cue. ⚠️ A line ending in "Nx" would start a repeat, so that one still refuses.
+   * ⚠️ Read off the Quick Guide, not yet seen on a live Intervals.icu calendar.
+   */
+  let heading = '';
+  let cueLabel = label;
   if (label && /[\d%]/.test(label)) {
-    throw new IntervalsSerializeError(`${where}: label "${label}" contains digits or %, which Intervals would read as part of the step`);
+    if (/\b\d+x\s*$/i.test(label)) {
+      throw new IntervalsSerializeError(`${where}: label "${label}" ends in "Nx", which Intervals would read as a repeat`);
+    }
+    heading = label;
+    cueLabel = '';
   }
-  const cue = label || CUE_BY_KIND[kind] || '';
+  const cue = cueLabel || CUE_BY_KIND[kind] || '';
 
   const lo = Number(step?.powerRange?.lower);
   // ⛔ A FLOOR WITH NO CEILING GOES OUT WITH THE PAGE'S OWN TOP (2026-09-16, p237 "start at 110%, progress to
@@ -89,7 +103,8 @@ function stepLine(step: any, index: number, ftp: number): string {
   } else {
     throw new IntervalsSerializeError(`${where}: unreadable power range ${JSON.stringify(step.powerRange)}`);
   }
-  return `- ${cue ? `${cue} ` : ''}${formatDuration(seconds)} ${target}`;
+  const line = `- ${cue ? `${cue} ` : ''}${formatDuration(seconds)} ${target}`;
+  return heading ? `${heading}\n${line}` : line;
 }
 
 export function serializeRide(row: PlannedRideRow): IntervalsEvent {

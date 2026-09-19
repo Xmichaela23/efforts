@@ -38,7 +38,7 @@ Deno.test('a ride: watts, the floor-only "and up", a spin prints its watts, and 
   // 2026-09-16: a recovery inside a hard ride prints the power it carries, not "easy".
   assertEquals(plannedStepLines([work, spin, work, spin, work, spin], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 @ 80–110 W between']);
   const bare: PlannedStep = { kind: 'recovery', seconds: 270 };
-  assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 easy between']);
+  assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 between']);
 });
 
 Deno.test('a step that repeats nothing prints on its own line', () => {
@@ -68,41 +68,35 @@ Deno.test('the approved ladder lines, word for word (2026-09-17)', () => {
     '10:00 warm-up · HR 138–144 · ref 10:56–12:22/mi',
     'Set 1',
     '3:00, 2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
-    'jog after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi',
+    'after each: 2:00, 1:20, 40 s, 30 s, 20 s @ 15:01–16:55/mi',
     '2:00 @ 10:56–12:22/mi between sets',
     'Set 2',
     '2:00, 1:00, 45 s, 30 s @ 7:49–8:09/mi',
-    'jog after each: 1:20, 40 s, 30 s @ 15:01–16:55/mi',
+    'after each: 1:20, 40 s, 30 s @ 15:01–16:55/mi',
     '8:00 cool-down · HR 138–144 · ref 10:56–12:22/mi',
   ]);
 });
 
 /**
- * ⛔ THE BOOK'S EFFORT WORDS, WORD FOR WORD (Michael, 2026-09-17). No step prints an effort number; the talk test
- * (p235) goes under a VT1 or LSD run, "all-out" (p229–231) under a Sprint / Power run whose work carries no target.
+ * ⛔ THE BOOK'S EFFORT WORDS (Michael, 2026-09-17). No step prints an effort number. The talk test (p235) is the VT1
+ * run's own line (`family-lines.ts`), printed above the steps; the copy under the steps came off 2026-09-18
+ * (book-language pass 1). "All-out" (p229–231) still goes under a Sprint / Power run whose work carries no target.
  */
 const easyWrap = (kind: string, seconds: number): PlannedStep =>
   ({ kind, seconds, distanceDerived: true, prescription: 'heart_rate', hr_range: { lower: 138, upper: 144 }, pace_range: easy });
 
-Deno.test('VT1 and LSD: the talk-test line, after the run and ahead of the cool-down', () => {
+Deno.test('VT1 and LSD: no talk-test line under the steps — the session line carries it, once', () => {
   const run: PlannedStep = { kind: 'work', seconds: 1800, distanceDerived: true, prescription: 'heart_rate', hr_range: { lower: 138, upper: 144 }, pace_range: easy };
   for (const family of ['run_vt1', 'run_lsd']) {
-    assertEquals(plannedStepLines([run], { sport: 'run', family }), [
-      '30:00 @ HR 138–144 · ref 8:33–9:41/mi',
-      'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.',
-    ]);
+    assertEquals(plannedStepLines([run], { sport: 'run', family }), ['30:00 @ HR 138–144 · ref 8:33–9:41/mi']);
   }
-  assertEquals(plannedStepLines([easyWrap('warmup', 600), run, easyWrap('cooldown', 480)], { sport: 'run', family: 'run_vt1' }).slice(-2), [
-    'Easy enough to talk in full sentences. Check after 5 minutes and again after 20.',
-    '8:00 cool-down · HR 138–144 · ref 8:33–9:41/mi',
-  ]);
 });
 
 Deno.test('Sprint / Power: the all-out line when a work step carries no target, and none when every step has one', () => {
   const sprint: PlannedStep = { kind: 'work', seconds: 10, label: 'Sprint' };
   const walk: PlannedStep = { kind: 'recovery', seconds: 90, label: 'Walk back' };
   const lines = plannedStepLines([easyWrap('warmup', 600), sprint, walk, sprint, walk, sprint, easyWrap('cooldown', 300)], { sport: 'run', family: 'run_sprint_power' });
-  assertEquals(lines[lines.length - 2], 'All-out: the best speed you have today.');
+  assertEquals(lines[lines.length - 2], '"All-out" indicates "best possible speed" for the day.');
   assertEquals(lines.filter((l) => /RPE/.test(l)), []);
   const paced = plannedStepLines([W(300, 490, 510), R(90, 513, 581), W(300, 490, 510)], { sport: 'run', family: 'run_sprint_power' });
   assertEquals(paced, ['2 × 5:00 @ 8:10–8:30/mi, 1:30 @ 8:33–9:41/mi between']);

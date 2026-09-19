@@ -60,7 +60,8 @@ Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the a
   assertEquals(s.sections.standard, { label: 'Multisport Focus', blurb: 'Running, riding and lifting in one plan.', list_title: 'Multisport' });
   assertEquals(s.programs.ride_strength.requirement, 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.');
   assertEquals(s.plans.all_rounder.name, 'Run + Ride + Strength');
-  assertEquals(s.plans.cycling_base.ftp_note, "If you're coming back from a riding break, make sure your FTP is current.");
+  // ⛔ The FTP line came off 2026-09-18 (book-language pass 3): on no page.
+  assertEquals(s.plans.cycling_base.ftp_note, null);
   assertEquals(s.plans.strength_5k.confirm_line.replace('{weeks}', '12'),
     'A 12-week block.');
 });
@@ -68,10 +69,11 @@ Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the a
 Deno.test('⛔ Rides screen and runs screen — rows and words from the server', () => {
   const ride = enduranceIntakeReadout({ frame: 'cycling_base', answers: {} }).ride_strength_week!;
   assertEquals(ride.count_label, 'Rides a week');
-  assertEquals(ride.default_count, 5);
+  // ⛔ p278's Standard column (2026-09-18, book-language pass 4): seven rides; one fewer drops Day 2's easy ride.
+  assertEquals(ride.default_count, 7);
   assertEquals(ride.counts.map((c) => [c.label, c.rows.map((r) => r.line)]), [
-    ['Four rides', ['Day 1 · Hard Ride', 'Day 3 · VO2 Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
-    ['Five rides', ['Day 1 · Hard Ride', 'Day 2 · Ride', 'Day 3 · VO2 Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Six rides', ['Day 1 · Hard Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+    ['Seven rides', ['Day 1 · Hard Ride', 'Day 2 · Ride', 'Day 3 · VO2 Ride', 'Day 3 · Hard Ride', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
   ]);
   // The screen and the composed week agree, both counts (this pin moved here from the phone's test).
   const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
@@ -87,7 +89,7 @@ Deno.test('⛔ Rides screen and runs screen — rows and words from the server',
   assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).ride_strength_week, null);
   const run = enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).run_strength_week!;
   assertEquals(run.commitment_line, 'Four lifting days a week. Four runs fit around them.');
-  assertEquals(run.sub_line, 'Pick how long the long run is. The easy run is 30 minutes. The two hard runs rotate.');
+  assertEquals(run.sub_line, 'Pick how long the long run is. The easy run is 30 minutes.');
   assertEquals(run.rows.map((r) => r.title), ['Day 1 · Hard session 1', 'Day 3 · Hard session 2', 'Day 4 · Easy session', 'Day 6 · Long session']);
   assertEquals(run.rows.map((r) => r.length), ['length varies week to week', 'length varies week to week', '30 min', null]);
 });

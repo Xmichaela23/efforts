@@ -940,13 +940,16 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
  * Three lifting days (1 heavy upper, 2 heavy lower, 4 full-body speed), a plyo warm-up on day 3, rides
  * on days 1, 2, 3, 5 and 6, day 7 full rest. **Every lifting row p278 prints and nothing else.**
  *
- * ⛔⛔ THE STANDARD WEEK TAKES p278's STANDARD LIFTING AND p278's DELOAD RIDES, IN ONE WEEK. p251
- * prints a week that takes one column's lifting and the other column's endurance, which is the basis.
- * The work order's rides are the Deload column's five, all at level 1 (sweet spot, easy, VO2, sprint,
- * easy) — not the Standard column's seven. Written INTO the column rather than mixed at compose time,
- * so every reader of `columns` (placement, conflicts, copy, the sport assignment) sees one week.
- * ⚠️ So `taper` here is p278's Deload column on BOTH sides, and it is what the Adjust deload gives.
- * ⚠️ Rides do not get longer week to week (Michael, 2026-09-13). Each prints its level 1 session.
+ * ⛔⛔ THE STANDARD WEEK IS p278's STANDARD COLUMN, RIDES INCLUDED (2026-09-18, book-language pass 4, audit §3).
+ * It took p278's DELOAD rides (five, all level 1) under the STANDARD lifting, on a work-order choice of 2026-09-13.
+ * The page means the Standard column for the ordinary week and the Deload column for a deload week: p281's own Base
+ * notes speak of "the Tuesday and Friday endurance rides" and "the Saturday long ride" — days 2, 5 and 6 — and only
+ * the Standard column has an endurance ride on day 5 (SOURCE Part E2a, read off p278 by row shading; E2d, p281).
+ * So the standard week is seven rides: sweet spot (level 1-2), endurance (1), VO2 (1) + sweet spot (1), endurance (1)
+ * + sprint (1), endurance (2). `taper` is p278's Deload column on both sides — five rides at level 1.
+ * ⚠️ p281 has the endurance rides lengthen ("gradually increase volume over two to three by 1-month cycles"; the long
+ * ride "every 1 to 2 weeks") and prints no amount, so the rides are built at their printed level and the rides
+ * screen prints p281's sentence; no step is invented.
  *
  * ⚠️ NO RUN SLOT AND NO SWIM (`enduranceSports: ['ride']`).
  * ⚠️ NO OVERHEAD PRESS IS NAMED — p278's push rows are categories. `testedLifts` is bench, squat and
@@ -975,7 +978,8 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
     ],
-    endurance: [E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1) — p278 Deload column', { role: 'hard' })],
+    // p278 Standard column, day 1: "Cyc sweet spot (level 1-2)". OURS — level 1, the low end of the page's range.
+    endurance: [E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1-2)', { role: 'hard' })],
   },
   {
     day: 2,
@@ -1003,9 +1007,17 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1) — p278 Deload column', { role: 'easy' })],
+    // p278 Standard column, day 2: "Cyc endurance (level 1)"
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
   },
-  { day: 3, label: null, strength: [], endurance: [E('ride_vo2', 1, 'Cyc VO2 (level 1) — p278 Deload column', { role: 'hard' })], plyo: true },
+  // p278 Standard column, day 3: "Cyc VO2 (level 1) · Cyc sweet spot (level 1)" — two rides.
+  {
+    day: 3, label: null, strength: [], plyo: true,
+    endurance: [
+      E('ride_vo2', 1, 'Cyc VO2 (level 1)', { role: 'hard' }),
+      E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1)', { role: 'hard' }),
+    ],
+  },
   {
     day: 4,
     label: 'DE: Full',
@@ -1031,22 +1043,30 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
    * (2026-09-13): its effort has no printed length — an acceleration up to speed — and no step on a
    * watch file can carry a work step with no clock. Open for Michael.
    */
-  { day: 5, label: null, strength: [], endurance: [E('ride_sprints', 1, 'Cyc sprint (level 1) — p278 Deload column', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] })] },
+  // p278 Standard column, day 5: "Cyc endurance (level 1) · Cyc sprint (level 1)" — two rides.
+  {
+    day: 5, label: null, strength: [],
+    endurance: [
+      E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' }),
+      E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] }),
+    ],
+  },
   /**
-   * ⚠️ p281 CALLS THIS "THE SATURDAY LONG RIDE", so the frame states `long`. It is still level 1
-   * endurance, the Deload column's cell, and it does not lengthen week to week.
+   * ⚠️ p281 CALLS THIS "THE SATURDAY LONG RIDE", so the frame states `long`. p278 Standard column, day 6:
+   * "Cyc endurance (level 2)".
    */
-  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1) — p278 Deload column', { role: 'long' })] },
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'long' })] },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
 /**
  * ⛔ p278's DELOAD COLUMN, BOTH SIDES. The lifting is a CUT, not a substitution: day 1 is unchanged,
- * day 2 loses the DE secondary hinge, day 4 loses the DE primary hinge and the carry. The rides are
- * the same five as the standard week above.
+ * day 2 loses the DE secondary hinge, day 4 loses the DE primary hinge and the carry. The rides are the
+ * Deload column's five, one a day, all level 1: day 3 drops its sweet spot, day 5 its endurance ride.
  */
 const CYCLING_BASE_TAPER: FrameDay[] = [
-  { ...CYCLING_BASE_STANDARD[0] },
+  // p278 Deload column, day 1: the same lifting; "Cyc sweet spot (level 1)".
+  { ...CYCLING_BASE_STANDARD[0], endurance: [E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1)', { role: 'hard' })] },
   {
     day: 2,
     label: 'ME Lower',
@@ -1067,7 +1087,8 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
     // p278 Deload column, day 2 endurance cell: Cyc endurance (level 1)
     endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
   },
-  { ...CYCLING_BASE_STANDARD[2] },
+  // p278 Deload column, day 3: "Cyc VO2 (level 1)".
+  { day: 3, label: null, strength: [], plyo: true, endurance: [E('ride_vo2', 1, 'Cyc VO2 (level 1)', { role: 'hard' })] },
   {
     day: 4,
     label: 'DE: Full',
@@ -1080,8 +1101,10 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
     ],
     endurance: [],
   },
-  { ...CYCLING_BASE_STANDARD[4] },
-  { ...CYCLING_BASE_STANDARD[5] },
+  // p278 Deload column, day 5: "Cyc sprint (level 1)".
+  { day: 5, label: null, strength: [], endurance: [E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] })] },
+  // p278 Deload column, day 6: "Cyc endurance (level 1)".
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long' })] },
   { ...CYCLING_BASE_STANDARD[6] },
 ];
 
@@ -1192,8 +1215,9 @@ export const FRAMES: Record<FrameId, Frame> = {
     enduranceSports: ['ride'],
     hardSessionsFixed: true,
     printedWeekOnly: true,
-    // OURS — `fewerRidesDropsSlot` the four-ride week (Michael, 2026-09-13); p278's Deload column prints five rides, and day 2's easy ride is the one that comes out
-    fewerRidesDropsSlot: { rideCount: 4, day: 2, index: 0 },
+    // OURS — `fewerRidesDropsSlot` the one-fewer-ride week (Michael, 2026-09-13, as four of five rides; one fewer than
+    // p278's Standard seven since 2026-09-18); day 2's easy ride is the one that comes out
+    fewerRidesDropsSlot: { rideCount: 6, day: 2, index: 0 },
   },
 };
 

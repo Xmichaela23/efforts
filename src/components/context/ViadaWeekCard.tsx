@@ -187,8 +187,11 @@ export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWee
     switch (kind) {
       case 'work_sets': return 'work sets';
       case 'muscle_sets': return `${word(MUSCLE_WORD, key)} sets`;
-      case 'pattern_heavy': return `${word(PATTERN_WORD, key)} heavy reps`;
-      case 'pattern_speed': return `${word(PATTERN_WORD, key)} speed reps`;
+      // ⛔ p80's own words for its two doses (2026-09-18, book-language pass 1, audit item 30): "4 to 6 repetitions
+      // over 90 percent and 15 to 20 velocity-focused" reps per movement pattern. "heavy" and "speed" were ours, and
+      // "speed" read as a name for dynamic effort, which the book spells "Dynamic Effort" (`INTENT_TITLE`).
+      case 'pattern_heavy': return `${word(PATTERN_WORD, key)} reps over 90 percent`;
+      case 'pattern_speed': return `${word(PATTERN_WORD, key)} velocity-focused reps`;
     }
   });
 

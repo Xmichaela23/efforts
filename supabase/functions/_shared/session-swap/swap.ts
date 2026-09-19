@@ -338,9 +338,10 @@ export function swappedSessionBlock(s: SwappableSession): { effort: string; note
     ? `Hard ${noun}, no target`
     : `Easy ${noun}, no pace target`;
   const from = originOf(s);
+  // ⛔ "Same time, same effort." came off (2026-09-18, book-language pass 3): on no page. What is left says what the app did.
   const note = from
-    ? `Swapped from your planned ${from === 'ride' ? 'ride' : from}. Same time, same effort.`
-    : 'Swapped from another sport. Same time, same effort.';
+    ? `Swapped from your planned ${from === 'ride' ? 'ride' : from}.`
+    : 'Swapped from another sport.';
   return { effort, note };
 }
 

@@ -411,7 +411,9 @@ export default function StateAdjustLens({ mainLifts }: {
   };
   const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started take the new number. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
   const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is your zone 2 pace, worked out from threshold pace. The threshold test goes on the calendar today; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
-  const BIKE_INFO = "The FTP tests go on the calendar today; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
+  // ⛔ "The 20-minute test is the classic … all-out with no pacing, so it repeats well" came off (2026-09-18, book-language
+  // pass 2): on no page. What is left says how the app reads the tests.
+  const BIKE_INFO = "The FTP tests go on the calendar today; a ride logged within a day of the test is read as the test. The 5-minute test counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
   type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
   const sections: Section[] = [
@@ -425,10 +427,10 @@ export default function StateAdjustLens({ mainLifts }: {
     ...(deload?.canDeload && nextWeek != null ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
       <>
         <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
-        {/* ⛔ 2026-09-18 (book-language fix, strength half): "Max-effort sets become skill and speed sets, the extra
-            lower-body sets come out" came off — no quoted words on any page, "speed" is not the book's word for DE,
-            and the substitution differs by program (p274 substitutes; p278 only cuts). */}
-        <p className="text-footnote text-label-secondary mt-2 leading-snug">The endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
+        {/* ⛔ p245's own words (2026-09-18, book-language pass 2, audit T4). The paragraph that stood here was ours:
+            "skill and speed sets" for the page's DE, "drop a level" for a column that also removes sessions, and p247's
+            "two weeks out" stated for every program. Each program's deload column is built by the plan itself. */}
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">If performance begins to suffer, particularly if the ME lifts underperform 2 weeks in a row, consider running a single deload week.</p>
         {deload.taperWeeks.length > 0 && <p className="text-caption text-label-secondary mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
         {deloadNote && <p className="text-footnote text-label-secondary mt-1.5">{deloadNote}</p>}
       </>

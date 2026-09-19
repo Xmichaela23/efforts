@@ -144,6 +144,8 @@ export type KeySessionItem = {
   date: string; // YYYY-MM-DD
   type: string;
   name: string | null;
+  /** The one server title (`_shared/session-title.ts`) — what State's NEXT row prints. Display only. */
+  title?: string | null;
   category: KeySessionCategory;
   workload_planned: number | null;
 };

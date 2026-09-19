@@ -54,7 +54,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 02  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ WEEK 02  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 03  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -152,7 +152,7 @@ WEEK 03  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 04  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ WEEK 04  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 05  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -250,7 +250,7 @@ WEEK 05  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 06  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -299,7 +299,7 @@ WEEK 06  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 07  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -348,7 +348,7 @@ WEEK 07  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -397,7 +397,7 @@ WEEK 08  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -446,7 +446,7 @@ WEEK 09  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 10  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -494,7 +494,7 @@ WEEK 10  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 11  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -542,7 +542,7 @@ WEEK 11  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)
 
 WEEK 12  column=standard
 ----------------------------------------------------------------------------------------------------
@@ -590,4 +590,4 @@ WEEK 12  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
+      [warning ] Friday heavy legs, Saturday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.  (Viada p86)

@@ -26,7 +26,9 @@ import { localDateInTz } from './local-date.ts';
 
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
 // 2 (2026-09-18): one name per movement (83 spellings merged), every movement filed by its page, the pull-up leads the primary pull cell.
-export const PLAN_WRITER_VERSION = 2;
+// 3 (2026-09-18): the book-language fix — every instruction the page's own words; warm-up boxes line by line, the page's
+// words on steps, p235's long run and p278's Standard rides as printed; p218's reserve band on HYP/DE/SKILL rows.
+export const PLAN_WRITER_VERSION = 3;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

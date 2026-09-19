@@ -14,10 +14,10 @@ Deno.test('durations', () => {
 
 Deno.test('easy ride: one steady step, plan percentages recovered from watts', () => {
   const ev = serializeRide({
-    id: 'a', date: '2026-09-10', type: 'ride', name: 'Ride', description: 'Easy ride, under 75 percent of FTP the whole way.',
+    id: 'a', date: '2026-09-10', type: 'ride', name: 'Ride', description: 'Easy ride below 75%.',
     computed: { anchors, steps: [{ kind: 'work', seconds: 3600, powerRange: { lower: 137, upper: 158 } }] },
   });
-  assertEquals(ev.description, 'Easy ride, under 75 percent of FTP the whole way.\n\n- 1h 65-75%');
+  assertEquals(ev.description, 'Easy ride below 75%.\n\n- 1h 65-75%');
   assertEquals(ev.moving_time, 3600);
   assertEquals(ev.start_date_local, '2026-09-10T00:00:00');
   assertEquals(ev.external_id, 'a');
@@ -55,15 +55,26 @@ Deno.test('explicit failures', () => {
   assertThrows(() => serializeRide({ id: 'e', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [] } }), IntervalsSerializeError, 'no saved steps');
   assertThrows(() => serializeRide({ id: 'f', date: '2026-09-15', type: 'ride', computed: { steps: [{ kind: 'work', seconds: 60 }] } }), IntervalsSerializeError, 'no FTP');
   assertThrows(() => serializeRide({ id: 'g', date: '2026-09-15', type: 'run', computed: { anchors, steps: [{ kind: 'work', seconds: 60 }] } }), IntervalsSerializeError, 'not a ride');
-  assertThrows(() => serializeRide({ id: 'h', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', label: 'Hard — 3 min', seconds: 180 }] } }), IntervalsSerializeError, 'contains digits');
+  assertThrows(() => serializeRide({ id: 'h', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', label: 'twice 3x', seconds: 180 }] } }), IntervalsSerializeError, 'repeat');
   assertThrows(() => serializeRide({ id: 'i', date: '2026-09-15', type: 'ride', computed: { anchors, steps: [{ kind: 'work', powerRange: { lower: 100, upper: 120 } }] } }), IntervalsSerializeError, 'no duration');
+});
+
+/**
+ * ⛔ A LABEL WITH DIGITS PRINTS ON ITS OWN LINE ABOVE THE STEP (2026-09-18, book-language pass 4). The FTP test's page
+ * words ("3 minutes at high intensity. Push yourself at a 9/10 effort") refused the whole ride before.
+ */
+Deno.test('a step labelled with the page\'s numbers goes out with the words above it, not refused', () => {
+  const ev = serializeRide({ id: 'h2', date: '2026-09-15', type: 'ride', name: 'FTP', computed: { anchors, steps: [
+    { kind: 'work', label: 'high intensity. Push yourself at a 9/10 effort', seconds: 180 },
+  ] } });
+  assertEquals(ev.description, 'high intensity. Push yourself at a 9/10 effort\n- 3m freeride');
 });
 
 /** ⛔ p239's easy step (0 up to 75% of FTP) goes to Intervals.icu / Zwift with no target (Michael, 2026-09-18). */
 Deno.test('a ceiling-only easy step goes out as freeride', () => {
   const ev = serializeRide({
-    id: 'j', date: '2026-09-15', type: 'ride', name: 'Easy', description: 'Easy ride, under 75 percent of FTP the whole way.',
+    id: 'j', date: '2026-09-15', type: 'ride', name: 'Easy', description: 'Easy ride below 75%.',
     computed: { anchors, steps: [{ kind: 'work', seconds: 3600, powerRange: { lower: 0, upper: 158 } }] },
   });
-  assertEquals(ev.description, 'Easy ride, under 75 percent of FTP the whole way.\n\n- 1h freeride');
+  assertEquals(ev.description, 'Easy ride below 75%.\n\n- 1h freeride');
 });

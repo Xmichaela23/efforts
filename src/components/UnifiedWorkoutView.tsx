@@ -36,6 +36,7 @@ import { useSwapSheet, postSwap, type SwapSheetOption } from '@/hooks/useSwapShe
 import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 
 // Get unified planned workout data with pace ranges (same as Today's Effort and Weekly)
 const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPlanned: any, linkedPlanned: any) => {
@@ -617,41 +618,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }
       }
       
-      const rawDesc = String((plannedRow as any)?.name || (plannedRow as any)?.rendered_description || (plannedRow as any)?.description || '').toLowerCase();
-      const tagsArr: any[] = Array.isArray((plannedRow as any)?.tags) ? (plannedRow as any).tags : [];
-      const tags = tagsArr.map((x:any)=> String(x).toLowerCase());
-      const focus = (() => {
-        if (t === 'ride') {
-          if (tags.includes('group_ride') || /group\s*ride/.test(rawDesc)) return 'Group Ride';
-          if (tags.includes('long_ride')) return 'Long Ride';
-          if (/vo2/.test(rawDesc)) return 'VO2';
-          if (/threshold|thr_/.test(rawDesc)) return 'Threshold';
-          if (/sweet\s*spot|\bss\b/.test(rawDesc)) return 'Sweet Spot';
-          if (/recovery/.test(rawDesc)) return 'Recovery';
-          if (/endurance|\bz2\b/.test(rawDesc)) return 'Endurance';
-          return 'Ride';
-        }
-        if (t === 'run') {
-          if (tags.includes('long_run')) return 'Long Run';
-          if (/tempo/.test(rawDesc)) return 'Tempo';
-          if (/(intervals?)/.test(rawDesc) || /(\d+)\s*[x×]\s*(\d+)/.test(rawDesc)) return 'Intervals';
-          if (/easy|recovery|aerobic/.test(rawDesc)) return 'Easy Run';
-          if (/m.?pace|marathon.?pace/.test(rawDesc)) return 'M-Pace Run';
-          if (/long/.test(rawDesc)) return 'Long Run';
-          return null; // no meaningful focus found — fall through to just typeLabel
-        }
-        if (t === 'swim') {
-          if (tags.includes('opt_kind:technique') || /drills|technique/.test(rawDesc)) return 'Technique';
-          return 'Endurance';
-        }
-        if (t === 'strength') return 'Strength';
-        // Generic fallbacks
-        if (/sweet\s*spot|\bss\b/.test(rawDesc)) return 'Sweet Spot';
-        if (/threshold|tempo|interval/.test(rawDesc)) return 'Quality';
-        if (/endurance|long/.test(rawDesc)) return 'Endurance';
-        return null;
-      })();
-      return focus ? `${typeLabel} — ${focus}` : typeLabel;
+      /**
+       * ⛔ THE PLANNED SESSION'S OWN TITLE (2026-09-18, book-language pass 1, audit item 29). This built "Ride — VO2" /
+       * "Run — Tempo" from a regex over the description, so the anaerobic ride (p237) read as a VO2 ride and the
+       * name the plan gave the session never printed. It is the same derivation the server title uses
+       * (`_shared/session-title.ts`), which every other screen and every send reads.
+       */
+      return deriveWorkoutTitle(plannedRow) || typeLabel;
     }
     // Otherwise, prefer the saved workout name if present
     const explicitName = String((workout as any)?.name || '').trim();

@@ -215,9 +215,18 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (allStrength && Array.isArray(computedAny?.strength_lines)) {
         lines.push(...computedAny.strength_lines.filter((l:any)=> typeof l === 'string' && l));
       }
-      // The talk-test reminder prints once per session, on the first heart-rate step; the rest carry the range.
-      let talkTestSaid = false;
+      /**
+       * ⛔ A RUN, RIDE OR WALK PRINTS THE SERVER'S STEP LINES (2026-09-18, book-language pass 1). This tab re-composed
+       * every step itself — its own warm-up words, its own talk-test sentence, /mi for a metric athlete — while Today
+       * and the plan list printed `computed.step_lines` (`_shared/planned-step-lines.ts`). One writer now; a row
+       * materialized before `step_lines` existed falls back to the per-step lines below.
+       */
+      const serverStepLines: string[] | null = (parentDiscV3 === 'run' || parentDiscV3 === 'ride' || parentDiscV3 === 'walk')
+        && Array.isArray(computedAny?.step_lines) && computedAny.step_lines.length > 0
+        ? computedAny.step_lines.filter((l:any)=> typeof l === 'string' && l) : null;
+      if (serverStepLines) lines.push(...serverStepLines);
       v3.forEach((st:any)=>{
+        if (serverStepLines) return;
         // The step's own time, for its line. ⚠️ No longer summed into a session total — see `plannedSecs`.
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
@@ -333,16 +342,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
          * easy work carry `prescription: 'heart_rate'` + `hr_range` from the materializer, and that
          * range is what the watch gets; the pace is a reference. This list printed the reference
          * alone, so the athlete read a pace target on a step that has none.
-         * ⛔ THE WORDS ARE THE BOOK'S TALK TEST (p211): VT1 is the last pace at which a full sentence
-         * can be recited aloud without taking a breath. Michael: "whatever Viada says about VT1".
+         * The talk-test sentence that stood here came off 2026-09-18: the session's own line (`family-lines.ts`, p235)
+         * carries it, once.
          */
         const hrr = (st as any)?.prescription === 'heart_rate' && (st as any)?.hr_range
           && typeof (st as any).hr_range.lower === 'number' && typeof (st as any).hr_range.upper === 'number'
           ? (st as any).hr_range as { lower: number; upper: number } : null;
         if (hrr) {
-          const talk = talkTestSaid ? '' : ', easy enough to say a full sentence without stopping for breath';
-          talkTestSaid = true;
-          pieces.push(`@ HR ${Math.round(hrr.lower)}–${Math.round(hrr.upper)}${talk}`);
+          pieces.push(`@ HR ${Math.round(hrr.lower)}–${Math.round(hrr.upper)}`);
           if (pTxt) pieces.push(`· ref pace ${pTxt}`);
         }
         else if (pTxt) pieces.push(`@ ${pTxt}`);

@@ -167,7 +167,8 @@ Deno.test('⛔ THE LONG RUN AND HEAVY LEGS — a day apart and stacked are two d
   const apart = build({ runs: 4, rides: 0 }, 'Wednesday', [null, null], ['Saturday', 'Sunday'])
     .week.conflicts.find((x) => x.rule === 'long_after_heavy_legs');
   assert(apart, 'the long run beside the heavy leg day raised nothing');
-  assertEquals(apart!.text, 'Tuesday heavy legs, Wednesday long run. The run is on legs that have not recovered.');
+  // p86's own words since 2026-09-18 (book-language pass 2).
+  assertEquals(apart!.text, 'Tuesday heavy legs, Wednesday long run. A highly taxing, 14+ work set session may diminish performance in other modalities significantly for twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.');
   assertEquals(apart!.days.length, 2, apart!.days.join(','));
 
   /**

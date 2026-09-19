@@ -302,12 +302,13 @@ Deno.test('a session sized to the source band lands inside the source band', () 
           // ⛔ WHERE THE CAP BINDS, IT BINDS THE EASY BOUT — not the session. An LSD run whose steady
           // portion is clipped to two hours still carries its inserted sets on top, so the session is
           // legitimately longer than the cap while no single easy bout inside it is.
-          const easy = allSteps(s).filter((st) => st.role === 'work' && st.intensity.kind === 'vt1');
+          // ⚠️ p235's long run is built as printed since 2026-09-18 (book-language pass 5): one easy run cut by the sets,
+          // its pieces `float`. The cap binds the easy running as a whole — the pieces' sum.
+          const easy = allSteps(s).filter((st) => (st.role === 'work' || st.role === 'float') && st.intensity.kind === 'vt1');
           assert(easy.length > 0, `${family} L${level} @${size}: a capped family with no easy bout in it`);
-          for (const st of easy) {
-            assert((st.seconds ?? 0) <= VT1_CONTINUOUS_CAP_SECONDS,
-              `${family} L${level} @${size}: a ${st.seconds}s easy bout survived the cap`);
-          }
+          const easySum = easy.reduce((t, st) => t + (st.seconds ?? 0), 0);
+          assert(easySum <= VT1_CONTINUOUS_CAP_SECONDS + 60,
+            `${family} L${level} @${size}: ${easySum}s of easy running survived the cap`);
           assert(s.totals.clockedSeconds <= floored + 60,
             `${family} L${level} @${size}: built ${s.totals.clockedSeconds}s, longer than the source's ${floored}s`);
         }

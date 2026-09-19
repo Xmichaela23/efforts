@@ -943,7 +943,7 @@ export type NonRaceState = {
    * ⛔ RIDE + STRENGTH'S ONE ENDURANCE ANSWER — four rides or five (p278; the 4-ride week leaves out
    * the Day 2 easy ride). Absent = the page's five.
    */
-  rideCount?: 4 | 5;
+  rideCount?: number;
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
    * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is

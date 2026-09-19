@@ -217,9 +217,15 @@ export function wattsAt(
   return { lower: Math.round(lo * f), upper: Math.round(hi * f) };
 }
 
-export type RunStep = { kind: 'work' | 'recovery'; duration_s: number; pace_sec_per_mi?: number };
+/**
+ * ⛔ WHICH PLACE IN THE SHAPE A STEP HOLDS (2026-09-18, book-language pass 2). The token carries no word, so the
+ * materializer looks the page's word up by this place (`endurance-library/step-words.ts`): the rest between sets, an
+ * untargeted recovery inside the round, an all-out effort, a race-pace finish.
+ */
+export type StepPlace = 'between' | 'in_round' | 'all_out' | 'race_pace';
+export type RunStep = { kind: 'work' | 'recovery'; duration_s: number; pace_sec_per_mi?: number; place?: StepPlace };
 /** ⚠️ `upper` IS OPTIONAL: a floor-only step has no ceiling to carry. See `wattsAt`. */
-export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: { lower: number; upper?: number } };
+export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: { lower: number; upper?: number }; place?: StepPlace };
 
 /**
  * The work as running steps — what `expandRunToken` pushes for these two shapes, id aside.
@@ -240,17 +246,17 @@ export function qualityRunSteps(
           // ⛔ PRESCRIBED WORK WITH NO PACE, and the library says so itself: race pace is set by the
           // race, not by this library. The step reaches the watch; the number does not, because
           // there is no number.
-          out.push({ kind: 'work', duration_s: seg.seconds });
+          out.push({ kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out' });
         } else if (seg.role === 'recovery') {
           const paced = pacedAt(seg.pct, thr) ?? easyPace;
-          out.push({ kind: 'recovery', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}) });
+          out.push({ kind: 'recovery', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}), ...(seg.at === 'easy' ? { place: 'in_round' as const } : {}) });
         } else {
           const paced = pacedAt(seg.pct, thr);
           out.push({ kind: 'work', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}) });
         }
       }
       if (work.restBetweenS > 0 && r < work.sets - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restBetweenS, ...(easyPace ? { pace_sec_per_mi: easyPace } : {}) });
+        out.push({ kind: 'recovery', duration_s: work.restBetweenS, ...(easyPace ? { pace_sec_per_mi: easyPace } : {}), place: 'between' });
       }
     }
     return out;
@@ -282,9 +288,9 @@ export function qualityRideSteps(
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
         // ⛔ AN ALL-OUT STEP IS WORK WITH NO POWER TARGET — p236's "max effort", unresolved on purpose (p229).
-        if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds });
+        if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out' });
         // A plain easy spin: no target (see the note above `SEGMENT`).
-        else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds });
+        else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, place: 'in_round' });
         else {
           // ⚠️ THE RULE IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
           // 50% half) is a stated number, not an effort with a floor, and keeps its band.
@@ -298,7 +304,7 @@ export function qualityRideSteps(
         }
       }
       if (work.restBetweenS > 0 && r < work.sets - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restBetweenS });
+        out.push({ kind: 'recovery', duration_s: work.restBetweenS, place: 'between' });
       }
     }
     return out;
@@ -309,7 +315,7 @@ export function qualityRideSteps(
       out.push({ kind: 'work', duration_s: work.workS, ...(w ? { power_range: w } : {}) });
       // The rest between repeats is an easy spin the page gives no number: no target.
       if (work.restS > 0 && i < work.reps - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restS });
+        out.push({ kind: 'recovery', duration_s: work.restS, place: 'between' });
       }
     }
   }
@@ -411,6 +417,7 @@ export function repeatingUnit(segments: QualitySegment[]): { unit: QualitySegmen
 
 function runSegmentWord(seg: QualitySegment, p: QualityPricing): string {
   const dur = durationWord(seg.seconds);
+  // ⚠️ "easy" stands for the page's "@ VT1" here, and the word VT1 never prints on screen; see step-words.ts.
   if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
   const paced = pacedAt(seg.pct, p.thresholdSecPerMi);
@@ -419,7 +426,8 @@ function runSegmentWord(seg: QualitySegment, p: QualityPricing): string {
 
 function rideSegmentWord(seg: QualitySegment, p: QualityPricing): string {
   const dur = durationWord(seg.seconds);
-  if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy`;
+  // ⛔ p237–p239 print the ride's untargeted recovery as "easy spin" (2026-09-18, book-language pass 2).
+  if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy spin`;
   // ⚠️ COPY NOT YET APPROVED (2026-09-13): the word for an all-out effort on the line. Held for Michael.
   if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
@@ -438,7 +446,9 @@ export function qualityWorkLine(work: QualityWork | null, sport: 'run' | 'ride',
    * ⚠️ A SEMICOLON WHERE THE BODY ALREADY HAS COMMAS — the page's own punctuation for a round's rest
    * ("…; 2-min recovery walk/jog between sets"), so the rest cannot be read as a fourth segment.
    */
-  const between = (seconds: number, sep = ', ') => (seconds > 0 ? `${sep}${durationWord(seconds)} easy between` : '');
+  // ⛔ NO WORD OF OURS ON THE REST (2026-09-18, book-language pass 2): it said "easy between" on every shape, where the
+  // pages say "recovery walk/jog", "rest", "spin" or "easy spin" by shape. The line keeps the page's structure word.
+  const between = (seconds: number, sep = ', ') => (seconds > 0 ? `${sep}${durationWord(seconds)} between` : '');
   if (work.kind === 'round') {
     const { unit, rounds } = repeatingUnit(work.segments);
     const body = unit.map((seg) => (sport === 'run' ? runSegmentWord(seg, p) : rideSegmentWord(seg, p))).join(', ');

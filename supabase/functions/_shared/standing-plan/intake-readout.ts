@@ -76,9 +76,14 @@ export type IntakeRow = {
  * this change: the app has no path today that changes a built session's SHAPE — the Instead sheet
  * offers the sport, the machine, the long day's hike and the way back, and nothing else.
  */
+/**
+ * ⛔ THE FIRST SENTENCE CAME OFF BOTH ROWS (2026-09-18, book-language pass 2). "A series of near-threshold efforts"
+ * stood over the MLSS row, which p231 puts in zone 4, above threshold; neither sentence was a page's words, and a row
+ * keyed on the sport cannot know which page its session is on. What is left operates the app.
+ */
 export const HARD_ROW_LINE: Record<SlotSport, string> = {
-  run: 'A series of near-threshold efforts. Choose the workout on the day.',
-  ride: 'A series of efforts near or above threshold. Choose the workout on the day.',
+  run: 'Choose the workout on the day.',
+  ride: 'Choose the workout on the day.',
 };
 
 export type EnduranceIntakeReadout = {

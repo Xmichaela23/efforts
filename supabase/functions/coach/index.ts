@@ -115,6 +115,7 @@ import {
 } from '../_shared/plan-week.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import { normalizeGoalDistanceKey } from '../_shared/race-projections.ts';
+import { sessionTitle } from '../_shared/session-title.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -1013,6 +1014,8 @@ Deno.serve(async (req) => {
           date: String(r?.date || '').slice(0, 10),
           type: String(r?.type || ''),
           name: r?.name != null ? String(r.name) : null,
+          // ⛔ THE SAME TITLE THE CALENDAR SYNC SENDS (2026-09-18, book-language pass 1, audit item 29).
+          title: sessionTitle(r),
           category,
           workload_planned: safeNum(r?.workload_planned),
         } as KeySessionItem;
@@ -4858,7 +4861,7 @@ Deno.serve(async (req) => {
         // sessions") came off State with the verdict words. `bodyRpeDriver` stays in `_shared` with its tests.
         readiness_rpe_driver: null,
         // D-232: the loaded-legs suggestion line (rendered under the Why). Null for systemic/EFFORT-UP.
-        readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion ?? null,
+        readiness_suggestion: fatigueRefinement?.loadedLegs?.suggestion || null,
         signals: trendSignals,
       },
       details: {

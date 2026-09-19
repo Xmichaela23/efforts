@@ -7,7 +7,7 @@ import { Row, Chip, Dot, fmtDate } from './state-primitives';
 export default function StateNextBlock({
   nextSessions,
 }: {
-  nextSessions: Array<{ date: string; name?: string | null; type?: string | null }>;
+  nextSessions: Array<{ date: string; name?: string | null; title?: string | null; type?: string | null }>;
 }) {
   return (
     <div className="px-3 py-3">
@@ -16,7 +16,7 @@ export default function StateNextBlock({
         {nextSessions.map((s, i) => (
           <React.Fragment key={i}>
             {i > 0 && <Dot />}
-            <Chip label={fmtDate(s.date)} value={s.name ?? s.type} />
+            <Chip label={fmtDate(s.date)} value={s.title ?? s.name ?? s.type} />
           </React.Fragment>
         ))}
       </Row>

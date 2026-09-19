@@ -14,27 +14,25 @@
  *     plyometrics) and which intents its rows carry (ME / DE / SKILL / HYP, `slot_intent`);
  *   · the endurance session — run, ride or swim (`sport:`), and how hard (`band:`).
  *
- * THE SENTENCES AND THEIR PAGES:
- *   lead    "Two sessions today. Keep them six to eight hours apart."
- *           p143 rule 6: "allow at least 6 to 8 hours with one full meal before the resistance training session".
- *   ⛔ "If they have to be closer", the heading that stood over the next line, CAME OFF 2026-09-18: it states no
- *   rule and no page prints it (Michael: "any sentence with no page comes off"). The closer opens from a chevron.
- *   easy    "Lift first and keep the {run|ride} easy."
- *           p143 rule 5: work that benefits from pre-fatigue (almost always VT1 work) goes last, "after these
- *           muscles have already been worked". Only when the endurance session is VT1 or easier AND the lift
- *           worked the legs — ⛔ NOT ON THE FRAME'S UPPER DAY: the run's muscles were not worked, so the rule
- *           says nothing about the order (changed 2026-09-18; the phone printed it on upper days).
- *   order   "Lift first."
- *           p143 rule 6: "the skill movements are focused on the first session because you may be 'fresher'";
- *           p77: minimally fatigued prior to and during strength movement practice; p140 rule 2a: "all that
- *           matters is that you need to be fresh for it". Only when the lift has skill or speed sets and is not
- *           the upper day.
- *   cost    "{Running|Riding} first costs the lift its skill and speed sets."
- *           p143 rule 6, p77, p140 rule 2a. Same condition as `order`. On the upper day riding or running costs the
- *           legs, not the bench (p131: the physical systems the session taxes).
+ * THE SENTENCES ARE THE PAGE'S OWN WORDS (2026-09-18, book-language pass 2 — no paraphrasing), read off
+ * book-sources/viada-hybrid-athlete/p143.jpg; each is cut from the page's sentence (words dropped, order kept):
+ *   lead    "Allow at least 6 to 8 hours with one full meal before the resistance training session."
+ *           Rule 6: "…the recommendation is to consider shorter-than-normal threshold runs under this sort of structure,
+ *           to reduce fatigue, and allow at least 6 to 8 hours with one full meal before the resistance training
+ *           session." (It said "Keep them six to eight hours apart" and dropped the meal.)
+ *   short   "If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long
+ *           as you consume calories and monitor hydration after this session." Rule 6, whole sentence — printed only
+ *           when the endurance session is VT1 or easier (`band:vt1_or_easier`) and under an hour (audit item 34).
+ *   easy    "Performing low-intensity conditioning after these muscles have already been worked can potentially result
+ *           in greater benefits at a given volume." Rule 5. Only when the endurance session is VT1 or easier AND the
+ *           lift worked the legs — ⛔ NOT ON THE FRAME'S UPPER DAY: the run's muscles were not worked.
+ *   order   "The skill movements are focused on the first session because you may be "fresher," but this is not a
+ *           hard-and-fast rule." Rule 6. Only when the lift has skill or speed sets and is not the upper day. It
+ *           replaces "Lift first." and "{Running|Riding} first costs the lift its skill and speed sets.", which were
+ *           ours and stronger than the page.
  *
- * ⛔ A SILENCE IS AN ANSWER: a swim day gets the lead only (no swim wording approved); a day where neither `easy`
- * nor `cost` holds gets the lead only, and the chevron is not drawn.
+ * ⛔ A SILENCE IS AN ANSWER: a swim day gets the lead only; a day where neither `easy` nor `order` holds gets the lead
+ * (and the short-session sentence where it applies), and the chevron is not drawn.
  */
 
 export type SpacingRow = {
@@ -42,6 +40,9 @@ export type SpacingRow = {
   tags?: unknown;
   training_plan_id?: string | null;
   strength_exercises?: unknown;
+  /** Minutes, as the plan row stores it. */
+  duration?: number | null;
+  total_duration_seconds?: number | null;
 };
 
 export type SpacingLine = { lead: string; closer?: string };
@@ -84,7 +85,22 @@ const intentsOf = (row: SpacingRow): Set<string> => {
 const isUpperDay = (lift: SpacingRow): boolean => tagValue(lift, 'frame') != null && tagValue(lift, 'lower') == null;
 
 // Viada p143 rule 6.
-const LEAD = 'Two sessions today. Keep them six to eight hours apart.';
+const LEAD = 'Allow at least 6 to 8 hours with one full meal before the resistance training session.';
+// Viada p143 rule 6.
+const SHORT_VT1 = 'If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long as you consume calories and monitor hydration after this session.';
+// Viada p143 rule 5.
+const EASY_LAST = 'Performing low-intensity conditioning after these muscles have already been worked can potentially result in greater benefits at a given volume.';
+// Viada p143 rule 6.
+const SKILL_FIRST = 'The skill movements are focused on the first session because you may be "fresher," but this is not a hard-and-fast rule.';
+// Viada p143 rule 6: "lasting less than an hour".
+const SHORT_SESSION_MINUTES = 60;
+
+const minutesOf = (row: SpacingRow): number | null => {
+  const m = Number(row?.duration);
+  if (Number.isFinite(m) && m > 0) return m;
+  const s = Number(row?.total_duration_seconds);
+  return Number.isFinite(s) && s > 0 ? s / 60 : null;
+};
 
 export function spacingLineFor(rows: readonly SpacingRow[]): SpacingLine | null {
   const planned = rows.filter(isFromPlan);
@@ -94,18 +110,17 @@ export function spacingLineFor(rows: readonly SpacingRow[]): SpacingLine | null 
   if (!lift || !endurance) return null;
 
   const sport = sportOf(endurance);
+  const vt1 = tagValue(endurance, 'band') === 'vt1_or_easier';
+  const mins = minutesOf(endurance);
+  const lead = vt1 && mins != null && mins < SHORT_SESSION_MINUTES && (sport === 'run' || sport === 'ride')
+    ? `${LEAD} ${SHORT_VT1}` : LEAD;
   if (sport !== 'run' && sport !== 'ride') return { lead: LEAD };
 
   const upper = isUpperDay(lift);
   const intents = intentsOf(lift);
   // ⚠️ AN UNKNOWN BAND COUNTS AS NOT EASY: the claim needs the page, not the absence of a tag.
-  const easy = tagValue(endurance, 'band') === 'vt1_or_easier' && !upper;
-  const costs = !upper && (intents.has('SKILL') || intents.has('DE'));
-  if (!easy && !costs) return { lead: LEAD };
-
-  // Viada p143 rule 5 (the easy clause), p143 rule 6 and p77 (the order).
-  const first = easy ? `Lift first and keep the ${sport} easy.` : 'Lift first.';
-  // Viada p143 rule 6, p77, p140 rule 2a.
-  const cost = `${sport === 'run' ? 'Running' : 'Riding'} first costs the lift its skill and speed sets.`;
-  return { lead: LEAD, closer: costs ? `${first} ${cost}` : first };
+  const easy = vt1 && !upper;
+  const skill = !upper && (intents.has('SKILL') || intents.has('DE'));
+  if (!easy && !skill) return { lead };
+  return { lead, closer: [easy ? EASY_LAST : null, skill ? SKILL_FIRST : null].filter(Boolean).join(' ') };
 }

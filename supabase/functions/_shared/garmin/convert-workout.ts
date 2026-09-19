@@ -458,12 +458,15 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               // SECOND. That is the worst of the three failure modes this step has, because it does
               // not drop anything and does not error — the athlete gets a 1-second recovery on the
               // watch and the export looks like it worked. Checked FIRST, before the coercion.
+              // ⛔ THE STEP'S OWN WORDS GO WITH IT (2026-09-18, book-language pass 4): a recovery the page names
+              // ("easy walk/jog", "easy spin", "rest") carries that word to the watch instead of a bare "rest".
+              const restLabel = isSwim ? undefined : (String((st as any)?.label || '').trim() || undefined)
               if ((st as any)?.lap_button === true) {
-                mainArr.push({ effortLabel: 'rest', lapButton: true })
+                mainArr.push({ effortLabel: 'rest', lapButton: true, stepLabel: restLabel })
                 continue
               }
               const sec = num((st as any)?.duration_s) ?? num((st as any)?.seconds) ?? num((st as any)?.rest_s) ?? num((st as any)?.restSeconds)
-              mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
+              mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)), stepLabel: restLabel })
               continue
             }
             let label = String((st as any)?.label || '').trim()
@@ -500,8 +503,12 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (typeof s2 === 'number') return Math.floor(s2)
               return undefined
             })()
+            // ⛔ A STEP THE PAGE PRINTS WITHOUT A CLOCK (a drill, p210's strides) is a lap-button step, and every
+            // labelled step carries its words as the watch step's description (2026-09-18, book-language pass 4).
+            const lapButton = (st as any)?.lap_button === true
+            const stepLabel = !isSwim && label ? label : undefined
             if (t === 'warmup') {
-              const warm: any = { effortLabel: 'warm up' }
+              const warm: any = { effortLabel: 'warm up', ...(lapButton ? { lapButton: true } : {}), ...(stepLabel ? { stepLabel } : {}) }
               if (typeof meters === 'number' && meters > 0) warm.distanceMeters = Math.round(meters)
               // Add duration only when defined (>0). For RUN use duration only if distance missing.
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
@@ -510,7 +517,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               attachSwimMeta(warm, st)
               warmArr.push(warm)
             } else if (t === 'cooldown') {
-              const cool: any = { effortLabel: 'cool down' }
+              const cool: any = { effortLabel: 'cool down', ...(lapButton ? { lapButton: true } : {}), ...(stepLabel ? { stepLabel } : {}) }
               if (typeof meters === 'number' && meters > 0) cool.distanceMeters = Math.round(meters)
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 cool.duration = Math.floor(seconds)
@@ -529,10 +536,12 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               const swimEffortLabel = isSwim && (swimIntensity === 'easy' || swimIntensity === 'moderate' || swimIntensity === 'hard')
                 ? swimIntensity
                 : ''
+              // ⚠️ ON A RUN OR A RIDE THE LABEL IS THE DESCRIPTION, NOT THE INTENSITY KEY: a labelled work step
+              // ("low resistance/high turnover") read as ACTIVE because its label matched no intensity word.
               const effortLabel = isStride
                 ? 'Stride'
-                : (swimEffortLabel || label || 'interval')
-              const main: any = { effortLabel }
+                : (isSwim ? (swimEffortLabel || label || 'interval') : 'interval')
+              const main: any = { effortLabel, ...(lapButton ? { lapButton: true } : {}), ...(stepLabel ? { stepLabel } : {}) }
               if (typeof meters === 'number' && meters > 0) main.distanceMeters = Math.round(meters)
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 main.duration = Math.floor(seconds)
@@ -725,7 +734,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       stepId,
       stepOrder: stepId,
       intensity,
-      description: String(interval?.effortLabel ?? '').trim() || undefined,
+      description: String((interval as any)?.stepLabel ?? interval?.effortLabel ?? '').trim() || undefined,
       durationType: lapButton ? 'OPEN' : ((Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME'),
       ...(lapButton ? {} : {
         durationValue: (Number.isFinite(meters) && meters > 0) ? ((): number => {
@@ -820,12 +829,14 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   })()
   /**
    * ⛔ THE SESSION NOTE GOES WITH A RIDE (Michael, 2026-09-18) — the row's `description`, the same note the Planned
-   * tab shows and the Intervals.icu send carries. One note, one more destination; runs and swims unchanged.
+   * tab shows and the Intervals.icu send carries.
+   * ⛔ AND WITH A RUN, THE SAME WAY (2026-09-18, book-language pass 4, audit §4): the talk test (p235), the MLSS hills
+   * line (p231), the race-tempo sentence (p247) and the run test's protocol (p210) stayed in the app. Swims unchanged.
    */
-  const rideNote = sport === 'CYCLING' ? String((workout as any)?.description ?? '').trim() : ''
+  const sessionNote = sport === 'CYCLING' || sport === 'RUNNING' ? String((workout as any)?.description ?? '').trim() : ''
   return {
     workoutName: workout.name,
-    ...(rideNote ? { description: rideNote } : {}),
+    ...(sessionNote ? { description: sessionNote } : {}),
     sport,
     ...(isSwimSport ? poolFields : {}),
     ...(typeof estSecs === 'number' ? { estimatedDurationInSecs: estSecs } : {}),

@@ -26,6 +26,8 @@ import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volum
 import { zonesForBaselinesRow } from '../save-baselines/zones.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { displayFormat, M_PER_MI } from '../_shared/display-format.ts';
+// The one server title for a planned session (`_shared/session-title.ts`) — plans.csv's session name.
+import { sessionTitle } from '../_shared/session-title.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -271,7 +273,7 @@ function plansCsv(plans: Row[], planned: Row[]): { text: string; count: number }
     for (const s of sessions) {
       // `duration` defaults to 0 on planned rows that carry seconds instead; a zero is not a length.
       const minutes = Number(s.duration) > 0 ? round(s.duration, 0) : Number(s.total_duration_seconds) > 0 ? round(Number(s.total_duration_seconds) / 60, 0) : null;
-      out.push([plan.name ?? '', start, end, String(s.date || '').slice(0, 10), s.type ?? '', s.name ?? '', minutes, s.workout_status === 'completed']);
+      out.push([plan.name ?? '', start, end, String(s.date || '').slice(0, 10), s.type ?? '', sessionTitle(s), minutes, s.workout_status === 'completed']);
     }
   }
   return { text: csv(header, out), count: out.length };
@@ -362,7 +364,7 @@ Deno.serve(async (req) => {
         .or('workout_status.eq.completed,workout_status.is.null').order('date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
       allRows<Row>((from, to) => admin.from('plans').select('id,name,duration_weeks,config,status,created_at').eq('user_id', userId)
         .order('created_at', { ascending: true }).range(from, to)),
-      allRows<Row>((from, to) => admin.from('planned_workouts').select('training_plan_id,date,type,name,duration,total_duration_seconds,workout_status')
+      allRows<Row>((from, to) => admin.from('planned_workouts').select('training_plan_id,date,type,name,description,tags,steps_preset,workout_structure,duration,total_duration_seconds,workout_status')
         .eq('user_id', userId).order('date', { ascending: true }).range(from, to)),
       admin.from('user_baselines').select('units,birthday,height,weight,performance_numbers,learned_fitness,locked_baselines,gender,updated_at,profile,configured_hr_zones,effort_paces,effort_paces_source')
         .eq('user_id', userId).maybeSingle().then(({ data, error }) => { if (error) throw new Error(error.message); return data as Row | null; }),

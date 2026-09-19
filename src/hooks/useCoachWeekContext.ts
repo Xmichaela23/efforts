@@ -173,6 +173,8 @@ export type CoachWeekContextV1 = {
       date: string;
       type: string;
       name: string | null;
+      /** The server's one title for the session (2026-09-18). */
+      title?: string | null;
       category: string;
       workload_planned: number | null;
     }>;
