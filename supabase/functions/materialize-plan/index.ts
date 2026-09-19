@@ -110,6 +110,7 @@ import { pacesFromThresholdSecPerMi } from '../../../src/lib/run-paces-from-thre
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { frielZones } from '../_shared/endurance/hr-zones.ts';
+import { isEnduranceAdjustment } from '../_shared/session-swap/plan-adjustments.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -123,6 +124,7 @@ type PlanAdjustment = {
   applies_from: string;
   applies_until?: string;
   status: string;
+  created_at?: string;
 };
 
 // Apply adjustment to a calculated weight
@@ -181,7 +183,9 @@ function resolveSwap(
 ): string | null {
   if (!adjustments.length) return null;
   const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
-  const swap = adjustments.find(adj => {
+  // ⛔ THE LATEST SWAP COVERING THE DATE WINS (2026-09-19): a "Just today" swap is a one-date row inside a "Rest of plan"
+  // one's window, and it has to beat it on that date. Latest start, then latest made.
+  const swap = adjustments.filter(adj => {
     if (adj.status !== 'active') return false;
     if (!adj.substitute_exercise_name) return false;
     const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
@@ -189,7 +193,7 @@ function resolveSwap(
     if (adj.applies_from > workoutDate) return false;
     if (adj.applies_until && adj.applies_until < workoutDate) return false;
     return true;
-  });
+  }).sort((a, b) => String(b.applies_from).localeCompare(String(a.applies_from)) || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))[0];
   return swap?.substitute_exercise_name ?? null;
 }
 
@@ -4517,10 +4521,12 @@ Deno.serve(async (req) => {
     try {
       const { data: adjData } = await supabase
         .from('plan_adjustments')
-        .select('id, exercise_name, adjustment_factor, absolute_weight, weight_offset, substitute_exercise_name, add_meta, applies_from, applies_until, status')
+        .select('id, exercise_name, adjustment_factor, absolute_weight, weight_offset, substitute_exercise_name, add_meta, applies_from, applies_until, status, created_at')
         .eq('user_id', userId)
         .eq('status', 'active');
-      adjustments = adjData || [];
+      // ⛔ AN ENDURANCE SWAP IS NOT A LIFT (2026-09-19): its row names a run/ride slot, and the lift readers here match
+      // names by substring. The plan rewrite applies it (`_shared/session-swap/plan-adjustments.ts`).
+      adjustments = (adjData || []).filter((a: PlanAdjustment) => !isEnduranceAdjustment(a));
       if (adjustments.length > 0) {
         console.log(`🔧 Found ${adjustments.length} active plan adjustments for user`);
       }

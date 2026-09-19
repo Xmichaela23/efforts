@@ -628,35 +628,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [setTypeFor, setSetTypeFor] = useState<'ME' | 'DE' | 'SKILL' | 'HYP' | null>(null); // the set-type sheet
   const [swapRestOfPlan, setSwapRestOfPlan] = useState(false); // when on, a swap persists to the plan (not just today)
 
-  // Adapt-a-plan #1 — persist a swap for the rest of the plan on the EXISTING override table
-  // (mirrors StrengthAdjustmentModal's plan_adjustments write). The slot keeps its identity via
-  // exercise_name; substitute_exercise_name names the new exercise; materialize re-resolves its weight
-  // from that exercise's own reference. One active swap per slot, so we revert any prior first.
-  const persistPlanSwap = async (slotName: string, substituteName: string) => {
+  // Adapt-a-plan #1 — the swap goes to the plan on the EXISTING override table (`plan_adjustments`). ⛔ THE SERVER
+  // WRITES IT (2026-09-19, `swap-session` { lift }): the phone names the slot, the movement and the scope and decides
+  // nothing. "Just today" is a one-date row, "Rest of plan" an open-ended one, and the slot's own movement is Back to
+  // the plan; materialize-plan applies it to the sessions it reaches.
+  const persistPlanSwap = async (slotName: string, substituteName: string, scope: 'today' | 'rest_of_plan') => {
     try {
-      const userId = getStoredUserId();
-      const planId = (scheduledWorkout as any)?.training_plan_id || null;
-      if (!userId || !slotName || !substituteName) return;
-      const from = targetDate || (scheduledWorkout as any)?.date || new Date().toLocaleDateString('en-CA');
-      await supabase
-        .from('plan_adjustments')
-        .update({ status: 'reverted', updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('exercise_name', slotName)
-        .eq('status', 'active')
-        .not('substitute_exercise_name', 'is', null);
-      await supabase.from('plan_adjustments').insert({
-        user_id: userId,
-        plan_id: planId,
-        exercise_name: slotName,
-        substitute_exercise_name: substituteName,
-        applies_from: from,
-        status: 'active',
-        reason: 'exercise swap',
+      if (!sourcePlannedId || !slotName || !substituteName) return;
+      const { error } = await supabase.functions.invoke('swap-session', {
+        body: { lift: { planned_id: sourcePlannedId, slot: slotName, substitute: substituteName, scope } },
       });
-      if (planId) {
-        await (supabase.functions.invoke as any)('materialize-plan', { body: { training_plan_id: planId } });
-      }
+      if (error) console.error('[swap] plan swap not written', error);
     } catch (e) {
       console.error('[swap] persistPlanSwap failed', e);
     }
@@ -667,11 +649,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // too — so the Just-today / Rest-of-plan choice is universal, not just for the offered chips. Takes
   // the new name explicitly (React state may not have flushed by the onBlur/suggestion-pick).
   const maybePersistTypedSwap = (exerciseId: string, newName: string) => {
-    if (swapFor !== exerciseId || !swapRestOfPlan) return;
+    if (swapFor !== exerciseId) return;
     const ex = exercises.find((e) => e.id === exerciseId);
     const slot = ex?.planned_name;
     if (slot && newName && newName.toLowerCase().trim() !== slot.toLowerCase().trim()) {
-      void persistPlanSwap(slot, newName);
+      void persistPlanSwap(slot, newName, swapRestOfPlan ? 'rest_of_plan' : 'today');
       setSwapRestOfPlan(false);
       setSwapFor(null);
     }
@@ -5346,7 +5328,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               }
                             : ex,
                         ));
-                        if (swapRestOfPlan && exercise.planned_name) void persistPlanSwap(exercise.planned_name, altName);
+                        if (exercise.planned_name) void persistPlanSwap(exercise.planned_name, altName, swapRestOfPlan ? 'rest_of_plan' : 'today');
                         setSwapRestOfPlan(false);
                         setSwapFor(null);
                       };

@@ -60,8 +60,11 @@ import { localDateInTz } from './local-date.ts';
 //   and p238's fixed 2 × 6 / 8 / 10 short VO2 repeats build as printed.
 // 19 (2026-09-19): the author's sentences are replaced by the 74 approved rewrites (docs/AUDIT-author-sentences-2026-09-19.md)
 //   — session lines, drawer notes, spacing lines, plyo, warm-up, test-day and block-description words.
+// 20 (2026-09-19): an endurance swap is a `plan_adjustments` row, the list the lift swap already uses
+//   (`_shared/session-swap/plan-adjustments.ts`), and the rewrite composes it in — a chosen workout, a sport and a machine
+//   survive every rewrite; "Just today" is a one-date row; swaps made before are read from their tags on the first rewrite.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 19;
+export const PLAN_WRITER_VERSION = 20;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

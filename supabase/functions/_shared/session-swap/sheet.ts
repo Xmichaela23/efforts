@@ -210,7 +210,8 @@ export type ApplyResult =
 
 /**
  * Write the chosen option to the session and, for "Rest of plan", to its later repeats — Today's apply
- * path, moved as it was.
+ * path, moved as it was. ⛔ ON A STANDING PLAN BLOCK THE TAP IS A `plan_adjustments` ROW (`rewrite`, 2026-09-19); the
+ * row writes and the rest-of-plan loop below run only for a plan the composer does not build.
  *
  * ⛔ THE OPTION IS RE-DERIVED HERE, NEVER TAKEN FROM THE PHONE. The tap names an option by id; the
  * patch is built from the stored row now. An option the row no longer offers is refused.
@@ -229,11 +230,32 @@ export async function applySwap(args: {
   optionId: string;
   restOfPlan: boolean;
   materialize: (plannedId: string) => Promise<void>;
+  /**
+   * ⛔ THE PLAN'S OWN REWRITE, WHEN THE COMPOSER BUILDS THIS PLAN (2026-09-19). `swap-session` passes it for a Standing
+   * Plan block: the tap is a `plan_adjustments` row (`plan-adjustments.ts`) and `rematerialize-standing-block` writes
+   * the sessions it reaches, the tapped one first. Absent — a plan the composer does not build, which has no rewrite to
+   * read the list — the tap writes the rows itself, below, as it always has.
+   */
+  rewrite?: (swap: { option: string; scope: 'today' | 'rest_of_plan'; revert: 'venue' | 'session' | null }) =>
+    Promise<{ ok: true; ids: string[] } | { ok: false; error: string }>;
 }): Promise<ApplyResult> {
   const { db, userId, ctx, materialize } = args;
   const session = ctx.session;
   const option = sheetOptions(ctx).find((o) => optionId(o) === args.optionId);
   if (!option) return { ok: false, error: 'This swap is no longer offered for this session' };
+
+  if (args.rewrite) {
+    // ⛔ THE SHEET'S RULES STAND: an easy session and a chosen workout are today only (see below).
+    const restOfPlan = args.restOfPlan && restOfPlanOffered(session) && option.kind !== 'workout';
+    const res = await args.rewrite({
+      option: optionId(option),
+      scope: restOfPlan ? 'rest_of_plan' : 'today',
+      revert: option.kind === 'revert' ? (option.venue ? 'venue' : 'session') : null,
+    });
+    if (res.ok === false) return { ok: false, error: res.error };
+    const alsoWritten = Math.max(0, res.ids.length - 1);
+    return { ok: true, receipt: receiptFor(option, alsoWritten), alsoWritten, ids: res.ids };
+  }
 
   const write = await resolveSwapWrite(db, userId, session, option);
   // ⛔ A RESTORE THAT FOUND NOTHING IS NOT A RESTORE (§8).

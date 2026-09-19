@@ -55,6 +55,18 @@ import {
   blockDescriptionFor,
 } from '../_shared/standing-plan/index.ts';
 import { calculateDurationWorkload, getDefaultIntensityForType, getStepsIntensity } from '../_shared/workload.ts';
+// ⛔ THE ATHLETE'S ENDURANCE SWAPS, READ FROM `plan_adjustments` WHEN THE WEEKS ARE COMPOSED (2026-09-19).
+import {
+  adjustmentsFromSwapTags,
+  applyEnduranceAdjustments,
+  ENDURANCE_SLOT_PREFIX,
+  enduranceSlotName,
+  optionsFromSwapTags,
+  swapClassOf,
+  weekdayOfDate,
+  type SwapAdjustment,
+} from '../_shared/session-swap/plan-adjustments.ts';
+import { originOf, disciplineOf } from '../_shared/session-swap/swap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,7 +90,13 @@ Deno.serve(async (req: Request) => {
     // ⛔ THE AUTOMATIC REFRESH (2026-09-18): the same apply, plus the expansion always runs (a number the rows are
     // priced off may have changed with no token moving) and the job record the screens poll is kept.
     const isRefresh = p?.refresh === true;
-    const willWrite = p?.apply === true || isRefresh;
+    /**
+     * ⛔ A SWAP TAP (2026-09-19): `swap-session` has written the `plan_adjustments` row and sends
+     * `{ swap: { planned_id, slot, cls, from, until } }` — the sessions that row reaches (`cls`: the machine or the session). The same rewrite runs and writes
+     * only those, the tapped one expanded first. Nothing else in the block is touched.
+     */
+    const swapTap = p?.swap && typeof p.swap === 'object' && typeof p.swap.planned_id === 'string' ? p.swap : null;
+    const willWrite = p?.apply === true || isRefresh || !!swapTap;
     const asOf = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : null;
 
     const supabase = createClient(
@@ -494,7 +512,130 @@ Deno.serve(async (req: Request) => {
      * restated; a library correction or a deload column never reached an existing calendar. Same
      * laws: unstarted sessions only, the diff comes back on the dry run, applying is the tap.
      */
-    const endurance = restateEndurance({ composed, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX, fromDate: today });
+    /**
+     * ⛔ THE ATHLETE'S ENDURANCE SWAPS ARE PART OF WHAT THE PLAN BUILDS (2026-09-19). Each is a `plan_adjustments` row —
+     * the list the logger's lift swap already writes — and `applyEnduranceAdjustments` makes the composed session what
+     * the athlete chose, on the dates the row covers. The lift restate above reads `composed` as it always did;
+     * materialize-plan applies a lift swap when it expands the row.
+     */
+    const tapRow = swapTap ? (plannedRows ?? []).find((r: Record<string, unknown>) => String(r.id) === String(swapTap.planned_id)) : null;
+    const tapDate = tapRow ? String(tapRow.date ?? '').slice(0, 10) : null;
+    // ⚠️ A SWAP ON A SESSION DATED BEFORE TODAY (one the athlete missed) still writes that session.
+    const writeFrom = tapDate && tapDate < today ? tapDate : today;
+    const loadSwaps = async (): Promise<SwapAdjustment[]> => {
+      const { data } = await supabase.from('plan_adjustments')
+        .select('id, exercise_name, substitute_exercise_name, applies_from, applies_until, status, created_at')
+        .eq('user_id', userId).eq('status', 'active').like('exercise_name', `${ENDURANCE_SLOT_PREFIX}%`)
+        .not('substitute_exercise_name', 'is', null);
+      return (data ?? []) as SwapAdjustment[];
+    };
+    let swaps = await loadSwaps();
+    /**
+     * ⛔ A SWAP MADE BEFORE THIS SHIPPED, READ INTO `plan_adjustments` HERE, ONCE (`adjustmentsFromSwapTags`): a session
+     * not done, today on, whose swap tags no active row accounts for. The next rewrite finds the row and reads nothing.
+     */
+    let migrated = 0;
+    if (willWrite) {
+      const bySlot = new Map<string, Array<{ date: string; options: string[] }>>();
+      for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
+        if (!isRefreshable(r, writeFrom)) continue;
+        const date = String(r.date ?? '').slice(0, 10);
+        const planSport = originOf(r as never) ?? disciplineOf(String(r.type ?? ''));
+        const slot = planSport ? enduranceSlotName(date, r as never) : null;
+        if (!planSport || !slot) continue;
+        // ⚠️ NOT WHAT A TAP IS ABOUT TO REWRITE: the sessions the tapped adjustment reaches, in its class, are the tap's
+        // (Back to the plan on a swapped session must not read that session's swap back in).
+        const tapReaches = swapTap && date >= String(swapTap.from ?? '') && (!swapTap.until || date <= String(swapTap.until))
+          && slot === String(swapTap.slot);
+        const options = optionsFromSwapTags(r as never, planSport).filter((o) => !(tapReaches && swapClassOf(o) === swapTap.cls)).filter((o) => !swaps.some((a) =>
+          a.exercise_name === slot && swapClassOf(a.substitute_exercise_name) === swapClassOf(o)
+          && a.applies_from <= date && (!a.applies_until || a.applies_until >= date)));
+        bySlot.set(slot, [...(bySlot.get(slot) ?? []), { date, options }]);
+      }
+      const inserts = [];
+      for (const [slot, list] of bySlot) {
+        if (!list.some((x) => x.options.length)) continue;
+        list.sort((a, b) => a.date.localeCompare(b.date));
+        for (const a of adjustmentsFromSwapTags(slot, list)) {
+          inserts.push({ ...a, user_id: userId, plan_id: plan.id, status: 'active', reason: 'endurance swap' });
+        }
+      }
+      if (inserts.length) {
+        const { error: migErr } = await supabase.from('plan_adjustments').insert(inserts);
+        if (migErr) console.warn(`[standing-restate] swaps not read into plan_adjustments: ${migErr.message}`);
+        else { migrated = inserts.length; swaps = await loadSwaps(); }
+      }
+    }
+    // The calendar date of a block week's weekday — the stored rows say it; the block's Monday-anchored weeks otherwise.
+    const dateByWeekDay = new Map<string, string>();
+    for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
+      if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(String(r.date))}`, String(r.date).slice(0, 10));
+    }
+    const planned = applyEnduranceAdjustments(composed, swaps, (week, day) => dateByWeekDay.get(`${week}|${day}`) ?? null);
+
+    const endurance = restateEndurance({ composed: planned, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX, fromDate: writeFrom });
+
+    /**
+     * ⛔ THE ENDURANCE ROWS: tokens, minutes, words, tags and the sport off the composition; `computed` is re-expanded by
+     * materialize-plan (it reads each row's own tokens), and the planned load is re-estimated the way activate-plan
+     * estimated it at build (D-238: duration x intensity^2). A row whose sport changes loses the old sport's structure,
+     * subtitle and expansion with it, as the swap's own patch cleared them.
+     */
+    const writeEnduranceRow = async (u: typeof endurance.rows[number]) => {
+      const intensity = getStepsIntensity(u.steps_preset, u.type) || getDefaultIntensityForType(u.type) || 0.70;
+      const load = u.duration > 0 ? Math.round(calculateDurationWorkload(u.duration, intensity)) : 0;
+      const { error } = await supabase
+        .from('planned_workouts')
+        .update({
+          type: u.type,
+          name: u.name, description: u.description, rendered_description: u.description,
+          duration: u.duration, steps_preset: u.steps_preset.length ? u.steps_preset : null, tags: u.tags,
+          workload_planned: load > 0 ? load : null,
+          ...(u.type_moved ? { computed: null, workout_structure: null, friendly_summary: null, intervals: null } : {}),
+        })
+        .eq('id', u.id)
+        .eq('user_id', userId);
+      return !error;
+    };
+
+    // ── THE SWAP TAP: the sessions the adjustment reaches, the tapped one first ────────────────────────
+    if (swapTap) {
+      if (!tapRow) return json({ success: false, reason: 'swap_session_not_in_plan' }, 200);
+      const from = String(swapTap.from ?? tapDate).slice(0, 10);
+      const until = swapTap.until ? String(swapTap.until).slice(0, 10) : null;
+      const reached = new Set((plannedRows ?? [])
+        .filter((r: Record<string, unknown>) => {
+          const d = String(r.date ?? '').slice(0, 10);
+          if (String(r.id) === String(tapRow.id)) return true;
+          return enduranceSlotName(d, r as never) === String(swapTap.slot) && d >= from && (!until || d <= until);
+        })
+        .map((r: Record<string, unknown>) => String(r.id)));
+      const rows = endurance.rows
+        .filter((u) => reached.has(u.id) || (migrated > 0 && u.id !== String(tapRow.id)))
+        .sort((a, b) => (a.id === String(tapRow.id) ? -1 : b.id === String(tapRow.id) ? 1 : a.id.localeCompare(b.id)));
+      const ids: string[] = [];
+      for (const u of rows) {
+        if (!(await writeEnduranceRow(u))) continue;
+        ids.push(u.id);
+        try {
+          // ⛔ THE TAPPED SESSION FIRST, so the athlete sees it at once; `stamp_writer_version`: this code just wrote it.
+          const { error: mErr } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: u.id, stamp_writer_version: true } });
+          if (mErr) console.warn(`[standing-restate] swap expansion failed ${u.id}: ${mErr.message}`);
+        } catch (e) { console.warn(`[standing-restate] swap expansion failed ${u.id}: ${(e as Error)?.message ?? String(e)}`); }
+      }
+      const matched = ids.includes(String(tapRow.id))
+        || !endurance.unmatched.some((x) => `${x.week}|${x.day}` === `${tapRow.week_number}|${weekdayOfDate(String(tapDate))}`);
+      console.log(`[standing-restate] swap plan=${plan.id} row=${tapRow.id} slot=${swapTap.slot} ${from}→${until ?? 'end'} written=${ids.length} migrated=${migrated}`);
+      if (!matched) return json({ success: false, reason: 'swap_session_not_matched' }, 200);
+      // ⛔ THE SESSIONS THE SWAP REACHES, the tapped one first — rewritten now or already as chosen — which is what the
+      // receipt counts ("this and N later").
+      const reachedIds = (plannedRows ?? [])
+        .filter((r: Record<string, unknown>) => reached.has(String(r.id)) && (String(r.id) === String(tapRow.id) || isRefreshable(r, writeFrom)))
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.date).localeCompare(String(b.date)))
+        .map((r: Record<string, unknown>) => String(r.id));
+      const list = [String(tapRow.id), ...reachedIds.filter((id: string) => id !== String(tapRow.id))];
+      return json({ success: true, swap: { ids: list, written: ids.length, migrated } });
+    }
 
     if (!willWrite) {
       return json({
@@ -542,23 +683,10 @@ Deno.serve(async (req: Request) => {
       if (!error) written += 1;
     }
 
-    // ⛔ THE ENDURANCE ROWS: tokens, minutes, words and tags off the composer; `computed` is re-expanded
-    // by the whole-plan refresh below (materialize-plan reads each row's own tokens), and the planned
-    // load is re-estimated the way activate-plan estimated it at build (D-238: duration x intensity^2).
+    // ⛔ THE ENDURANCE ROWS (`writeEnduranceRow` above); `computed` is re-expanded by the whole-plan refresh below.
     let enduranceWritten = 0;
     for (const u of endurance.rows) {
-      const intensity = getStepsIntensity(u.steps_preset, u.type) || getDefaultIntensityForType(u.type) || 0.70;
-      const load = u.duration > 0 ? Math.round(calculateDurationWorkload(u.duration, intensity)) : 0;
-      const { error } = await supabase
-        .from('planned_workouts')
-        .update({
-          name: u.name, description: u.description, rendered_description: u.description,
-          duration: u.duration, steps_preset: u.steps_preset.length ? u.steps_preset : null, tags: u.tags,
-          workload_planned: load > 0 ? load : null,
-        })
-        .eq('id', u.id)
-        .eq('user_id', userId);
-      if (!error) enduranceWritten += 1;
+      if (await writeEnduranceRow(u)) enduranceWritten += 1;
     }
 
     // ⛔ THE WORKING NUMBERS ARE STORED UNDER THE BLOCK'S OWN KEY, never `config.training_max`
@@ -608,7 +736,8 @@ Deno.serve(async (req: Request) => {
              * AUTHORED set counts to find the ME rows, so its ledger would report the numbers the
              * restate is replacing. See the two-compositions comment above.
              */
-            week_ledgers: weekLedgersFor(composed),
+            // ⚠️ `planned` — the weeks with the athlete's endurance swaps in them, which is what the calendar carries.
+            week_ledgers: weekLedgersFor(planned),
             /**
              * ⛔⛔ WHAT EVERY HEAVY SESSION OF THIS BLOCK WAS — the walk `earnedMeSets` already made,
              * stored instead of thrown away.

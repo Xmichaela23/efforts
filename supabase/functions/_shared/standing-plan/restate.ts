@@ -24,6 +24,8 @@
 
 import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
 import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
+// ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
+import { originOf } from '../session-swap/swap.ts';
 
 /** ⚠️ DB shape, deliberately loose — a materialized calendar row as this reader sees it. */
 export type PlannedRowish = {
@@ -505,7 +507,14 @@ export function restateFromTest(args: {
 // endurance sessions drop a level" was copy the write never honoured. The rebuild now restates both.
 //
 // ⛔ THE SAME TWO LAWS. Only sessions the athlete has not done, dated today or later; the diff is
-// returned before it is applied. Matched on week + weekday + type, in date order when a day carries two of one sport.
+// returned before it is applied. Matched on week + weekday + the sport the PLAN wrote there, in date order when a day
+// carries two of one sport.
+//
+// ⛔ THE PLAN'S SPORT, NOT THE ROW'S (2026-09-19). A swap is a `plan_adjustments` row now, and the composition carries it
+// (`_shared/session-swap/plan-adjustments.ts`): a run swapped to a ride is composed as that ride, tagged `swapped_from:run`.
+// Matching on the row's own type left a swapped row unmatched (kept only while no ride sat on that day) and matched a
+// chosen workout back to the plan's. Both sides are keyed on `swapped_from:` when it is there, the type when not, so
+// a swap, a hike (a `walk` row) and a Back to the plan all land on the row they belong to — and the type is written.
 //
 // ⚠️ A SCHEDULED TEST IS NOT THE COMPOSER'S ROW. Retests the athlete put on the calendar (run test,
 // FTP test) are inserted rows the composer does not know about; they are skipped by tag, never
@@ -513,6 +522,12 @@ export function restateFromTest(args: {
 // ============================================================================
 
 const ENDURANCE_TYPES = new Set(['run', 'ride', 'swim']);
+/** The sport the plan wrote for this session: `swapped_from:` on a swapped one, its type otherwise. */
+const planSportOf = (x: { type?: unknown; tags?: unknown }): string =>
+  originOf({ type: String(x?.type ?? ''), tags: tokensOf(x?.tags) }) ?? String(x?.type ?? '');
+/** The tags that say what a swap did — compared on their own, because a machine changes nothing else. */
+const SWAP_MARK = /^(discipline_swapped$|swapped_from:|swapped_name:|workout_from:|venue:)/;
+const swapMarksOf = (tags: unknown): string => tokensOf(tags).filter((t) => SWAP_MARK.test(t)).sort().join(' ');
 const TEST_ROW_TAGS = new Set(['assessment', 'run_test', 'ftp_test', 'ftp_test_5min', '1rm_test', 'retest']);
 
 export type EndurancePlannedRowish = PlannedRowish & {
@@ -534,6 +549,8 @@ export type RestatedEnduranceRow = {
   duration: number;
   steps_preset: string[];
   tags: string[];
+  /** The row's type changes — a swap to another sport, a hike, or back to the plan's. */
+  type_moved: boolean;
 };
 
 export type EnduranceChange = {
@@ -566,8 +583,9 @@ export function restateEndurance(args: {
   const bySlot = new Map<string, Array<ComposedWeek['sessions'][number]>>();
   for (const wk of args.composed) {
     for (const s of wk.sessions) {
-      if (!ENDURANCE_TYPES.has(String(s.type))) continue;
-      const key = `${wk.week}|${s.day}|${s.type}`;
+      const sport = planSportOf(s);
+      if (!ENDURANCE_TYPES.has(sport)) continue;
+      const key = `${wk.week}|${s.day}|${sport}`;
       bySlot.set(key, [...(bySlot.get(key) ?? []), s]);
     }
   }
@@ -576,7 +594,7 @@ export function restateEndurance(args: {
   for (const row of args.planned ?? []) {
     const week = Number(row?.week_number);
     if (!Number.isFinite(week) || week < args.afterWeek) continue;
-    const type = String(row?.type ?? '');
+    const type = planSportOf(row);
     if (!ENDURANCE_TYPES.has(type) || !row?.id) continue;
     if (tokensOf(row?.tags).some((t) => TEST_ROW_TAGS.has(t))) continue;
     const day = weekdayOf(row?.date);
@@ -609,6 +627,8 @@ export function restateEndurance(args: {
       const shapeMoved = nextTokens.join(' ') !== curTokens.join(' ');
       const nameMoved = String(fresh.name ?? '') !== String(row.name ?? '');
       const descMoved = String(fresh.description ?? '') !== String(row.description ?? '');
+      const typeMoved = String(fresh.type ?? '') !== String(row.type ?? '');
+      const marksMoved = swapMarksOf(fresh.tags) !== swapMarksOf(row.tags);
       /**
        * ⛔⛔ THE MINUTES ARE NOT A CHANGE OF THEIR OWN (2026-09-10). A stored row's `duration` is what
        * materialize-plan expanded its tokens to — a long run of `longrun_91min_easypace` + `round_4x_135s115`
@@ -618,12 +638,13 @@ export function restateEndurance(args: {
        * its token total. The report listed lengths that never reached a calendar. Same tokens is the same
        * session, so the length moves only with the shape.
        */
-      if (!shapeMoved && !nameMoved && !descMoved) return;
+      if (!shapeMoved && !nameMoved && !descMoved && !typeMoved && !marksMoved) return;
       rows.push({
         id: String(row.id), week, day, type: String(fresh.type),
         name: String(fresh.name ?? ''), description: String(fresh.description ?? ''),
         // ⚠️ A words-only rewrite keeps the stored length — the tokens it was expanded from did not move.
         duration: shapeMoved ? toMin : (fromMin ?? toMin), steps_preset: nextTokens, tags: tokensOf(fresh.tags),
+        type_moved: typeMoved,
       });
       if (shapeMoved) {
         changes.push({ week, day, type: String(fresh.type), name: String(fresh.name ?? ''), from_minutes: fromMin, to_minutes: toMin, shape_moved: shapeMoved });

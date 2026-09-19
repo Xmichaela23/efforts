@@ -642,7 +642,6 @@ export function getDisciplineSwaps(
   return targets
     .filter((d) => d !== from)
     .map((to) => {
-      const { name, description } = describeSwap(to, band, minutes);
       /**
        * ═══ THE SESSION ITSELF IS NOT WRITTEN HERE ANY MORE (§7, 2026-09-09) ════════════════════
        *
@@ -666,47 +665,7 @@ export function getDisciplineSwaps(
         to,
         label: to === 'ride' ? 'Ride instead' : to === 'swim' ? 'Swim instead' : 'Run instead',
         needsMaterialize: false,
-        patch: {
-          type: to,
-          name,
-          description,
-          // ⛔ duration is NOT in this patch. The library session writes its own minutes; a shell
-          // leaves the row's own time alone, because re-writing a preserved value is how it gets
-          // accidentally rounded.
-          steps_preset: null,
-          /**
-           * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
-           * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer
-           * it over `description` (`TodaysEffort:1886`, `UnifiedWorkoutView:542`). Leaving it in
-           * place meant a swapped ride kept printing the run's sentence — the swap would look like
-           * it had failed, or worse, quietly prescribe the wrong session.
-           */
-          rendered_description: null,
-          /**
-           * ⛔ AND THE OLD SPORT'S SUBTITLE (2026-09-10, audit H-T20). materialize-plan writes a swim's
-           * line into `friendly_summary`; an easy swim swapped to a run wrote this shell raw and kept
-           * printing "WU 300 yd • …". It is words only — no duration rung reads it — so it clears here
-           * like `rendered_description`, unlike `computed` below.
-           */
-          friendly_summary: null,
-          /**
-           * ⛔ THE TAG RECORDS WHAT THE PLAN ORIGINALLY ASKED FOR (2026-08-08), and that is load-bearing.
-           *
-           * `get-week` re-materialises planned rows from `plans.sessions_by_week` on every read and
-           * decides "is this session already here?" on `plan|date|TYPE`. A swap changes the type, so
-           * the blob's run looked MISSING and get-week inserted a second row — the athlete's Tuesday
-           * ended up holding the swapped ride AND a freshly re-created run, on every calendar load.
-           * `swapped_from:<original>` is what lets that check find the slot without the blob being
-           * touched. The swap stays individualised; the plan keeps saying what it prescribed.
-           *
-           * ⛔ THE EARLIEST ORIGIN WINS, NOT THE LAST HOP. Swapping run → ride → swim must still
-           * report `swapped_from:run`, because `run` is what the blob holds and what get-week will
-           * look for. Recording the immediately-previous discipline would leave the blob's run
-           * unmatched on the second swap and the duplicate would come straight back.
-           */
-          // ⚠️ `swapOriginTags` also stamps `swapped_name:` — the name the revert option wears (§8).
-          tags: swapOriginTags(session, from),
-        },
+        patch: disciplineShellPatch(session, to),
         kind: 'discipline' as const,
         /** The sheet's line for this row, by band. Pending Michael's words — see `SWAP_COPY_KEYS`. */
         copyKey: band === 'long' ? SWAP_COPY_KEYS.longDay : band === 'hard' ? SWAP_COPY_KEYS.hardRunToRide : SWAP_COPY_KEYS.easy,
@@ -714,6 +673,57 @@ export function getDisciplineSwaps(
         warnings: swapWarnings(to, band, sameDayOthers),
       };
     });
+}
+
+/**
+ * ⛔ THE SPORT SWAP'S SHELL — type, copy, and the tags that point back at what the plan asked for (moved out of
+ * `getDisciplineSwaps` 2026-09-19 so the plan's composition builds the same shell from a swap record; the sheet's
+ * gates stay in `getDisciplineSwaps`, where the athlete is asked). `withLibrarySession` merges the session over it.
+ */
+export function disciplineShellPatch(session: SwappableSession, to: Discipline): Record<string, unknown> {
+  const from = disciplineOf(session.type) ?? to;
+  const { name, description } = describeSwap(to, intensityOf(session), resolveMinutes(session));
+  return {
+    type: to,
+    name,
+    description,
+    // ⛔ duration is NOT in this patch. The library session writes its own minutes; a shell
+    // leaves the row's own time alone, because re-writing a preserved value is how it gets
+    // accidentally rounded.
+    steps_preset: null,
+    /**
+     * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
+     * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer
+     * it over `description` (`TodaysEffort:1886`, `UnifiedWorkoutView:542`). Leaving it in
+     * place meant a swapped ride kept printing the run's sentence — the swap would look like
+     * it had failed, or worse, quietly prescribe the wrong session.
+     */
+    rendered_description: null,
+    /**
+     * ⛔ AND THE OLD SPORT'S SUBTITLE (2026-09-10, audit H-T20). materialize-plan writes a swim's
+     * line into `friendly_summary`; an easy swim swapped to a run wrote this shell raw and kept
+     * printing "WU 300 yd • …". It is words only — no duration rung reads it — so it clears here
+     * like `rendered_description`, unlike `computed` below.
+     */
+    friendly_summary: null,
+    /**
+     * ⛔ THE TAG RECORDS WHAT THE PLAN ORIGINALLY ASKED FOR (2026-08-08), and that is load-bearing.
+     *
+     * `get-week` re-materialises planned rows from `plans.sessions_by_week` on every read and
+     * decides "is this session already here?" on `plan|date|TYPE`. A swap changes the type, so
+     * the blob's run looked MISSING and get-week inserted a second row — the athlete's Tuesday
+     * ended up holding the swapped ride AND a freshly re-created run, on every calendar load.
+     * `swapped_from:<original>` is what lets that check find the slot without the blob being
+     * touched. The swap stays individualised; the plan keeps saying what it prescribed.
+     *
+     * ⛔ THE EARLIEST ORIGIN WINS, NOT THE LAST HOP. Swapping run → ride → swim must still
+     * report `swapped_from:run`, because `run` is what the blob holds and what get-week will
+     * look for. Recording the immediately-previous discipline would leave the blob's run
+     * unmatched on the second swap and the duplicate would come straight back.
+     */
+    // ⚠️ `swapOriginTags` also stamps `swapped_name:` — the name the revert option wears (§8).
+    tags: swapOriginTags(session, from),
+  };
 }
 
 /**
@@ -785,20 +795,26 @@ export function sessionSwapExtras(
     options.push({
       kind: 'hike', to: from, label: K.longDay, copyKey: K.longDay,
       needsMaterialize: false, warnings: [],
-      patch: {
-        type: 'walk',
-        steps_preset: null,
-        workout_structure: null,
-        // ⛔ The old session's subtitle goes with its structure (2026-09-10, audit H-T20).
-        friendly_summary: null,
-        intervals: null,
-        rendered_description: null,
-        tags: swapOriginTags(session, from),
-      },
+      patch: hikePatch(session),
     });
   }
 
   return options;
+}
+
+/** The hike's patch: the long session's minutes as a `walk` row (p275). Shared with the plan's composition. */
+export function hikePatch(session: SwappableSession): Record<string, unknown> {
+  const from = disciplineOf(session.type) ?? 'run';
+  return {
+    type: 'walk',
+    steps_preset: null,
+    workout_structure: null,
+    // ⛔ The old session's subtitle goes with its structure (2026-09-10, audit H-T20).
+    friendly_summary: null,
+    intervals: null,
+    rendered_description: null,
+    tags: swapOriginTags(session, from),
+  };
 }
 
 /**
@@ -892,7 +908,7 @@ export function revertOptions(session: SwappableSession, planId?: string | null)
  * machine is the same session performed elsewhere, and rewriting any of those would make it a
  * different session wearing the same page's blessing.
  */
-function venuePatch(session: SwappableSession, venue: Venue): Record<string, unknown> {
+export function venuePatch(session: SwappableSession, venue: Venue): Record<string, unknown> {
   return {
     tags: [...new Set([
       ...(session.tags ?? []).filter((t) => !String(t).toLowerCase().startsWith(VENUE_PREFIX)),
