@@ -952,14 +952,12 @@ function assistanceRows(
         // rep field carries the unit in words.
         sets: undefined,
         reps: `${totalReps} total`,
-        // ⛔ STILL 'By feel', AND `load_prescribed` IS STILL false. Both are load-bearing and neither
-        // D-406 nor D-407 touched either. `weight` is what every surface RENDERS as the prescription,
-        // and the prescription has not changed: the plan still declines to name a load.
-        // `load_prescribed: false` is separately the one answer to "is this row assistance?"
-        // (`src/lib/assistance-slot.ts`, D-370) — flipping it would make the server matcher, the
+        // ⛔ `load_prescribed` IS STILL false — the one answer to "is this row assistance?"
+        // (`src/lib/assistance-slot.ts`, D-370); flipping it would make the server matcher, the
         // logger, the compare table and the performance summary stop recognising the row, and work
-        // the athlete did would read as a skip.
-        weight: 'By feel',
+        // the athlete did would read as a skip. The plan still declines to name a load.
+        // ⛔ NO `weight: 'By feel'` (2026-09-18, round 3): no page prints "by feel" as a load, and every surface
+        // printed the string as the row's weight. The row carries no weight.
         load_prescribed: false,
         /**
          * ⛔ THE SET'S INTENT, AS DATA. `exercise_log.slot_intent` gates the e1RM series: a set the

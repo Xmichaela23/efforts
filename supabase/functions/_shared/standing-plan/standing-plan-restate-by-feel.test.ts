@@ -43,7 +43,7 @@ Deno.test('⛔⛔ A PRICED ROW WITH NO MARKER GOES BACK TO By feel — no weight
   const out = restate(composedWith([freshByFeel()]), plannedWith([pricedRow()]));
   assertEquals(out.rows.length, 1, 'the row is rewritten');
   const row = out.rows[0].strength_exercises[0] as Record<string, unknown>;
-  assertEquals(row.weight, 'By feel');
+  assertEquals(row.weight, undefined, 'no "By feel" word — the row carries no weight (2026-09-18, round 3)');
   assertEquals(row.load_prescribed, false);
   assertEquals(row.load_basis, 'no_tested_lift', 'the basis is the composer\'s, so the row reads as a fresh build would');
   assertEquals(row.percent_1rm, undefined);
@@ -61,7 +61,7 @@ Deno.test('⛔⛔ A PRICED ROW WITH NO MARKER GOES BACK TO By feel — no weight
 Deno.test('⛔ THE OLD MARKER STILL WORKS — a row the deleted branch stamped `derived_ratio` is restated the same way', () => {
   const out = restate(composedWith([freshByFeel()]), plannedWith([pricedRow({ load_basis: 'derived_ratio' })]));
   const row = out.rows[0]?.strength_exercises[0] as Record<string, unknown>;
-  assertEquals(row?.weight, 'By feel');
+  assertEquals(row?.weight, undefined);
   assertEquals(row?.load_basis, 'no_tested_lift');
   assertEquals(row?.set_plan, undefined);
 });
@@ -70,7 +70,7 @@ Deno.test('⛔ A ROW WITH NO BASIS AT ALL (the same-pattern ratio case) is resta
   const composed = composedWith([freshByFeel({ name: 'Close Grip Bench Press', load_basis: undefined })]);
   const planned = plannedWith([pricedRow({ name: 'Close Grip Bench Press' })]);
   const row = restate(composed, planned).rows[0]?.strength_exercises[0] as Record<string, unknown>;
-  assertEquals(row?.weight, 'By feel');
+  assertEquals(row?.weight, undefined);
   assertEquals(row?.load_prescribed, false);
   assertEquals(row?.load_basis, undefined);
 });

@@ -2768,7 +2768,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Extract notes separately - ensure they don't end up in the name
         const rawName = String(exercise.name || '').trim();
         // Notes can come from notes, description, or weight (if weight is a string like "Planks, dead bugs, bird dogs")
-        const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+        const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) && !/^\s*by feel\s*$/i.test(exercise.weight) ? exercise.weight : '';  // ⛔ a stored "By feel" (rows built before 2026-09-18) is no note — no page prints it
         const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
@@ -2884,7 +2884,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (se.length) {
               const pre: LoggedExercise[] = se.map((exercise: any, index: number) => {
                 const rawName = String(exercise.name || '').trim();
-                const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+                const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) && !/^\s*by feel\s*$/i.test(exercise.weight) ? exercise.weight : '';  // ⛔ a stored "By feel" (rows built before 2026-09-18) is no note — no page prints it
                 const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
                 const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
                 return {
@@ -2971,7 +2971,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
           const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => {
             const rawName = String(exercise.name || '').trim();
-            const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
+            const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) && !/^\s*by feel\s*$/i.test(exercise.weight) ? exercise.weight : '';  // ⛔ a stored "By feel" (rows built before 2026-09-18) is no note — no page prints it
             const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
             const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
             // The assistance rep TOTAL, on the strength_exercises pass-through. ⛔ THIS PATH NEVER

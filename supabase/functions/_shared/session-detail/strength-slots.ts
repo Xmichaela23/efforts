@@ -130,7 +130,8 @@ function plannedRows(plannedRowRaw: any): { rows: PlannedRow[]; fromSteps: boole
       else if (typeof ex?.weight === 'string') {
         const t = ex.weight.trim();
         if (/^[\d.]+\s*(lb|lbs|kg)?$/i.test(t)) weight = Number.parseFloat(t) || 0;
-        else if (t) weight_display = t;
+        // ⛔ A stored "By feel" (rows built before 2026-09-18, round 3) prints nothing — no page prints it as a load.
+        else if (t && !/^by feel$/i.test(t)) weight_display = t;
       }
       const duration = typeof ex?.duration_seconds === 'number' ? ex.duration_seconds : 0;
       return {

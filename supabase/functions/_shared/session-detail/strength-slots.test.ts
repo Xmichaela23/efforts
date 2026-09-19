@@ -49,7 +49,8 @@ Deno.test('a declared swap is one row, and a planned range is printed as written
   assertEquals([r.status, r.executed_name, r.name], ['swapped', 'Hip Thrust', 'Bulgarian Split Squat']);
   assertEquals(r.planned_sets[0].reps_text, '8-10');
   assertEquals(r.planned_sets[0].reps, undefined);
-  assertEquals(r.planned_sets[0].weight_display, 'By feel');
+  // A stored "By feel" prints nothing (2026-09-18, round 3) — no page prints it as a load.
+  assertEquals(r.planned_sets[0].weight_display, undefined);
 });
 
 Deno.test('"not logged" and "not in the plan"; with no plan, no label and no count', () => {

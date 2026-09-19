@@ -83,7 +83,8 @@ Deno.test('⛔ AND THE UNPRICED BLOCK IS ACTUALLY UNPRICED — the file a false 
    * has started inventing a weight for an athlete who has tested nothing — which is the one thing
    * `working-number.ts` exists to prevent (*"the seed is not the answer"*).
    */
-  assert(text.includes('@ By feel'),
+  // An unpriced row prints nothing after "@" (the "By feel" word came off 2026-09-18, round 3).
+  assert(/@\s+\|/.test(text),
     '⛔ an athlete with no tested max has priced rows. A stored 1RM is a SEED for the test\'s '
     + 'warm-ups and is never a working number.');
 });

@@ -356,7 +356,8 @@ export function restateFromTest(args: {
        * row's, so the rebuilt row reads exactly as a new build of the same block would.
        */
       const exPriced = ex?.load_prescribed === true || topWorkWeight(ex) != null;
-      const freshByFeel = fresh.load_prescribed === false && /by feel/i.test(String(fresh.weight ?? ''));
+      // ⚠️ The composer writes no weight on an unpriced row since 2026-09-18 (round 3; it wrote "By feel").
+      const freshByFeel = fresh.load_prescribed === false && topWorkWeight(fresh) == null;
       if (exPriced && freshByFeel && fresh.load_basis !== 'awaiting_test') {
         touched = true;
         return {
@@ -364,7 +365,8 @@ export function restateFromTest(args: {
           ...shape,
           sets: fresh.sets,
           reps: fresh.reps,
-          weight: 'By feel',
+          // ⛔ NO "By feel" (2026-09-18, round 3): no page prints it as a load, so the row carries no weight.
+          weight: undefined,
           load_prescribed: false,
           load_basis: fresh.load_basis,
           notes: undefined,

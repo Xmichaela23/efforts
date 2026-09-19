@@ -92,7 +92,8 @@ export function plainLiftList(items: any[], _units: 'imperial' | 'metric' = 'imp
     if (typeof x?.prescription_words === 'string' && x.prescription_words.trim()) return x.prescription_words.trim();
     const d = typeof x?.weight_display === 'string' ? x.weight_display.trim() : '';
     if (d) return d;
-    if (typeof x?.weight === 'string' && x.weight.trim()) return x.weight.trim();
+    // ⛔ A stored "By feel" (rows built before 2026-09-18, round 3) prints nothing — no page prints it as a load.
+    if (typeof x?.weight === 'string' && x.weight.trim() && !/^\s*by feel\s*$/i.test(x.weight)) return x.weight.trim();
     // server-word: materialize-plan stamps `weight_display: 'By feel'` on an auto-regulated row (2026-09-17).
     return null;
   };

@@ -64,7 +64,8 @@ function weightLabelFor(ex: Record<string, unknown> | undefined): string | null 
   const display = ex?.weight_display;
   if (typeof display === 'string' && display.trim()) return display.trim();
   const raw = ex?.weight;
-  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  // ⛔ A stored "By feel" (rows built before 2026-09-18, round 3) prints nothing — no page prints it as a load.
+  if (typeof raw === 'string' && raw.trim() && !/^\s*by feel\s*$/i.test(raw)) return raw.trim();
   return null;
 }
 

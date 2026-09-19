@@ -769,7 +769,8 @@ Deno.test('D-406 — a suggestion never becomes a prescription', () => {
   for (const r of rows as any[]) {
     // ⛔ THE PRESCRIPTION IS UNCHANGED. Both of these are what every surface renders and reads; if
     // either moves, the suggestion has stopped being a suggestion.
-    assertEquals(r.weight, 'By feel', `${r.name} stopped saying "By feel"`);
+    // No "By feel" word since 2026-09-18 (round 3): the row carries no weight.
+    assertEquals(r.weight, undefined, `${r.name} was handed a weight`);
     assertEquals(r.load_prescribed, false, `${r.name} lost the assistance marker`);
     // ⚠️ AND NO FABRICATED INTENSITY. A percentage on one of these rows is the exact thing
     // materialize-plan strips on sight.

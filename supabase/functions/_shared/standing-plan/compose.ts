@@ -196,7 +196,11 @@ export type StrengthExercise = {
   name: string;
   sets?: number;
   reps: number | string;
-  weight: string | number;
+  /**
+   * The prescribed weight. ⛔ ABSENT ON A ROW WITH NO PRESCRIBED LOAD (`load_prescribed: false`) — it carried the
+   * string "By feel" until 2026-09-18 (round 3); no page prints "by feel" as a load, so the row carries nothing.
+   */
+  weight?: string | number;
   percent_1rm?: number;
   load_prescribed?: boolean;
   notes?: string;
@@ -1685,7 +1689,6 @@ function exerciseForSlot(
         ...(rowExecutionName(movement, slot, args.equipment)
           ? { execution_name: rowExecutionName(movement, slot, args.equipment)! } : {}),
         reps: '',
-        weight: 'By feel',
         load_prescribed: false,
         prescription_words: words,
         // ⚠️ THE PAGE'S CELL, KEPT AS DATA — the week's own checks count printed cells by it. Every
@@ -1812,7 +1815,6 @@ function exerciseForSlot(
         ...rowSwapOptions(slotKey, movement, slot, args.equipment),
         sets,
         reps,
-        weight: 'By feel',
         load_prescribed: false,
         ...(targetRir != null ? { target_rir: targetRir } : {}),
         ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
@@ -2066,7 +2068,6 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
         name: names[lift],
         // Viada p215: the pretest steps are 6 reps, 5 reps, then max reps
         reps: '6, 5, max',
-        weight: 'By feel',
         load_prescribed: false,
         slot_intent: TEST_LIFT_INTENT,
         notes: TEST_LAST_SET_LINE, // p215 step 8 — one owner, `strength/test-session.ts`
@@ -3840,7 +3841,6 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // `repPrescribable` was resolved where the movement was chosen so this never re-derives it.
         // Viada p86: 8-10 reps for accessory work
         reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION,
-        weight: 'By feel',
         load_prescribed: false,
         // ⚠️ A FLOOR, DIAL OR CORE ROW IS ACCESSORY WORK — p86 doses it in reps and a reserve and
         // gives it no load, so its by-feel is the SAME kind as a HYP slot's: an output of the rule,
@@ -4002,8 +4002,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           sets: muscleFloorSets(),
           // Viada p86: 8-10 reps for accessory work
           reps: takesReps ? '8-10' : HOLD_PRESCRIPTION,
-          weight: 'By feel',
-          load_prescribed: false,
+            load_prescribed: false,
           load_basis: 'auto_regulated' as const,
           ...(takesReps ? { target_rir: ACCESSORY_TARGET_RIR } : {}),
           ...(executionHowTo(movement, args.equipment ?? null) ? { how_to: executionHowTo(movement, args.equipment ?? null)! } : {}),

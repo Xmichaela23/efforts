@@ -33,20 +33,20 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 90 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -60,19 +60,19 @@ WEEK 02  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -82,20 +82,20 @@ WEEK 02  column=standard
   [Wednesday] run      Near-threshold Run — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -108,19 +108,19 @@ WEEK 03  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -130,20 +130,20 @@ WEEK 03  column=standard
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -156,19 +156,19 @@ WEEK 04  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -178,20 +178,20 @@ WEEK 04  column=standard
   [Wednesday] run      Near-threshold Run — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -204,19 +204,19 @@ WEEK 05  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -226,20 +226,20 @@ WEEK 05  column=standard
   [Wednesday] run      Near-threshold Run — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -252,19 +252,19 @@ WEEK 06  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 315           | 90% · how-to · plan 315x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -274,20 +274,20 @@ WEEK 06  column=standard
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -300,19 +300,19 @@ WEEK 07  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -322,20 +322,20 @@ WEEK 07  column=standard
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -348,19 +348,19 @@ WEEK 08  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -370,20 +370,20 @@ WEEK 08  column=standard
   [Wednesday] run      Near-threshold Run — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -396,19 +396,19 @@ WEEK 09  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 320           | 90% · how-to · plan 320x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -418,20 +418,20 @@ WEEK 09  column=standard
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -444,19 +444,19 @@ WEEK 10  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -466,20 +466,20 @@ WEEK 10  column=standard
   [Wednesday] run      Near-threshold Run — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 82 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -492,19 +492,19 @@ WEEK 11  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -514,20 +514,20 @@ WEEK 11  column=standard
   [Wednesday] run      Near-threshold Run — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -540,19 +540,19 @@ WEEK 12  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · how-to · plan 205x
-      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
-      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    Smith Machine Press            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 325           | 90% · how-to · plan 325x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Machine Hip Thrust             3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -562,20 +562,20 @@ WEEK 12  column=standard
   [Wednesday] run      Near-threshold Run — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift · how-to
-      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Triceps Pushdown               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
-      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side · how-to
+      HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 87 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.

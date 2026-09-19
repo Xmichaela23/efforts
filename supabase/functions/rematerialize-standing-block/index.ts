@@ -35,6 +35,7 @@ import { athleteToday, isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SEL
 import { isTestSession } from '../save-baseline-test/pick.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import { DELOAD_LINE } from '../_shared/standing-plan/setup-copy.ts';
+import { TEST_LAST_SET_LINE } from '../_shared/strength/test-session.ts';
 import type { FrameId } from '../_shared/standing-plan/frames.ts';
 import {
   composeBlock,
@@ -136,8 +137,11 @@ Deno.serve(async (req: Request) => {
         const seed = Number.isFinite(predicted) && predicted > 0 ? predicted : Number(seeds?.[lift]);
         const steps = Number.isFinite(seed) && seed > 0 ? pretestSession(lift, seed, 5) : null;
         if (!steps) {
-          exercises.push({ name: names[lift], reps: '6, 5, max', weight: 'By feel', load_prescribed: false, slot_intent: 'ME',
-            notes: 'No max on file to aim the warm-ups — work up until the last set is genuinely hard.' });
+          // ⛔ NO "By feel" weight and no words of ours (2026-09-18, round 3). "No max on file to aim the warm-ups — work
+          // up until the last set is genuinely hard." was on no page; the row carries p215 step 8, as the composer's
+          // test row does (`TEST_LAST_SET_LINE`, one owner).
+          exercises.push({ name: names[lift], reps: '6, 5, max', load_prescribed: false, slot_intent: 'ME',
+            notes: TEST_LAST_SET_LINE });
           continue;
         }
         exercises.push({

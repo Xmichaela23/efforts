@@ -106,7 +106,7 @@ Deno.test('⛔ THE NAMED COMPOUNDS ARE BY FEEL — trap bar deadlift, front squa
       const n = String(r.name).toLowerCase();
       if (!['trap bar deadlift', 'front squat', 'close grip bench press', 'barbell row'].includes(n)) continue;
       seen += 1;
-      assertEquals(String(r.weight), 'By feel', `week ${week}: ${r.name} was handed ${r.weight}`);
+      assertEquals(r.weight, undefined, `week ${week}: ${r.name} was handed ${r.weight}`);
       assertEquals(r.load_prescribed, false, `week ${week}: ${r.name} claims a prescribed load`);
       const cfg = resolveExerciseConfig(n).config;
       assert(cfg?.primaryRef != null, `${n} lost its catalogue entry — the ratio table must stay`);
@@ -142,7 +142,7 @@ Deno.test('⛔⛔ PULL-UPS STAY BY FEEL — the pattern has no tested lift, and 
    */
   for (const week of [2, 3, 5]) {
     for (const r of rowsFor(week).filter((x) => /pull ?up|chin ?up/i.test(x.name))) {
-      assertEquals(String(r.weight), 'By feel', `${r.name} was handed a weight in week ${week}`);
+      assertEquals(r.weight, undefined, `${r.name} was handed a weight in week ${week}`);
       assertEquals(r.load_basis, 'no_tested_lift', `${r.name} no longer says why it is by feel`);
     }
   }

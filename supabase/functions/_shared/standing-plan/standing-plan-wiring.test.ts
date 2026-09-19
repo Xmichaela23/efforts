@@ -412,7 +412,8 @@ Deno.test('an auto-regulated row stays by feel forever', () => {
   const restated = restateFromTest({ composed: after, planned, afterWeek: 1 });
   for (const row of restated.rows) {
     for (const ex of row.strength_exercises) {
-      if (ex.load_prescribed === false) assertEquals(ex.weight, 'By feel');
+      // No "By feel" word since 2026-09-18 (round 3): the row carries no weight.
+      if (ex.load_prescribed === false) assertEquals(ex.weight, undefined);
     }
   }
   // Only the bench was tested, so only bench rows carry a number.
