@@ -1115,7 +1115,11 @@ function exerciseForSlot(
    * ⛔ NULL WHEN THE DAY HAS NO MOVEMENT LEFT FOR THIS SLOT — see the drop branch below. The caller
    * skips the slot and says so; it does not print the row above twice.
    */
-): { exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern } | null {
+): {
+  exercise: StrengthExercise; movement: string; sets: number; pattern: ViadaPattern;
+  /** ⛔ p247's reduction touched this row's weight (a lower row, weeks 1-9, a hard run the day before). */
+  reduced?: boolean;
+} | null {
   const pattern = patternForWeek(slot, args.week);
   const competition = args.competitionLifts[pattern] ?? null;
 
@@ -1886,7 +1890,14 @@ function exerciseForSlot(
   // ⛔ ONLY ON THE PAGE'S OWN PROGRAM (2026-09-18, round 3). p247 is the Run + Strength page (`strength_5k`, Strength +
   // 5K, pp246-247); its sentence printed on the Run + Ride + Strength description too. The line prints where its page
   // applies and nowhere else.
-  if (isLower && haircut < 1 && args.frame === 'strength_5k'
+  // ⛔⛔ AND IN EVERY PROGRAM WHERE ITS CAUSE HOLDS (round 4, 2026-09-18, Michael): the reduction applies wherever a
+  // challenging run lands the day before an ME lower session — Run + Ride + Strength, Run + Strength or Ride +
+  // Strength — and its sentence prints every time it applies, never silently: here on the plan's description, and
+  // on each ME lower session it touches (the session's `description`, set in `composeWeek` from `reduced` below).
+  // "Challenging" is `sport-slots.ts isHardSlot` on the placed RUN: the slot's own `hard` role, else MLSS or
+  // near-threshold (see `hardRunBeforeLowerOn`). The round-3 gate to `strength_5k` is gone.
+  const reduced = isLower && haircut < 1;
+  if (reduced
     && !notes.some((n) => n.cite === 'Viada p247' && n.text === HAIRCUT_LINE)) {
     notes.push({
       kind: 'source',
@@ -1993,6 +2004,7 @@ function exerciseForSlot(
     movement,
     sets,
     pattern,
+    ...(reduced ? { reduced: true } : {}),
   };
 }
 
@@ -3110,6 +3122,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const dosed: DosingSession['sets'] = [];
         const takenToday = new Set<string>();
         let droppedHere = 0;
+        // p247 — the rows whose weight the lower-body reduction touched today (see `exerciseForSlot`).
+        const reducedRows = new Set<StrengthExercise>();
         for (const slot of day.strength) {
           const built = exerciseForSlot(
             slot, args, notes, hardRunBeforeLowerOn(day.day), takenToday, picks, focusMuscles,
@@ -3117,6 +3131,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // ⛔ THE DAY RAN OUT OF MOVEMENTS FOR THIS PATTERN — see `exerciseForSlot`'s drop branch.
           if (!built) { droppedHere += 1; continue; }
           const { exercise, movement, sets, pattern } = built;
+          if (built.reduced) reducedRows.add(exercise);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });
           if (slot.intent === 'ME') {
@@ -3189,8 +3204,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
            * read once and then never again.
            * ⚠️ THE TWO CONSTANTS ARE KEPT AS THE RECORD and now have no caller — the same idiom as
            * `STANDING_DE_SET_CUE`. Their comments are why particular phrasings must not come back.
+           * ⛔ EXCEPT p247's SENTENCE, ON EACH ME LOWER SESSION ITS REDUCTION TOUCHES (round 4, 2026-09-18, Michael):
+           * the reduction never applies silently. One owner for the words (`HAIRCUT_LINE`, Viada p247, cut) and one
+           * for the decision (`exerciseForSlot`'s `reduced`, off `prescribedLoad`).
            */
-          description: '',
+          description: exercises.some((e) => reducedRows.has(e)) ? HAIRCUT_LINE : '',
           // OURS — `duration` 55 min on a lifting session row: placeholder length, no page, kept as found
           duration: 55,
           strength_exercises: exercises,

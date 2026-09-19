@@ -1068,3 +1068,24 @@ Deno.test('⛔⛔ ONE HARD RUN AND ONE HARD RIDE GO IN HIS ORDER, whichever way 
   // ⚠️ AN UNANSWERED HALF IS NOT THE ONE-OF-EACH CASE EITHER.
   assertEquals(hardPairInFrameOrder('run', undefined).hard1, 'run');
 });
+
+Deno.test('p247 (round 4): the sentence prints on each ME lower session the reduction touches, in every program', async () => {
+  const { HAIRCUT_LINE } = await import('./compose.ts');
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    const wk = composeWeek({ ...BASE, frame, week: 2, column: 'standard' });
+    const strength = wk.sessions.filter((s: PlanSession) => s.type === 'strength');
+    const touched = strength.filter((s: PlanSession) => s.description === HAIRCUT_LINE);
+    // every session that carries the sentence is a heavy leg day, and the block says it too
+    for (const s of touched) assert((s.tags ?? []).includes('lower:me'), `${frame}: ${s.name} carries p247 but is not an ME lower day`);
+    if (touched.length > 0) assert(wk.notes.some((n) => n.text === HAIRCUT_LINE), `${frame}: session line without the block line`);
+    // no other strength session carries it
+    for (const s of strength) if (!touched.includes(s)) assertEquals(s.description, '');
+  }
+  // the Run + Strength week has its hard run the day before the ME lower day
+  const run = composeWeek({ ...BASE, week: 2, column: 'standard' });
+  assert(run.sessions.some((s: PlanSession) => s.description === HAIRCUT_LINE), 'Run + Strength week 2 lost the p247 line');
+  // week 10: the reduction is phased out, so nothing prints
+  const late = composeWeek({ ...BASE, week: 10, column: 'standard' });
+  assert(!late.sessions.some((s: PlanSession) => s.description === HAIRCUT_LINE), 'the p247 line printed after the phase-out');
+  assert(!late.notes.some((n) => n.text === HAIRCUT_LINE));
+});

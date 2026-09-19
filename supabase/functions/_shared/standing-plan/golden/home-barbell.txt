@@ -98,6 +98,7 @@ WEEK 02  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -146,6 +147,7 @@ WEEK 03  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -194,6 +196,7 @@ WEEK 04  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -242,6 +245,7 @@ WEEK 05  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -290,6 +294,7 @@ WEEK 06  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -338,6 +343,7 @@ WEEK 07  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -386,6 +392,7 @@ WEEK 08  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
@@ -434,6 +441,7 @@ WEEK 09  column=standard
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
+      [source  ] A 3 to 4 percent reduction in working 1RM should be assumed here. This reduction can be gradually phased out in eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Each drill should be done until the movement is optimized for the day and the athlete develops confidence in it; then they move on from it. Fatigue, poor form, and imprecise movements are all absolute no-no's.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
