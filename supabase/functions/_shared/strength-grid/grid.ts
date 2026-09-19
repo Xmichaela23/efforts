@@ -296,8 +296,9 @@ const TWO_DUMBBELLS = new Set([
   'arnold press', 'chest fly', 'lateral raise', 'front raise', 'rear delt fly', 'rear delt machine', 'tate press',
   'skull crusher', 'dumbbell curl', 'hammer curl', 'spider curl', 'drag curl', 'db romanian deadlift',
   'romanian deadlift', 'stiff-legged deadlift', 'weighted single leg calf raise', 'farmers carry', 'gorilla row',
-  // ACE's lunge: "grip one dumbbell in each hand" — bodyweight on a kit with no dumbbells.
-  'lunge',
+  // ACE's lunge: "grip one dumbbell in each hand" — bodyweight on a kit with no dumbbells. The walking and reverse
+  // lunges and the Bulgarian split squat the same (Michael, 2026-09-18; their how-tos hold a dumbbell in each hand).
+  'lunge', 'walking lunge', 'reverse lunge', 'bulgarian split squat',
 ]);
 /**
  * Does this row use two dumbbells on this kit? A movement done only with dumbbells always does. One the kit could
@@ -801,8 +802,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Alternate Bound" — https://exrx.net/Plyometrics/AlternateBoundDoubleArm' },
   'box step up': { text: 'Stand facing a box or bench about knee height. Put one foot fully on it and push through that foot to stand up on the box, then step back down with the same leg you stepped up with last. Do all reps on one leg, then the other.',
     source: 'ExRx, "Dumbbell Step-up" — https://exrx.net/WeightExercises/GluteusMaximus/DBStepUp' },
-  'bulgarian split squat': { text: 'Stand a stride in front of a bench and put the top of your back foot on it. Lower your back knee toward the floor until your front thigh is about parallel to the floor, then push back up through the front foot. Keep your front knee in line with your toes. Do all reps on one leg, then the other.',
-    source: 'ExRx, "Single Leg Split Squat" — https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSplitSquat' },
+  // ⛔ THE DUMBBELL VERSION, THE SOURCE'S OWN WORDS (Michael, 2026-09-18); a kit with no dumbbells keeps the bodyweight words.
+  'bulgarian split squat': [
+    { route: ['dumbbells'], value: { text: "Hold a dumbbell in each hand and stand two to three feet in front of a bench or other surface about knee-height off the ground. Lean slightly forward, put most of your weight on your right foot, and extend your left foot behind you, resting the top of your foot on the bench. Keeping your right foot firmly planted, lower your butt toward the floor by bending both knees at the same time until your left knee touches the floor or your right thigh is parallel to the floor (whichever comes first). Stand up to return to the starting position. When you've finished your reps, switch legs.",
+      source: 'Legion, Michael Matthews, CPT (reviewed by Cole Holan, M.D.), "Bulgarian Split Squats" — https://legionathletics.com/bulgarian-split-squat/' } },
+    { route: [], value: { text: 'Stand a stride in front of a bench and put the top of your back foot on it. Lower your back knee toward the floor until your front thigh is about parallel to the floor, then push back up through the front foot. Keep your front knee in line with your toes. Do all reps on one leg, then the other.',
+      source: 'ExRx, "Single Leg Split Squat" — https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSplitSquat' } },
+  ],
   'cable crossover': { text: 'Stand between two high pulleys holding a handle in each hand, leaning forward slightly with your hips and knees a little bent. With a slight bend in your elbows, bring the handles together in front of you in a hugging motion. Let them go back out until you feel a stretch across your chest. Keep the same bend in your elbows on every rep.',
     source: 'ExRx, "Cable Isolateral Standing Fly" — https://exrx.net/WeightExercises/PectoralSternal/CBStandingFly' },
   'cable curls': { text: 'Stand facing a low pulley or standing on a band, holding the handle or band with your palms up and arms straight. Curl your hands up toward your shoulders, then lower them until your arms are straight. Keep your elbows at your sides.',
@@ -1042,8 +1048,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' },
   'reverse hyperextension': { text: 'Put the strap around your legs just above the ankles and lie face down on the pad, holding the handles. Lift your legs behind you as high as you can, keeping them nearly straight. Lower them slowly.',
     source: 'ExRx, "Lever Reverse Hyper-extension" — https://exrx.net/WeightExercises/GluteusMaximus/LVReverseHyperextension' },
-  'reverse lunge': { text: 'Stand up straight. Step back with one foot and land on the ball of that foot. Lower your back knee until it nearly touches the floor, then push through the front foot to stand back up. Alternate legs or do all reps on one leg, then the other.',
-    source: 'ExRx, "Dumbbell Rear Lunge" — https://exrx.net/WeightExercises/GluteusMaximus/DBRearLunge' },
+  // ⛔ THE DUMBBELL VERSION, THE SOURCE'S OWN WORDS (Michael, 2026-09-18); a kit with no dumbbells keeps the bodyweight words.
+  'reverse lunge': [
+    { route: ['dumbbells'], value: { text: "Hold a dumbbell in each hand and let your arms hang at your sides. Stand up straight with your feet about hip-width apart and keep your chest up and shoulders back. Step back about two-to-three feet with your left leg, placing most of your weight on your front foot. Lower your body by bending both knees until your left knee touches the floor. Keep your chest up and your arms at your sides as you descend. Reverse the movement and return to the starting position. Once your legs are straight, repeat the pattern with your other foot (to complete one full rep). Continue to alternate legs until you've completed the desired number of reps with each.",
+      source: 'Legion, Michael Matthews, CPT (reviewed by Dr. Brian Grant, DPT, CSCS), "Dumbbell Reverse Lunge" — https://legionathletics.com/reverse-lunge/' } },
+    { route: [], value: { text: 'Stand up straight. Step back with one foot and land on the ball of that foot. Lower your back knee until it nearly touches the floor, then push through the front foot to stand back up. Alternate legs or do all reps on one leg, then the other.',
+      source: 'ExRx, "Dumbbell Rear Lunge" — https://exrx.net/WeightExercises/GluteusMaximus/DBRearLunge' } },
+  ],
   'romanian deadlift': { text: 'Stand holding a barbell or dumbbells in front of your thighs, knees slightly bent. Push your hips back and lower the weight along your legs until you feel a stretch in your hamstrings, about mid-shin, keeping your back flat. Push your hips forward to stand back up.',
     source: 'ExRx, "Romanian Deadlift" — https://exrx.net/WeightExercises/OlympicLifts/RomanianDeadlift (barbell); NASM Exercise Library, "Dumbbell Romanian Deadlift" — https://www.nasm.org/resource-center/exercise-library/dumbbell-romanian-deadlift' },
   'sandbag throw': { text: 'Stand over a sandbag with it between your feet, then squat down and grip it on each side. Pull it up into your lap and move your hands to hug it. Stand up in one movement and throw it so it clears one shoulder and falls behind you. Turn around and repeat.',
@@ -1103,8 +1114,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     { route: ['bands'], value: { text: 'Anchor a band high and face it, feet together and elbows at your sides. Keep your chest up and your back flat, hips angled slightly forward. Push the band down until your arms are straight, keeping your elbows slightly in front of your shoulders. Let it come back up slowly.',
       source: 'Mike Dewar / BarBend, "The 15 Best Tricep Exercises" (Triceps Pushdown) — https://barbend.com/best-triceps-exercises/' } },
   ],
-  'walking lunge': { text: 'Step forward with one foot and lower your back knee toward the floor until both knees are bent at about 90 degrees. Push through the front foot and bring your back foot forward into the next step. Keep your torso upright.',
-    source: 'ExRx, "Walking Lunge" — https://exrx.net/Stretches/Miscellaneous/WalkingLunge' },
+  // ⛔ THE DUMBBELL VERSION, THE SOURCE'S OWN WORDS (Michael, 2026-09-18); a kit with no dumbbells keeps the bodyweight words.
+  'walking lunge': [
+    { route: ['dumbbells'], value: { text: 'Grasp a dumbbell in each hand, and hold them at your sides. Take a large step forward, and drop your back knee towards the ground. There should be roughly a 90 degree bend in your front knee. Hold this position for a moment at the bottom of the movement. Engage your quads, glutes, and hamstrings to extend your front leg and pull yourself into a standing position. Switch legs, and repeat.',
+      source: 'Fitbod, Jim Parker, CPT, "How to do a Dumbbell Walking Lunge" — https://fitbod.me/exercises/dumbbell-walking-lunge' } },
+    { route: [], value: { text: 'Step forward with one foot and lower your back knee toward the floor until both knees are bent at about 90 degrees. Push through the front foot and bring your back foot forward into the next step. Keep your torso upright.',
+      source: 'ExRx, "Walking Lunge" — https://exrx.net/Stretches/Miscellaneous/WalkingLunge' } },
+  ],
   'weighted reverse hyper': { text: 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Squeeze a light dumbbell between your feet. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
     source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' },
   'ytw raises': { text: 'Lie face down on the floor, arms straight above your head and thumbs up. Lift your arms off the floor in a Y shape, then lower them. Move them out to the sides in a T, lift and lower. Bend your elbows and pull them down into a W, lift and lower.',

@@ -797,6 +797,7 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 | FIELD — ExRx, "Dumbbell Lying Shoulder External Rotation" (https://exrx.net/WeightExercises/Infraspinatus/DBLyingExternalRotation) | External Rotation (dumbbell) | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Dumbbell Pullover" (https://exrx.net/WeightExercises/PectoralSternal/DBPullover) | DB Pullover | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Dumbbell Rear Lunge" (https://exrx.net/WeightExercises/GluteusMaximus/DBRearLunge) | Reverse Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Legion, Michael Matthews, CPT, reviewed by Dr. Brian Grant, DPT, CSCS, "Dumbbell Reverse Lunge" (https://legionathletics.com/reverse-lunge/) | Reverse Lunge, dumbbell version (approved 2026-09-18, source's words); ExRx words kept for a kit with no dumbbells | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Dumbbell Shoulder Press" (https://exrx.net/WeightExercises/DeltoidAnterior/DBShoulderPress) | Seated DB Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Dumbbell Split Squat" (https://exrx.net/WeightExercises/GluteusMaximus/DBSplitSquat) | Split Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Dumbbell Step-up" (https://exrx.net/WeightExercises/GluteusMaximus/DBStepUp) | Step Up | `strength-grid/grid.ts EXECUTION_HOW_TO` |
@@ -823,6 +824,7 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 | FIELD — ExRx, "Romanian Deadlift" (https://exrx.net/WeightExercises/OlympicLifts/RomanianDeadlift) | Romanian Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Single Leg Lateral Hop" (https://exrx.net/Plyometrics/SingleLegLateralHopBarrier) | Single-Leg Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Single Leg Split Squat" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSplitSquat) | Bulgarian Split Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Legion, Michael Matthews, CPT, reviewed by Cole Holan, M.D., "Bulgarian Split Squats" (https://legionathletics.com/bulgarian-split-squat/) | Bulgarian Split Squat, dumbbell version (approved 2026-09-18, source's words); ExRx words kept for a kit with no dumbbells | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Single Leg Squat (pistol)" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegSquat) | Single Leg Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Single Leg Stiff-leg Deadlift" (https://exrx.net/WeightExercises/GluteusMaximus/BWSingleLegStiffLegDeadlift) | Single Leg RDL | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Sled Hack Squat" (https://exrx.net/WeightExercises/GluteusMaximus/SLHackSquat) | Hack Squat | `strength-grid/grid.ts EXECUTION_HOW_TO` |
@@ -835,6 +837,7 @@ calf raise) keep their rows above ("Exercise how-to lines", "GHD back extension 
 | FIELD — ExRx, "Trap Bar Squat" (https://exrx.net/WeightExercises/Quadriceps/TBSquat) | Trap Bar Deadlift | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Vertical Jumps" (https://exrx.net/Plyometrics/VerticalJumps) | Rebound Jumps | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — ExRx, "Walking Lunge" (https://exrx.net/Stretches/Miscellaneous/WalkingLunge) | Walking Lunge | `strength-grid/grid.ts EXECUTION_HOW_TO` |
+| FIELD — Fitbod, Jim Parker, CPT, "How to do a Dumbbell Walking Lunge" (https://fitbod.me/exercises/dumbbell-walking-lunge) | Walking Lunge, dumbbell version (approved 2026-09-18, source's words); ExRx words kept for a kit with no dumbbells | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — Jake Boly, CSCS / BarBend, "How the Larsen Press Can Be a Secret Weapon For Bench Press Gains" (https://barbend.com/larsen-press/) | Larsen Press | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — Jesse Zucker, CPT / BarBend, "The 12 Best Cardiovascular Exercises" (Skater) (https://barbend.com/best-cardiovascular-exercises/) | Skater Hops | `strength-grid/grid.ts EXECUTION_HOW_TO` |
 | FIELD — John Meadows / T Nation, "Tip: Master the Meadows Row" (https://archive.t-nation.com/training/tip-master-the-meadows-row/) | Meadows Row | `strength-grid/grid.ts EXECUTION_HOW_TO` |
