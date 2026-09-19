@@ -119,3 +119,16 @@ Deno.test('⛔ THE PLYO LIST IS THE SAME LIST THE PHONE BUILT: the other drills 
     }
   }
 });
+
+Deno.test('⛔ THE WARM-UP LINE BY PAGE SCOPE: p139 every lifting day, p140 only when the first lift is SKILL (Michael, 2026-09-18)', async () => {
+  const { warmUpLineFor, WARM_UP_P139, WARM_UP_P140_SKILL } = await import('../standing-plan/warmup.ts');
+  assertEquals(WARM_UP_P139, 'A good warm-up is meant to prepare your body to do work, not be a stimulus.');
+  assertEquals(WARM_UP_P140_SKILL, 'With skill development work, every warm-up set should have equal focus and quality to the work sets. The first set of your skill work should also be the last set of your warm-up.');
+  assertEquals(warmUpLineFor([{ slot_intent: 'ME' }, { slot_intent: 'HYP' }]), WARM_UP_P139);
+  assertEquals(warmUpLineFor([{ slot_intent: 'DE' }, { slot_intent: 'SKILL' }]), WARM_UP_P139);
+  assertEquals(warmUpLineFor([{ slot_intent: 'SKILL' }, { slot_intent: 'HYP' }]), `${WARM_UP_P139} ${WARM_UP_P140_SKILL}`);
+  assertEquals(warmUpLineFor([{ slot_intent: 'HYP' }, { slot_intent: 'HYP' }]), null);
+  assertEquals(warmUpLineFor([]), null);
+  const logger = await Deno.readTextFile(new URL('../../../../src/components/StrengthLogger.tsx', import.meta.url));
+  assert(!/stimulus|skill development work/.test(logger), 'the warm-up words are back on the phone');
+});

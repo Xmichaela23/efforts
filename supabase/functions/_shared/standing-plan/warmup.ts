@@ -1,7 +1,7 @@
 // ============================================================================
 // THE WARM-UP — pp.139–140, and the warm-up SETS from StrongLifts (round 4, 2026-09-18, Michael approved).
 //
-// ⛔ THE BOOK'S SENTENCE STAYS (`WARM_UP_LINE`, p139–140), printed in the logger above the session's first
+// ⛔ THE BOOK'S SENTENCES STAY (`warmUpLineFor`, p139–140), printed in the logger above the session's first
 // ME / DE / SKILL row. p139–140 give no loads, percentages or rep counts for a warm-up.
 //
 // ⛔⛔ THE WARM-UP SETS COME FROM STRONGLIFTS' PUBLISHED WARM-UP, NOT FROM THE BOOK. The round-1 ramp (empty bar × 5,
@@ -99,14 +99,25 @@ export function warmupSetsFor(name: string, workWeightLb: number | null | undefi
 export const DEFAULT_BAR_LB = 45;
 
 /**
- * The warm-up line, one owner — the pages' own words, cut (pass 6, read off p139.jpg and p140.jpg):
- *   p139 Rule 1: "A good warm-up is meant to prepare your body to do work, not be a stimulus."
- *   p140 Rule 2a: "With skill development work, every warm-up set should have equal focus and quality to the
- *        work sets." and the pull-quote "The first set of your skill work should also be the last set of your
- *        warm-up."
+ * The warm-up line, one owner — the pages' own words, cut (pass 6, read off p139.jpg and p140.jpg), SPLIT BY EACH
+ * PAGE'S OWN SCOPE (Michael, 2026-09-18):
+ *   p139 Rule 1, every lifting day: "A good warm-up is meant to prepare your body to do work, not be a stimulus."
+ *   p140 Rule 2a, skill work only: "With skill development work, every warm-up set should have equal focus and quality
+ *        to the work sets." and the pull-quote "The first set of your skill work should also be the last set of your
+ *        warm-up." — printed only on a session whose first lift is SKILL.
  * ⚠️ p139-140 give no percentages, loads or rep counts for a warm-up ("working up in weight", "gradually heavier
  * squats until the work set"). The warm-up SETS are StrongLifts' (`warmupSetsFor`, above), not the book's.
  */
-export const WARM_UP_LINE = 'A good warm-up is meant to prepare your body to do work, not be a stimulus. '
-  + 'With skill development work, every warm-up set should have equal focus and quality to the work sets. '
-  + 'The first set of your skill work should also be the last set of your warm-up.';
+export const WARM_UP_P139 = 'A good warm-up is meant to prepare your body to do work, not be a stimulus.'; // p139
+export const WARM_UP_P140_SKILL = 'With skill development work, every warm-up set should have equal focus and quality to the work sets. ' // p140
+  + 'The first set of your skill work should also be the last set of your warm-up.'; // p140
+
+/**
+ * The session's warm-up line (materialize-plan stamps it as `computed.warm_up_line`; the logger prints it above the
+ * first ME / DE / SKILL row). Null on a session with no ME / DE / SKILL row. `rows` in session order.
+ */
+export function warmUpLineFor(rows: Array<{ slot_intent?: unknown } | null | undefined>): string | null {
+  const intentOf = (r: { slot_intent?: unknown } | null | undefined) => String(r?.slot_intent ?? '').toUpperCase();
+  if (!rows.some((r) => ['ME', 'DE', 'SKILL'].includes(intentOf(r)))) return null;
+  return intentOf(rows[0]) === 'SKILL' ? `${WARM_UP_P139} ${WARM_UP_P140_SKILL}` : WARM_UP_P139;
+}

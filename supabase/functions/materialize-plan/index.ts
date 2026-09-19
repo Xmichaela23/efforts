@@ -53,7 +53,7 @@ import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { barLbForExercise, calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 // Round 4 (2026-09-18): the warm-up sets in front of a standing-plan barbell lift — FIELD, StrongLifts (see the file).
-import { warmupSetsFor } from '../_shared/standing-plan/warmup.ts';
+import { warmUpLineFor, warmupSetsFor } from '../_shared/standing-plan/warmup.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
@@ -4735,6 +4735,10 @@ Deno.serve(async (req) => {
               Object.assign(s, loggerStampsForStep(s, standingDay));
             });
             if (strengthRows.length) update.computed.strength_lines = formatStrengthExerciseLines(strengthRows, weightUnit, (_s, i) => testLines(i));
+            // The warm-up line (p139 every lifting day; p140 too when the first lift is SKILL), on a standing-plan
+            // lifting day that is not a test day. The logger prints it as sent (2026-09-18, `warmUpLineFor`).
+            const warmUpLine = standingDay && !testDay ? warmUpLineFor(strengthRows) : null;
+            if (warmUpLine) update.computed.warm_up_line = warmUpLine; else delete update.computed.warm_up_line;
             if (authored && authored.length && strengthRows.length >= authored.length
               && !strengthRows.some((s: any) => s?.name === 'strength block')) {
               update.strength_exercises = authored.map((ex: any, i: number) => {

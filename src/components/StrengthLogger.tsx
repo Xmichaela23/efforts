@@ -25,7 +25,6 @@ type AlternativeOption = { name: string; display?: string; weight_per?: 'each'; 
 // `supersetLabel` stays: the heading joins the two names on screen, so it follows a swap (Michael, 2026-09-18).
 import { supersetLabel } from '@shared/strength/strength-display-lines';
 import { intentLine as bookIntentLine, intentMeaning, restRuleFor, RIR_NOTE, SETS_START_LOW_LINE } from '@shared/strength-grid/intents';
-import { WARM_UP_LINE } from '@shared/standing-plan/warmup';
 import {
   getExerciseConfig,
 } from '@/lib/exercise-config';
@@ -621,6 +620,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // pick something the app never showed them).
   const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
   const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
+  // The session's warm-up line as the server sent it (`computed.warm_up_line`, p139; p140 too when the first lift is SKILL).
+  const [warmUpLine, setWarmUpLine] = useState<string | null>(null);
   // The server's swap list per exercise id, fetched when its sheet opens (`swap-list`). 'loading' until it lands.
   const [swapLists, setSwapLists] = useState<Record<string, SwapGroup[] | 'loading'>>({});
   const [howToFor, setHowToFor] = useState<string | null>(null); // exercise.id whose how-to sheet is open
@@ -2091,6 +2092,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Build from computed.steps (single source of truth)
   const parseFromComputed = (computed: any): LoggedExercise[] => {
+    setWarmUpLine(typeof computed?.warm_up_line === 'string' && computed.warm_up_line ? computed.warm_up_line : null);
     try {
       const steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
       if (!steps.length) return [];
@@ -4915,16 +4917,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const cardGlow = isMainLiftCard || isMobilityMode ? [0.40, 0.05] : [0.22, 0.035];
           return (
           <React.Fragment key={exercise.id}>
-          {/* ⛔ THE WARM-UP'S ONE QUOTED SENTENCE (pp139-140, SOURCE Part C2), ONCE, above the session's first
-              ME / DE / SKILL row on a standing-plan lifting day (2026-09-18). The ramp of warm-up sets that used
-              to sit here was ours and came off; this is the page's own instruction, from `warmup.ts`. */}
-          {!isBaselineTestWorkout(scheduledWorkout || {})
-            && Array.isArray(scheduledWorkout?.tags)
-            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
+          {/* ⛔ THE WARM-UP'S QUOTED SENTENCES (pp139-140, SOURCE Part C2), ONCE, above the session's first
+              ME / DE / SKILL row. The server sends them on a standing-plan lifting day that is not a test day: p139's
+              sentence always, p140's two only when the first lift is SKILL (`warmUpLineFor`, 2026-09-18). */}
+          {warmUpLine
             && ['ME', 'DE', 'SKILL'].includes(String((exercise as any)?.slot_intent || '').toUpperCase())
             && exercises.findIndex((e) => ['ME', 'DE', 'SKILL'].includes(String((e as any)?.slot_intent || '').toUpperCase())) === exerciseIndex && (
             <p className="mx-3 mb-1.5 mt-2 text-caption font-medium text-label-secondary leading-snug">
-              {WARM_UP_LINE}
+              {warmUpLine}
             </p>
           )}
           {/* 2026-09-03 (Michael: supersets are the book's layout, p274). The first row of a pair opens the
