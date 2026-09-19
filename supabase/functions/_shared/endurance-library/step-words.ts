@@ -74,8 +74,8 @@ export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = 
   ride_sweet_spot: {
     // p238 / p239: "3-minute easy spin", "2-minute easy spin", "4-minute easy spin", "5-minute easy spin".
     minute_surge: { between: 'easy spin' },
-    medium: { between: 'easy spin' },
-    long: { between: 'easy spin' },
+    medium: { between: 'easy spin' },  // p238 — "2-minute easy spin", "4-minute easy spin"
+    long: { between: 'easy spin' },  // p238 — "5-minute easy spin"
     // p239 L3: "20 minutes @ 80% with 10 seconds @ all-out sprint every 4 minutes".
     tempo: { between: 'easy spin', allOut: 'all-out sprint' },
   },

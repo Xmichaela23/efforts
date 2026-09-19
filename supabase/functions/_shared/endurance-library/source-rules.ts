@@ -53,6 +53,7 @@ export const PERCENT_BASIS: Record<Sport, { meaning: string; stated: boolean; ci
   },
 };
 
+// not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const INFERRED_CYCLING_BASIS_NOTE =
   'Percentages here are read as percent of threshold power. The cycling pages give no basis for '
   + 'them — the running pages do, and this carries that convention across. That carry-over is ours.';
@@ -112,6 +113,7 @@ export const TEMPO_CROSSOVER_SECONDS = 15 * 60;
  */
 // Viada p107: 10 percent, or 5 percent for hybrid athletes training several times a week (see above).
 export const CARDIAC_DRIFT_TERMINATION_PCT = 5;
+// not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const CARDIAC_DRIFT_NOTE =
   'End the session when heart rate has drifted 5% at the same pace, or pace has fallen 5% at the '
   + 'same heart rate. Training several times a week puts an athlete on the 5% figure rather than 10%.';
@@ -145,35 +147,35 @@ const drill: Intensity = { kind: 'drill' };
 /** p229 — the running sprint/power box. */
 const RUN_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy },
-    { label: '3 sets of 20 meter walking lunges', seconds: null, intensity: drill },
+    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy },  // p229 — the box, as printed
+    { label: '3 sets of 20 meter walking lunges', seconds: null, intensity: drill },  // p229 — the box, as printed
     { label: '2 x 30-second rounds of butt kicks', seconds: 2 * 30, intensity: drill },
-    { label: 'Perform 3 rounds of the following: 10 seconds seated arm pump drill, 10 seconds standing arm pump drill, 10 seconds "high elbows"',
+    { label: 'Perform 3 rounds of the following: 10 seconds seated arm pump drill, 10 seconds standing arm pump drill, 10 seconds "high elbows"',  // p229 — the box, as printed
       seconds: 3 * 30, intensity: drill },
   ],
-  cooldown: [{ label: '5-minute easy jog or cross-training/bike', seconds: 5 * 60, intensity: easy }],
+  cooldown: [{ label: '5-minute easy jog or cross-training/bike', seconds: 5 * 60, intensity: easy }],  // p229 — the box, as printed
   cite: 'Viada p229',
 };
 
 /** p231 (MLSS). */
 const RUN_MLSS_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
-    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
-    { label: '2 sets of 10 per side Cossack squats', seconds: null, intensity: drill },
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },  // p231 — the box, as printed
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },  // p231 — the box, as printed
+    { label: '2 sets of 10 per side Cossack squats', seconds: null, intensity: drill },  // p231 — the box, as printed
   ],
-  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],  // p231 — the box, as printed
   cite: 'Viada p231',
 };
 
 /** p233 (near-threshold) prints the same box, with "(per side)" in brackets. */
 const RUN_NT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },
-    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },
-    { label: '2 sets of 10 (per side) Cossack squats', seconds: null, intensity: drill },
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },  // p233 — the box, as printed
+    { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },  // p233 — the box, as printed
+    { label: '2 sets of 10 (per side) Cossack squats', seconds: null, intensity: drill },  // p233 — the box, as printed
   ],
-  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],
+  cooldown: [{ label: '8-minute easy jog', seconds: 8 * 60, intensity: easy }],  // p233 — the box, as printed
   cite: 'Viada p233',
 };
 
@@ -190,8 +192,8 @@ const NO_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada p235 �
  */
 const RIDE_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy },
-    { label: '4 cadence only 15-second sprints to build up the leg speed and focus on timing and technique with 3-minute rest between',
+    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy },  // p236 — the box, as printed
+    { label: '4 cadence only 15-second sprints to build up the leg speed and focus on timing and technique with 3-minute rest between',  // p236 — the box, as printed
       seconds: 4 * 15 + 3 * 3 * 60, intensity: drill },
   ],
   cooldown: [],
@@ -203,7 +205,7 @@ const RIDE_SPRINT_WRAPPER: WrapperSpec = {
  * 12:30 is the middle of the page's range — OURS, the pick inside it (the label prints the page's range).
  */
 const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
-  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy }],
+  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy }],  // p237, p238 — the box, as printed
   cooldown: [],
   cite: 'Viada p237, p238 — "10- to 15-minute easy spin"; the midpoint of his own range',
 };
@@ -211,9 +213,9 @@ const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
 /** p238 — the VO2 box, the only cycling warm-up with an effort in it. */
 const RIDE_VO2_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy },
-    { label: '5 minutes @ 95%', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },
-    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy },
+    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy },  // p238 — the box, as printed
+    { label: '5 minutes @ 95%', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },  // p238 — the box, as printed
+    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy },  // p238 — the box, as printed
   ],
   cooldown: [],
   cite: 'Viada p238',
@@ -645,7 +647,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'run',
     label: 'Sprint / power',  // not-instruction: family name, a label for the session, not an instruction; no page names it; Michael's call
     workFloorPct: 1.3,
-    intent: 'Pure speed, technical and neuromuscular. Paces come from performance and RPE rather '
+    intent: 'Pure speed, technical and neuromuscular. Paces come from performance and RPE rather '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'than a prescribed pace; "all-out" means the best speed available that day.',
     cite: 'Viada pp229-231',
     archetypes: [
@@ -734,7 +736,7 @@ export const FAMILIES: Record<FamilyId, {
      */
     label: 'Above threshold',  // not-instruction: family name, a label for the session, not an instruction; no page names it; Michael's call
     workFloorPct: 1.0,
-    intent: 'Maximum time in zone 4 with equalised fatigue.',
+    intent: 'Maximum time in zone 4 with equalised fatigue.',  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
     cite: 'Viada pp231-232',
     archetypes: [
       {
@@ -748,9 +750,9 @@ export const FAMILIES: Record<FamilyId, {
          */
         // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
-          1: { sets: 1, rounds: 6, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)] },
-          2: { sets: 2, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },
-          3: { sets: 3, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },
+          1: { sets: 1, rounds: 6, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)] },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          2: { sets: 2, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          3: { sets: 3, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
         /**
          * ⛔ THE DISPLAY NAME IS THE FIELD'S, NOT THE BOOK'S (Michael, 2026-08-25). "Surge and
@@ -841,9 +843,9 @@ export const FAMILIES: Record<FamilyId, {
          */
         // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
-          1: { sets: 2, rounds: 3, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
-          2: { sets: 2, rounds: 4, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
-          3: { sets: 3, rounds: 4, round: [W(45, 1.25, 'Surge'), W(60, 1.15, 'Near-threshold float'), W(60, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
+          1: { sets: 2, rounds: 3, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          2: { sets: 2, rounds: 4, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          3: { sets: 3, rounds: 4, round: [W(45, 1.25, 'Surge'), W(60, 1.15, 'Near-threshold float'), W(60, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
         label: 'Long surge with a near-threshold float',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 45, hi: 45 },
@@ -856,7 +858,7 @@ export const FAMILIES: Record<FamilyId, {
          * the third step, which was missing.
          */
         float: { band: { lo: 45, hi: 45 }, intensity: pct(1.15), label: 'Near-threshold float' },
-        hold: { band: { lo: 30, hi: 30 }, intensity: pct(1.00), label: 'At threshold' },
+        hold: { band: { lo: 30, hi: 30 }, intensity: pct(1.00), label: 'At threshold' },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         recovery: { kind: 'stated', band: { lo: 90, hi: 90 }, intensity: vt1 },
         set: { repeatsPerSet: { lo: 3, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
         cite: 'Viada pp231-232 — 2-minute recovery walk/jog between sets',
@@ -893,7 +895,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'run',
     label: 'Near-threshold',
     workFloorPct: 0.85,
-    intent: 'Maximum time near threshold, whether from shorter above-threshold intervals or longer '
+    intent: 'Maximum time near threshold, whether from shorter above-threshold intervals or longer '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'below-threshold ones, while controlling fatigue.',
     cite: 'Viada pp233-234',
     archetypes: [
@@ -1150,7 +1152,7 @@ export const FAMILIES: Record<FamilyId, {
      */
     label: 'Easy',
     workFloorPct: 0,
-    intent: 'Any run at or below VT1. The level refers almost strictly to the duration.',
+    intent: 'Any run at or below VT1. The level refers almost strictly to the duration.',  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
     cite: 'Viada p235',
     archetypes: [
       {
@@ -1175,7 +1177,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'run',
     label: 'Long slow distance',
     workFloorPct: 0,
-    intent: 'Maximise training time; may combine zones but is primarily below VT1. Unlike VT1 '
+    intent: 'Maximise training time; may combine zones but is primarily below VT1. Unlike VT1 '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'sessions it may include rest periods or pauses with little negative impact.',
     cite: 'Viada p235',
     archetypes: [
@@ -1418,9 +1420,9 @@ export const FAMILIES: Record<FamilyId, {
          */
         // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
-          1: { sets: 1, rounds: 5, round: [W(30, 1.20, 'Surge'), W(150, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
-          2: { sets: 1, rounds: 6, round: [W(30, 1.20, 'Surge'), W(240, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
-          3: { sets: 2, rounds: 4, round: [W(30, 1.20, 'Surge'), W(330, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240, betweenSetsSeconds: 300 },
+          1: { sets: 1, rounds: 5, round: [W(30, 1.20, 'Surge'), W(150, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          2: { sets: 1, rounds: 6, round: [W(30, 1.20, 'Surge'), W(240, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          3: { sets: 2, rounds: 4, round: [W(30, 1.20, 'Surge'), W(330, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240, betweenSetsSeconds: 300 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
         label: 'Surge, sustain, surge',
         repBand: { lo: 30, hi: 30 },
@@ -1492,7 +1494,7 @@ export const FAMILIES: Record<FamilyId, {
     label: 'Sweet spot',
     workFloorPct: 0.80,
     underThreshold: true,
-    intent: 'As close to threshold as possible without exceeding it — plenty of time in the zone '
+    intent: 'As close to threshold as possible without exceeding it — plenty of time in the zone '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'with far less fatigue than riding at or above it.',
     cite: 'Viada pp238-239',
     archetypes: [
@@ -1508,9 +1510,9 @@ export const FAMILIES: Record<FamilyId, {
          */
         // not-instruction: step labels (names for a step, not instructions); planned-step-lines prints a label only when page_label is set; no page names them; Michael's call
         printedIntervalsByLevel: {
-          1: { sets: 3, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
-          2: { sets: 4, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
-          3: { sets: 4, rounds: 8, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
+          1: { sets: 3, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          2: { sets: 4, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
+          3: { sets: 4, rounds: 8, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },  // not-instruction: step label (a name for the step); no page names it; Michael's call
         },
         label: 'Sweet-spot blocks with a surge on the minute',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 360, hi: 480 },
@@ -1586,7 +1588,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'ride',
     label: 'Endurance',
     workFloorPct: 0,
-    intent: 'Straight endurance, or endurance carrying some speed/threshold work. Each level is '
+    intent: 'Straight endurance, or endurance carrying some speed/threshold work. Each level is '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'meant to be roughly comparable in overall fatigue; the more intense versions are for '
       + 'sparing use unless an event is coming.',
     cite: 'Viada p239',
@@ -1603,7 +1605,7 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'mixed',
         shape: 'continuous_with_inserts',
-        label: 'Endurance ride with tempo blocks and sprints',
+        label: 'Endurance ride with tempo blocks and sprints',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 120, hi: 120 },
         work: pct(0.80),
         float: { band: { lo: 180, hi: 180 }, intensity: pct(0.70), label: 'Steady' },
@@ -1823,11 +1825,13 @@ export const SESSION_ADD_ONS: Record<SessionAddOnId, SessionAddOn> = {
   },
 };
 
+// not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const STRIDES_DOSE_IS_OURS =
   'Six efforts of thirty seconds is ours. The source prescribes strides by name and gives no dose '
   + 'for them; twenty to thirty seconds is the field standard. The placement, the all-out intensity '
   + 'and the untimed full recovery are his.';
 
+// not-instruction: never prints — pushed only into the library session's notes (generate.ts), which nothing outside generate.ts reads (traced: translateEnduranceSession, enduranceLedgerFor, session-swap library-session/workout-choice)
 export const STRIDES_NOTE =
   'A handful of strides at the end of an easy run trains running economy without a separate speed '
   + 'session. Run them fast and relaxed, at the best speed available that day — there is no pace '

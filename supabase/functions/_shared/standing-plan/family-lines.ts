@@ -69,7 +69,7 @@ export const RIDE_ANAEROBIC_PROGRESSIVE_LINE = 'Each set should start at 110% an
  * ride's "below 75%" does not print over it: the page gives this ride no such sentence.
  */
 export function rideWithWorkLine(sprintEveryMinutes: number): string {
-  return `10-second all-out sprint every ${sprintEveryMinutes} minutes.`;
+  return `10-second all-out sprint every ${sprintEveryMinutes} minutes.`;  // p239 — "10-second all-out sprint every 9 minutes"
 }
 
 /**

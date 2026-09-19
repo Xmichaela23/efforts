@@ -54,20 +54,20 @@ export const RUN_TEST_TRIAL_MIN = 12; // Viada p210: "Record distance traveled a
 export function runTestSteps(): ProtocolStep[] {
   return [
     // p210 step 1: "An easy 6- to 8-minute jog to warm up." 7:00 sits inside the page's 6 to 8 (OURS pick in the range).
-    { kind: 'warmup', seconds: 420, label: 'An easy 6- to 8-minute jog to warm up' },
+    { kind: 'warmup', seconds: 420, label: 'An easy 6- to 8-minute jog to warm up' },  // p210
     // p210 step 2: "2 × 100-meter strides (begin slow and accelerate to near full tilt)." The page times none; each
     // stride is a lap-button step on the watch, back to back — the page prints no rest between them.
-    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },
-    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },
+    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },  // p210
+    { kind: 'work', seconds: 0, label: '100-meter stride (begin slow and accelerate to near full tilt)' },  // p210
     // p210 step 3: "3 rounds of 30 seconds at a "fast run" (mile PR) pace followed by 1 minute easy walk/jog."
-    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },
-    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },
-    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },
-    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },
-    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },
-    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },
+    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },  // p210
+    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },  // p210
+    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },  // p210
+    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },  // p210
+    { kind: 'work', seconds: 30, label: '"fast run" (mile PR) pace' },  // p210
+    { kind: 'recovery', seconds: 60, label: 'easy walk/jog' },  // p210
     // p210 step 4: "1 minute additional rest."
-    { kind: 'recovery', seconds: 60, label: 'additional rest' },
+    { kind: 'recovery', seconds: 60, label: 'additional rest' },  // p210
     // p210 step 5: "Begin time trial: 9.5/10 intensity to begin, ending at 10/10 intensity".
     { kind: 'work', seconds: RUN_TEST_TRIAL_MIN * 60, label: 'time trial: 9.5/10 intensity to begin, ending at 10/10 intensity' },
   ];
@@ -77,7 +77,7 @@ export function runTestSteps(): ProtocolStep[] {
 export function ftpTestSteps(): ProtocolStep[] {
   return [
     // p212 step 1: "5- to 10-minute easy warm-up." 8:00 sits inside the page's 5 to 10 (OURS pick in the range).
-    { kind: 'warmup', seconds: 480, label: '5- to 10-minute easy warm-up' },
+    { kind: 'warmup', seconds: 480, label: '5- to 10-minute easy warm-up' },  // p212
     // p212 step 2: "3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest
     // between each." Between each: two rests for three efforts.
     { kind: 'work', seconds: 60, label: 'low resistance/high turnover' },
@@ -86,15 +86,15 @@ export function ftpTestSteps(): ProtocolStep[] {
     { kind: 'recovery', seconds: 60, label: 'rest' },
     { kind: 'work', seconds: 60, label: 'low resistance/high turnover' },
     // p212 step 3: "3-minute easy recovery."
-    { kind: 'recovery', seconds: 180, label: 'easy recovery' },
+    { kind: 'recovery', seconds: 180, label: 'easy recovery' },  // p212
     // p212 step 4: "3 minutes at high intensity. Push yourself at a 9/10 effort."
-    { kind: 'work', seconds: 180, label: 'high intensity. Push yourself at a 9/10 effort' },
+    { kind: 'work', seconds: 180, label: 'high intensity. Push yourself at a 9/10 effort' },  // p212
     // p212 step 5: "6 to 8 minutes at a low pace to recover." 7:00 sits inside the page's 6 to 8 (OURS pick in the range).
-    { kind: 'recovery', seconds: 420, label: '6 to 8 minutes at a low pace to recover' },
+    { kind: 'recovery', seconds: 420, label: '6 to 8 minutes at a low pace to recover' },  // p212
     // p212 step 6: "Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort!"
-    { kind: 'work', seconds: 1200, label: 'hit the lap button and do 20 minutes at your best effort!' },
+    { kind: 'work', seconds: 1200, label: 'hit the lap button and do 20 minutes at your best effort!' },  // p212
     // p212 step 7: "5 to 10 minutes of easy recovery." 5:00 is the low end of the page's range (OURS pick in the range).
-    { kind: 'cooldown', seconds: 300, label: '5 to 10 minutes of easy recovery' },
+    { kind: 'cooldown', seconds: 300, label: '5 to 10 minutes of easy recovery' },  // p212
   ];
 }
 
@@ -125,7 +125,7 @@ export function runThresholdTestRow(date: string): BaselineTestRow {
 export function ftpTestRow(date: string): BaselineTestRow {
   return {
     // ⛔ NO "48 HOURS PRIOR" and no page citation — see the run test above.
-    name: 'FTP Test — 20-Minute Protocol',
+    name: 'FTP Test — 20-Minute Protocol',  // not-instruction: session name, not an instruction; p212 heads the test "The 20-Minute Test"; Michael's call
     type: 'ride',
     date,
     // ⛔ p212's own words, in its order (2026-09-18). "indoor trainer recommended; a power meter or smart trainer" and
