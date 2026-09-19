@@ -89,3 +89,53 @@ Deno.test('an easy ride step is 0 up to 75% of FTP on every row, with or without
     assertEquals(w.power_range, { lower: 0, upper: 150 });
   }
 });
+
+// ── Pass 2: the OFF lines, in the page's words ──────────────────────────────────────────────────
+
+import { buildEnduranceSession } from './endurance-library/index.ts';
+import { translateEnduranceSession } from './standing-plan/session-vocabulary.ts';
+import { familyLineFor, RACE_TEMPO_LINE } from './standing-plan/family-lines.ts';
+
+const ANCHORS: any = {
+  run: { sport: 'run', value: 480, unit: 'sec_per_mi', source: 't', isEstimate: false, vt1SecPerMi: 600, easyRangeSecPerMi: { lo: 547, hi: 619 } },
+  ride: { sport: 'ride', value: 250, unit: 'watts', source: 't', isEstimate: false },
+  swim: { sport: 'swim', value: 120, unit: 'sec_per_100m', source: 't', isEstimate: false },
+};
+const BASE: any = { ftp: 250, _resolvedThresholdSecPerMi: 480, _resolvedEasySecPerMi: 583, _resolvedEasyRange: { lo: 547, hi: 619 }, _anchors: { ftp_w: 250 } };
+const built = (family: string, level: 1 | 2 | 3, archetype: string, opts?: { raceTempo?: boolean }) => {
+  const t = translateEnduranceSession(buildEnduranceSession({ family, level, archetype, size: 0.5, anchors: ANCHORS } as any) as any, opts);
+  const row = { ...t, id: 'x', date: '2026-09-21' };
+  const v3 = expandTokensForRow(row, BASE).steps.map((s: any, i: number) => toV3Step({ ...s, planned_index: i }, row));
+  const fam = (t.tags as string[]).find((x) => x.startsWith('family:'))!.slice(7);
+  return { row, v3, lines: plannedStepLines(v3, { sport: t.type, family: fam }) };
+};
+
+Deno.test('each family line is the page\'s own words (p231, p233, p235, p237, p238, p239)', () => {
+  assertEquals(familyLineFor('run_mlss'), 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
+  assertEquals(familyLineFor('run_near_threshold'), 'Workouts that maximize time near-threshold while controlling fatigue.');
+  assertEquals(familyLineFor('ride_sweet_spot'), 'As close as possible to threshold without exceeding it.');
+  assertEquals(familyLineFor('ride_endurance', 'steady'), 'Easy ride below 75%.');
+  assert(familyLineFor('ride_anaerobic', 'progressive_repeats')!.endsWith('Each set should start at 110% and progress up to 125–130% by the end.'));
+  // The flat anaerobic rides do not carry the progressive option's sentence.
+  assert(!familyLineFor('ride_anaerobic', 'one_to_one')!.includes('Each set'));
+  assertEquals(RACE_TEMPO_LINE, 'Increase the pace here to race pace, but extend recovery periods by 25 percent.');
+});
+
+Deno.test('a rest the page names prints the page\'s word and no pace: MLSS "recovery walk/jog between sets" (p232)', () => {
+  const { lines } = built('run_mlss', 2, 'surge_float');
+  assert(lines.some((l) => l.includes('2:00 recovery walk/jog between sets')), lines.join(' | '));
+});
+
+Deno.test('the ride sprint prints p236\'s "max effort" and its recovery word, and sends them to Intervals.icu', () => {
+  const { row, v3, lines } = built('ride_sprints', 1, 'max_effort');
+  assert(lines.some((l) => /max effort/.test(l) && /recovery between/.test(l)), lines.join(' | '));
+  const ev = serializeRide({ ...row, computed: { steps: v3, anchors: { ftp_w: 250 } } } as any);
+  assert(ev.description.includes('- max effort 2m freeride'), ev.description);
+});
+
+Deno.test('the level 1 swim is p241\'s: 200 m, three 50s, two 600s, in the page\'s words', () => {
+  const { v3 } = built('swim_endurance', 1, 'long_repeats');
+  const work = v3.filter((s: any) => s.kind !== 'recovery');
+  assertEquals(work.map((s: any) => s.distanceMeters), [200, 50, 50, 50, 600, 600]);
+  assertEquals(work[work.length - 1].label, 'easy-to-moderate intensity (race pace)');
+});

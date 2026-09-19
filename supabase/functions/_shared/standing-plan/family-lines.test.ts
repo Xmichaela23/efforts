@@ -11,8 +11,8 @@ import { buildEnduranceSession } from '../endurance-library/generate.ts';
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { familyLineFor, sprintEveryMinutesFromTokens } from './family-lines.ts';
 
-const line = (n: number) =>
-  `Easy ride with a block of 2-minute pushes, then a 10-second sprint every ${n} minutes. Everything else under 75 percent of FTP.`;
+// p239: "45 minutes @ VT1 with 10-second all-out sprint every 9 minutes" — cut to the sprint (2026-09-18).
+const line = (n: number) => `10-second all-out sprint every ${n} minutes.`;
 
 for (const [level, every] of [[1, 9], [2, 8], [3, 9]] as const) {
   Deno.test(`level ${level} ride with work: the line says every ${every} minutes, in the drawer and on the row`, () => {
@@ -26,7 +26,7 @@ for (const [level, every] of [[1, 9], [2, 8], [3, 9]] as const) {
 Deno.test('the plain endurance ride keeps its one line', () => {
   assertEquals(
     familyLineFor('ride_endurance', 'steady'),
-    'Easy ride, under 75 percent of FTP the whole way.',
+    'Easy ride below 75%.',
   );
 });
 

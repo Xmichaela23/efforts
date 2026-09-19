@@ -18,37 +18,52 @@
  * stamps for the near-threshold run is `run_near_threshold` (`endurance-library/classification.ts`),
  * so both are keyed to the one approved line rather than one of them silently printing nothing.
  *
- * ⚠️ EVERY LINE HERE IS APPROVED COPY. Changing one changes it on Today AND in the drawer; it goes
- * through Michael first.
+ * ⚠️ EVERY LINE HERE IS THE PAGE'S WORDS (2026-09-18). Changing one changes it on Today AND in the drawer, and a
+ * change is a new quote off the page, never a rewording.
+ */
+/**
+ * ⛔⛔ EVERY LINE IS THE PAGE'S OWN WORDS (2026-09-18, book-language pass 2 — Michael's rule: "no paraphrasing; quote
+ * the book's words; if a line must be shorter, cut the book's words down, never reword them"). Read off the page
+ * photographs (book-sources/viada-hybrid-athlete/p231.jpg … p239.jpg). Where a line is shorter than the page, words
+ * were dropped and the order kept; the full sentence is quoted beside it.
  */
 export const FAMILY_LINE: Readonly<Record<string, string>> = {
-  // p237.
-  ride_anaerobic: 'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
-  // p239, p211. REVISED 2026-09-10 (approved): lead with what the ride is. The plain version; the
-  // with-work version is `rideWithWorkLine`, chosen by archetype in `familyLineFor`.
-  // REVISED 2026-09-14 (approved): the talk test sentence came off — p239 prescribes rides in power only.
-  ride_endurance: 'Easy ride, under 75 percent of FTP the whole way.',
-  // p233 ("Maximise time near threshold … while controlling fatigue") — the hard run, both family ids.
-  // REVISED 2026-09-14 (approved): the idiom "without falling apart" is gone.
-  run_mlss: 'Spend as much time near threshold as you can while controlling fatigue.',
-  run_near_threshold: 'Spend as much time near threshold as you can while controlling fatigue.',
-  // p235, p211 — the long run.
-  // REVISED 2026-09-14 (approved): "long sentences" was not the book's words; the talk test is asked after the run.
-  run_lsd: 'Easy the whole way. Stopping for a bit is fine.',
-  // p235, p211. ⛔ NEVER THE WORD VT1 ON SCREEN.
-  run_vt1: 'Easy. Talk test twice, at 5 minutes and at 20.',
-  // p238.
-  ride_sweet_spot: 'As close to threshold as you can without going over.',
+  // p237: "With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor
+  // rather than a specific power target, so use the following numbers as guidelines." (whole sentence)
+  ride_anaerobic: 'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
+  // p239: "60- to 100-minute easy ride below 75%" — the length is the row's own, so it is cut.
+  ride_endurance: 'Easy ride below 75%.',
+  // p231: "Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized
+  // fatigue." It printed p233's near-threshold sentence until 2026-09-18 (audit item 14).
+  run_mlss: 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.',
+  // p233: "Workouts that maximize time near-threshold (NT)—whether shorter above-threshold intervals or longer
+  // below-threshold intervals. These are designed to maximize total time spent at this intensity while controlling
+  // fatigue." — cut to its first and last words.
+  run_near_threshold: 'Workouts that maximize time near-threshold while controlling fatigue.',
+  // p235: "Any workout that is intended to maximize training time may be a combination of zones, though primarily below
+  // VT1. … Unlike VT1 workouts, these sessions can include rest periods or pauses in the hike/jog sessions with little
+  // negative impact." Cut around the word VT1, which never prints on screen (Today's standing rule, pinned in
+  // `today-lines.test.ts`). "Easy the whole way" came off: the long run with inserted sets is not easy the whole way.
+  run_lsd: 'Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.',
+  // p235, whole sentence.
+  run_vt1: 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.',
+  // p238: "These workouts are intended to push you as close as possible to threshold without exceeding it" — cut.
+  ride_sweet_spot: 'As close as possible to threshold without exceeding it.',
 };
 
 /**
- * ⛔ THE ENDURANCE RIDE HAS TWO APPROVED LINES, ONE PER p239 VERSION (Michael, 2026-09-10). The
- * `mixed` archetype is the ride with work in it; every other ride_endurance session is the plain one.
- * ⛔ THE SPRINT INTERVAL COMES FROM THE BUILT SESSION, never a fixed word (2026-09-10): p239 prints a
- * sprint every 9 minutes at levels 1 and 3 and every 8 at level 2.
+ * p237, printed under each progressive option: "Each set should start at 110% and progress up to 125–130% by the
+ * end." It belongs to that option only (`progressive_repeats`); the one-to-one and sandwich rides are flat.
+ */
+export const RIDE_ANAEROBIC_PROGRESSIVE_LINE = 'Each set should start at 110% and progress up to 125–130% by the end.';
+
+/**
+ * ⛔ THE ENDURANCE RIDE WITH WORK (p239): "45 minutes @ VT1 with 10-second all-out sprint every 9 minutes" — cut to the
+ * sprint. ⛔ THE INTERVAL COMES FROM THE BUILT SESSION (p239 prints 9 at levels 1 and 3, 8 at level 2). The plain
+ * ride's "below 75%" does not print over it: the page gives this ride no such sentence.
  */
 export function rideWithWorkLine(sprintEveryMinutes: number): string {
-  return `Easy ride with a block of 2-minute pushes, then a 10-second sprint every ${sprintEveryMinutes} minutes. Everything else under 75 percent of FTP.`;
+  return `10-second all-out sprint every ${sprintEveryMinutes} minutes.`;
 }
 
 /**
@@ -65,24 +80,31 @@ export function sprintEveryMinutesFromTokens(tokens: unknown): number | null {
 }
 
 /**
- * ⛔ THE PEDALLING NOTE LIVES IN THE DRAWER, UNDER THE LINE — not on Today (2026-09-10). p239: several
- * minutes of every long ride on pedal stroke and position.
+ * ⛔ THE PEDALLING NOTE LIVES IN THE DRAWER, UNDER THE LINE — not on Today (2026-09-10). p239, whole sentence. "(smooth
+ * circles, not stomping)" was on no page and came off 2026-09-18.
  */
 export const RIDE_ENDURANCE_DRAWER_NOTE =
-  'Spend a few minutes of the ride paying attention to how you pedal (smooth circles, not stomping) and how you sit on the bike.';
+  'You won\'t regret spending several minutes on every long ride practicing pedal stroke and working on position.';
 
 /**
- * ⛔ THE MLSS HILLS NOTE, IN THE DRAWER AFTER THE LINE (p231). Moved here 2026-09-18 (book-language pass 1) so the
- * run's sentences have one owner; it was written inline in `session-vocabulary.ts`.
+ * ⛔ THE MLSS HILLS NOTE, IN THE DRAWER AFTER THE LINE. p231: "Note that athletes may perform any of these work
+ * intervals on hills and adjust pace accordingly to maintain target intensity." — "Note that" cut.
  */
-export const RUN_MLSS_DRAWER_NOTE = 'Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.';
+export const RUN_MLSS_DRAWER_NOTE = 'Athletes may perform any of these work intervals on hills and adjust pace accordingly to maintain target intensity.';
 
 /**
- * ⛔ THE ERG NOTE ON THE ANAEROBIC RIDE, IN THE DRAWER AFTER THE LINE (approved by Michael, 2026-09-18). p237: *"best
- * done by feel with a power FLOOR rather than a specific power target"* — ERG holds a target, so it comes off.
+ * ⛔ THE ERG NOTE ON THE ANAEROBIC RIDE, IN THE DRAWER AFTER THE LINE (approved by Michael, 2026-09-18). ⚠️ NOT A PAGE
+ * LINE, KEPT AS A LINE THAT OPERATES THE ATHLETE'S DEVICE: p237 asks for a power floor rather than a target, and ERG
+ * holds a target. It says how to set Zwift, not how to ride.
  * The session note goes to the Planned tab, the Garmin workout description and the Intervals.icu description.
  */
 export const RIDE_ANAEROBIC_DRAWER_NOTE = 'On Zwift, turn ERG off.';
+
+/**
+ * p247: "If within six weeks of a race, increase the pace here to race pace, but extend recovery periods by 25
+ * percent." — the race-tempo row's sentence; the condition is cut because the row exists only for that case.
+ */
+export const RACE_TEMPO_LINE = 'Increase the pace here to race pace, but extend recovery periods by 25 percent.';
 
 /**
  * The approved line for a family (and, for the endurance ride, its archetype), or null.
@@ -98,5 +120,7 @@ export function familyLineFor(
   if (family === 'ride_endurance' && archetype === 'mixed') {
     return sprintEveryMinutes != null && sprintEveryMinutes > 0 ? rideWithWorkLine(sprintEveryMinutes) : null;
   }
-  return FAMILY_LINE[family] ?? null;
+  const line = FAMILY_LINE[family] ?? null;
+  if (line && family === 'ride_anaerobic' && archetype === 'progressive_repeats') return `${line} ${RIDE_ANAEROBIC_PROGRESSIVE_LINE}`;
+  return line;
 }

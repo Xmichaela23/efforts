@@ -25,6 +25,11 @@ import { WEEKDAYS, weekdayForFrameDay, type Weekday } from './day-map.ts';
 import { isHardSlot, isLongSlot } from './sport-slots.ts';
 import type { PlanSession } from './compose.ts';
 
+/** Viada p86 (SOURCE, quoted): the day-after cost of a lifting day, by its work sets. */
+const P86_SET_COST = 'A highly taxing, 14+ work set session may diminish performance in other modalities significantly for '
+  + 'twenty-four hours and still notably for up to seventy-two hours. A less taxing 6 to 8 work set session may result in '
+  + 'only marginal performance deficits for twenty-four hours, with few issues noted forty-eight hours after the session.';
+
 /**
  * ⛔ WHICH BREAK IT IS. Three come from `COST` and one from the frame — and the fourth is not a
  * clearance at all, which is why it needs its own id rather than being folded into the others.
@@ -460,8 +465,9 @@ export function weekConflicts(args: {
         shortBy: u.shortBy,
         text: apart === 'same'
           ? enduranceAfterLifting(sDay, bareFor(subject))
-          // Viada p130 / p131: keystone sessions need the relevant systems fresh.
-          : `${bDay} heavy legs, ${sDay} long run. The run is on legs that have not recovered.`,
+          // ⛔ p86's own words (2026-09-18, book-language pass 2): the cost depends on the lifting day's work sets, which
+          // "The run is on legs that have not recovered" stated for every heavy day.
+          : `${bDay} heavy legs, ${sDay} long run. ${P86_SET_COST}`,
       });
       continue;
     }

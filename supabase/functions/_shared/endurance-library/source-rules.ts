@@ -1787,3 +1787,40 @@ export function ridePowerRuleOf(family: string | null | undefined): RidePowerRul
   if (f.underThreshold) return 'under_threshold';
   return null;
 }
+
+
+/**
+ * ⛔⛔ THE ENDURANCE SWIM AS p241 PRINTS IT, LEVEL BY LEVEL (2026-09-18, book-language pass 2, audit item 32).
+ *
+ * The shape builder made level 1 a 300 m opener and ONE 600 m repeat; the page prints 200 m, three 50s and TWO 600s.
+ * The Standing Plan's swim is this family at level 1 (`sport-slots.ts`), so the row now carries the page's own
+ * session, token for token, with the page's words for each piece (`words`, read off p241.jpg). The token list is the
+ * whole session: `session-vocabulary.ts` sends it as it stands, with no wrapper of its own.
+ * ⚠️ Where the page offers two options ("3 x 600m or 2 x 1000m") the first is built.
+ */
+export const SWIM_ENDURANCE_PRINTED: Record<Level, { token: string; words: string }[]> = {
+  // p241 L1: "200m as 25m easy, 25m drill choice · 3 x 50m @ 25m easy, 25m sprint with 10-second rest · 2 x 600m @
+  // easy-to-moderate intensity (race pace) with 2-minute rest"
+  1: [
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_3x50m_r10', words: '25m easy, 25m sprint' },
+    { token: 'swim_aerobic_2x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+  // p241 L2: "100m kick · 200m as 25m easy, 25m drill choice · 4 x 50m @ 25m easy, 25m sprint with 10-second rest ·
+  // 3 x 600m or 2 x 1000m @ easy-to-moderate intensity (race pace) with 2-minute rest"
+  2: [
+    { token: 'swim_kick_1x100m', words: 'kick' },
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_4x50m_r10', words: '25m easy, 25m sprint' },
+    { token: 'swim_aerobic_3x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+  // p241 L3: "100m kick · 100m DPS or glide drill · 200m as 25m easy, 25m drill choice · 8 x 25m sprint with 5-second
+  // rest · 3 x 1200m or 2 x 1600m @ easy-to-moderate intensity (race pace) with 3-minute rest"
+  3: [
+    { token: 'swim_kick_1x100m', words: 'kick' },
+    { token: 'swim_drill_dps_1x100m', words: 'DPS or glide drill' },
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
+    { token: 'swim_aerobic_8x25m_r5', words: 'sprint' },
+    { token: 'swim_aerobic_3x1200m_r180', words: 'easy-to-moderate intensity (race pace)' },
+  ],
+};

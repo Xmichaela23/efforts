@@ -43,6 +43,8 @@ import {
 // ⛔ THE RIDE TYPE'S OWN RULE — p237 floor, pp238–239 never over threshold (`ridePowerRuleOf`). The tag on the row
 // names the family; the library states the rule, so the materializer does not carry a second list.
 import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
+import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
+import { SWIM_ENDURANCE_PRINTED } from '../_shared/endurance-library/source-rules.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -2256,7 +2258,8 @@ function expandBikeToken(
   // Recovery zone tokens: bike_recovery_5min — p239's "easy spin" between blocks, printed with no number: no target.
   if (/bike_recovery_\d+min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 300;
-    out.push({ id: uid(), kind:'recovery', duration_s: sec, label: 'Recovery' });
+    // p239's "5-minute easy spin between sets" — the word is the page's (`step-words.ts`, 2026-09-18); "Recovery" was ours.
+    out.push({ id: uid(), kind:'recovery', duration_s: sec, place: 'between' });
     return out;
   }
   // FTP Test: bike_ftp_test_20min - maximal sustainable effort (no upper cap!)
@@ -2342,7 +2345,8 @@ function expandBikeToken(
     const n = every > sprint ? Math.floor(total / every) : 0;
     for (let k = 0; k < n; k += 1) {
       out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: easyRange() });
-      out.push({ id: uid(), kind: 'work', duration_s: sprint, label: 'Sprint' });
+      // p239: "10-second all-out sprint" — the word is the page's (`step-words.ts`, 2026-09-18).
+      out.push({ id: uid(), kind: 'work', duration_s: sprint, place: 'all_out' });
     }
     const tail = total - n * every;
     if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: easyRange() });
@@ -3386,10 +3390,36 @@ export function expandTokensForRow(
     const hit = tags.map((t) => String(t ?? '').toLowerCase()).find((t) => t.startsWith('family:'));
     return hit ? hit.slice('family:'.length) : null;
   })();
+  /**
+   * ⛔ THE PAGE'S WORD FOR A STEP THE TOKEN CANNOT NAME (2026-09-18, book-language pass 2). The quality expanders mark
+   * where a step sits (`place`: the rest between sets, an untargeted recovery in the round, an all-out effort, a
+   * race-pace finish); the word is the page's, per session type and shape (`endurance-library/step-words.ts`). A step
+   * the table has no word for keeps none.
+   */
+  const rowTagValue = (prefix: string): string | null => {
+    const raw = (row as any)?.tags;
+    const tags: unknown[] = Array.isArray(raw) ? raw : [];
+    const hit = tags.map((t) => String(t ?? '').toLowerCase()).find((t) => t.startsWith(`${prefix}:`));
+    return hit ? hit.slice(prefix.length + 1) : null;
+  };
+  const rowArchetype = rowTagValue('archetype');
+  const rowLevel = Number(rowTagValue('level')) || null;
+  const PLACE_WORD: Record<string, 'between' | 'inRound' | 'allOut' | 'racePace'> = {
+    between: 'between', in_round: 'inRound', all_out: 'allOut', race_pace: 'racePace',
+  };
+  const withPageWords = (steps: any[]): any[] => steps.map((st) => {
+    if (!st || typeof st !== 'object' || !st.place) return st;
+    const { place, ...rest } = st;
+    const word = stepWordFor(rowFamily, rowArchetype, rowLevel, PLACE_WORD[String(place)] ?? 'between');
+    return word ? { ...rest, label: word, page_label: true } : rest;
+  });
+  // Where each token's steps start, so the printed swim's page words can be put on its steps after the loop.
+  const tokenStarts: { tok: string; start: number }[] = [];
   for (const tok of tokens) {
+    tokenStarts.push({ tok: String(tok), start: steps.length });
     let added: any[] = [];
-    if (discipline==='run' || discipline==='walk') added = stampRunPrescription(tok, expandRunToken(tok, baselines), baselines);
-    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines, rowFamily);
+    if (discipline==='run' || discipline==='walk') added = withPageWords(stampRunPrescription(tok, expandRunToken(tok, baselines), baselines));
+    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = withPageWords(expandBikeToken(tok, baselines, rowFamily));
     else if (discipline==='swim') {
       // Detailed swim expansion — one line per rep
       const s = String(tok).toLowerCase();
@@ -3585,6 +3615,23 @@ export function expandTokensForRow(
       continue;
     }
     steps.push(...added);
+  }
+  /**
+   * ⛔ THE ENDURANCE SWIM'S PAGE WORDS (2026-09-18, book-language pass 2, audit item 32). p241's session is carried
+   * token for token (`SWIM_ENDURANCE_PRINTED`); each token's work steps take the page's words for that piece, in place
+   * of the tier word ("easy") that stood for "easy-to-moderate intensity (race pace)".
+   */
+  if (discipline === 'swim' && rowFamily === 'swim_endurance' && rowLevel != null) {
+    const printed = SWIM_ENDURANCE_PRINTED[rowLevel as 1 | 2 | 3] ?? [];
+    tokenStarts.forEach(({ tok, start }, i) => {
+      const hit = printed.find((p) => p.token === tok.toLowerCase());
+      if (!hit) return;
+      const end = i + 1 < tokenStarts.length ? tokenStarts[i + 1].start : steps.length;
+      for (let k = start; k < end; k += 1) {
+        const st = steps[k];
+        if (st && st.kind !== 'recovery') { st.label = hit.words; st.page_label = true; }
+      }
+    });
   }
   // Fallback: if no tokens yielded steps, try to expand from workout_structure when present
   try {

@@ -16,9 +16,9 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE } from './family-lines.ts';
+import { familyLineFor, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_MLSS_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
-import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
+import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED } from '../endurance-library/index.ts';
 
 /** The `type` field on a plan row. Unchanged vocabulary. */
 export type SessionType = 'run' | 'ride' | 'swim' | 'strength';
@@ -463,6 +463,7 @@ export function translateEnduranceSession(
     ...(session.archetype ? [`archetype:${session.archetype}`] : []),
   ];
   let work: string[];
+  let swimPrinted = false;
 
   switch (session.family) {
     case 'run_vt1':
@@ -737,6 +738,10 @@ export function translateEnduranceSession(
      * metres are stage 1's own; nothing here invents one.
      */
     case 'swim_endurance': {
+      // ⛔ p241'S OWN SESSION (2026-09-18, book-language pass 2, audit item 32) — see `SWIM_ENDURANCE_PRINTED`. The
+      // token list is the whole session, opener included, so the wrapper is not added.
+      const printedSwim = SWIM_ENDURANCE_PRINTED[session.level];
+      if (printedSwim) { work = printedSwim.map((p) => p.token); swimPrinted = true; break; }
       const { reps } = repShape(session);
       const metres = session.blocks
         .flatMap((b) => b.steps)
@@ -784,7 +789,7 @@ export function translateEnduranceSession(
     duration: totalMin,
     // ⛔ THE ADD-ON SITS BETWEEN THE SESSION AND THE COOLDOWN — p109 puts the strides after the run,
     // and the watch plays these in order.
-    steps_preset: [...pre, ...work, ...addOnTokens(session), ...post],
+    steps_preset: swimPrinted ? work : [...pre, ...work, ...addOnTokens(session), ...post],
     tags: raceTempo ? [...tags, 'race_tempo'] : tags,
   };
 }
@@ -832,9 +837,8 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   // ⛔ "Go by heart rate. Pace varies with fatigue, hydration and weather." CAME OFF (2026-09-18, book-language
   // pass 1, audit item 13). p235 tells the athlete to use the talk test, which the VT1 line already says; the drawer
   // printed both instructions for the same run.
-  if (raceTempo) {
-    parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
-  }
+  // p247's own words (2026-09-18, book-language pass 2); the steps follow them since the same pass.
+  if (raceTempo) parts.push(RACE_TEMPO_LINE);
   return parts.join(' ');
 }
 
@@ -875,6 +879,9 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^swim_warmup_\d+m$/, example: 'swim_warmup_300m' },
   { shape: /^swim_cooldown_\d+m$/, example: 'swim_cooldown_200m' },
   { shape: /^swim_aerobic_\d+x\d+m_r\d+$/, example: 'swim_aerobic_6x200m_r20' },
+  // ⛔ p241's printed swim at levels 2 and 3 (2026-09-18): the kick length and the DPS / glide drill.
+  { shape: /^swim_kick_\d+x\d+m$/, example: 'swim_kick_1x100m' },
+  { shape: /^swim_drill_[a-z]+_\d+x\d+m$/, example: 'swim_drill_dps_1x100m' },
 ];
 
 /**
@@ -897,6 +904,8 @@ export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
 export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
   /swim_(warmup|cooldown)_(\d+)(yd|m)/,
   /^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/,
+  /swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/,
+  /swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/,
 ];
 
 /**

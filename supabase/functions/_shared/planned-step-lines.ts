@@ -154,7 +154,10 @@ function targetText(s: PlannedStep, opts: StepLineOptions): string {
   // hard run or ride prints the page's pace or power"). It printed " easy" ahead of the watts; " easy" is left for a
   // recovery that carries no target at all (the last line below).
   if (pow) return ` @ ${pow}`;
-  return isRecovery(s) ? ' easy' : '';
+  // ⛔ NO WORD OF OURS ON A REST (2026-09-18, book-language pass 2). An untargeted recovery printed " easy" — the page
+  // says "recovery walk/jog", "rest", "spin" or "easy spin" by shape, and a step that carries the page's word prints it
+  // (`page_label`, from `endurance-library/step-words.ts`). One without a word prints its length and the structure.
+  return '';
 }
 
 function wrapperLine(s: PlannedStep, word: string, opts: StepLineOptions): string {
@@ -186,8 +189,10 @@ const stepText = (s: PlannedStep, opts: StepLineOptions) => {
   const words = pageWords(s);
   // An untimed page step is its words alone (the lap button ends it).
   if (words && untimed(s)) return words;
-  const base = `${lengthText(s, opts)}${words && isRecovery(s) && !paceText(s, opts) && !hrText(s) && !powerText(s) ? '' : targetText(s, opts)}`;
-  return words ? `${base} · ${words}` : base;
+  // The page's word follows the length, as the page sets it: "2:00 recovery walk/jog", "30 s max effort". ⛔ A rest the
+  // page names in words carries no pace or watts on the line — the page gives it none; the words are the prescription.
+  const base = `${lengthText(s, opts)}${words && isRecovery(s) ? '' : targetText(s, opts)}`;
+  return words ? `${base} ${words}` : base;
 };
 const sigOf = (s: PlannedStep, opts: StepLineOptions) => `${isRecovery(s) ? 'r' : 'w'}|${stepText(s, opts)}`;
 

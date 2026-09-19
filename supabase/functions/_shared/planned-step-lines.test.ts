@@ -38,7 +38,7 @@ Deno.test('a ride: watts, the floor-only "and up", a spin prints its watts, and 
   // 2026-09-16: a recovery inside a hard ride prints the power it carries, not "easy".
   assertEquals(plannedStepLines([work, spin, work, spin, work, spin], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 @ 80–110 W between']);
   const bare: PlannedStep = { kind: 'recovery', seconds: 270 };
-  assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 easy between']);
+  assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 between']);
 });
 
 Deno.test('a step that repeats nothing prints on its own line', () => {

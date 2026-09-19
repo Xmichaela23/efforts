@@ -132,22 +132,21 @@ Deno.test('⛔ ONLY ADJACENT ROWS PAIR — a mark with something between is two 
 
 // ── the endurance session ───────────────────────────────────────────────────────────────────────
 
-Deno.test('each named family gets its line, and only that line', () => {
+Deno.test('each named family gets its line, and only that line — the page\'s own words (2026-09-18)', () => {
   assertEquals(enduranceLinesFor(ride('ride_anaerobic', 'above')), [
-    'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
+    'With the aim of building anaerobic repeatability, these sessions are best done by feel with a power floor rather than a specific power target, so use the following numbers as guidelines.',
   ]);
-  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'As close to threshold as you can without going over.');
-  assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'Easy. Talk test twice, at 5 minutes and at 20.');
+  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'As close as possible to threshold without exceeding it.');
+  assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'You\'re encouraged to practice your "talk test" at least twice per run if you\'re unsure—once after 5 minutes of running and the other after 20 minutes.');
   assertEquals(
     enduranceLinesFor(run('run_lsd', 'vt1_or_easier'))[0],
-    'Easy the whole way. Stopping for a bit is fine.',
+    'Any workout that is intended to maximize training time may be a combination of zones. These sessions can include rest periods or pauses in the hike/jog sessions with little negative impact.',
   );
 });
 
-Deno.test('⛔ THE HARD RUN IS BOTH FAMILY IDS — the composer stamps `run_near_threshold`', () => {
-  const line = 'Spend as much time near threshold as you can while controlling fatigue.';
-  assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], line);
-  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], line);
+Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p233 for near-threshold (2026-09-18)', () => {
+  assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'Workouts that emphasize time spent in zone 4. The objective is accruing maximum time with equalized fatigue.');
+  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Workouts that maximize time near-threshold while controlling fatigue.');
 });
 
 Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {
@@ -171,7 +170,7 @@ Deno.test('⛔ NO STOP RULE ON ANY ENDURANCE SESSION', () => {
     ...enduranceLinesFor(run('run_vt1', 'vt1_or_easier')),
   ].join(' ');
   /* ⚠️ PIN THE SENTENCE, NOT A FRAGMENT OF IT. `/5 percent/` also matches the easy ride's
-     "under 75 percent", and `/stop\./` the long run's "Stopping for a bit is fine." */
+     "below 75%". */
   assert(!everyLine.includes('Heart rate up 5 percent'), everyLine);
   assert(!everyLine.includes('output down 5 percent'), everyLine);
 });
@@ -203,8 +202,8 @@ const withWork = (level: number, every: number | null) => ({
 });
 
 Deno.test('the ride with work reads its sprint interval off the row: 9, 8, 9', () => {
-  const line = (n: number) =>
-    `Easy ride with a block of 2-minute pushes, then a 10-second sprint every ${n} minutes. Everything else under 75 percent of FTP.`;
+  // p239: "45 minutes @ VT1 with 10-second all-out sprint every 9 minutes" — cut to the sprint (2026-09-18).
+  const line = (n: number) => `10-second all-out sprint every ${n} minutes.`;
   assertEquals(enduranceLinesFor(withWork(1, 9)), [line(9)]);
   assertEquals(enduranceLinesFor(withWork(2, 8)), [line(8)]);
   assertEquals(enduranceLinesFor(withWork(3, 9)), [line(9)]);

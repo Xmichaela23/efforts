@@ -19,7 +19,11 @@ const ride = (band: string) => ({ type: 'ride', training_plan_id: PLAN, tags: ['
 const run = (band: string) => ({ type: 'run', training_plan_id: PLAN, tags: ['standing_plan', 'sport:run', `band:${band}`] });
 const swim = () => ({ type: 'swim', training_plan_id: PLAN, tags: ['sport:swim'] });
 
-const LEAD = 'Two sessions today. Keep them six to eight hours apart.';
+// ⛔ p143's own words (2026-09-18, book-language pass 2).
+const LEAD = 'Allow at least 6 to 8 hours with one full meal before the resistance training session.';
+const SHORT = 'If the morning session is a VT1 session lasting less than an hour, 4 to 6 hours may be sufficient, as long as you consume calories and monitor hydration after this session.';
+const EASY = 'Performing low-intensity conditioning after these muscles have already been worked can potentially result in greater benefits at a given volume.';
+const SKILL = 'The skill movements are focused on the first session because you may be "fresher," but this is not a hard-and-fast rule.';
 
 Deno.test('one session, two endurance sessions, or a session not from the plan: nothing', () => {
   assertEquals(spacingLineFor([lift([{ slot_intent: 'ME' }])]), null);
@@ -29,25 +33,25 @@ Deno.test('one session, two endurance sessions, or a session not from the plan: 
 
 Deno.test('lower day with skill or speed sets, easy session: both halves', () => {
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('vt1_or_easier')]),
-    { lead: LEAD, closer: 'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.' });
+    { lead: LEAD, closer: `${EASY} ${SKILL}` });
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), run('vt1_or_easier')])?.closer,
-    'Lift first and keep the run easy. Running first costs the lift its skill and speed sets.');
+    `${EASY} ${SKILL}`);
 });
 
 Deno.test('lower day with skill or speed sets, hard session: the order and its cost', () => {
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('above')])?.closer,
-    'Lift first. Riding first costs the lift its skill and speed sets.');
+    SKILL);
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), run('near')])?.closer,
-    'Lift first. Running first costs the lift its skill and speed sets.');
+    SKILL);
   // no band counts as not easy
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'SKILL' }]), { type: 'ride', training_plan_id: PLAN, tags: ['sport:ride'] }])?.closer,
-    'Lift first. Riding first costs the lift its skill and speed sets.');
+    SKILL);
 });
 
 Deno.test('lower day with heavy or hypertrophy sets only: the easy half, or nothing', () => {
-  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), ride('vt1_or_easier')])?.closer, 'Lift first and keep the ride easy.');
+  assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), ride('vt1_or_easier')])?.closer, EASY);
   assertEquals(spacingLineFor([lowerLift([{ slot_intent: 'ME' }], 'me'), run('above')]), { lead: LEAD });
-  assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('vt1_or_easier')])?.closer, 'Lift first and keep the ride easy.');
+  assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('vt1_or_easier')])?.closer, EASY);
   assertEquals(spacingLineFor([lift([{ slot_intent: 'HYP' }]), ride('above')]), { lead: LEAD });
 });
 
@@ -58,7 +62,7 @@ Deno.test('⛔ THE FRAME\'S UPPER DAY: the lead only, whatever the session', () 
 
 Deno.test('a day with no frame tag (test week, plyometrics) counts as working the legs', () => {
   assertEquals(spacingLineFor([lift([{ slot_intent: 'SKILL' }]), ride('vt1_or_easier')])?.closer,
-    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.');
+    `${EASY} ${SKILL}`);
 });
 
 Deno.test('a swim day: the lead only', () => {
@@ -68,10 +72,19 @@ Deno.test('a swim day: the lead only', () => {
 Deno.test('⛔ UPPER OR LOWER IS NEVER READ OFF THE NAME', () => {
   const namedUpper = { ...lowerLift([{ slot_intent: 'SKILL' }], 'me'), name: 'Upper body: Push' };
   assertEquals(spacingLineFor([namedUpper, ride('vt1_or_easier')])?.closer,
-    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.');
+    `${EASY} ${SKILL}`);
 });
 
 Deno.test('⛔ NO HEADING WITHOUT A PAGE: "If they have to be closer" is gone', () => {
   const out = spacingLineFor([lowerLift([{ slot_intent: 'DE' }]), ride('above')]);
   assertEquals(Object.keys(out ?? {}).sort(), ['closer', 'lead']);
+});
+
+Deno.test('⛔ p143: a VT1 session under an hour adds the page\'s 4-to-6-hour sentence; an hour or more does not', () => {
+  const shortRun = { ...run('vt1_or_easier'), duration: 30 };
+  const longRun = { ...run('vt1_or_easier'), duration: 60 };
+  assertEquals(spacingLineFor([upperLift([{ slot_intent: 'ME' }]), shortRun]), { lead: `${LEAD} ${SHORT}` });
+  assertEquals(spacingLineFor([upperLift([{ slot_intent: 'ME' }]), longRun]), { lead: LEAD });
+  // a hard session under an hour is not a VT1 session
+  assertEquals(spacingLineFor([upperLift([{ slot_intent: 'ME' }]), { ...run('above'), duration: 40 }]), { lead: LEAD });
 });

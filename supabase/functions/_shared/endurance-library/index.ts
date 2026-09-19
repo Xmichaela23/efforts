@@ -14,3 +14,4 @@ export * from './source-rules.ts';
 export * from './anchors.ts';
 export * from './generate.ts';
 export * from './classification.ts';
+export * from './step-words.ts';

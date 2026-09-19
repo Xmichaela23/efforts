@@ -169,6 +169,10 @@ function everyQualityToken(): Array<{ token: string; sport: 'run' | 'ride'; rule
   return out;
 }
 
+// ⚠️ `place` (2026-09-18, book-language pass 2) marks where a step sits so the materializer can put the page's word on
+// it; it is not part of the step the branches built, so the comparison leaves it out.
+const noPlace = (steps: unknown[]) => JSON.parse(JSON.stringify(steps, (k, v) => (k === 'place' ? undefined : v)));
+
 Deno.test('every quality token the four hard families emit expands exactly as the branches did', () => {
   const tokens = everyQualityToken();
   // The sweep is worthless if the families stopped emitting these shapes.
@@ -177,15 +181,15 @@ Deno.test('every quality token the four hard families emit expands exactly as th
     const work = parseQualityWork(token)!;
     if (sport === 'run') {
       const now = qualityRunSteps(work, { thresholdSecPerMi: THRESHOLD, easySecPerMi: EASY });
-      assertEquals(JSON.parse(JSON.stringify(now)), JSON.parse(JSON.stringify(refRun(token, THRESHOLD, EASY))), `${where} ${token}`);
+      assertEquals(noPlace(now), JSON.parse(JSON.stringify(refRun(token, THRESHOLD, EASY))), `${where} ${token}`);
       // And with nothing to price it with — the state the branches' `|| undefined` produced.
       const bare = qualityRunSteps(work, { thresholdSecPerMi: null, easySecPerMi: null });
-      assertEquals(JSON.parse(JSON.stringify(bare)), JSON.parse(JSON.stringify(refRun(token, undefined, undefined))), `${where} ${token} (no paces)`);
+      assertEquals(noPlace(bare), JSON.parse(JSON.stringify(refRun(token, undefined, undefined))), `${where} ${token} (no paces)`);
     } else {
       const now = qualityRideSteps(work, FTP, rule);
-      assertEquals(JSON.parse(JSON.stringify(now)), JSON.parse(JSON.stringify(refRide(token, FTP, rule))), `${where} ${token}`);
+      assertEquals(noPlace(now), JSON.parse(JSON.stringify(refRide(token, FTP, rule))), `${where} ${token}`);
       const bare = qualityRideSteps(work, null, rule);
-      assertEquals(JSON.parse(JSON.stringify(bare)), JSON.parse(JSON.stringify(refRide(token, undefined, rule))), `${where} ${token} (no ftp)`);
+      assertEquals(noPlace(bare), JSON.parse(JSON.stringify(refRide(token, undefined, rule))), `${where} ${token} (no ftp)`);
     }
   }
 });
@@ -196,12 +200,12 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
   // p231 MLSS, the surge and float: sets of rounds, the float at VT1, the rest between sets.
   assertEquals(
     qualityWorkLine(parseQualityWork('round_3x_15s130-45s105-r60svt1-15s130-45s105-r60svt1-15s130-45s105-r60svt1-15s130-45s105_R120s'), 'run', run),
-    '3 sets of 4 rounds: 15 s at 5:46/mi, 45 s at 7:09/mi, 1 min easy; 2 min easy between',
+    '3 sets of 4 rounds: 15 s at 5:46/mi, 45 s at 7:09/mi, 1 min easy; 2 min between',
   );
   // p234 near-threshold: one percentage, an easy float between.
   assertEquals(
     qualityWorkLine(parseQualityWork('interval_8x240s_90pct_R75s'), 'run', run),
-    '8 × 4 min at 8:20/mi, 1:15 easy between',
+    '8 × 4 min at 8:20/mi, 1:15 between',
   );
   /**
    * ⛔ p237 anaerobic: the sandwich, in watts. EVERY work step is a floor with no ceiling (2026-09-18) —
@@ -210,7 +214,7 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
   const anaerobic = { ...ride, rule: ridePowerRuleOf('ride_anaerobic') };
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', anaerobic),
-    '8 rounds: 30 s at 252 W and up, 2:30 at 189 W and up; 4 min easy between',
+    '8 rounds: 30 s at 252 W and up, 2:30 at 189 W and up; 4 min between',
   );
   /**
    * ⛔ pp238–239 sweet spot: never over threshold. 95% of 210 is 180–210 W (−10%, capped at FTP); the 105% surge on
@@ -219,52 +223,53 @@ Deno.test('the line is the work, in the page\'s structure, priced for this athle
   const sweet = { ...ride, rule: ridePowerRuleOf('ride_sweet_spot') };
   assertEquals(
     qualityWorkLine(parseQualityWork('round_6x_240s95_R120s'), 'ride', sweet),
-    '6 rounds: 4 min at 180–210 W, 2 min easy between',
+    '6 rounds: 4 min at 180–210 W, 2 min between',
   );
   assertEquals(
     qualityWorkLine(parseQualityWork('round_3x_10s105-50s90_R180s'), 'ride', sweet),
-    '3 rounds: 10 s at 198–243 W, 50 s at 170–208 W; 3 min easy between',
+    '3 rounds: 10 s at 198–243 W, 50 s at 170–208 W; 3 min between',
   );
   // And the same shape with no family floor: both steps are single percentages and both get the band.
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', ride),
-    '8 rounds: 30 s at 227–277 W, 2:30 at 170–208 W; 4 min easy between',
+    '8 rounds: 30 s at 227–277 W, 2:30 at 170–208 W; 4 min between',
   );
   // p238 sweet spot: the band is the token's own, and it prints as a range.
   assertEquals(
     qualityWorkLine(parseQualityWork('bike_ss_4x8min_R4min'), 'ride', ride),
-    '4 × 8 min at 179–200 W, 4 min easy between',
+    '4 × 8 min at 179–200 W, 4 min between',
   );
   assertEquals(
     qualityWorkLine(parseQualityWork('bike_thr_8x3min_R2min'), 'ride', ride),
-    '8 × 3 min at 200–221 W, 2 min easy between',
+    '8 × 3 min at 200–221 W, 2 min between',
   );
 });
 
 Deno.test('no pace and no FTP prints the page\'s percentages, never a derived number', () => {
   assertEquals(
     qualityWorkLine(parseQualityWork('interval_8x240s_90pct_R75s'), 'run', {}),
-    '8 × 4 min at 90%, 1:15 easy between',
+    '8 × 4 min at 90%, 1:15 between',
   );
   assertEquals(
     qualityWorkLine(parseQualityWork('bike_ss_4x8min_R4min'), 'ride', {}),
-    '4 × 8 min at 85–95%, 4 min easy between',
+    '4 × 8 min at 85–95%, 4 min between',
   );
   assertEquals(
     qualityWorkLine(parseQualityWork('round_8x_30s120-150s90_R240s'), 'ride', {}),
-    '8 rounds: 30 s at 120%, 2:30 at 90%; 4 min easy between',
+    '8 rounds: 30 s at 120%, 2:30 at 90%; 4 min between',
   );
 });
 
 Deno.test('a metric athlete reads the same work per kilometre', () => {
   assertEquals(
     qualityWorkLine(parseQualityWork('interval_8x240s_90pct_R75s'), 'run', { thresholdSecPerMi: THRESHOLD, units: 'metric' }),
-    '8 × 4 min at 5:11/km, 1:15 easy between',
+    '8 × 4 min at 5:11/km, 1:15 between',
   );
 });
 
 Deno.test('the line says nothing beyond the page\'s structure, the numbers and the units', () => {
-  const ALLOWED = /^[0-9\s:×–%,;./]*(?:(?:rounds|sets|of|at|easy|between|min|s|W|mi|km)[0-9\s:×–%,;./]*)*$/;
+  // ⛔ "spin" joined 2026-09-18 (book-language pass 2): a ride's untargeted recovery reads the page's "easy spin".
+  const ALLOWED = /^[0-9\s:×–%,;./]*(?:(?:rounds|sets|of|at|easy|spin|between|min|s|W|mi|km)[0-9\s:×–%,;./]*)*$/;
   for (const { token, sport } of everyQualityToken()) {
     const line = qualityWorkLine(parseQualityWork(token), sport, { thresholdSecPerMi: THRESHOLD, ftp: FTP, units: 'imperial' });
     assertEquals(ALLOWED.test(line), true, `unexpected word in: ${line}`);
