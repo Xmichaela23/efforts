@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Info } from 'lucide-react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
@@ -117,49 +117,33 @@ export function deckCardsFor(session: TodayRow, useImperial: boolean): DeckCard[
     .filter((c) => c.name);
 }
 
-// ── the day's spacing line ──────────────────────────────────────────────────────────────────────
+// ── the day's (i) note ──────────────────────────────────────────────────────────────────────────
 
 /**
- * The day's spacing, above the sessions. The words are `get-week`'s (`spacing_lines`, 2026-09-18). ⛔ IT CARRIES NO SPORT COLOUR (§2b): it belongs to the day,
- * not to either session. Renders nothing unless the day is a lift and a ride or run.
- *
- * ⚠️ IT MOVED HERE FROM `TodaySessionLines`, which was deleted (2026-09-09). That component drew the
- * per-session lines BEFORE the deck existed and became unreachable when every planned session
- * started rendering as a deck or a card; the spacing line was the one piece of it still on screen.
+ * The day's (i), above the sessions (2026-09-19). The cards already show the order, so nothing prints until the
+ * athlete taps it; then it shows `get-week`'s note (`spacing_lines`): what to do if the order is switched or the
+ * break cannot be left. ⛔ NO SPORT COLOUR (§2b): it belongs to the day, not to either session. Renders nothing on a
+ * day with no note.
  */
 export const TodaySpacingLine: React.FC<{ spacing: SpacingLine | null }> = ({ spacing }) => {
-  // ⛔ CLOSED BY DEFAULT (§2.1, 2026-09-10).
+  // ⛔ CLOSED BY DEFAULT (§2.1).
   const [open, setOpen] = React.useState(false);
-  if (!spacing) return null;
+  if (!spacing?.note) return null;
   return (
     <div
-      className="text-footnote font-normal leading-snug"
-      /* 12 px to the first card (Michael, 2026-09-09). */
-      style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 12px' }}
+      className="text-footnote font-normal leading-snug flex items-start justify-end gap-2"
+      style={{ color: 'var(--label-secondary)', padding: '0 0.35rem 8px' }}
     >
-      {/* ⛔ THE CLOSER OPENS FROM A CHEVRON ON THE LEAD LINE (2026-09-18). Its heading (the words over the closer)
-          came off: no page prints it. Closed by default (§2.1); no chevron where there is nothing under it (a swim day). */}
-      <div className="flex items-start justify-between gap-2">
-        <span>{spacing.lead}</span>
-        {spacing.closer ? (
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-label={spacing.closer}
-            className="shrink-0 bg-transparent border-none p-0 cursor-pointer"
-          >
-            <ChevronDown
-              className="h-4 w-4 text-label-secondary"
-              aria-hidden="true"
-              style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
-            />
-          </button>
-        ) : null}
-      </div>
-      {spacing.closer && open ? (
-        <div style={{ marginTop: 2, color: 'var(--label-secondary)' }}>{spacing.closer}</div>
-      ) : null}
+      {open ? <span className="flex-1">{spacing.note}</span> : null}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="If the order changes"
+        className="shrink-0 bg-transparent border-none p-0 cursor-pointer text-white/40 hover:text-white/70 transition-colors"
+      >
+        <Info className="h-4 w-4" aria-hidden="true" />
+      </button>
     </div>
   );
 };

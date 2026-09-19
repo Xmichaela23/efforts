@@ -1,11 +1,10 @@
 /**
  * The day's listing order, decided on the server (audit H-T16, 2026-09-10). Rule 1 is the book's since 2026-09-19:
- * the lift goes first exactly where Today prints the order sentence (`liftGoesFirst`, Viada p143 rules 5 and 6).
+ * the lift goes first on every leg day (`liftGoesFirst`, Viada p143 rules 5 and 6, p77); the upper day is left to the tie-break.
  *   deno test --no-lock --allow-all supabase/functions/_shared/day-order.test.ts
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { dayOrderFor, orderDay, type DayOrderRow } from './day-order.ts';
-import { spacingLineFor } from './standing-plan/spacing-line.ts';
 
 const id = (r: DayOrderRow) => r;
 const PLAN = 'plan-1';
@@ -23,36 +22,25 @@ const hardRide = session('ride', 'Anaerobic Ride', 'above');
 const easyRide = session('ride', 'Ride', 'vt1_or_easier');
 const swim = { type: 'swim', name: 'Swim', training_plan_id: PLAN, tags: ['sport:swim'] };
 
-/** The lift is listed first exactly when Today's line is not the 6-to-8-hours sentence (2026-09-19). */
-const sentenceSaysLiftFirst = (rows: DayOrderRow[]) => {
-  const lead = spacingLineFor(rows as never)?.lead;
-  return lead != null && !lead.includes('6 to 8 hours');
-};
-
-Deno.test('a leg day with speed sets goes before a hard ride, whichever way the rows arrive, and the sentence prints', () => {
+Deno.test('a leg day with speed sets goes before a hard ride, whichever way the rows arrive', () => {
   assertEquals(orderDay([hardRide, lowerME], id).map((w) => w.type), ['strength', 'ride']);
   assertEquals(orderDay([lowerME, hardRide], id).map((w) => w.type), ['strength', 'ride']);
-  assertEquals(sentenceSaysLiftFirst([hardRide, lowerME]), true);
 });
 
 Deno.test('a leg day goes before an easy ride (p143 rule 5), even with no speed or skill sets', () => {
   assertEquals(orderDay([easyRide, lowerHyp], id).map((w) => w.type), ['strength', 'ride']);
-  assertEquals(sentenceSaysLiftFirst([easyRide, lowerHyp]), true);
 });
 
-Deno.test('the upper day (heavy bench) beside a hard run: the page is silent, no sentence, the run is listed first', () => {
+Deno.test('the upper day (heavy bench) beside a hard run: the page gives no order, the run is listed first', () => {
   assertEquals(orderDay([upperME, hardRun], id).map((w) => w.type), ['run', 'strength']);
-  assertEquals(sentenceSaysLiftFirst([upperME, hardRun]), false);
 });
 
-Deno.test('the upper day beside an easy ride: silent, the ride is listed first', () => {
+Deno.test('the upper day beside an easy ride: no order from the page, the ride is listed first', () => {
   assertEquals(orderDay([upperME, easyRide], id).map((w) => w.type), ['ride', 'strength']);
-  assertEquals(sentenceSaysLiftFirst([upperME, easyRide]), false);
 });
 
-Deno.test('a leg day with no speed or skill sets beside a hard ride: silent, the ride is listed first', () => {
-  assertEquals(orderDay([lowerHyp, hardRide], id).map((w) => w.type), ['ride', 'strength']);
-  assertEquals(sentenceSaysLiftFirst([lowerHyp, hardRide]), false);
+Deno.test('a leg day with no speed or skill sets beside a hard ride: the lift is listed first (2026-09-19)', () => {
+  assertEquals(orderDay([lowerHyp, hardRide], id).map((w) => w.type), ['strength', 'ride']);
 });
 
 Deno.test('a swim beside a leg day: the page gives no order, discipline order puts the swim first', () => {

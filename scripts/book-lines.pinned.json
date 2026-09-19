@@ -195,9 +195,7 @@
    "Easy session",
    "Easy session {n}"
   ],
-  "supabase/functions/_shared/standing-plan/spacing-line.ts": [
-   "If the morning session is a VT1 session under an hour, 4 to 6 hours may be enough, provided you eat and track hydration after it."
-  ],
+  "supabase/functions/_shared/standing-plan/spacing-line.ts": [],
   "supabase/functions/_shared/standing-plan/sport-slots.ts": [
    "A kept swim is easy laps and technique. The hard swim sessions in the source — the all-out speed",
    "sets and the open-water sighting work — are never prescribed by this plan.",

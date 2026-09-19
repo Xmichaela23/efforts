@@ -2099,9 +2099,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
           // day's own lines beneath it — work order 2026-09-09 §2.
           <div>
-            {/* ⛔ THE SPACING LINE, ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). It shows
-                only on a day that is a lift and a ride or run; every other day gets nothing. The words are
-                get-week's `spacing_lines` (2026-09-18), composed from the day's sessions. */}
+            {/* ⛔ THE DAY'S (i), ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). Only on a day that is a lift
+                and a ride or run; the note is get-week's `spacing_lines` (2026-09-19). */}
             <TodaySpacingLine spacing={spacingLines?.[activeDate] ?? null} />
             {/* ⛔ 14 px BETWEEN SESSIONS (Michael, 2026-09-09). Each deck and card already
                 carries its own 14 px bottom margin, so the list adds none — two gaps stacked is
