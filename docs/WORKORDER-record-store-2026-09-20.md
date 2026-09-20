@@ -228,18 +228,22 @@ them changing, if a read ever gets slow.
    screen must not place them so they read as a contradiction, and it must not silently show one.
    The same gap will appear at every distance he has raced.
 
-2. ⚠️ **Equal efforts on one day both rank, by design.** The 400 m podium currently reads
-   `1:42 (2025-09-01)` twice. The rule that used to collapse those was removed when job zero was
-   withdrawn, because with no duplicates in the data it could only hide a real second effort. **That
-   pair is not yet explained** — two entries means two workout ROWS, so it is either a genuine double
-   day or one run stored twice in his own account. The scratchpad script now prints both workout ids
-   and compares name, distance and duration, and scans the whole history for rows sharing date, type,
-   name and distance. Settle it before stage 3 prints the podium.
+2. **Equal efforts on one day both rank, by design — and the one case in the data is CLOSED.**
+   The 400 m podium reads `1:42 (2025-09-01)` twice. The rule that used to collapse such a pair was
+   removed when job zero was withdrawn, because with no duplicates in the data it could only hide a
+   real second effort.
 
-   ⚠️ If it IS one run stored twice, the structural finding below is the cause and the fix belongs at
-   the write, not in the ranker: the unique index is partial (`WHERE garmin_activity_id IS NOT NULL`)
-   and `save-imported-workout:159`, `mark-planned-complete:69-83` and `ingest-phone-workout:238`
-   insert with no de-duplication check.
+   ⛔ **SETTLED 2026-09-20 — do not re-open it, and do not raise it with Michael.** It is one run
+   stored twice in his own data from a year ago. Both rows carry the same Garmin activity
+   `20250876827-detail`: the older one was written by an in-app Garmin import (`source: 'manual'`,
+   `garmin_activity_id` null, `description: "Imported from Garmin - RUNNING"`), the newer one by the
+   webhook three days later. It is the only manual run or ride in the account. **Nothing is deleted.**
+   The screen needs no change — two equal efforts both rank, which is already pinned by a fixture.
+
+   ⚠️ It is a year-old artefact of his own history, not a live defect and not a user-facing problem.
+   Michael, 2026-09-20: *"are we frame fucking my history or building a feature for users?"* The
+   structural finding below stands as a lead for whoever touches ingest next; it is not this screen's
+   work and it is not worth another minute here.
 
 ### Deploy
 
