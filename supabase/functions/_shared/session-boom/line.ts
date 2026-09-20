@@ -278,9 +278,10 @@ function enduranceLine(input: BoomInput, isRide: boolean): SessionBoomV1 | null 
     if (mine) {
       const ordered = [...POWER_CURVE_DURATIONS].sort((a, b) => b.seconds - a.seconds);
       for (const { label, seconds } of ordered) {
-        // ⚠️ ONLY THE FOUR THE LINE NAMES. The curve stores twelve durations; the approved line lists
-        // 20 min, 5 min, 1 min and 5 s, and printing "best 12-minute power" would be a line he has
-        // not written.
+        // ⚠️ ONLY THE FOUR THE LINE NAMES. The curve stores sixteen durations (widened 2026-09-19 for
+        // the record screen); the approved line lists 20 min, 5 min, 1 min and 5 s, and printing
+        // "best 15-minute power" would be a line he has not written. This filter is what keeps the
+        // two apart — widening the stored curve never widens the line.
         // OURS — 20 min / 5 min / 1 min / 5 s power durations (ledger row: the line of good news on a done session)
         if (![1200, 300, 60, 5].includes(seconds)) continue;
         const w = Number(mine[label]);

@@ -1,14 +1,25 @@
 /**
  * Backfill Power Curves
- * 
- * One-time function to recalculate power curves and best efforts
- * for existing workouts that have sensor_data but no power_curve yet.
- * 
+ *
+ * Recomputes the per-workout analysis for rows whose `computed` is missing a field the current
+ * analyser writes. It does not compute anything itself — it re-invokes `compute-workout-analysis`,
+ * which is the one place an effort is measured.
+ *
+ * ⛔ WIDENED 2026-09-19 (WORKORDER-record-efforts stage 1). It used to ask one question per sport:
+ * does the ride have a `power_curve`, does the run have `best_efforts`. Both were true on every row
+ * the moment the first backfill finished, so the new record fields would never have been reached and
+ * a second backfill would have been written beside this one. It now asks whether the row is missing
+ * ANY field this version writes, and a row that already has them all is skipped.
+ *
+ * Newest first, resumable through `offset` — the response hands back the next one.
+ *
  * Usage: POST /backfill-power-curves
- * Body: { "days_back": 60, "dry_run": false }
+ * Body: { "days_back": 60, "dry_run": false, "limit": 10, "offset": 0 }
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+// The stamp `compute-workout-analysis` writes. One constant, so the two can never disagree.
+import { ANALYSIS_VERSION } from '../_shared/analysis-version.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,9 +73,9 @@ Deno.serve(async (req) => {
     const startDateStr = startDate.toISOString().split('T')[0];
 
     // Find workouts needing backfill
-    // - Has sensor_data (so we can calculate power curve)
+    // - Has sensor_data (so there are samples to measure)
     // - Is a bike or run
-    // - Doesn't already have power_curve or best_efforts
+    // - Is missing at least one field the current analyser writes
     const { data: workouts, error: queryError, count } = await supabase
       .from('workouts')
       .select('id, name, date, type, computed', { count: 'exact' })
@@ -79,16 +90,27 @@ Deno.serve(async (req) => {
       throw new Error(`Query failed: ${queryError.message}`);
     }
 
-    // Filter to those without power_curve/best_efforts
+    /**
+     * The fields the current analyser writes, per sport. A row missing any one of them is recomputed.
+     *
+     * ⚠️ A LONG RIDE WITH NO POWER METER HAS NO `power_curve`, AND THAT IS THE RIGHT ANSWER — so the
+     * absence of a field cannot mean "not computed yet" on its own. `computed.analysis.version` is
+     * what says which analyser last ran: a row stamped with the current version has been measured by
+     * this code and is skipped whatever it holds. A row below it, or with no stamp, is recomputed once.
+     */
+    const RIDE_FIELDS = ['power_curve', 'ride_records'];
+    const RUN_FIELDS = ['best_efforts', 'pace_curve', 'hr_curve', 'run_best_distances', 'run_records'];
+
     const needsBackfill = (workouts || []).filter(w => {
       const computed = w.computed || {};
       const type = (w.type || '').toLowerCase();
-      
+      if (computed?.analysis?.version === ANALYSIS_VERSION) return false;
+
       if (type === 'ride' || type === 'cycling' || type === 'bike') {
-        return !computed.power_curve;
+        return RIDE_FIELDS.some(f => computed[f] == null);
       }
       if (type === 'run' || type === 'running') {
-        return !computed.best_efforts;
+        return RUN_FIELDS.some(f => computed[f] == null);
       }
       return false;
     });

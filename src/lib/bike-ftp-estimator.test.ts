@@ -10,6 +10,7 @@ import {
   fitCriticalPower,
   compoundFtp,
   POWER_CURVE_DURATIONS,
+  CP_FIT_DURATIONS,
   type SignalBResult,
 } from './bike-ftp-estimator.ts';
 
@@ -17,10 +18,26 @@ import {
 const CP = 250, WP = 20000;
 const pAt = (s: number) => CP + WP / s;
 
-Deno.test('POWER_CURVE_DURATIONS — the twelve stored labels, 20min and 60min unchanged', () => {
-  assertEquals(POWER_CURVE_DURATIONS.map((d) => d.label), ['5s', '1min', '2min', '3min', '5min', '8min', '10min', '12min', '20min', '30min', '45min', '60min']);
+Deno.test('POWER_CURVE_DURATIONS — the sixteen stored labels, 20min and 60min unchanged', () => {
+  assertEquals(POWER_CURVE_DURATIONS.map((d) => d.label), ['5s', '15s', '30s', '1min', '2min', '3min', '5min', '8min', '10min', '12min', '15min', '20min', '30min', '45min', '60min', '120min']);
   assertEquals(POWER_CURVE_DURATIONS.find((d) => d.label === '20min')!.seconds, 1200);
 });
+
+Deno.test('CP_FIT_DURATIONS — still the twelve the fit was validated on', () => {
+  assertEquals(CP_FIT_DURATIONS.map((d) => d.label), ['5s', '1min', '2min', '3min', '5min', '8min', '10min', '12min', '20min', '30min', '45min', '60min']);
+});
+
+/**
+ * ⛔ THE GUARD ON LEARNED FTP. 15 min (900 s) is on the stored curve and inside the fit's window
+ * (120–1200 s). If `bestPerDuration` ever reads the stored list again, this point reaches
+ * `fitCriticalPower` and every athlete's learned FTP moves on the next recompute with no ride behind
+ * the change. The assertion is that it does not come back.
+ */
+Deno.test('bestPerDuration — the record-only durations never reach the fit', () => {
+  const pts = bestPerDuration([{ '5min': 300, '15min': 260, '20min': 240, '15s': 900, '120min': 180 }]);
+  assertEquals(pts.map((p) => p.seconds), [300, 1200]);
+});
+
 
 Deno.test('bestPerDuration — takes the best at each duration across rides, ignores _hr', () => {
   const pts = bestPerDuration([

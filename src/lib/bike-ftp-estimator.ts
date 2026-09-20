@@ -47,9 +47,45 @@
  * fit accepts, and one of them was usually missing. The added durations sample the curve where it
  * actually bends (2-12 min) and where FTP lives (30-45 min). Backfills for free on recompute.
  *
+ * ⛔ WIDENED AGAIN 2026-09-19 to sixteen, for the record screen. 15s, 30s, 15min and 2h were added so
+ * the stored curve carries Strava's fifteen published durations (5s, 15s, 30s, 1, 2, 3, 5, 8, 10, 15,
+ * 20, 30, 45 min, 1h, 2h — support.strava.com/en-us/articles/15401645-best-efforts-cycling); 12min is
+ * ours on top of that list, for the fit. THE FIT DOES NOT READ THIS LIST — see `CP_FIT_DURATIONS`.
+ *
  * ⚠️ LABELS ARE THE STORED KEYS. Readers index `power_curve` by these strings; do not rename one.
  */
 export const POWER_CURVE_DURATIONS: ReadonlyArray<{ label: string; seconds: number }> = [
+  { label: '5s', seconds: 5 },
+  { label: '15s', seconds: 15 },
+  { label: '30s', seconds: 30 },
+  { label: '1min', seconds: 60 },
+  { label: '2min', seconds: 120 },
+  { label: '3min', seconds: 180 },
+  { label: '5min', seconds: 300 },
+  { label: '8min', seconds: 480 },
+  { label: '10min', seconds: 600 },
+  { label: '12min', seconds: 720 },
+  { label: '15min', seconds: 900 },
+  { label: '20min', seconds: 1200 },
+  { label: '30min', seconds: 1800 },
+  { label: '45min', seconds: 2700 },
+  { label: '60min', seconds: 3600 },
+  { label: '120min', seconds: 7200 },
+];
+
+/**
+ * ⛔ THE FIT'S OWN LIST, FROZEN AT THE TWELVE IT WAS VALIDATED ON (2026-09-19).
+ *
+ * `POWER_CURVE_DURATIONS` is the STORED curve and it grew above to carry Strava's record list
+ * (support.strava.com/en-us/articles/15401645-best-efforts-cycling). One of the new durations —
+ * 15 min, 900 s — lands inside the critical-power window (`CP_FIT_MIN_S`–`CP_FIT_MAX_S`, 120–1200 s).
+ * Had `bestPerDuration` kept reading the stored list, every athlete's fit would have silently gained
+ * a point and their learned FTP could have moved on a recompute with no ride behind the change.
+ *
+ * So the two lists are separate on purpose: the curve grows for records, the fit does not.
+ * ⚠️ Adding a duration here changes learned FTPs. Adding one above does not.
+ */
+export const CP_FIT_DURATIONS: ReadonlyArray<{ label: string; seconds: number }> = [
   { label: '5s', seconds: 5 },
   { label: '1min', seconds: 60 },
   { label: '2min', seconds: 120 },
@@ -185,12 +221,18 @@ export const FTP_FROM_CP = 0.97;
 export const CP_MIN_R2 = 0.90;
 export const CP_MIN_POINTS = 3;
 
-/** Best watts at each duration, from `power_curve` labels → seconds via POWER_CURVE_DURATIONS. */
+/**
+ * Best watts at each duration, from `power_curve` labels → seconds via **`CP_FIT_DURATIONS`**.
+ *
+ * ⛔ IT READS THE FIT'S LIST, NOT THE STORED CURVE (2026-09-19). The stored curve is wider than the
+ * fit's domain and grows when the record screen needs a duration. Reading it here would feed those
+ * new points to `fitCriticalPower` and move learned FTPs for no reason.
+ */
 export function bestPerDuration(curves: ReadonlyArray<Record<string, unknown> | null | undefined>): Array<{ seconds: number; watts: number }> {
   const best = new Map<number, number>();
   for (const c of curves) {
     if (!c || typeof c !== 'object') continue;
-    for (const { label, seconds } of POWER_CURVE_DURATIONS) {
+    for (const { label, seconds } of CP_FIT_DURATIONS) {
       const v = Number((c as Record<string, unknown>)[label]);
       if (!Number.isFinite(v) || v <= 0) continue;
       if ((best.get(seconds) ?? 0) < v) best.set(seconds, v);

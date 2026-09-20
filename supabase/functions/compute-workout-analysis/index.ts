@@ -19,8 +19,20 @@ import { buildDisplaySeriesColumn } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
 // heart-rate/power minute-blocks. Pure, shared with the learner (docs/SPEC-ftp-estimator-2026-09-04.md).
 import { POWER_CURVE_DURATIONS } from '../../../src/lib/bike-ftp-estimator.ts';
+// The record finder: one window per distance, carrying BOTH the as-run elapsed time (the record) and
+// the grade-adjusted pace (the trend). docs/AUDIT-athletic-record-2026-09-19.md §10.
+import {
+  bestDistanceEfforts,
+  RUN_RECORD_DISTANCES,
+  RIDE_RECORD_DISTANCES,
+  RUN_MAX_SPEED_MPS,
+  RIDE_MAX_SPEED_MPS,
+  type DistanceEfforts,
+} from '../../../src/lib/best-efforts.ts';
 
-const ANALYSIS_VERSION = 'v0.2.3'; // 2026-09-10 (audit H-D01–H-D03): display series for the Details map, and `time_s` on each split. v0.2.2: ride power curve at 12 durations (FTP estimator substrate); hr_power_blocks no longer written (power-only FTP, 2026-09-04)
+// One stamp, shared with `backfill-power-curves` so the two can never disagree about which rows
+// the current analyser has measured. The per-version changelog lives in that file.
+import { ANALYSIS_VERSION } from '../_shared/analysis-version.ts';
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -1914,6 +1926,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     let paceCurve: RunPaceCurve | null = null;
     let hrCurve: RunHrCurve | null = null;
     let runDistanceBests: RunDistanceBests | null = null;
+    let runRecords: DistanceEfforts | null = null;
+    let rideRecords: DistanceEfforts | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
@@ -1921,6 +1935,24 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       if (powerCurve) {
         console.log(`⚡ Power curve saved for bike workout`);
       }
+      /**
+       * ⛔ THE RIDE'S FASTEST DISTANCES (2026-09-19). Strava's own list, on elapsed time
+       * (support.strava.com/en-us/articles/15401645-best-efforts-cycling). A ride with no power meter
+       * gets the distances and no curve; the two do not wait on each other.
+       *
+       * ⚠️ A VIRTUAL RIDE COUNTS FOR POWER ONLY — Strava's rule on the same page, and the right one:
+       * a trainer's distance is whatever the simulated course says it is, so a Zwift flat lap would
+       * sit on the record list beside a road 40K and beat it. The power curve above is still measured
+       * (a trainer's watts are real watts).
+       */
+      rideRecords = isIndoorSession(w) ? null : bestDistanceEfforts(RIDE_RECORD_DISTANCES, {
+        cumDistM: distance_m,
+        cumElapsedS: time_s,
+        hrBpm: hr_bpm,
+        elevationM: elevation_m,
+        maxSpeedMps: RIDE_MAX_SPEED_MPS,
+      });
+      if (rideRecords) console.log(`🚴 Ride records: ${Object.keys(rideRecords).join(', ')}`);
     }
     
     if (w.type === 'run' || w.type === 'running') {
@@ -1957,6 +1989,27 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       // The fastest moving time over 400 m to 5 km — the efforts the threshold suggestion is fitted from
       // (Smyth & Muniz-Pumares 2020; `src/lib/run-critical-speed.ts`).
       if (flatCum && movingCum) runDistanceBests = buildRunDistanceBests(flatCum, movingCum, hr_bpm, elevation_m);
+      /**
+       * ⛔ THE RUN'S RECORD DISTANCES (2026-09-19) — the fourteen Strava keeps, on ELAPSED time over
+       * the ground AS RUN (support.strava.com/en-us/articles/15401661-best-efforts-running).
+       *
+       * ⚠️ DO NOT CONFUSE IT WITH THE THREE READS ABOVE. `best_efforts` is the old ±2% finder and
+       * stays until stage 2 retires it. `pace_curve`, `hr_curve` and `run_best_distances` are the
+       * threshold learner's substrate — grade-adjusted metres on MOVING seconds — and changing what
+       * they feed would move learned thresholds. This one is the clock time a record is made of, and
+       * it carries the grade-adjusted pace for the SAME window so the trend work never needs a
+       * second finder (docs/AUDIT-athletic-record-2026-09-19.md §10).
+       */
+      runRecords = bestDistanceEfforts(RUN_RECORD_DISTANCES, {
+        cumDistM: distance_m,
+        cumElapsedS: time_s,
+        hrBpm: hr_bpm,
+        elevationM: elevation_m,
+        cumFlatM: flatCum,
+        cumMovingS: movingCum,
+        maxSpeedMps: RUN_MAX_SPEED_MPS,
+      });
+      if (runRecords) console.log(`🏃 Run records: ${Object.keys(runRecords).join(', ')}`);
     }
 
     // Build partial computed data (only what this function writes)
@@ -1970,6 +2023,10 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       pace_curve: paceCurve,
       hr_curve: hrCurve,
       run_best_distances: runDistanceBests,
+      // The record distances (2026-09-19). One object per distance: as-run elapsed seconds, the
+      // grade-adjusted pace over the same window, average heart rate, net elevation.
+      run_records: runRecords,
+      ride_records: rideRecords,
     };
 
     console.log('📝 About to UPDATE:', {
@@ -1983,7 +2040,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       // `_hr` is a sibling of the duration labels (the HR during each best window), so it appears in
       // this key list. Log line only — every reader indexes by duration label.
       power_curve: partialComputed.power_curve ? Object.keys(partialComputed.power_curve).join(',') : null,
-      best_efforts: partialComputed.best_efforts ? Object.keys(partialComputed.best_efforts).join(',') : null
+      best_efforts: partialComputed.best_efforts ? Object.keys(partialComputed.best_efforts).join(',') : null,
+      run_records: partialComputed.run_records ? Object.keys(partialComputed.run_records).join(',') : null,
+      ride_records: partialComputed.ride_records ? Object.keys(partialComputed.ride_records).join(',') : null
     });
 
     // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks

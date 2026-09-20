@@ -28,6 +28,10 @@ export const COMPUTED_LIST_KEYS = [
   'power_curve',
   'best_efforts',
   'pace_curve',
+  // The record distances (2026-09-19, WORKORDER-record-efforts stage 1). Fourteen small objects on a
+  // long run, thirteen on a long ride — kilobytes, not the megabytes this file exists to keep out.
+  'run_records',
+  'ride_records',
   'adaptation',
   'session_boom_v1',
   'coaching_note',
