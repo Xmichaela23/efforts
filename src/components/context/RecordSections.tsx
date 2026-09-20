@@ -31,6 +31,10 @@ export type RecordTotals = Record<string, PeriodTotals>;
  * order would make the screen disagree with every app the athlete already reads.
  * The LABELS are English for the same keys — the unit inside a figure follows the athlete, the name
  * of the distance does not.
+ *
+ * ⛔ EVERY LABEL IN THE THREE LISTS BELOW IS APPROVED COPY (Michael, 2026-09-20), down to the
+ * spelling: "1/2 mile" not "Half mile", "5K" not "5k", "5 sec" not "5s", "1 hour" not "60 min".
+ * Changing one is a copy change and goes back to him first, the same as a heading. Do not tidy them.
  */
 const RUN_DISTANCES: ReadonlyArray<[string, string]> = [
   ['400m', '400 m'], ['half_mile', '1/2 mile'], ['1km', '1 km'], ['1mi', '1 mile'], ['2mi', '2 miles'],
