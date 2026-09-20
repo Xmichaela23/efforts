@@ -81,7 +81,7 @@ const POWER_DURATIONS: ReadonlyArray<[string, string]> = [
  * `rounded-2xl`, inset + outer shadow. Typography: Inter, light (300) body, normal (400) emphasis,
  * semibold (600) headings, `tracking-wide` on buttons and navigation ONLY, normal for body text.
  */
-const CARD = 'p-4 rounded-2xl bg-white/[0.05] backdrop-blur-lg border border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
+export const RECORD_CARD = 'p-4 rounded-2xl bg-white/[0.05] backdrop-blur-lg border border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
 const HEADING = 'text-sm font-semibold text-white';
 const GROUP = 'text-xs font-normal text-white/70';
 const ROW_LABEL = 'font-light text-gray-300';
@@ -196,11 +196,18 @@ function TotalsColumn({ title, note, data, control }: {
  * (docs/WORKORDER-record-efforts-2026-09-19.md). Swim totals are real and print here; there is no
  * empty bests block waiting to be filled.
  */
-export function RecordSportPanel({ standings, totals, ftp, onOpen }: {
+export function RecordSportPanel({ standings, totals, ftp, onOpen, swimSlot }: {
   standings: RecordStandings | null;
   totals: RecordTotals | null;
   ftp: RecordFtp;
   onOpen: (id: string) => void;
+  /**
+   * The typed 100 yd pace and its "Logged suggests … Update" line, rendered by the page because the
+   * Update saves through `save-baselines` and that lives there. It is a swim number, so it belongs in
+   * the swim panel rather than under a "Personal records" heading calling a typed baseline a record
+   * (Michael, 2026-09-20).
+   */
+  swimSlot?: React.ReactNode;
 }) {
   const [sport, setSport] = useState('run');
   const [year, setYear] = useState<string | null>(null);
@@ -215,7 +222,7 @@ export function RecordSportPanel({ standings, totals, ftp, onOpen }: {
   const ride = standings?.ride;
 
   return (
-    <div className={CARD}>
+    <div className={RECORD_CARD}>
       {/*
         ⛔ THE PILLS FOLLOW `DESIGN_GUIDELINES.md` → Buttons & Interactive Elements: `bg-white/[0.08]`,
         `border-2`, `shadow-lg`, `tracking-wide`, `transition-all duration-300`. GalaxyButton still
@@ -303,6 +310,8 @@ export function RecordSportPanel({ standings, totals, ftp, onOpen }: {
             </ul>
           </div>
         )}
+
+        {sport === 'swim' && swimSlot}
 
         {sport === 'ride' && (
           <div className="space-y-4">

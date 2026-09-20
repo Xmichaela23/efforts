@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { RecordSportPanel, type RecordStandings, type RecordTotals } from '@/components/context/RecordSections';
+import { RecordSportPanel, RECORD_CARD, type RecordStandings, type RecordTotals } from '@/components/context/RecordSections';
 import { sportTint } from '@/lib/context-utils';
 
 // "Logged suggests … Update" — a subtle line under a baseline. Never auto-applies — the athlete taps Update.
@@ -445,14 +445,30 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             totals={totals}
             ftp={record?.ftp_best ?? null}
             onOpen={(id) => navigate(`/workout/${id}`)}
+            swimSlot={
+              <div>
+                <p className="text-sm font-light text-gray-300">
+                  100yd pace:{' '}
+                  <span className="font-normal tabular-nums text-white">{record?.swim_pace_100.value || '—'}</span>
+                </p>
+                {record?.swim_pace_100.suggestion && (
+                  <SuggestionLine
+                    sug={record.swim_pace_100.suggestion}
+                    onConfirm={() => confirmSuggestion('swim_pace', record.swim_pace_100.suggestion!.computed)}
+                  />
+                )}
+              </div>
+            }
           />
 
-          <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
+          <div className={RECORD_CARD}>
             {/* ⛔ NO EXPLAINER LINE (Michael, 2026-09-20). "Official finish times, start line to
                 finish line." was drafted here, to sit against the Running card's fastest-26.2 and stop
                 the two marathon times reading as a contradiction. He cut it with the other two: the
                 field's own screens print none, and the heading carries it. Do not re-add it short. */}
-            <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Race results</h3>
+            {/* Headings are semibold 600 and NOT tracking-wide — DESIGN_GUIDELINES puts tracking-wide
+                on buttons and navigation only, and this card now matches Strength and the panel. */}
+            <h3 className="text-sm font-semibold text-white mb-3">Race results</h3>
             {races.length === 0 ? (
               <p className="text-sm text-white/45">No saved race finishes yet. Complete a plan from State or add one manually.</p>
             ) : (
@@ -515,53 +531,39 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             </Button>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-            <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Personal records</h3>
-            <div className="space-y-4">
-              {/* ⛔ THE RUN AND CYCLING BESTS MOVED OUT (2026-09-20, stage 3) into RecordRunningCard and
-                  RecordCyclingCard above and below, which read the server's standings. They are NOT
-                  duplicated here: two lists of the same athlete's bests, built two different ways, is
-                  exactly the "two answers for one 5K" this work was done to prevent. What is left in
-                  this card is Swim's typed pace and the four working lifts. */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-white/70">Swim</p>
-                <p className="text-sm text-white/80">
-                  100yd pace:{' '}
-                  <span className="tabular-nums text-white/90">{record?.swim_pace_100.value || '—'}</span>
-                </p>
-                {record?.swim_pace_100.suggestion && (
-                  <SuggestionLine
-                    sug={record.swim_pace_100.suggestion}
-                    onConfirm={() => confirmSuggestion('swim_pace', record.swim_pace_100.suggestion!.computed)}
-                  />
-                )}
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-white/70">Strength</p>
-                <ul className="text-sm text-white/80 space-y-1.5">
-                  {([
-                    ['Deadlift', 'deadlift'],
-                    ['Squat', 'squat'],
-                    ['Bench', 'bench'],
-                    ['OHP', 'overheadPress1RM'],
-                  ] as const).map(([label, key]) => {
-                    const row = record?.lifts.find((l) => l.key === key) ?? null;
-                    const sug = row?.suggestion ?? null;
-                    return (
-                      <li key={key}>
-                        <div className="flex justify-between">
-                          <span className="text-white/50">{label}</span>
-                          <span className="tabular-nums">
-                            {row?.value_display ?? '—'}
-                          </span>
-                        </div>
-                        {sug && <SuggestionLine sug={sug} onConfirm={() => confirmSuggestion('lift', sug.computed, key)} />}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
+          {/*
+            ⛔ THE "PERSONAL RECORDS" CARD IS GONE (2026-09-20). Once the run and cycling bests moved
+            into the sport panel it held only the typed swim pace and the four working lifts — and
+            neither is a record, while the heading said both were. The swim pace went into the Swim
+            panel, where its own sport already is. The lifts stand on their own below, under the
+            heading they always had. No replacement card and no "Baselines" heading: a card that
+            exists to hold two unrelated leftovers is how the screen grew the wrong name in the first
+            place.
+          */}
+          <div className={RECORD_CARD}>
+            <h3 className="text-sm font-semibold text-white">Strength</h3>
+            <ul className="text-sm mt-2">
+              {([
+                ['Deadlift', 'deadlift'],
+                ['Squat', 'squat'],
+                ['Bench', 'bench'],
+                ['OHP', 'overheadPress1RM'],
+              ] as const).map(([label, key]) => {
+                const row = record?.lifts.find((l) => l.key === key) ?? null;
+                const sug = row?.suggestion ?? null;
+                return (
+                  <li key={key} className="py-1">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-light text-gray-300">{label}</span>
+                      <span className="font-normal tabular-nums text-white">
+                        {row?.value_display ?? <span className="font-light text-white/30">—</span>}
+                      </span>
+                    </div>
+                    {sug && <SuggestionLine sug={sug} onConfirm={() => confirmSuggestion('lift', sug.computed, key)} />}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           {/* Milestones came off 2026-09-20 (audit §3 G): it was a placeholder sentence promising
