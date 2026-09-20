@@ -35,8 +35,9 @@ times at standard distances. Each number from the athlete's own synced data; eac
 Audit done 2026-09-19: `docs/AUDIT-athletic-record-2026-09-19.md` (§7–§9 hold Michael's rulings; §10 the three stages).
 Stage 1 (per-workout efforts) is built, deployed and backfilled — `docs/WORKORDER-record-efforts-2026-09-19.md`.
 Swims parked for that stage (the stored lengths carry no start time, so rest at the wall is invisible). Stage 2 is the
-records-and-totals store; stage 3 the screen. ⚠️ Found while spot-checking: most rides appear TWICE in `workouts`
-(same date, same name) — totals must not count both.
+records-and-totals store; stage 3 the screen. (A "rides are stored twice" finding on 2026-09-19 was WITHDRAWN the
+next morning: the rows belong to two different accounts with the same Garmin history. Scope every query to one
+`user_id`.)
 
 ## QUEUED (2026-09-18, Michael: "so we have an ours thing happening?") — THE PERFORMANCE WORKLOAD "usual" RANGE IS OURS
 

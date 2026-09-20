@@ -11,7 +11,22 @@ Every run carries `computed.run_records`, every outdoor ride `computed.ride_reco
 (`RUN_RECORD_DISTANCES`, `RIDE_RECORD_DISTANCES`). Rides also carry `computed.power_curve` at sixteen durations
 (`POWER_CURVE_DURATIONS`); the FTP fit reads the separate frozen `CP_FIT_DURATIONS` and must keep doing so.
 
-## ⛔ Job zero — the same ride is stored twice, and totals cannot ship until this is understood
+## ✅ Job zero — WITHDRAWN 2026-09-20. There are no duplicate rows. Totals are not blocked.
+
+> **This section claimed the same ride was stored twice and that totals would come out double. That was
+> wrong, and it was wrong because the query behind it was not scoped to one athlete.**
+>
+> Read at 2026-09-20 with `select=*` on the two rows: they differ in `user_id`. There are **two accounts**
+> with the same Garmin history — `45d122e7…` (463 workouts) and `1a1f04d1…` (445 workouts, last activity
+> 2026-09-05). Scoped to one athlete, 2026-09-05 has exactly **two** rides, one per Garmin activity id.
+>
+> The partial unique index is still partial (`20250906120000_workouts_activity_unique_indexes.sql:19-20`,
+> `WHERE garmin_activity_id IS NOT NULL`) and the three id-less insert paths the trace below names are still
+> real — but no row pair in this data demonstrates a duplicate, so none of it is evidence of a bug today.
+> **Anything below this line is the withdrawn claim and its trace, kept so the next session does not
+> re-derive it.** Totals may be built.
+
+### (withdrawn) the original claim
 
 Verified 2026-09-19 by direct query. On 2026-09-05 the `workouts` table holds **four** ride rows: two pairs, each pair
 identical in date, name, distance and moving time. In each pair one row has a `garmin_activity_id` and its twin has
@@ -52,7 +67,7 @@ Activities, distance, time and elevation gain, per sport, for **last 4 weeks** (
 **all time** — the three periods Strava's profile states
 (support.strava.com/en-us/articles/15402175-your-strava-profile-page). "All time" is labelled from the athlete's first
 synced date until a deeper history exists (Strava's connect import is 90 days, Garmin's is capped at 180).
-Job zero decides how a doubled row is counted.
+No de-duplication is needed: job zero was withdrawn (see above).
 
 ### 4. One source, and everything reads it
 `athletic-record` serves the screen from this store. The run lines of the done-session good-news line
@@ -71,13 +86,12 @@ rows live under "Best efforts and records". `npm run lint:truth` stays green.
 3. Cross-check a handful of run records against Strava's own stored numbers
    (`workouts.achievements.best_efforts`, Strava-sourced runs only). A disagreement is a finding to report, not a
    number to tune toward.
-4. Totals: add the same period by hand off the raw rows and confirm the store agrees — including whatever job zero
-   ruled about the doubles.
+4. Totals: add the same period by hand off the raw rows and confirm the store agrees. Scope every query to ONE
+   `user_id` — the mistake job zero made was reading two accounts' rows as one athlete's.
 
 ## Handoff must state
 
-PUSHED / DEPLOYED (with the importer list) / VERIFIED, separately. What job zero found, and what it did or did not
-change. Which fields the store holds. What stage 3 can rely on.
+PUSHED / DEPLOYED (with the importer list) / VERIFIED, separately. Which fields the store holds. What stage 3 can rely on.
 
 ---
 
