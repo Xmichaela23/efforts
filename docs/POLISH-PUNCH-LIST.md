@@ -20,7 +20,7 @@ Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb s
 sets of five before the work. Many coaches drop reps as the weight climbs (5, 3, 2, 1); that needs its own named
 source before it changes. Not urgent: light and middle lifters get two to five sets.
 
-## AWAITING MICHAEL (2026-09-20, edited in the working tree; NOT committed, NOT pushed, no phone build) — THE MENU (☰) IS UNRELIABLE
+## AWAITING MICHAEL (2026-09-20, b229a30e4 PUSHED, iOS synced; NOT checked signed in or on a device) — THE MENU (☰) IS UNRELIABLE
 
 > Traced 2026-09-20, four causes, all fixed in place. (1) Gear and Import were opened by a flag with no path, so
 > from Account, Connections, Help or the + screen the open screen kept winning and the tap did nothing; both are
@@ -125,12 +125,13 @@ by order (the D-laps work: `_shared/session-detail/interval-compare.ts`, the lap
 6f3d7c19/44a1ab79), judge the matched ones, and print what was not matched. Execution must not read 95% on a run
 whose every work rep was outside its range. Report before building.
 
-## BUILT 2026-09-20 (working tree; NOT committed, NOT deployed; then resubmit the form) — THE WEBHOOK IGNORES "ATHLETE REMOVED THE APP"
+## AWAITING MICHAEL (2026-09-20, b05ddc85f PUSHED, `strava-webhook` DEPLOYED; resubmit the form) — THE WEBHOOK IGNORES "ATHLETE REMOVED THE APP"
 
 > `strava-webhook` now handles `object_type: athlete` with `updates.authorized: "false"`: it deletes the Strava rows
 > in both connection tables (the tokens live there) and writes a `connection_events` row, event `deauthorized`. No
-> call to Strava. Logged workouts stay, the same as a disconnect inside Efforts. Deploy `strava-webhook` only. Not
-> exercised on a live account. Everything below is history.
+> call to Strava. Logged workouts stay, the same as a disconnect inside Efforts. A fake event for athlete
+> 999999999999 returned 200 after the deploy; the `connection_events` row it should write (matched: false) was not
+> read back. Not exercised on a live account. Everything below is history.
 
 
 Strava declined the capacity request until (a) webhooks replace polling and (b) deauthorized athletes are handled.
