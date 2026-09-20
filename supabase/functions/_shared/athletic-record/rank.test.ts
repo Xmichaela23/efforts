@@ -1,8 +1,7 @@
 /**
  * Run: ~/.deno/bin/deno test supabase/functions/_shared/athletic-record/rank.test.ts --no-check
  *
- * Standings with a KNOWN answer: the ordering, the tie-break, the top-three cut, and the duplicate
- * collapse that job zero forced (docs/WORKORDER-record-store-2026-09-20.md).
+ * Standings with a KNOWN answer: the ordering, the tie-break and the top-three cut.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { rankAthleticRecords, RANKS_KEPT, type RankableWorkout } from './rank.ts';
@@ -34,19 +33,13 @@ Deno.test('OURS — two equal times: the earlier date is ranked first', () => {
   assertEquals(s.run.distances['5k'].map((e) => e.workout_id), ['earlier', 'later']);
 });
 
-/**
- * ⛔ JOB ZERO'S SYMPTOM. The same run is in the table twice with identical numbers. Without the
- * collapse the card would print "1st 20:00, 2nd 20:00" off one run and push the real second place
- * into third.
- */
-Deno.test('OURS — a duplicated row does not take two places', () => {
+Deno.test('two equal efforts on one day both rank — nothing is collapsed', () => {
   const s = rankAthleticRecords([
-    run('real', '2026-09-01', 1200),
-    run('twin', '2026-09-01', 1200),
-    run('second', '2026-09-05', 1250),
-    run('third', '2026-09-06', 1300),
+    run('first', '2026-09-01', 1200),
+    run('second-same-day', '2026-09-01', 1200),
+    run('slower', '2026-09-05', 1250),
   ]);
-  assertEquals(s.run.distances['5k'].map((e) => [e.rank, e.value]), [[1, 1200], [2, 1250], [3, 1300]]);
+  assertEquals(s.run.distances['5k'].map((e) => [e.rank, e.value]), [[1, 1200], [2, 1200], [3, 1250]]);
 });
 
 Deno.test('the same time on two different days is two real efforts, not a duplicate', () => {

@@ -76,28 +76,17 @@ function sortCandidates(list: Candidate[], lowerIsBetter: boolean): Candidate[] 
 }
 
 /**
- * ⛔ ONE EFFORT CANNOT HOLD TWO RANKS (2026-09-20).
+ * ⚠️ TWO EQUAL EFFORTS ON ONE DAY BOTH RANK, and that is deliberate (2026-09-20).
  *
- * OURS — a rule the field's pages do not state, because their data does not need it and ours does:
- * the `workouts` table currently holds the same ride twice on several dates (job zero,
- * docs/WORKORDER-record-store-2026-09-20.md), and a duplicated row would take two of the three
- * places with the same number, printing "1st 22:36, 2nd 22:36" off one ride. Two rows carrying the
- * same value on the same date are collapsed to one, keeping the earlier-created row.
- *
- * ⚠️ IT HIDES THE SYMPTOM, IT DOES NOT FIX THE CAUSE. The duplicate rows are still there and totals
- * are still wrong; this only keeps the standings honest. Remove it when the rows are repaired.
+ * A rule that collapsed them was written here overnight, to stop a duplicated row taking two of the
+ * three places. **The duplicates were not real** — the query that found them was not scoped to a
+ * `user_id` and was reading a second test account's copy of the same Garmin history
+ * (docs/WORKORDER-record-store-2026-09-20.md, job zero, withdrawn). With the cause gone the rule only
+ * had the power to hide a genuine second effort, so it came out. A ranker that silently drops a row
+ * is worse than one that prints two identical times.
  */
-function collapseSameEffort(sorted: Candidate[]): Candidate[] {
-  const out: Candidate[] = [];
-  for (const c of sorted) {
-    const twin = out.find((o) => o.value === c.value && o.date === c.date);
-    if (!twin) out.push(c);
-  }
-  return out;
-}
-
 function topThree(list: Candidate[], lowerIsBetter: boolean): RankedEntry[] {
-  const kept = collapseSameEffort(sortCandidates(list, lowerIsBetter)).slice(0, RANKS_KEPT);
+  const kept = sortCandidates(list, lowerIsBetter).slice(0, RANKS_KEPT);
   return kept.map((c, i) => ({ value: c.value, workout_id: c.workout_id, date: c.date, name: c.name ?? null, rank: i + 1 }));
 }
 
