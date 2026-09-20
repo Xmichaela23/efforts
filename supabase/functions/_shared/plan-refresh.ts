@@ -66,8 +66,10 @@ import { localDateInTz } from './local-date.ts';
 // 21 (2026-09-19): the rewrite carries each plyo drill's approved note ("Benefit: … ") onto rows built before it.
 // 22 (2026-09-20): a hard run or ride carries Today's narrative (`computed.narrative`, `_shared/planned-narrative.ts`),
 //   said off the same steps as `computed.step_lines`.
+// 23 (2026-09-20): the descending ladder's narrative leads with its count of sets and reads in the list's own shape
+//   ("2 sets. Set 1: … After each one: … Set 2 repeats set 1 from the 2:00 effort.").
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 22;
+export const PLAN_WRITER_VERSION = 23;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

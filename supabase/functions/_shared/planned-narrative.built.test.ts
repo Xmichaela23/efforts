@@ -31,9 +31,9 @@ function narrativeOf(family: string, level: 1 | 2 | 3, archetype: string, baseli
 
 Deno.test('the runs, as a plan builds them (pp231–234)', () => {
   assertEquals(narrativeOf('run_mlss', 2, 'descending'),
-    '3:00 at 6:00–7:20/mi, then 2:00 at 12:00–14:40/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds. Then 2:00 at 9:07–10:19/mi and a second set starting from the 2:00 effort.');
+    '2 sets. Set 1: 3:00, 2:00, 1:00, 45 seconds and 30 seconds at 6:00–7:20/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 12:00–14:40/mi. Then 2:00 at 9:07–10:19/mi. Set 2 repeats set 1 from the 2:00 effort.');
   assertEquals(narrativeOf('run_mlss', 1, 'descending'),
-    '3:00 at 6:00–7:20/mi, then 2:00 at 12:00–14:40/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds.');
+    '3:00, 2:00, 1:00, 45 seconds and 30 seconds at 6:00–7:20/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 12:00–14:40/mi.');
   assertEquals(narrativeOf('run_mlss', 2, 'surge_float'),
     '2 sets of 4 rounds: 15 seconds at 5:32–6:46/mi, 45 seconds at 6:51–8:23/mi, then 1 minute at 9:07–10:19/mi. 2-minute recovery walk or jog between sets.');
   assertEquals(narrativeOf('run_mlss', 2, 'forty_twenty'),

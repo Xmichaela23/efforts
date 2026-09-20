@@ -23,7 +23,9 @@
  *   5 rounds: 30 seconds at 252–273 W, 2:30 at 189 W and up, 30 seconds at 252–273 W, then a 4-minute easy spin.
  *   8 rounds: 5 minutes at 8:10–8:30/mi, then 1:30 at 10:56–12:22/mi.
  *   3 rounds of 8 minutes at 170–189 W, with a 4-minute easy spin after each.
- *   3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds. Then 2:00 at 10:56–12:22/mi and a second set starting from the 2:00 effort.
+ *   2 sets. Set 1: 3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 14:22–17:34/mi. Then 2:00 at 10:56–12:22/mi. Set 2 repeats set 1 from the 2:00 effort.
+ *     (the ladder, reworded the same day: Michael threw out "The same two paces for each pair after that" as invented
+ *      language and asked how many sets there were; the count now leads, in the list's own "Set 1" / "Set 2")
  *   8 repeats of 45 seconds, with 5 minutes of recovery between them.
  *   3 sets of 6 minutes at 170–189 W, with 10 seconds at 199–210 W every minute on the minute. 3-minute easy spin after each set.
  *   3 max-effort sprints of 2:30, each one aiming to beat the last. 5:30 of recovery between them.
@@ -133,25 +135,25 @@ const sentence = (s: string): string => `${s.charAt(0).toUpperCase()}${s.slice(1
 type Ladder = { work: PlannedStep[]; rec: PlannedStep[] };
 
 /**
- * p231–232's descending ladder. The first pair carries both paces; the pairs after it are lengths only; a second
- * set that starts partway down (level 2) is named by the effort it starts from.
+ * p231–232's descending ladder, in the session sheet's own shape (`planned-step-lines.ts setBlockAt`): the efforts
+ * and their pace, then what follows each one and its pace. Level 2 leads with the count of sets and names the second
+ * by the effort it starts from (p232: "followed by a second round from the 2 minutes @ 120% interval").
  */
 function ladderNarrative(blocks: Ladder[], seps: PlannedStep[], opts: NarrativeOptions): string | null {
   const first = blocks[0];
   const w0 = first.work[0], r0 = first.rec[0];
   const wPace = paceText(w0, opts), rPace = paceText(r0, opts);
   if (!wPace || !rPace || hrText(w0) || hrText(r0)) return null;
-  const out = [`${ladderTime(secondsOf(w0))} at ${wPace}, then ${ladderTime(secondsOf(r0))} at ${rPace}.`];
-  const pairs: string[] = [];
-  for (let i = 1; i < first.work.length; i++) {
-    const w = secondsOf(first.work[i]);
-    const r = first.rec[i] ? secondsOf(first.rec[i]) : 0;
-    if (!(w > 0)) return null;
-    if (!(r > 0)) pairs.push(`then ${ladderTime(w)}`);
-    else pairs.push(w < 60 && r < 60 ? `${w} and ${r} seconds` : `${ladderTime(w)} and ${ladderTime(r)}`);
-  }
-  if (pairs.length) out.push(`The same two paces for each pair after that: ${pairs.join(', ')}.`);
-  if (blocks.length === 1) return out.join(' ');
+  if ([...first.work, ...first.rec].some((st) => !(secondsOf(st) > 0))) return null;
+  // "3:00, 2:00, 1:00, 45 seconds and 30 seconds"
+  const listed = (steps: PlannedStep[]): string => {
+    const t = steps.map((st) => ladderTime(secondsOf(st)));
+    return t.length > 1 ? `${t.slice(0, -1).join(', ')} and ${t[t.length - 1]}` : t[0];
+  };
+  const efforts = `${listed(first.work)} at ${wPace}.`;
+  const after = `After each one: ${listed(first.rec)} at ${rPace}.`;
+  // Level 1: one set, and no set words.
+  if (blocks.length === 1) return `${efforts} ${after}`;
   if (seps.length !== blocks.length - 1) return null;
   const sep = seps[0];
   const sepWords = pageWords(sep);
@@ -167,8 +169,7 @@ function ladderNarrative(blocks: Ladder[], seps: PlannedStep[], opts: NarrativeO
   const second = blocks[1];
   const tail = first.work.map(secondsOf).slice(first.work.length - second.work.length).join(',');
   if (blocks.length !== 2 || second.work.length >= first.work.length || tail !== lengths(second)) return null;
-  out.push(`Then ${sepText} and a second set starting from the ${ladderTime(secondsOf(second.work[0]))} effort.`);
-  return out.join(' ');
+  return `2 sets. Set 1: ${efforts} ${after} Then ${sepText}. Set 2 repeats set 1 from the ${ladderTime(secondsOf(second.work[0]))} effort.`;
 }
 
 /** The work and rest steps of a main set whose every effort is one length and every rest another, or null. */

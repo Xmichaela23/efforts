@@ -150,7 +150,7 @@ Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p2
 });
 
 Deno.test('⛔ A HARD RUN OR RIDE READS THE SERVER\'S NARRATIVE FIRST, THEN ITS PAGE\'S LINE (2026-09-20)', () => {
-  const narrative = '3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds. Then 2:00 at 10:56–12:22/mi and a second set starting from the 2:00 effort.';
+  const narrative = '2 sets. Set 1: 3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 14:22–17:34/mi. Then 2:00 at 10:56–12:22/mi. Set 2 repeats set 1 from the 2:00 effort.';
   assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative } }), [
     narrative,
     'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.',

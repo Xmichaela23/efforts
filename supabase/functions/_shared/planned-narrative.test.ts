@@ -25,7 +25,7 @@ const HARD = [431, 527] as const, JOG = [862, 1054] as const, EASY = [656, 742] 
 const rung = (s: number) => W(s, HARD[0], HARD[1]);
 const jog = (s: number) => R(s, JOG[0], JOG[1]);
 
-Deno.test('the descending ladder at level 2, word for word (p232; approved 2026-09-20)', () => {
+Deno.test('the descending ladder at level 2, word for word (p232; the reworded sentence, approved 2026-09-20)', () => {
   const steps = [
     warm,
     rung(180), jog(120), rung(120), jog(80), rung(60), jog(40), rung(45), jog(30), rung(30), jog(20),
@@ -35,19 +35,19 @@ Deno.test('the descending ladder at level 2, word for word (p232; approved 2026-
   ];
   assertEquals(
     plannedNarrative(steps, { units: 'imperial', sport: 'run', family: 'run_mlss', archetype: 'descending' }),
-    '3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds. Then 2:00 at 10:56–12:22/mi and a second set starting from the 2:00 effort.',
+    '2 sets. Set 1: 3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 14:22–17:34/mi. Then 2:00 at 10:56–12:22/mi. Set 2 repeats set 1 from the 2:00 effort.',
   );
 });
 
-Deno.test('the ladder at level 1 is one set; a last effort with no jog after it is said alone (p231)', () => {
+Deno.test('the ladder at level 1 is one set with no set words; a last effort with nothing after it lists one fewer (p231)', () => {
   const full = [warm, rung(180), jog(120), rung(120), jog(80), rung(60), jog(40), rung(45), jog(30), rung(30), jog(20), cool];
   assertEquals(
     plannedNarrative(full, { sport: 'run', family: 'run_mlss', archetype: 'descending' }),
-    '3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds.',
+    '3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 14:22–17:34/mi.',
   );
   assertEquals(
     plannedNarrative(full.filter((_, i) => i !== 10), { sport: 'run', family: 'run_mlss', archetype: 'descending' }),
-    '3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, then 30 seconds.',
+    '3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds and 30 seconds at 14:22–17:34/mi.',
   );
 });
 
