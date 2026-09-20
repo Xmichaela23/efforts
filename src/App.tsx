@@ -37,6 +37,8 @@ const App = () => (
 {/* Kept so an old link still resolves; AppLayout sends it to State's Record tab (2026-09-20). */}
           <Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/account" element={<Index />} />
+<Route path="/gear" element={<Index />} /> {/* inside the app shell; see AppLayout's /gear and /import effect */}
+<Route path="/import" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/support" element={<Support />} /> {/* public: no session needed, the address given to Strava and Garmin */}
 <Route path="/help" element={<Index />} />

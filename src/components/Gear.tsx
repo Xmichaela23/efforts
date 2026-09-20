@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, Trash2, Check, X, AlertTriangle
 } from 'lucide-react';
-import { MobileHeader } from './MobileHeader';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import { useVisualViewportKeyboardInset } from '@/hooks/useVisualViewportKeyboardInset';
@@ -307,7 +306,8 @@ export default function Gear({ onClose }: GearProps) {
 
   return (
     <div className="mobile-app-container">
-      <MobileHeader />
+      {/* No header here (2026-09-20): Gear is only drawn inside AppLayout, which has the header. A second
+          one sat on top of it, and its menu had no Import handler and sent Gear to a missing page. */}
       <main className="mobile-main-content min-h-0">
         <div className="flex flex-col flex-1 min-h-0 max-w-2xl mx-auto w-full px-4">
           <div className="shrink-0 pt-2 pb-1">

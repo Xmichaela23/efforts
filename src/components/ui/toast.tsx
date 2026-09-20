@@ -14,7 +14,9 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Below the header and click-through (2026-09-20): at top-0 the list covered the whole header, so the
+      // menu could not be tapped while a toast was up. The toast itself keeps pointer-events-auto.
+      "pointer-events-none fixed top-[calc(env(safe-area-inset-top)+var(--header-h))] z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
       className
     )}
     {...props}

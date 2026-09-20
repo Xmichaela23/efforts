@@ -79,7 +79,7 @@ export function MobileHeader({
         Gear
       </DropdownMenuItem>
       {/* Athletic Record came off this menu 2026-09-20: it is the Record tab on State now. */}
-      <DropdownMenuItem onClick={onImportClick}>
+      <DropdownMenuItem onClick={onImportClick || (() => navigate('/import'))}>
         <Download className="mr-2 h-4 w-4" />
         Import
       </DropdownMenuItem>

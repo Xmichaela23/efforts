@@ -679,6 +679,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [location.pathname]);
 
+  // Deep link: /gear and /import open Gear and Import (2026-09-20, punch list "THE MENU IS UNRELIABLE").
+  // They were the last two menu screens opened by a flag alone, so the path stayed on /account,
+  // /connections or /help, that screen kept winning the render chain below, and the tap did nothing.
+  // No else branch: Gear is also opened by a flag from a workout and from the feedback popup, with no
+  // path change; every other menu path and handleBackToDashboard already close both.
+  useEffect(() => {
+    if (location.pathname !== '/gear' && location.pathname !== '/import') return;
+    setSelectedWorkout(null);
+    setShowContext(false);
+    setShowStrengthLogger(false);
+    setShowPilatesYogaLogger(false);
+    setShowBuilder(false);
+    setShowAllPlans(false);
+    setShowStrengthPlans(false);
+    setShowTrainingBaselines(false);
+    setShowGoals(false);
+    setShowAccount(false);
+    setShowConnections(false);
+    setShowSupport(false);
+    setShowGear(location.pathname === '/gear');
+    setShowImportPage(location.pathname === '/import');
+  }, [location.pathname]);
+
   /**
    * ⛔ `/profile/athletic-record` NO LONGER OPENS A PAGE (2026-09-20). Record is the fourth tab on
    * State. The path is kept only so a link somebody already has still lands somewhere sensible: it
@@ -923,12 +946,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
+    setShowGoals(false);
     setShowGear(true);
-    if (location.pathname === '/profile') {
+    // The path carries the screen, like Profile, Account, Connections and Help (see the /gear effect).
+    if (location.pathname !== '/gear') {
       try {
-        navigate('/', { replace: true });
+        navigate('/gear', { replace: true });
       } catch (e) {
-        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+        console.warn('[AppLayout] navigate to /gear failed:', e);
       }
     }
   };
@@ -949,12 +974,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowGear(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
+    setShowGoals(false);
     setShowImportPage(true);
-    if (location.pathname === '/profile') {
+    if (location.pathname !== '/import') {
       try {
-        navigate('/', { replace: true });
+        navigate('/import', { replace: true });
       } catch (e) {
-        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+        console.warn('[AppLayout] navigate to /import failed:', e);
       }
     }
   };
@@ -985,6 +1011,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       }
     });
     setShowImportPage(false);
+    if (location.pathname === '/import') {
+      try { navigate('/', { replace: true }); } catch { /* the flag above already closed the screen */ }
+    }
   };
 
   /**
@@ -1051,7 +1080,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setActiveTab('summary');
 
     // 2026-09-08: /connections and /help are route-driven views (Michael: the tab bar did nothing on Connections).
-    if (location.pathname === '/goals' || location.pathname === '/account' || location.pathname === '/connections' || location.pathname === '/help' || location.pathname === '/profile') {
+    if (location.pathname === '/goals' || location.pathname === '/account' || location.pathname === '/connections' || location.pathname === '/help' || location.pathname === '/profile' || location.pathname === '/gear' || location.pathname === '/import') {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1359,14 +1388,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // Dead simple swipe detection
 
 
-  // Show import page
-  if (showImportPage) {
-    return (
-      <FitFileImporter
-        onWorkoutsImported={handleWorkoutsImported}
-      />
-    );
-  }
+  // Import is drawn inside the layout below (2026-09-20). It used to return here on its own, with no
+  // header, no tab bar and no way back.
 
   // Training baselines is now included in main layout flow below
   // Show dashboard immediately; workouts load in background (avoids stuck "Loading..." on slow iOS)
@@ -1565,6 +1588,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 // After closing gear, reload gear in feedback popup if it's open
                 // This will be handled by PostWorkoutFeedback's useEffect when it re-renders
               }} />
+            </div>
+          ) : showImportPage ? (
+            <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
+              <FitFileImporter onWorkoutsImported={handleWorkoutsImported} />
             </div>
           ) : showBuilder ? (
             <div className="pt-4">
