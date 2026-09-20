@@ -4,6 +4,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { raise as raiseAlarm } from '../_shared/alarm.ts';
 import { recordProviderResult } from '../_shared/connection-health.ts';
+import { logConnectionEvent } from '../_shared/provider-deregister.ts';
 import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 
 // Strava webhook verification and processing
@@ -66,6 +67,18 @@ async function processStravaWebhook(payload: any) {
   try {
     const { object_type, object_id, aspect_type, updates, owner_id } = payload;
     
+    // The athlete removed Efforts on Strava's side: object_type 'athlete', aspect_type 'update',
+    // updates.authorized 'false' (developers.strava.com/docs/webhooks, "Webhook Events API"). Until
+    // 2026-09-20 this fell into the skip below and the connection read live until a later call got a 401.
+    if (object_type === 'athlete') {
+      if (String(updates?.authorized) === 'false') {
+        await handleAthleteDeauthorized(owner_id ?? object_id);
+      } else {
+        console.log('⏭️ Skipping athlete webhook with no deauthorization:', JSON.stringify(updates ?? {}));
+      }
+      return;
+    }
+
     // Only process activity-related events
     if (object_type !== 'activity') {
       console.log('⏭️ Skipping non-activity webhook:', object_type);
@@ -89,6 +102,49 @@ async function processStravaWebhook(payload: any) {
     }
   } catch (error) {
     console.error('❌ Error in processStravaWebhook:', error);
+  }
+}
+
+/**
+ * What disconnect-connection does for Strava, minus the call to Strava (Strava already revoked the
+ * token, so oauth/deauthorize would only 401): delete our Strava rows in BOTH connection tables, which
+ * is where the tokens live, and write a connection_events row so support can answer "what happened".
+ */
+async function handleAthleteDeauthorized(stravaAthleteId: number | string) {
+  const athleteId = String(stravaAthleteId ?? '').trim();
+  if (!athleteId) return;
+  try {
+    const { data: rows, error } = await supabase
+      .from('device_connections')
+      .select('user_id')
+      .eq('provider', 'strava')
+      .eq('provider_user_id', athleteId);
+    if (error) throw new Error(error.message);
+    const userIds = [...new Set((rows ?? []).map((r: any) => r?.user_id).filter(Boolean))] as string[];
+
+    if (userIds.length === 0) {
+      await logConnectionEvent(supabase, { user_id: null, provider: 'strava', event: 'deauthorized', detail: { strava_athlete_id: athleteId, matched: false } });
+      return;
+    }
+
+    for (const userId of userIds) {
+      const dc = await supabase.from('device_connections').delete().eq('user_id', userId).eq('provider', 'strava').select('id');
+      const uc = await supabase.from('user_connections').delete().eq('user_id', userId).eq('provider', 'strava').select('id');
+      await logConnectionEvent(supabase, {
+        user_id: userId,
+        provider: 'strava',
+        event: 'deauthorized',
+        detail: {
+          strava_athlete_id: athleteId,
+          matched: true,
+          rows_deleted: { device_connections: dc.data?.length ?? 0, user_connections: uc.data?.length ?? 0 },
+          errors: [dc.error?.message, uc.error?.message].filter(Boolean),
+        },
+      });
+    }
+  } catch (e) {
+    console.error('❌ Error handling Strava deauthorization:', e);
+    await raiseAlarm('strava-webhook', `deauthorization not applied: ${String((e as Error)?.message ?? e).slice(0, 120)}`, { function: 'strava-webhook', strava_athlete_id: athleteId });
   }
 }
 
