@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
+import { setPendingStateLens } from '@/lib/state-lens';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Calendar } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
@@ -23,7 +24,6 @@ import TrainingBaselines from './TrainingBaselines';
 import AccountPage from './AccountPage';
 import SupportContent from '@/components/SupportContent';
 import Connections from '@/components/Connections';
-import AthleticRecordPage from './AthleticRecordPage';
 import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -206,7 +206,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showAccount, setShowAccount] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
-  const [showAthleticRecord, setShowAthleticRecord] = useState(false);
   const [showGear, setShowGear] = useState(false);
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
@@ -606,7 +605,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowImportPage(false);
       setShowAllPlans(false);
       setShowStrengthPlans(false);
-      setShowAthleticRecord(false);
       setShowGoals(false);
       setShowTrainingBaselines(true);
     }
@@ -625,7 +623,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowAllPlans(false);
       setShowStrengthPlans(false);
       setShowTrainingBaselines(false);
-      setShowAthleticRecord(false);
       setShowGoals(false);
       setShowAccount(true);
     } else {
@@ -651,7 +648,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowAllPlans(false);
       setShowStrengthPlans(false);
       setShowTrainingBaselines(false);
-      setShowAthleticRecord(false);
       setShowGoals(false);
       setShowAccount(false);
       setShowSupport(false);
@@ -675,7 +671,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowAllPlans(false);
       setShowStrengthPlans(false);
       setShowTrainingBaselines(false);
-      setShowAthleticRecord(false);
       setShowGoals(false);
       setShowAccount(false);
       setShowSupport(true);
@@ -684,25 +679,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [location.pathname]);
 
-  // Deep link: /profile/athletic-record opens My Record (match menu + shareable URL)
+  /**
+   * ⛔ `/profile/athletic-record` NO LONGER OPENS A PAGE (2026-09-20). Record is the fourth tab on
+   * State. The path is kept only so a link somebody already has still lands somewhere sensible: it
+   * opens State on the Record tab and then takes the old path out of the address bar, so the athlete
+   * cannot end up looking at a second copy of the same screen.
+   */
   useEffect(() => {
-    if (location.pathname === '/profile/athletic-record') {
-      setSelectedWorkout(null);
-      setShowContext(false);
-      setShowStrengthLogger(false);
-      setShowPilatesYogaLogger(false);
-      setShowBuilder(false);
-      setShowGear(false);
-      setShowImportPage(false);
-      setShowAllPlans(false);
-      setShowStrengthPlans(false);
-      setShowTrainingBaselines(false);
-      setShowGoals(false);
-      setShowAthleticRecord(true);
-    } else {
-      setShowAthleticRecord(false);
+    if (location.pathname !== '/profile/athletic-record') return;
+    setPendingStateLens('record');
+    window.dispatchEvent(new CustomEvent('open:state'));
+    try { navigate('/', { replace: true }); } catch (e) {
+      console.warn('[AppLayout] redirect from /profile/athletic-record failed:', e);
     }
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
 
 
@@ -851,7 +841,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       return;
     }
     // Handle other views - return to dashboard
-    if (showTrainingBaselines || showAthleticRecord || showGear || showImportPage || showContext || showBuilder || showStrengthLogger || showPilatesYogaLogger) {
+    if (showTrainingBaselines || showGear || showImportPage || showContext || showBuilder || showStrengthLogger || showPilatesYogaLogger) {
       handleBackToDashboard();
       return;
     }
@@ -911,7 +901,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
-    setShowAthleticRecord(false);
     setShowTrainingBaselines(true);
     if (location.pathname !== '/profile') {
       try {
@@ -922,25 +911,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
-  const handleAthleticRecordClick = () => {
-    setSelectedWorkout(null);
-    setShowContext(false);
-    setShowStrengthLogger(false);
-    setShowPilatesYogaLogger(false);
-    setShowBuilder(false);
-    setShowGear(false);
-    setShowImportPage(false);
-    setShowAllPlans(false);
-    setShowStrengthPlans(false);
-    setShowTrainingBaselines(false);
-    setShowGoals(false);
-    setShowAthleticRecord(true);
-    try {
-      navigate('/profile/athletic-record', { replace: true });
-    } catch (e) {
-      console.warn('[AppLayout] navigate to athletic record failed:', e);
-    }
-  };
 
   // Gear handler - clear other views first
   const handleGearClick = () => {
@@ -950,12 +920,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowPilatesYogaLogger(false);
     setShowBuilder(false);
     setShowTrainingBaselines(false);
-    setShowAthleticRecord(false);
     setShowImportPage(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowGear(true);
-    if ((location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
+    if (location.pathname === '/profile') {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -977,12 +946,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowPilatesYogaLogger(false);
     setShowBuilder(false);
     setShowTrainingBaselines(false);
-    setShowAthleticRecord(false);
     setShowGear(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowImportPage(true);
-    if ((location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
+    if (location.pathname === '/profile') {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1029,9 +997,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const openStateTab = () => {
     if (
       selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary
-      || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showConnections || showSupport
+      || showImportPage || showTrainingBaselines || showAccount || showConnections || showSupport
       || showGear || showPilatesYogaLogger || showBuilder
-      || location.pathname === '/profile' || location.pathname === '/profile/athletic-record'
+      || location.pathname === '/profile'
     ) {
       handleBackToDashboard();
     }
@@ -1071,7 +1039,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowStrengthPlans(false);
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
-    setShowAthleticRecord(false);
     setShowAccount(false);
     setShowGear(false); // Reset gear view
     setShowContext(false);
@@ -1084,7 +1051,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setActiveTab('summary');
 
     // 2026-09-08: /connections and /help are route-driven views (Michael: the tab bar did nothing on Connections).
-    if (location.pathname === '/goals' || location.pathname === '/account' || location.pathname === '/connections' || location.pathname === '/help' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
+    if (location.pathname === '/goals' || location.pathname === '/account' || location.pathname === '/connections' || location.pathname === '/help' || location.pathname === '/profile') {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1440,14 +1407,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         onLogout={onLogout}
         onProfileClick={handleTrainingBaselinesClick}
         onAccountClick={handleAccountClick}
-        onAthleticRecordClick={handleAthleticRecordClick}
         onConnectionsClick={handleConnectionsClick}
         onGearClick={handleGearClick}
         onImportClick={handleImportClick}
       />
 
       {/* Render UnifiedWorkoutView OUTSIDE mobile-main-content to avoid z-index issues */}
-      {selectedWorkout && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showAthleticRecord && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
+      {selectedWorkout && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
         <ScreenErrorBoundary label="Workout details" onClose={handleBackToDashboard}>
           <UnifiedWorkoutView
             // A new workout is a new screen: swiping to the next workout must not carry this one's state.
@@ -1584,10 +1550,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra))' }}>
               <AccountPage onSignOut={onLogout} />
             </div>
-          ) : showAthleticRecord ? (
-            <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
-              <AthleticRecordPage onClose={handleBackToDashboard} />
-            </div>
           ) : showTrainingBaselines ? (
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
               <TrainingBaselines
@@ -1720,8 +1682,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
               {(() => {
-                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear && !showContext;
-                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showAthleticRecord && !showGear;
+                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext;
+                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showSummary && !showImportPage && !showTrainingBaselines && !showGear;
                 const goalsActive = showGoals;
                 const tabBase =
                   'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
@@ -1765,7 +1727,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext || showConnections || showSupport) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAccount || showGear || showContext || showConnections || showSupport) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1792,7 +1754,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </Button>
                 <Button data-first-run="focus"
                   onClick={() => {
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext || showConnections || showSupport) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAccount || showGear || showContext || showConnections || showSupport) {
                       handleBackToDashboard();
                     }
                     setShowGoals(true);

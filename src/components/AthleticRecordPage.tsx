@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
+import { RecordTotalsCard, RecordRunningCard, RecordCyclingCard, type RecordStandings, type RecordTotals } from '@/components/context/RecordSections';
 
 // "Logged suggests … Update" — a subtle line under a baseline. Never auto-applies — the athlete taps Update.
 // ⛔ THE SERVER BUILDS IT (2026-09-10, audit H-B12): `athletic-record` sends the line with locked lifts
@@ -93,6 +94,10 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [record, setRecord] = useState<AthleticRecord | null>(null);
+  // The standings and totals `athletic-record` now returns beside `record` (stage 2). Already
+  // formatted — the phone prints the strings and converts nothing.
+  const [standings, setStandings] = useState<RecordStandings | null>(null);
+  const [totals, setTotals] = useState<RecordTotals | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState('');
@@ -114,8 +119,11 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const refreshRecord = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke('athletic-record', { body: {} });
     if (error) console.warn('[AthleticRecord] record', error);
-    const rec = (data as { record?: AthleticRecord } | null)?.record ?? null;
+    const payload = data as { record?: AthleticRecord; standings?: RecordStandings; totals?: RecordTotals } | null;
+    const rec = payload?.record ?? null;
     setRecord(rec);
+    setStandings(payload?.standings ?? null);
+    setTotals(payload?.totals ?? null);
     if (rec?.baselines_updated_at) setLastUpdated(rec.baselines_updated_at);
   }, []);
 
@@ -345,14 +353,11 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-6">
-      <h2 className="text-2xl font-bold text-white pb-2">My Record</h2>
-      <div className="text-center mb-6">
-        <p className="text-white/50 text-sm">What you&apos;ve accomplished — finish times use elapsed (chip), not moving time.</p>
-        {lastUpdated && (
-          <p className="text-xs text-white/40 mt-2">Last updated: {new Date(lastUpdated).toLocaleDateString()}</p>
-        )}
-      </div>
+    // ⛔ NO PAGE TITLE (2026-09-20). This was a route with its own "My Record" heading; it is a lens
+    // on State now and the tab above it already says Record. A second title would be the screen
+    // naming itself twice. The old subtitle explaining chip time moved into the Race results section,
+    // where it is about the numbers directly under it.
+    <div className="max-w-2xl mx-auto pb-6">
 
       {autoSaveStatus && (
         <div
@@ -431,8 +436,15 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         </div>
       ) : (
         <div className="space-y-5">
+          {/* Audit §3 order: Totals, Running, Race results, Cycling, Strength. */}
+          <RecordTotalsCard totals={totals} />
+          <RecordRunningCard standings={standings} onOpen={(id) => navigate(`/workout/${id}`)} />
+
           <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-            <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Race results</h3>
+            <h3 className="text-sm font-semibold text-white/90 tracking-wide">Race results</h3>
+            {/* The other half of the marathon pair — see RecordRunningCard. This says what these
+                numbers are; that says what those are; neither refers to the other. */}
+            <p className="text-xs text-white/45 leading-relaxed mt-1 mb-3">Official finish times, start line to finish line.</p>
             {races.length === 0 ? (
               <p className="text-sm text-white/45">No saved race finishes yet. Complete a plan from State or add one manually.</p>
             ) : (
@@ -489,41 +501,16 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             </Button>
           </div>
 
+          <RecordCyclingCard standings={standings} ftp={record?.ftp_best ?? null} onOpen={(id) => navigate(`/workout/${id}`)} />
+
           <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
             <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Personal records</h3>
             <div className="space-y-4">
-              {runDisc}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-white/70">Cycling</p>
-                <ul className="text-sm text-white/80 space-y-1.5">
-                  <li className="flex justify-between">
-                    <span className="text-white/50">FTP (best)</span>
-                    <span className="tabular-nums text-right">
-                      {record?.ftp_best ? (
-                        <>
-                          {`${record.ftp_best.watts}W`}
-                          <span className="text-white/40 text-xs ml-1">({record.ftp_best.date})</span>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span className="text-white/50">Longest ride (elapsed)</span>
-                    <span className="tabular-nums text-right">
-                      {record?.longest_ride ? (
-                        <>
-                          {record.longest_ride.display}
-                          {record.longest_ride.date && <span className="text-white/40 text-xs ml-1">({record.longest_ride.date})</span>}
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </span>
-                  </li>
-                </ul>
-              </div>
+              {/* ⛔ THE RUN AND CYCLING BESTS MOVED OUT (2026-09-20, stage 3) into RecordRunningCard and
+                  RecordCyclingCard above and below, which read the server's standings. They are NOT
+                  duplicated here: two lists of the same athlete's bests, built two different ways, is
+                  exactly the "two answers for one 5K" this work was done to prevent. What is left in
+                  this card is Swim's typed pace and the four working lifts. */}
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-white/70">Swim</p>
                 <p className="text-sm text-white/80">
@@ -565,12 +552,9 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-            <h3 className="text-sm font-semibold text-white/90 mb-2 tracking-wide">Milestones</h3>
-            <p className="text-sm text-white/45 leading-relaxed">
-              Streaks, plan completions, and other highlights from your training will show here.
-            </p>
-          </div>
+          {/* Milestones came off 2026-09-20 (audit §3 G): it was a placeholder sentence promising
+              streaks and highlights, and nothing ever filled it. An empty promise on a record screen
+              is worse than a shorter screen. */}
         </div>
       )}
 

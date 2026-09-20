@@ -20,6 +20,7 @@ import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
+import AthleticRecordPage from '@/components/AthleticRecordPage';
 import { takePendingStateLens } from '@/lib/state-lens';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -62,7 +63,7 @@ export default function StateTab({
   const coachBusy = loading || Boolean(revalidating);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
-  const [stateLens, setStateLens] = useState<StateLens>(() => takePendingStateLens() ?? 'status'); // State-as-hub: Status / Adjust / Schedule (D-316)
+  const [stateLens, setStateLens] = useState<StateLens>(() => takePendingStateLens() ?? 'status'); // State-as-hub: Status / Adjust / Schedule / Record (D-316)
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
@@ -611,6 +612,9 @@ export default function StateTab({
       {/* The coach's main-lift list (`strength_logged_sets.main`) — the extra lifts Adjust lists
             beside the four the block prices from. An older snapshot carries none and Adjust shows the four. */}
       {stateLens === 'adjust' && <StateAdjustLens mainLifts={(loggedSets?.main ?? []).map((m) => m.canonical)} />}
+      {/* Record — the personal-records screen, a lens since 2026-09-20 (it was `/profile/athletic-record`,
+          opened from the header menu; both are gone). It fetches `athletic-record` itself. */}
+      {stateLens === 'record' && <AthleticRecordPage onClose={() => setStateLens('status')} />}
       {stateLens === 'schedule' && (
         <div className="px-2 py-10 text-center text-label-secondary text-footnote leading-snug">
           Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.

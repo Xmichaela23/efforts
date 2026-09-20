@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { User, Download, Settings, Activity, Link, Package, HelpCircle, Trophy, KeyRound } from 'lucide-react';
+import { User, Download, Settings, Activity, Link, Package, HelpCircle, KeyRound } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,6 @@ interface MobileHeaderProps {
   /** Custom menu item handlers */
   onProfileClick?: () => void;
   onAccountClick?: () => void;
-  onAthleticRecordClick?: () => void;
   onConnectionsClick?: () => void;
   onGearClick?: () => void;
   onImportClick?: () => void;
@@ -38,7 +37,6 @@ export function MobileHeader({
   onLogout,
   onProfileClick,
   onAccountClick,
-  onAthleticRecordClick,
   onConnectionsClick,
   onGearClick,
   onImportClick,
@@ -80,12 +78,7 @@ export function MobileHeader({
         <Package className="mr-2 h-4 w-4" />
         Gear
       </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
-      >
-        <Trophy className="mr-2 h-4 w-4" />
-        Athletic Record
-      </DropdownMenuItem>
+      {/* Athletic Record came off this menu 2026-09-20: it is the Record tab on State now. */}
       <DropdownMenuItem onClick={onImportClick}>
         <Download className="mr-2 h-4 w-4" />
         Import

@@ -24,6 +24,9 @@ import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildAthleticRecord } from './record.ts';
 import { rankAthleticRecords, type RankableWorkout } from '../_shared/athletic-record/rank.ts';
 import { athleticTotals, type TotallableWorkout } from '../_shared/athletic-record/totals.ts';
+// The screen prints strings, never metres and seconds — the phone does not convert a unit the server
+// can (`record.ts` has sent a `display` beside every `seconds` since 2026-09-10 for the same reason).
+import { displayStandings, displayTotals, unitsOf } from '../_shared/athletic-record/display.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -115,6 +118,9 @@ Deno.serve(async (req) => {
       computed: { overall: (w.overall ?? null) as never },
     }));
 
+    // The athlete's own units, not the sport's and not the distance label's.
+    const units = unitsOf((bl.data as { units?: unknown } | null)?.units);
+
     const record = buildAthleticRecord({
       goals: goals.data ?? [],
       ftpRows: ftp.data ?? [],
@@ -125,8 +131,9 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       record,
-      standings: rankAthleticRecords(rankable),
-      totals: athleticTotals(totallable, asOf),
+      standings: displayStandings(rankAthleticRecords(rankable), units),
+      totals: displayTotals(athleticTotals(totallable, asOf), units),
+      units,
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ error: 'unauthorized' }, 401);
