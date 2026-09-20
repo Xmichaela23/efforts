@@ -20,13 +20,24 @@ Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb s
 sets of five before the work. Many coaches drop reps as the weight climbs (5, 3, 2, 1); that needs its own named
 source before it changes. Not urgent: light and middle lifters get two to five sets.
 
-## QUEUED (2026-09-18, Michael) — THE MENU (☰) IS UNRELIABLE
+## AWAITING MICHAEL (2026-09-20, edited in the working tree; NOT committed, NOT pushed, no phone build) — THE MENU (☰) IS UNRELIABLE
+
+> Traced 2026-09-20, four causes, all fixed in place. (1) Gear and Import were opened by a flag with no path, so
+> from Account, Connections, Help or the + screen the open screen kept winning and the tap did nothing; both are
+> paths now (`/gear`, `/import`), like the other four. (2) Gear drew a second header over the real one; its Import
+> did nothing and its Gear went to a missing page. (3) Import replaced the whole app: no header, no tab bar, no way
+> back; it is inside the layout now. (4) The toast list sat at the top of the screen over the whole header, so the
+> menu could not be tapped while a toast was up (checked in the browser on /support: before, the toast was the top
+> element at the menu button; after, the button is). Toasts now appear below the header. Not checked signed in.
+> Look for: every menu item opens from every other item's screen and from +; Import has the header and tab bar;
+> the menu opens straight after a save. Everything below is history.
+
 
 The menu does not always open, from any screen, and its items do not always open their screen when chosen from
 another item's screen. Trace first: every screen that shows the menu, what opens it, and what each item does when
 another item's screen is already open. Reproduce on the phone build and on the web before fixing.
 
-## QUEUED (2026-09-18, Michael) — ATHLETIC RECORD NEEDS AN AUDIT, AND MORE OF WHAT RUNNERS AND RIDERS EXPECT
+## [x] CLOSED 2026-09-20 (all three stages; verified on Michael's phone; see the ENGINE-STATE banner) — ATHLETIC RECORD NEEDS AN AUDIT, AND MORE OF WHAT RUNNERS AND RIDERS EXPECT
 
 Audit what the Athletic Record page shows today and where each number comes from (one source each, server-sent).
 Then add what athletes expect from a record page, modelled on a named app (Strava's profile: this year's and
@@ -114,7 +125,13 @@ by order (the D-laps work: `_shared/session-detail/interval-compare.ts`, the lap
 6f3d7c19/44a1ab79), judge the matched ones, and print what was not matched. Execution must not read 95% on a run
 whose every work rep was outside its range. Report before building.
 
-## QUEUED (2026-09-16, Strava Developer Program reply) — THE WEBHOOK IGNORES "ATHLETE REMOVED THE APP"
+## BUILT 2026-09-20 (working tree; NOT committed, NOT deployed; then resubmit the form) — THE WEBHOOK IGNORES "ATHLETE REMOVED THE APP"
+
+> `strava-webhook` now handles `object_type: athlete` with `updates.authorized: "false"`: it deletes the Strava rows
+> in both connection tables (the tokens live there) and writes a `connection_events` row, event `deauthorized`. No
+> call to Strava. Logged workouts stay, the same as a disconnect inside Efforts. Deploy `strava-webhook` only. Not
+> exercised on a live account. Everything below is history.
+
 
 Strava declined the capacity request until (a) webhooks replace polling and (b) deauthorized athletes are handled.
 (a) holds — traced 2026-09-16: no timer asks Strava for activities (the two cron jobs are `run-jobs` and
@@ -1698,7 +1715,12 @@ beside it** — the fix here is scope-at-creation and visibility, NOT a third pa
 
 ---
 
-## ⛔⛔ THE LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY (filed 2026-09-01, LIVE, HIS OWN SESSION)
+## [x] WITHDRAWN 2026-09-20 (Michael: "keep it by the book") — THE LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY (filed 2026-09-01)
+
+> The ladder ruling below is withdrawn. The test stays p215's three fixed sets (75% × 6, +10% × 5, +5% × max reps).
+> No retest interval: a search of SOURCE-viada-hybrid-athlete.md for "retest" finds none, and its notes say progress
+> carries on without retesting; a retest is the athlete's tap on Adjust. Everything below is history.
+
 
 **Michael, having just done his lower test:** *"It didn't ask me if I wanted to move it to my
 baseline. It's like this thing doesn't know it's a test."* And, on the row itself: *"we need to make
