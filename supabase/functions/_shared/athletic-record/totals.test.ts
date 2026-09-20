@@ -28,7 +28,7 @@ Deno.test('all three periods add up from the same rows', () => {
     ride('2025-11-01', 20, 45, 100),      // last year
   ], TODAY);
   assertEquals(t.ride.all_time, { activities: 4, distance_m: 220000, moving_s: 27300, elevation_m: 1900 });
-  assertEquals(t.ride.this_year, { activities: 3, distance_m: 200000, moving_s: 24600, elevation_m: 1800 });
+  assertEquals(t.ride.by_year['2026'], { activities: 3, distance_m: 200000, moving_s: 24600, elevation_m: 1800 });
   // 100 km and 210 min in the last four weeks, divided by four.
   assertEquals(t.ride.last_4_weeks, { activities: 0.5, distance_m: 25000, moving_s: 3150, elevation_m: 200 });
   assertEquals(t.ride.since, '2025-11-01');
@@ -45,7 +45,7 @@ Deno.test('the four-week window is the last 28 days, and the 28th day back is ou
 
 Deno.test('1 January counts toward this year', () => {
   const t = athleticTotals([ride('2026-01-01', 10, 30), ride('2025-12-31', 10, 30)], TODAY);
-  assertEquals(t.ride.this_year.activities, 1);
+  assertEquals(t.ride.by_year['2026'].activities, 1);
   assertEquals(t.ride.all_time.activities, 2);
 });
 
@@ -148,6 +148,46 @@ Deno.test('a year of older rows sums to real hours, not zero', () => {
     { date: '2026-01-04', type: 'ride', distance: 51.068, duration: 117, moving_time: null, elapsed_time: 117 },
     { date: '2026-01-02', type: 'ride', distance: 36.003, duration: 85, moving_time: null, elapsed_time: 85 },
   ], TODAY);
-  assertEquals(t.ride.this_year.moving_s, (117 + 85) * 60);
-  assertEquals(t.ride.this_year.moving_s / 3600 > 3, true);
+  assertEquals(t.ride.by_year['2026'].moving_s, (117 + 85) * 60);
+  assertEquals(t.ride.by_year['2026'].moving_s / 3600 > 3, true);
+});
+
+/**
+ * ⛔ THE YEAR PICKER'S SUBSTRATE (2026-09-20). Strava's My Stats lets the athlete flip the middle
+ * block back through earlier years, so the server computes every year and says which exist. The
+ * screen picks one; it never sums one.
+ */
+Deno.test('every year with data gets its own totals, newest first', () => {
+  const t = athleticTotals([
+    { date: '2026-09-01', type: 'ride', distance: 40, moving_time: 90 },
+    { date: '2026-03-01', type: 'ride', distance: 30, moving_time: 60 },
+    { date: '2025-07-04', type: 'ride', distance: 100, moving_time: 200 },
+  ], TODAY);
+  assertEquals(t.ride.years, ['2026', '2025']);
+  assertEquals(t.ride.by_year['2026'].activities, 2);
+  assertEquals(t.ride.by_year['2026'].distance_m, 70000);
+  assertEquals(t.ride.by_year['2025'].activities, 1);
+  assertEquals(t.ride.all_time.activities, 3);
+});
+
+Deno.test('a year the athlete did not do this sport is never offered', () => {
+  const t = athleticTotals([
+    { date: '2026-09-01', type: 'ride', distance: 40, moving_time: 90 },
+    { date: '2025-07-04', type: 'run', distance: 10, moving_time: 50 },
+  ], TODAY);
+  assertEquals(t.ride.years, ['2026']);
+  assertEquals(t.run.years, ['2025']);
+  assertEquals(t.swim.years, []);
+  assertEquals(t.swim.by_year, {});
+});
+
+Deno.test('the year totals add up to all time', () => {
+  const rows = [
+    { date: '2026-09-01', type: 'run', distance: 10, moving_time: 50, elevation_gain: 100 },
+    { date: '2026-01-02', type: 'run', distance: 21, moving_time: 110, elevation_gain: 200 },
+    { date: '2025-11-11', type: 'run', distance: 5, moving_time: 25, elevation_gain: 50 },
+  ];
+  const t = athleticTotals(rows, TODAY);
+  const summed = t.run.years.reduce((a, y) => a + t.run.by_year[y].distance_m, 0);
+  assertEquals(summed, t.run.all_time.distance_m);
 });

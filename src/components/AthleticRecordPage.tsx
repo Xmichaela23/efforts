@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { RecordTotalsCard, RecordRunningCard, RecordCyclingCard, type RecordStandings, type RecordTotals } from '@/components/context/RecordSections';
+import { RecordSportPanel, type RecordStandings, type RecordTotals } from '@/components/context/RecordSections';
+import { sportTint } from '@/lib/context-utils';
 
 // "Logged suggests … Update" — a subtle line under a baseline. Never auto-applies — the athlete taps Update.
 // ⛔ THE SERVER BUILDS IT (2026-09-10, audit H-B12): `athletic-record` sends the line with locked lifts
@@ -435,9 +436,16 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Audit §3 order: Totals, Running, Race results, Cycling, Strength. */}
-          <RecordTotalsCard totals={totals} />
-          <RecordRunningCard standings={standings} onOpen={(id) => navigate(`/workout/${id}`)} />
+          {/* ⛔ ONE PANEL PER SPORT (2026-09-20). Totals and that sport's bests move together, the
+              way Strava's My Stats does it — the Running and Cycling cards are no longer separate
+              sections below a switch. Race results and Strength stay their own sections: they are
+              not per-sport, so a sport switch has nothing to say about them. */}
+          <RecordSportPanel
+            standings={standings}
+            totals={totals}
+            ftp={record?.ftp_best ?? null}
+            onOpen={(id) => navigate(`/workout/${id}`)}
+          />
 
           <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
             {/* ⛔ NO EXPLAINER LINE (Michael, 2026-09-20). "Official finish times, start line to
@@ -468,7 +476,13 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-lg font-semibold tabular-nums text-emerald-300/90">{fmtGoalClock(sec)}</span>
+                          {/* ⛔ THE RACE TIME IS THE ROW'S OWN SPORT COLOUR (Michael, 2026-09-20). It
+                              was `text-emerald-300/90`, which is the ride's green reading back at him
+                              on a run. `SPORT_COLORS` is the one source; the row's own `sport` picks
+                              the hue so a race bike split is never gold. ⚠️ `StateRaceBlock` uses the
+                              same emerald and is a DIFFERENT component on the Status lens — it is
+                              deliberately not touched here. */}
+                          <span className="text-lg font-semibold tabular-nums" style={{ color: sportTint(r.sport) }}>{fmtGoalClock(sec)}</span>
                           {expandedId === r.id ? <ChevronDown className="w-4 h-4 text-white/40" /> : <ChevronRight className="w-4 h-4 text-white/40" />}
                         </div>
                       </button>
@@ -500,8 +514,6 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               Add race
             </Button>
           </div>
-
-          <RecordCyclingCard standings={standings} ftp={record?.ftp_best ?? null} onOpen={(id) => navigate(`/workout/${id}`)} />
 
           <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
             <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Personal records</h3>

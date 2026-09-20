@@ -99,7 +99,8 @@ export type DisplaySportTotals = SportTotals & {
 
 export type DisplayTotals = Record<string, {
   last_4_weeks: DisplaySportTotals;
-  this_year: DisplaySportTotals;
+  by_year: Record<string, DisplaySportTotals>;
+  years: string[];
   all_time: DisplaySportTotals;
   since: string | null;
   /** `since June 2026` — what "All time" actually covers, in the athlete's words. */
@@ -121,7 +122,8 @@ export function displayTotals(t: AthleticTotals, units: Units): DisplayTotals {
   for (const [sport, p] of Object.entries(t)) {
     out[sport] = {
       last_4_weeks: dressTotals(p.last_4_weeks, units),
-      this_year: dressTotals(p.this_year, units),
+      by_year: Object.fromEntries(Object.entries(p.by_year).map(([y, v]) => [y, dressTotals(v, units)])),
+      years: p.years,
       all_time: dressTotals(p.all_time, units),
       since: p.since,
       since_display: p.since ? `since ${monthDisplay(p.since)}` : null,

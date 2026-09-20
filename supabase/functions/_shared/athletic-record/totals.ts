@@ -36,7 +36,17 @@ export type SportTotals = {
 export type PeriodTotals = {
   /** The last four weeks divided by four — a typical week, which is what Strava's profile shows. */
   last_4_weeks: SportTotals;
-  this_year: SportTotals;
+  /**
+   * Every calendar year the athlete has this sport's data for, keyed `'2026'`, computed here.
+   *
+   * ⛔ THE YEARS ARE COMPUTED, NOT FILTERED ON THE PHONE (2026-09-20). Strava's My Stats puts a year
+   * control on the middle block and the athlete flips back through it. The screen picks WHICH year to
+   * print; it never sums one. A phone that filtered rows by year would be a second place totals are
+   * worked out, and the first place would stop being the only answer.
+   */
+  by_year: Record<string, SportTotals>;
+  /** The years in `by_year`, newest first — what the control offers, and nothing it cannot fill. */
+  years: string[];
   all_time: SportTotals;
   /**
    * The athlete's earliest workout in these rows, or null when they have none.
@@ -179,7 +189,6 @@ const isDone = (w: TotallableWorkout): boolean =>
  */
 export function athleticTotals(rows: ReadonlyArray<TotallableWorkout>, today: string): AthleticTotals {
   const recentFrom = dateDaysBefore(today, RECENT_DAYS);
-  const yearFrom = `${today.slice(0, 4)}-01-01`;
   const out = {} as AthleticTotals;
 
   for (const sport of Object.keys(SPORT_TYPES) as TotalsSport[]) {
@@ -187,15 +196,17 @@ export function athleticTotals(rows: ReadonlyArray<TotallableWorkout>, today: st
     const mine = rows.filter((w) => isDone(w) && types.has(String(w.type ?? '').toLowerCase()) && /^\d{4}-\d{2}-\d{2}/.test(String(w.date ?? '')));
 
     const recent = empty();
-    const year = empty();
     const all = empty();
+    const byYear = new Map<string, SportTotals>();
     let since: string | null = null;
 
     for (const w of mine) {
       const d = w.date.slice(0, 10);
       if (d > today) continue;                       // a row dated ahead of today is not done yet
       add(all, w);
-      if (d >= yearFrom) add(year, w);
+      const y = d.slice(0, 4);
+      if (!byYear.has(y)) byYear.set(y, empty());
+      add(byYear.get(y)!, w);
       if (d > recentFrom) add(recent, w);
       if (since == null || d < since) since = d;
     }
@@ -209,7 +220,16 @@ export function athleticTotals(rows: ReadonlyArray<TotallableWorkout>, today: st
       elevation_m: Math.round(recent.elevation_m / RECENT_WEEKS),
     };
 
-    out[sport] = { last_4_weeks: perWeek, this_year: year, all_time: all, since };
+    // Newest first, and only the years that have something in them — the control must not offer a
+    // year that prints zeroes.
+    const years = [...byYear.keys()].sort().reverse();
+    out[sport] = {
+      last_4_weeks: perWeek,
+      by_year: Object.fromEntries(years.map((y) => [y, byYear.get(y)!])),
+      years,
+      all_time: all,
+      since,
+    };
   }
 
   return out;

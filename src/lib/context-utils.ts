@@ -150,6 +150,18 @@ const DISCIPLINE_TO_TAILWIND: Record<string, string> = {
 };
 
 /**
+ * The hue for a sport word, from anywhere — a workout row, a goal, a payload key.
+ *
+ * ⛔ IT LIVES BESIDE THE OBJECT, NOT IN A SCREEN (2026-09-20). Every caller was reaching into
+ * `SPORT_COLORS` with its own fallback, which is how one screen ends up with a different answer for
+ * an unknown sport than the next. Unknown falls back to run, deliberately: an uncoloured number is
+ * harder to read than a slightly wrong one, and the status hues are excluded from that object on
+ * purpose so this can never return one.
+ */
+export const sportTint = (sport: string | null | undefined): string =>
+  (SPORT_COLORS as Record<string, string>)[String(sport ?? '').toLowerCase()] ?? SPORT_COLORS.run;
+
+/**
  * Convert hex color to RGB string (format: "r,g,b")
  * Useful for rgba() CSS and inline styles
  */
