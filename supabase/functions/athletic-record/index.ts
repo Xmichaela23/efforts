@@ -26,7 +26,7 @@ import { rankAthleticRecords, type RankableWorkout } from '../_shared/athletic-r
 import { athleticTotals, type TotallableWorkout } from '../_shared/athletic-record/totals.ts';
 // The screen prints strings, never metres and seconds — the phone does not convert a unit the server
 // can (`record.ts` has sent a `display` beside every `seconds` since 2026-09-10 for the same reason).
-import { displayStandings, displayTotals, unitsOf } from '../_shared/athletic-record/display.ts';
+import { displayStandings, displayTotals, monthDisplay, unitsOf } from '../_shared/athletic-record/display.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -128,9 +128,15 @@ Deno.serve(async (req) => {
       baselines: bl.data ?? null,
       asOf,
     });
+    // The FTP best's date prints as a month like every other date on this screen. Formatted here,
+    // not on the phone, for the same reason the distances are (`display.ts`).
+    const recordOut = record.ftp_best
+      ? { ...record, ftp_best: { ...record.ftp_best, date_display: monthDisplay(record.ftp_best.date) } }
+      : record;
+
     return json({
       success: true,
-      record,
+      record: recordOut,
       standings: displayStandings(rankAthleticRecords(rankable), units),
       totals: displayTotals(athleticTotals(totallable, asOf), units),
       units,

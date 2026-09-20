@@ -53,7 +53,6 @@ const POWER_DURATIONS: ReadonlyArray<[string, string]> = [
 
 const card = 'p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]';
 const heading = 'text-sm font-semibold text-white/90 tracking-wide';
-const subhead = 'text-xs text-white/45 leading-relaxed mt-1';
 
 /**
  * One distance, with up to three times under it. ⚠️ The three are STACKED, not laid side by side: at
@@ -112,7 +111,7 @@ export function RecordTotalsCard({ totals }: { totals: RecordTotals | null }) {
   if (!totals) return null;
 
   const COLUMNS: ReadonlyArray<[string, string | null, SportTotals | undefined]> = [
-    ['Last 4 weeks', 'a typical week', p?.last_4_weeks],
+    ['Last 4 weeks (avg)', null, p?.last_4_weeks],
     ['This year', null, p?.this_year],
     ['All time', p?.since_display ?? null, p?.all_time],
   ];
@@ -176,12 +175,13 @@ export function RecordRunningCard({ standings, onOpen }: { standings: RecordStan
     <div className={card}>
       <h3 className={heading}>Running</h3>
       {/*
-        ⛔ THIS LINE IS HOW THE TWO MARATHON TIMES STOP LOOKING LIKE A DISAGREEMENT. The race card
-        below prints the chip time, gun to line; this prints the fastest 26.2 anywhere inside a run,
-        and it is normally the quicker of the two. Each section says what it measures, once. A note
-        pointing from one to the other would create the contradiction it was trying to explain.
+        ⛔ NO EXPLAINER LINE UNDER THIS HEADING, and that is a ruling, not an omission (Michael,
+        2026-09-20). A draft carried "Your fastest time at each distance, from anywhere inside a run."
+        to keep the marathon here from reading as a contradiction with the chip time under Race
+        results. He cut it, and every other subline with it: Strava and Garmin print none, and the
+        instinct to explain the most common screen in training apps is where the padding comes from.
+        The headings carry it. ⚠️ Do not re-add a shorter version — that was asked and answered.
       */}
-      <p className={subhead}>Your fastest time at each distance, from anywhere inside a run.</p>
       {!anything ? (
         <p className="text-sm text-white/45 leading-relaxed mt-3">No runs with a recorded track yet.</p>
       ) : (
@@ -198,7 +198,8 @@ export function RecordRunningCard({ standings, onOpen }: { standings: RecordStan
 
 export function RecordCyclingCard({ standings, ftp, onOpen }: {
   standings: RecordStandings | null;
-  ftp: { watts: number; date: string } | null;
+  /** `date_display` is the month, formatted server-side — the phone does not format a date either. */
+  ftp: { watts: number; date: string; date_display?: string | null } | null;
   onOpen: (id: string) => void;
 }) {
   const ride = standings?.ride;
@@ -211,7 +212,6 @@ export function RecordCyclingCard({ standings, ftp, onOpen }: {
         {hasPower && (
           <div>
             <p className="text-xs font-semibold text-white/70">Best power</p>
-            <p className={subhead}>The highest average power you held for each length of time.</p>
             <ul className="text-sm text-white/80 mt-2">
               {POWER_DURATIONS.map(([key, label]) => (
                 <StandingRow key={key} label={label} entries={ride?.power[key]} onOpen={onOpen} />
@@ -236,7 +236,7 @@ export function RecordCyclingCard({ standings, ftp, onOpen }: {
             <span className="text-white/50">FTP</span>
             <span className="tabular-nums">
               {ftp ? `${ftp.watts} W` : <span className="text-white/30">—</span>}
-              {ftp?.date && <span className="text-white/35 text-xs ml-2">best, {ftp.date}</span>}
+              {ftp?.date_display && <span className="text-white/35 text-xs ml-2">best, {ftp.date_display}</span>}
             </span>
           </li>
         </ul>

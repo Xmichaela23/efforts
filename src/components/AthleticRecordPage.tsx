@@ -355,8 +355,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   return (
     // ⛔ NO PAGE TITLE (2026-09-20). This was a route with its own "My Record" heading; it is a lens
     // on State now and the tab above it already says Record. A second title would be the screen
-    // naming itself twice. The old subtitle explaining chip time moved into the Race results section,
-    // where it is about the numbers directly under it.
+    // naming itself twice. The old subtitle explaining chip time is gone with it — see Race results.
     <div className="max-w-2xl mx-auto pb-6">
 
       {autoSaveStatus && (
@@ -441,10 +440,11 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
           <RecordRunningCard standings={standings} onOpen={(id) => navigate(`/workout/${id}`)} />
 
           <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-            <h3 className="text-sm font-semibold text-white/90 tracking-wide">Race results</h3>
-            {/* The other half of the marathon pair — see RecordRunningCard. This says what these
-                numbers are; that says what those are; neither refers to the other. */}
-            <p className="text-xs text-white/45 leading-relaxed mt-1 mb-3">Official finish times, start line to finish line.</p>
+            {/* ⛔ NO EXPLAINER LINE (Michael, 2026-09-20). "Official finish times, start line to
+                finish line." was drafted here, to sit against the Running card's fastest-26.2 and stop
+                the two marathon times reading as a contradiction. He cut it with the other two: the
+                field's own screens print none, and the heading carries it. Do not re-add it short. */}
+            <h3 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Race results</h3>
             {races.length === 0 ? (
               <p className="text-sm text-white/45">No saved race finishes yet. Complete a plan from State or add one manually.</p>
             ) : (
