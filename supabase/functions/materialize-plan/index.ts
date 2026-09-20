@@ -48,6 +48,7 @@ import {
 // names the family; the library states the rule, so the materializer does not carry a second list.
 import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
 import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
+import { plannedNarrative } from '../_shared/planned-narrative.ts';
 import { SWIM_ENDURANCE_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
@@ -4769,6 +4770,17 @@ Deno.serve(async (req) => {
               // The book's effort line (p235 talk test, p229–231 all-out) is picked by the row's family.
               family: lineTags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null,
             });
+            // ⛔ TODAY'S NARRATIVE FOR A HARD RUN OR RIDE (2026-09-20) — said once, here, off the same steps as the
+            // list above; Today's card prints `computed.narrative`. See `_shared/planned-narrative.ts`.
+            const narrative = plannedNarrative(v3, {
+              units: (row as any)?.units ?? null,
+              sport: stepLineSport,
+              raceDay: lineTags.includes('race_day') || lineTags.includes('marathon_pace'),
+              family: lineTags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null,
+              archetype: lineTags.find((t) => t.startsWith('archetype:'))?.slice('archetype:'.length) ?? null,
+              level: Number(lineTags.find((t) => t.startsWith('level:'))?.slice('level:'.length)) || null,
+            });
+            if (narrative) update.computed.narrative = narrative; else delete update.computed.narrative;
           }
           
           // Update race day description to match actual pace used in computed steps

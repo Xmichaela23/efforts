@@ -62,9 +62,9 @@ export const ALL_OUT_LINE = '"All-out" means the fastest speed available that da
 const ALL_OUT_LINE_FAMILIES: ReadonlySet<string> = new Set(['run_sprint_power']);
 
 const kindOf = (s: PlannedStep) => String(s?.kind || '').toLowerCase();
-const isWarmup = (s: PlannedStep) => kindOf(s) === 'warmup';
-const isCooldown = (s: PlannedStep) => kindOf(s) === 'cooldown';
-const isRecovery = (s: PlannedStep) => kindOf(s) === 'recovery' || /rest/i.test(String(s?.label || ''));
+export const isWarmup = (s: PlannedStep) => kindOf(s) === 'warmup';
+export const isCooldown = (s: PlannedStep) => kindOf(s) === 'cooldown';
+export const isRecovery = (s: PlannedStep) => kindOf(s) === 'recovery' || /rest/i.test(String(s?.label || ''));
 
 /** "40 s" under a minute, "2:00" from a minute up. */
 function fmtTime(sec: number): string {
@@ -102,7 +102,7 @@ function paceRangeText(loSecPerMi: number, hiSecPerMi: number, units?: string | 
   return `${clockOf(f.metric ? perKm(loSecPerMi) : loSecPerMi)}–${f.pacePerUnit(perKm(hiSecPerMi))}`;
 }
 
-function paceText(s: PlannedStep, opts: StepLineOptions): string | undefined {
+export function paceText(s: PlannedStep, opts: StepLineOptions): string | undefined {
   if (opts.raceDay && typeof s?.paceTarget === 'string' && s.paceTarget) return s.paceTarget;
   const pr = s?.pace_range as any;
   if (pr && !Array.isArray(pr) && Number(pr.lower) > 0 && Number(pr.upper) > 0) return paceRangeText(Number(pr.lower), Number(pr.upper), opts.units);
@@ -112,7 +112,7 @@ function paceText(s: PlannedStep, opts: StepLineOptions): string | undefined {
   return typeof s?.paceTarget === 'string' && s.paceTarget ? s.paceTarget : undefined;
 }
 
-function powerText(s: PlannedStep): string | undefined {
+export function powerText(s: PlannedStep): string | undefined {
   if (!(s?.powerRange && typeof s.powerRange.lower === 'number')) return undefined;
   // p237's floor prints its shown top, 130% of FTP (round 5, `shownPowerRange`); the score has none.
   const r = shownPowerRange(s.powerRange)!;
@@ -124,7 +124,7 @@ function powerText(s: PlannedStep): string | undefined {
   return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
 }
 
-const hrText = (s: PlannedStep) =>
+export const hrText = (s: PlannedStep) =>
   s?.prescription === 'heart_rate' && s?.hr_range && typeof s.hr_range.lower === 'number' && typeof s.hr_range.upper === 'number'
     ? `HR ${Math.round(s.hr_range.lower)}–${Math.round(s.hr_range.upper)}` : undefined;
 
@@ -132,7 +132,7 @@ const hrText = (s: PlannedStep) =>
  * ⛔ THE PAGE'S OWN WORDS FOR A STEP, WHERE THE STEP CARRIES THEM (2026-09-18, book-language). Only a label marked
  * `page_label` prints: the other labels on the steps are ours and never reached these lines.
  */
-const pageWords = (s: PlannedStep): string | null =>
+export const pageWords = (s: PlannedStep): string | null =>
   s?.page_label === true && typeof s?.label === 'string' && s.label.trim() ? s.label.trim() : null;
 const untimed = (s: PlannedStep): boolean =>
   !(Number(s?.seconds) > 0) && !(Number(s?.distanceMeters ?? s?.distance_m) > 0);
@@ -196,7 +196,7 @@ const stepText = (s: PlannedStep, opts: StepLineOptions) => {
   const base = `${lengthText(s, opts)}${words && isRecovery(s) ? '' : targetText(s, opts)}`;
   return words ? `${base} ${words}` : base;
 };
-const sigOf = (s: PlannedStep, opts: StepLineOptions) => `${isRecovery(s) ? 'r' : 'w'}|${stepText(s, opts)}`;
+export const sigOf = (s: PlannedStep, opts: StepLineOptions) => `${isRecovery(s) ? 'r' : 'w'}|${stepText(s, opts)}`;
 
 function unitText(unit: PlannedStep[], opts: StepLineOptions): string {
   return unit.map((s, i) => {
@@ -205,10 +205,17 @@ function unitText(unit: PlannedStep[], opts: StepLineOptions): string {
   }).join(', ');
 }
 
+/**
+ * The repeat `groupAt` found, as numbers: `sets` of `rounds` rounds of the `unitLen` steps at `from`, the step at
+ * `sepIdx` between sets (-1 when there is none), and whether the last round dropped its trailing recovery. Today's
+ * narrative (`planned-narrative.ts`) reads these so it groups a session exactly as the list does.
+ */
+export type StepGroup = { covered: number; line: string; sets: number; rounds: number; unitLen: number; sepIdx: number; lastRoundShort: boolean };
+
 /** The best repeat that starts at `from`: how many steps it covers and its line. */
-function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLineOptions): { covered: number; line: string } {
+export function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLineOptions): StepGroup {
   const n = seg.length - from;
-  let best = { covered: 1, line: stepText(seg[from], opts), p: 1 };
+  let best: StepGroup & { p: number } = { covered: 1, line: stepText(seg[from], opts), p: 1, sets: 1, rounds: 1, unitLen: 1, sepIdx: -1, lastRoundShort: false };
   const same = (a: number, b: number, len: number) => {
     for (let k = 0; k < len; k++) if (sig[a + k] !== sig[b + k]) return false;
     return true;
@@ -251,9 +258,10 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
       line = `${r} × ${unitText(unit, opts)}`;
     }
     // The smallest round that covers the most steps wins; p only grows, so a tie keeps the smaller one.
-    if (covered > best.covered) best = { covered, line, p };
+    if (covered > best.covered) best = { covered, line, p, sets, rounds: r, unitLen: p, sepIdx: sets > 1 ? sepIdx : -1, lastRoundShort };
   }
-  return { covered: best.covered, line: best.line };
+  const { p: _p, ...group } = best;
+  return group;
 }
 
 /**
@@ -272,7 +280,7 @@ function groupAt(seg: PlannedStep[], sig: string[], from: number, opts: StepLine
  * FIELD — the chunking is Nielsen Norman Group's scanning guidance: readers scan rather than read, and a line runs
  * 50–75 characters. The one-line form was about 140 and wrapped.
  */
-function setBlockAt(seg: PlannedStep[], from: number, opts: StepLineOptions): { covered: number; work: PlannedStep[]; rec: PlannedStep[] } | null {
+export function setBlockAt(seg: PlannedStep[], from: number, opts: StepLineOptions): { covered: number; work: PlannedStep[]; rec: PlannedStep[] } | null {
   if (isRecovery(seg[from])) return null;
   const work: PlannedStep[] = [];
   const rec: PlannedStep[] = [];

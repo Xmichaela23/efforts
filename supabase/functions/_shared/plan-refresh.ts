@@ -64,8 +64,10 @@ import { localDateInTz } from './local-date.ts';
 //   (`_shared/session-swap/plan-adjustments.ts`), and the rewrite composes it in — a chosen workout, a sport and a machine
 //   survive every rewrite; "Just today" is a one-date row; swaps made before are read from their tags on the first rewrite.
 // 21 (2026-09-19): the rewrite carries each plyo drill's approved note ("Benefit: … ") onto rows built before it.
+// 22 (2026-09-20): a hard run or ride carries Today's narrative (`computed.narrative`, `_shared/planned-narrative.ts`),
+//   said off the same steps as `computed.step_lines`.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 21;
+export const PLAN_WRITER_VERSION = 22;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

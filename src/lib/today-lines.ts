@@ -37,6 +37,8 @@ export type TodayRow = {
   tags?: unknown;
   training_plan_id?: string | null;
   strength_exercises?: unknown;
+  /** `computed.narrative` — the server's narrative for a hard run or ride (`_shared/planned-narrative.ts`). */
+  computed?: unknown;
 };
 
 const tagsOf = (row: TodayRow | null | undefined): string[] =>
@@ -245,6 +247,11 @@ export function liftCardLinesFor(
  *
  * The family line, when the book has one, and nothing else. A session the athlete brought in rather
  * than one the plan built gets nothing — the caller decides that; see `isFromPlan`.
+ *
+ * ⛔ A HARD RUN OR RIDE READS ITS NARRATIVE FIRST (Michael, 2026-09-20: "this is just for a today effort read").
+ * materialize-plan writes it as `computed.narrative` off the session's own steps (`_shared/planned-narrative.ts`)
+ * and get-week passes it through; this file prints it as sent, above the family line. The session sheet and the
+ * week view keep the step list and do not print it. A row without one reads as it did before.
  */
 export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
@@ -256,7 +263,10 @@ export function enduranceLinesFor(session: TodayRow): string[] {
     tagValue(session, 'archetype'),
     sprintEveryMinutesFromTokens((session as { steps_preset?: unknown } | null)?.steps_preset),
   );
-  return line ? [line] : [];
+  const computed = (session as { computed?: unknown } | null)?.computed;
+  const sent = computed && typeof computed === 'object' ? (computed as { narrative?: unknown }).narrative : null;
+  const narrative = typeof sent === 'string' && sent.trim() ? sent.trim() : null;
+  return [narrative, line].filter((x): x is string => !!x);
 }
 
 /**

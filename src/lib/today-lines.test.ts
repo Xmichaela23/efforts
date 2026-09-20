@@ -149,6 +149,20 @@ Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p2
   assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.');
 });
 
+Deno.test('⛔ A HARD RUN OR RIDE READS THE SERVER\'S NARRATIVE FIRST, THEN ITS PAGE\'S LINE (2026-09-20)', () => {
+  const narrative = '3:00 at 7:11–8:47/mi, then 2:00 at 14:22–17:34/mi. The same two paces for each pair after that: 2:00 and 1:20, 1:00 and 40 seconds, 45 and 30 seconds, 30 and 20 seconds. Then 2:00 at 10:56–12:22/mi and a second set starting from the 2:00 effort.';
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative } }), [
+    narrative,
+    'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.',
+  ]);
+  // p236's sprints have no purpose line; the narrative prints alone.
+  const surges = '8 flying 30-second surges to max effort, with 2:30 of recovery between them.';
+  assertEquals(enduranceLinesFor({ ...ride('ride_sprints', 'above'), computed: { narrative: surges } }), [surges]);
+  // A row the server sent no narrative for reads as it did before.
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative: null } }).length, 1);
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: null }).length, 1);
+});
+
 Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {
   // ⚠️ The VO2 ride has p238's line since 2026-09-18 (book-language pass 5); p236's sprints print no intent sentence.
   assertEquals(enduranceLinesFor(ride('ride_sprints', 'above')), []);
