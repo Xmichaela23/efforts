@@ -1,6 +1,77 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-17, PM chat — `stage/one-truth-drift` MERGED to main, everything below PUSHED; main = `f1a39cda`)
+## 🧭 NEXT SESSION — START HERE (updated 2026-09-20 — main = `5a3801c5f`, PUSHED; `athletic-record` DEPLOYED at v10; iOS synced, NOT built in Xcode)
+
+> **How to talk to Michael (read first):** the voice example at the top of `~/.claude/CLAUDE.md`. Short spoken
+> sentences: what he gets, then what you'd do next. Never "worth knowing" or any cousin of it — he reads that phrase
+> as the tell of machine text and stops trusting the sentence after it. Answer the question asked; a yes/no gets
+> "Yes." No explainer sublines in the product either, for the same reason — see the copy ruling below.
+>
+> **YOUR JOB: the Record tab has never been seen on a device.** Everything below is DEPLOYED and unverified in the
+> only sense that counts. Michael synced the iOS build (`npm run ios`) and had not opened Xcode when we stopped —
+> he needs Clean Build Folder first. Look for: State's tab row reads Status · Adjust · Record (Schedule is hidden);
+> tapping Run / Ride / Swim switches the totals AND that sport's bests together in one panel; the pills carry the
+> sport colour softly when unselected and brighter when selected; the year block reads `2026` with a picker offering
+> 2025; the race finish time is gold, not green; there is no "Personal records" card; the swim pace and its
+> "Logged suggests" line sit in the Swim panel; the lifts sit under `Strength`.
+>
+> **WHAT SHIPPED 2026-09-19/20 — the Record tab, three stages, all on main and deployed. Do not redo any of it.**
+> Docs: `docs/AUDIT-athletic-record-2026-09-19.md` (the audit and every ruling), `docs/WORKORDER-record-efforts-2026-09-19.md`
+> (stage 1), `docs/WORKORDER-record-store-2026-09-20.md` (stage 2), `docs/WORKORDER-record-screen-2026-09-20.md` (stage 3).
+> - **Stage 1 — every workout measures its own efforts.** `src/lib/best-efforts.ts`: ONE finder storing BOTH the
+>   as-run elapsed time (the record) and the grade-adjusted pace over the same window (the trend), so nobody writes a
+>   second finder. Runs get Strava's 14 distances, outdoor rides its 13; an indoor or virtual ride sets no distance
+>   record and keeps its power curve. The old ±2% window is gone — the stored time is the time for the distance.
+>   The power curve widened to 16 durations; the FTP fit reads its own frozen `CP_FIT_DURATIONS`, so **no learned FTP
+>   moved**, and a pin test fails if that is undone. Backfilled over the whole history: 529 runs and rides, none below
+>   `ANALYSIS_VERSION` v0.3.0.
+> - **Stage 2 — the standings and totals.** `_shared/athletic-record/{rank,totals,display}.ts`, served by
+>   `athletic-record` beside the untouched `record`. **NO STORED TABLE, on Michael's ruling** — it is worked out on
+>   read so it can never drift from the workouts under it. Totals: activities, distance, time, elevation, per sport,
+>   for last 4 weeks (avg), a selectable year, and all time. **Session time is MINUTES in the rows** (a first version
+>   summed them as seconds and read a year of riding as six hours); the ladder now takes the first real value of five
+>   and prints HOURS on screen.
+> - **Stage 3 — the screen.** Record is a State lens (`src/components/context/RecordSections.tsx`,
+>   `AthleticRecordPage.tsx`). The old header-menu entry and `/profile/athletic-record` are gone; the old URL
+>   redirects to the tab. One panel per sport. Sport colour from `SPORT_COLORS` only. Pills and type to
+>   `DESIGN_GUIDELINES.md`. Schedule is **hidden, not deleted** (`hidden: true` in `StateHubTabs.tsx`) and a pending
+>   `'schedule'` lens lands on Status.
+>
+> **⛔ THE COPY RULING, and it binds the next session (Michael, 2026-09-20):** *"fight all our instincts to turn the
+> most common thing on any training app into ai slop with unnecessary language or worse, weird data points."* Three
+> explainer sublines were written, approved in draft, and **cut** — including the one under Running that existed to
+> stop the marathon reading as a contradiction (`4:41:27` fastest-26.2 on the tab vs `4:43:48` chip time under Race
+> results). Both files say the line was CUT, not forgotten. **Do not re-add a shorter version as a kindness.** The
+> label spellings are copy now too — "5K" not "5k", "1/2 mile", "5 sec", "1 hour" — and a tidy-up of them goes back
+> to him. Every athlete-facing line on this tab was approved word by word.
+>
+> **UNVERIFIED / OPEN:**
+> - The whole tab on a device (above). Web was seen and the totals were checked against his Strava stats page.
+> - His Strava all-time (768 runs / 4,104 mi) is far bigger than ours (171 / 914.2 mi) because **our history starts
+>   April 2025** — Strava's connect import is 90 days, Garmin's caps at 180. Not a bug. Do not try to close it.
+> - **Swims are parked** for records: the stored lengths carry no start time, so rest at the wall is invisible, and
+>   many swims arrive as evenly-split reconstructions. Swim totals DO ship.
+> - `get-week` is **deliberately undeployed** — its bundle carries stage 1's `workout-list-select` keys and another
+>   terminal's unapproved `spacing-line.ts`. Nothing reads those keys yet.
+> - A Trophy icon still sits on the "Saved <race> result" toast (`AthleticRecordPage.tsx:378`) on a screen he ruled
+>   has no medals. Not raised with him, not changed.
+> - Leads, none shown to have fired: the Garmin unique index is PARTIAL (`20250906120000_workouts_activity_unique_indexes.sql:19-20`,
+>   `WHERE garmin_activity_id IS NOT NULL`), three paths insert with no de-duplication check
+>   (`save-imported-workout:159`, `mark-planned-complete:69-83`, `ingest-phone-workout:238`), and the Strava-side
+>   guard uses `.maybeSingle()` (`strava-webhook:210-217`).
+>
+> **⛔ A WITHDRAWN FINDING, so nobody re-derives it.** A "the same ride is stored twice, totals will double" finding on
+> 2026-09-19 was WRONG: the query was not scoped to a `user_id` and was reading a **second test account** carrying the
+> same Garmin history (`1a1f04d1…`, 445 workouts; his is `45d122e7…`, 463). Michael confirmed the second account was a
+> test. **Scope every query to one `user_id`.** Separately, the one real doubled row — a 1:42 400 m printed twice — is
+> the same run imported twice a year ago and Michael ruled it closed: *"are we frame fucking my history or building a
+> feature for users?"* Leave his history alone.
+>
+> **Rules that bind you:** the phone prints and never ranks, sums or formats; every number has a source or says OURS
+> with a row in `docs/STATE-SOURCES.md`; commit exact files, never `-a` (terminals share this tree); commit, push and
+> deploy wait for his word; prod reads need his go-ahead per session.
+
+## (older banner) (written 2026-09-17, PM chat — `stage/one-truth-drift` MERGED to main, everything below PUSHED; main = `f1a39cda`)
 
 > **Your job:** `docs/WORKORDER-sessions-respond-2026-09-17.md` (sessions that answer back, stages A–D), one stage per
 > terminal, run from a project-manager chat. ⚠️ Its opening story says the 16 Sep run's laps "matched nothing" because
