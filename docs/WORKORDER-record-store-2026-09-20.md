@@ -207,3 +207,43 @@ in the table.
 
 ⚠️ **Not rides only.** The Strava cross-check run for stage 1 found every Strava-sourced RUN doubled
 as well, so the count in step 1 must cover every sport, not just rides.
+
+---
+
+## Stage 2 — what shipped, and what stage 3 must not trip over (2026-09-20)
+
+**Michael's ruling: NO stored records table.** `athletic-record` works the standings and the totals
+out from the workout rows on every read, and §1's "one store … written on the spine" is superseded.
+He was given the trade — a saved list has to be rewritten on every arrival, edit, delete and
+recompute, and that is the one way it drifts out of step with the workouts under it — and chose the
+fresh read. **§2 (rewritten when the data changes) therefore stays withdrawn: there is nothing to
+rewrite.** `rank.ts` and `totals.ts` are pure, so a table can be dropped in later without either of
+them changing, if a read ever gets slow.
+
+### Two things stage 3 has to handle on the screen
+
+1. ⚠️ **Two different marathon numbers, both correct.** The standings read **4:41:27** (the fastest
+   26.2 miles anywhere inside the run) and the race card reads **4:43:48** (the chip time, gun to
+   line). Neither is wrong and neither should be "fixed" — Strava prints both the same way. The
+   screen must not place them so they read as a contradiction, and it must not silently show one.
+   The same gap will appear at every distance he has raced.
+
+2. ⚠️ **Equal efforts on one day both rank, by design.** The 400 m podium currently reads
+   `1:42 (2025-09-01)` twice. The rule that used to collapse those was removed when job zero was
+   withdrawn, because with no duplicates in the data it could only hide a real second effort. **That
+   pair is not yet explained** — two entries means two workout ROWS, so it is either a genuine double
+   day or one run stored twice in his own account. The scratchpad script now prints both workout ids
+   and compares name, distance and duration, and scans the whole history for rows sharing date, type,
+   name and distance. Settle it before stage 3 prints the podium.
+
+   ⚠️ If it IS one run stored twice, the structural finding below is the cause and the fix belongs at
+   the write, not in the ranker: the unique index is partial (`WHERE garmin_activity_id IS NOT NULL`)
+   and `save-imported-workout:159`, `mark-planned-complete:69-83` and `ingest-phone-workout:238`
+   insert with no de-duplication check.
+
+### Deploy
+
+`athletic-record`, and nothing else — it is the only importer of `_shared/athletic-record/rank.ts`
+and `_shared/athletic-record/totals.ts` (traced 2026-09-20). ⚠️ `get-week` still holds stage 1's
+undeployed `workout-list-select` change; leave it held until stage 3 needs those keys, since its
+bundle would also carry another terminal's unapproved `spacing-line.ts`.
