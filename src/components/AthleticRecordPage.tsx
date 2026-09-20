@@ -99,6 +99,8 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   // formatted — the phone prints the strings and converts nothing.
   const [standings, setStandings] = useState<RecordStandings | null>(null);
   const [totals, setTotals] = useState<RecordTotals | null>(null);
+  /** True when `athletic-record` could not be reached — see `refreshRecord`. Never means "no data". */
+  const [recordFailed, setRecordFailed] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState('');
@@ -117,14 +119,37 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
 
   // ⛔ THE PERSONAL-RECORDS CARD COMES FROM THE SERVER (2026-09-10, audit H-B11 / H-B12). This page no longer
   // picks a marathon, prints the current FTP as the best, scans rides, or builds the suggestion lines.
+  /**
+   * ⛔ A FAILED CALL IS NOT AN EMPTY ONE (2026-09-20). This used to log the error and then write the
+   * nulls in anyway, so a slow or failed `athletic-record` printed every lift as "—" on a screen that
+   * otherwise looked fine — Race results rendered, because those come from a direct table read that
+   * succeeded. The athlete saw four dashes where his lifts are and nothing said why.
+   *
+   * Now: a failure leaves whatever was already on screen alone, retries once, and if there is still
+   * nothing it is recorded as a FAILURE rather than as an answer. The sections that need the payload
+   * are then not drawn at all. Absent is honest; "—" is a claim that the number is missing.
+   *
+   * ⚠️ Do NOT "fix" a failure by printing a number from somewhere else. There is no other source for
+   * these — that is the point of the whole stage.
+   */
   const refreshRecord = useCallback(async () => {
-    const { data, error } = await supabase.functions.invoke('athletic-record', { body: {} });
-    if (error) console.warn('[AthleticRecord] record', error);
+    const attempt = async () => supabase.functions.invoke('athletic-record', { body: {} });
+    let { data, error } = await attempt();
+    if (error || !data) {
+      console.warn('[AthleticRecord] record failed, retrying once', error);
+      ({ data, error } = await attempt());
+    }
     const payload = data as { record?: AthleticRecord; standings?: RecordStandings; totals?: RecordTotals } | null;
-    const rec = payload?.record ?? null;
+    if (error || !payload) {
+      console.warn('[AthleticRecord] record unavailable; leaving the screen as it was', error);
+      setRecordFailed(true);
+      return;
+    }
+    setRecordFailed(false);
+    const rec = payload.record ?? null;
     setRecord(rec);
-    setStandings(payload?.standings ?? null);
-    setTotals(payload?.totals ?? null);
+    setStandings(payload.standings ?? null);
+    setTotals(payload.totals ?? null);
     if (rec?.baselines_updated_at) setLastUpdated(rec.baselines_updated_at);
   }, []);
 
@@ -440,7 +465,10 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               way Strava's My Stats does it — the Running and Cycling cards are no longer separate
               sections below a switch. Race results and Strength stay their own sections: they are
               not per-sport, so a sport switch has nothing to say about them. */}
-          <RecordSportPanel
+          {/* ⚠️ NOT DRAWN AT ALL WHEN THE CALL FAILED AND NOTHING WAS CACHED IN STATE. A panel of
+              dashes reads as "you have done nothing"; an absent panel reads as "not loaded", which is
+              what actually happened. Same for Strength below. */}
+          {!(recordFailed && !totals) && <RecordSportPanel
             standings={standings}
             totals={totals}
             ftp={record?.ftp_best ?? null}
@@ -459,7 +487,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 )}
               </div>
             }
-          />
+          />}
 
           <div className={RECORD_CARD}>
             {/* ⛔ NO EXPLAINER LINE (Michael, 2026-09-20). "Official finish times, start line to
@@ -540,7 +568,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             exists to hold two unrelated leftovers is how the screen grew the wrong name in the first
             place.
           */}
-          <div className={RECORD_CARD}>
+          {!(recordFailed && !record) && <div className={RECORD_CARD}>
             <h3 className="text-sm font-semibold text-white">Strength</h3>
             <ul className="text-sm mt-2">
               {([
@@ -564,7 +592,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 );
               })}
             </ul>
-          </div>
+          </div>}
 
           {/* Milestones came off 2026-09-20 (audit §3 G): it was a placeholder sentence promising
               streaks and highlights, and nothing ever filled it. An empty promise on a record screen

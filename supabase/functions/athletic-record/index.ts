@@ -19,7 +19,24 @@
  * ⚠️ EVERY QUERY IS SCOPED TO THE CALLER'S OWN `userId`, taken from the verified JWT and never from
  * the body. An unscoped read is what produced the withdrawn "every ride is stored twice" finding on
  * 2026-09-19: a second test account holds a copy of the same Garmin history.
+ *
+ * ⛔ THE HISTORY HALF IS CACHED; THE BASELINE HALF IS NOT (2026-09-20). Reading 463 workouts and
+ * ranking them is the slow part and the athlete felt it — the tab sat on a spinner every open. That
+ * result is cached per athlete per day in `athletic_record_cache` and dropped by
+ * `_shared/invalidate-user-training-cache.ts` whenever a workout arrives, is edited, is deleted or is
+ * recomputed.
+ *
+ * ⚠️ `record` — the lifts, the swim pace, the FTP best, the races — is DELIBERATELY NOT CACHED. It
+ * comes from `user_baselines` and `goals` in two small queries, and it is what the "Logged suggests …
+ * Update" button writes. Caching it would mean a tap that saves a lift shows the old number until
+ * something unrelated invalidates the row, and nothing in `save-baselines` invalidates anything.
+ * Cache the expensive thing, not everything.
+ *
+ * ⛔ AND IT IS A CACHE, NOT THE RECORDS TABLE HE RULED OUT. A table is a second copy of the truth
+ * that every writer has to keep in step; this is the same read, from the same rows, by the same code,
+ * thrown away when those rows change. A miss is slower, never different.
  */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildAthleticRecord } from './record.ts';
 import { rankAthleticRecords, type RankableWorkout } from '../_shared/athletic-record/rank.ts';
@@ -37,6 +54,19 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+/** What the cache row holds: the two halves built from the workout history, already formatted. */
+type CachedHistory = { standings: unknown; totals: unknown };
+
+/**
+ * Service-role client, for the cache row only. The request's own client is RLS-scoped and may read
+ * its row but not write one — deliberately, so nothing on the phone can put a value into a cache the
+ * server serves back.
+ */
+const cacheClient = () => createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+);
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
@@ -45,6 +75,26 @@ Deno.serve(async (req) => {
     const { userId, supabase } = await requireUser(req);
     const body = await req.json().catch(() => ({}));
     const asOf = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.date ?? '')) ? String(body.date) : new Date().toISOString().slice(0, 10);
+
+    /**
+     * ⚠️ THE DATE IS PART OF THE KEY. The payload holds "last 4 weeks" and a current year, so a row
+     * computed yesterday is the wrong answer today even when no workout changed. A different `as_of`
+     * is a miss, not a hit.
+     * ⚠️ A CACHE READ THAT FAILS IS A MISS, never an error the athlete sees — the whole point is that
+     * the slow path still gives the right answer.
+     */
+    const cacheDb = cacheClient();
+    let cached: CachedHistory | null = null;
+    try {
+      const { data } = await cacheDb
+        .from('athletic_record_cache')
+        .select('payload, as_of')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (data && String(data.as_of).slice(0, 10) === asOf) cached = data.payload as CachedHistory;
+    } catch (e) {
+      console.warn('[athletic-record] cache read failed, computing:', e);
+    }
 
     const [goals, ftp, rides, bl, history] = await Promise.all([
       supabase
@@ -81,12 +131,14 @@ Deno.serve(async (req) => {
        * and `.eq('workout_status','completed')` would silently drop them from the totals. Planned
        * rows are excluded by name instead, and `athleticTotals` checks again.
        */
-      supabase
-        .from('workouts')
-        .select('id, date, name, type, workout_status, distance, elevation_gain, moving_time, elapsed_time, duration, run_records:computed->run_records, ride_records:computed->ride_records, power_curve:computed->power_curve, overall:computed->overall')
-        .eq('user_id', userId)
-        .or('workout_status.is.null,workout_status.neq.planned')
-        .order('date', { ascending: true }),
+      cached
+        ? Promise.resolve({ data: [], error: null })
+        : supabase
+          .from('workouts')
+          .select('id, date, name, type, workout_status, distance, elevation_gain, moving_time, elapsed_time, duration, run_records:computed->run_records, ride_records:computed->ride_records, power_curve:computed->power_curve, overall:computed->overall')
+          .eq('user_id', userId)
+          .or('workout_status.is.null,workout_status.neq.planned')
+          .order('date', { ascending: true }),
     ]);
     for (const r of [goals, ftp, rides, bl, history]) if (r.error) throw r.error;
 
@@ -134,12 +186,31 @@ Deno.serve(async (req) => {
       ? { ...record, ftp_best: { ...record.ftp_best, date_display: monthDisplay(record.ftp_best.date) } }
       : record;
 
+    /**
+     * ⛔ THE CACHE IS WRITTEN AFTER THE ANSWER IS BUILT, AND ITS FAILURE CHANGES NOTHING. A cache that
+     * can make a request fail is worse than no cache.
+     */
+    const history_payload: CachedHistory = cached ?? {
+      standings: displayStandings(rankAthleticRecords(rankable), units),
+      totals: displayTotals(athleticTotals(totallable, asOf), units),
+    };
+    if (!cached) {
+      try {
+        await cacheDb
+          .from('athletic_record_cache')
+          .upsert({ user_id: userId, as_of: asOf, payload: history_payload, generated_at: new Date().toISOString() });
+      } catch (e) {
+        console.warn('[athletic-record] cache write failed, answer unaffected:', e);
+      }
+    }
+
     return json({
       success: true,
       record: recordOut,
-      standings: displayStandings(rankAthleticRecords(rankable), units),
-      totals: displayTotals(athleticTotals(totallable, asOf), units),
+      standings: history_payload.standings,
+      totals: history_payload.totals,
       units,
+      cached: cached != null,
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ error: 'unauthorized' }, 401);
