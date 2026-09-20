@@ -8,7 +8,7 @@
  * value below is minutes x 60, and that conversion is the point of several of these.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { athleticTotals, dateDaysBefore, RECENT_WEEKS, type TotallableWorkout } from './totals.ts';
+import { athleticTotals, dateDaysBefore, movingSecondsOf, LONGEST_CREDIBLE_SESSION_H, RECENT_WEEKS, type TotallableWorkout } from './totals.ts';
 
 const TODAY = '2026-09-20';
 
@@ -96,4 +96,58 @@ Deno.test('elapsed time stands in when a row carries no moving time', () => {
 Deno.test('the same rows in any order give the same totals', () => {
   const rows = [ride('2026-09-19', 40, 90, 300), ride('2026-05-01', 100, 200, 1000), ride('2025-11-01', 20, 45, 100)];
   assertEquals(JSON.stringify(athleticTotals(rows, TODAY)), JSON.stringify(athleticTotals([...rows].reverse(), TODAY)));
+});
+
+/**
+ * ⛔ THE LADDER. Five places a session's time might be, in two units. Each rung is pinned, because
+ * the athlete's own history has rows in three different shapes: current rows with exact seconds in
+ * `computed.overall`, rows with `moving_time` in minutes, and rows through late 2025 with
+ * `moving_time` NULL and only `duration` / `elapsed_time`.
+ */
+Deno.test('ladder — exact moving seconds beat the rounded minutes column', () => {
+  assertEquals(movingSecondsOf({
+    date: '2026-09-19', type: 'ride', moving_time: 90,
+    computed: { overall: { duration_s_moving: 5432 } },
+  }), 5432);
+});
+
+Deno.test('ladder — the minutes column is used when there are no exact seconds', () => {
+  assertEquals(movingSecondsOf({ date: '2026-09-19', type: 'ride', moving_time: 90 }), 5400);
+});
+
+Deno.test('ladder — an older row with moving_time NULL still counts, off elapsed', () => {
+  // The real shape, read from his history: 2025-10-04 ride, duration 117, moving_time null.
+  assertEquals(movingSecondsOf({
+    date: '2025-10-04', type: 'ride', distance: 51.068, duration: 117, moving_time: null, elapsed_time: 117,
+  }), 117 * 60);
+});
+
+Deno.test('ladder — duration alone is read as minutes', () => {
+  assertEquals(movingSecondsOf({ date: '2025-10-04', type: 'ride', duration: 70 }), 4200);
+});
+
+/**
+ * ⛔ THE HEURISTIC THIS FILE REFUSES TO COPY. `race-finish-seconds.ts:31-33` reads `duration` as
+ * seconds above 120 and minutes below. A three-hour ride is 180 minutes, so that rule would call it
+ * 180 seconds. Totals are exactly where that breaks worst, so the cut here is a unit check far out
+ * of a real session's range instead.
+ */
+Deno.test('OURS — a long ride keeps its minutes; only an absurd value is refused as seconds', () => {
+  assertEquals(movingSecondsOf({ date: '2026-09-19', type: 'ride', duration: 180 }), 180 * 60);
+  const absurd = LONGEST_CREDIBLE_SESSION_H * 60 + 1;
+  assertEquals(movingSecondsOf({ date: '2026-09-19', type: 'ride', duration: absurd }), 0);
+});
+
+Deno.test('a refused time still counts as an activity, with its distance', () => {
+  const t = athleticTotals([{ date: '2026-09-19', type: 'ride', distance: 40, duration: 999_999 }], TODAY);
+  assertEquals(t.ride.all_time, { activities: 1, distance_m: 40000, moving_s: 0, elevation_m: 0 });
+});
+
+Deno.test('a year of older rows sums to real hours, not zero', () => {
+  const t = athleticTotals([
+    { date: '2026-01-04', type: 'ride', distance: 51.068, duration: 117, moving_time: null, elapsed_time: 117 },
+    { date: '2026-01-02', type: 'ride', distance: 36.003, duration: 85, moving_time: null, elapsed_time: 85 },
+  ], TODAY);
+  assertEquals(t.ride.this_year.moving_s, (117 + 85) * 60);
+  assertEquals(t.ride.this_year.moving_s / 3600 > 3, true);
 });

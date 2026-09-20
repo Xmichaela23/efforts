@@ -62,8 +62,12 @@ export type TotallableWorkout = {
   moving_time?: number | null;
   /** MINUTES. */
   elapsed_time?: number | null;
+  /** MINUTES, and the least trustworthy of the three — see `movingSecondsOf`. */
+  duration?: number | null;
   /** Metres. */
   elevation_gain?: number | null;
+  /** The summary step's own figures, in exact SECONDS. Preferred over every minutes column. */
+  computed?: { overall?: { duration_s_moving?: unknown; duration_s_elapsed?: unknown; duration_s?: unknown } | null } | null;
 };
 
 const SPORT_TYPES: Record<TotalsSport, ReadonlySet<string>> = {
@@ -78,27 +82,68 @@ const num = (v: unknown): number => {
 };
 
 /**
- * ⛔ THE COLUMN IS MINUTES. THIS RETURNS SECONDS.
+ * ⛔ SECONDS OUT. FIVE PLACES A SESSION'S TIME MIGHT BE, IN TWO DIFFERENT UNITS.
  *
- * `workouts.moving_time` and `workouts.elapsed_time` are stored in WHOLE MINUTES, not seconds, and
- * every writer converts on the way in: `ingest-activity:1217` marks it `MINUTES (convention)`,
- * `:501` divides by 60, `save-imported-workout:87` runs it through `toMin`, `mark-planned-complete`
- * writes the planned minutes, and `_shared/easy-hr.ts:199` states the convention for readers. A
- * totals file that summed the column as seconds would report a year of riding as about six hours.
+ * `computed.overall` holds the summary step's own figures in exact SECONDS. The `workouts` columns
+ * beside it hold WHOLE MINUTES — every writer converts on the way in (`ingest-activity:1217`, marked
+ * `MINUTES (convention)`; `:501`; `save-imported-workout:87` via `toMin`; `mark-planned-complete`
+ * writes planned minutes; `_shared/easy-hr.ts:199` states it for readers). Summing the columns as
+ * seconds would report a year of riding as about six hours.
  *
- * ⚠️ It also means the totals are only ever accurate to the minute, because the rows are. A
- * 40-second jog rounds to nothing.
+ * ⛔ AND OLDER ROWS HAVE NO `moving_time` AT ALL. Read from the athlete's own history 2026-09-20:
+ * rides and runs through late 2025 carry `duration` and `elapsed_time` with `moving_time` null. A
+ * ladder that stopped at `moving_time` would sum those months to zero and make all-time hours short.
  *
- * ⛔ MOVING, NOT ELAPSED. OURS — Strava's profile prints one "Time" figure and its help page does not
- * say which it is. Moving time is what every other duration in this app already means, so using
- * elapsed here would make the year's total disagree with the sum of the sessions that produced it
- * (ledger row: docs/STATE-SOURCES.md, `totals.ts`). Elapsed stands in only when a row carries no
- * moving time, so a session is never counted as zero.
+ * The order, and why: the exact moving seconds first, because they are exact and moving is the figure
+ * this file reports; then the minutes column for the same thing; then the elapsed pair, which is a
+ * slightly longer time for the same session rather than a wrong one; then `duration`.
+ *
+ * ⚠️ `duration` IS THE UNTRUSTED RUNG. `_shared/race-finish-seconds.ts:31-33` reads it as seconds
+ * above 120 and minutes below, which means it has been found holding both. That heuristic is NOT
+ * copied here: its cut sits at two hours, so it would read every long ride's minutes as seconds and
+ * turn a three-hour ride into three minutes — the exact rides that matter to a total.
+ *
+ * OURS — instead, `duration` is read as minutes, and refused when that comes out longer than
+ * `LONGEST_CREDIBLE_SESSION_H`, which means the row was holding seconds after all. A refused row
+ * still counts as an activity and contributes no time (ledger row: docs/STATE-SOURCES.md, `totals.ts`).
+ *
+ * ⛔ MOVING, NOT ELAPSED. OURS — Strava's profile prints one "Time" and its page does not say which.
+ * Moving time is what every other duration in this app means, so elapsed would make the year's total
+ * disagree with the sum of the sessions under it.
  */
 export const SECONDS_PER_MINUTE = 60;
 
+/**
+ * OURS — a unit check, not a training number. Longer than this in one session and the value was
+ * seconds being read as minutes. It is deliberately far past any real session (the longest ultras run
+ * to about 48 h) so that nothing genuine is ever refused; its whole job is to catch a 60x error.
+ */
+export const LONGEST_CREDIBLE_SESSION_H = 72;
+
+const exactSeconds = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
 export function movingSecondsOf(w: TotallableWorkout): number {
-  return (num(w.moving_time) || num(w.elapsed_time)) * SECONDS_PER_MINUTE;
+  const o = w.computed?.overall;
+
+  const exactMoving = exactSeconds(o?.duration_s_moving);
+  if (exactMoving > 0) return Math.round(exactMoving);
+
+  const moving = num(w.moving_time);
+  if (moving > 0) return Math.round(moving * SECONDS_PER_MINUTE);
+
+  const exactElapsed = exactSeconds(o?.duration_s_elapsed) || exactSeconds(o?.duration_s);
+  if (exactElapsed > 0) return Math.round(exactElapsed);
+
+  const elapsed = num(w.elapsed_time);
+  if (elapsed > 0) return Math.round(elapsed * SECONDS_PER_MINUTE);
+
+  const asMinutes = num(w.duration) * SECONDS_PER_MINUTE;
+  if (asMinutes > 0 && asMinutes <= LONGEST_CREDIBLE_SESSION_H * 3600) return Math.round(asMinutes);
+
+  return 0;
 }
 
 const empty = (): SportTotals => ({ activities: 0, distance_m: 0, moving_s: 0, elevation_m: 0 });
