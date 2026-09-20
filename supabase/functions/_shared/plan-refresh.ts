@@ -143,16 +143,39 @@ export function isStandingPlanConfig(config: unknown): boolean {
 }
 
 /**
- * OURS — a plan whose refresh ran in the last hour is not queued again for stale rows. A refresh that could
- * not stamp a row (it failed, or the row was added after it) would otherwise be queued on every calendar read.
+ * A plan refreshed BY THIS WRITER VERSION in the last five minutes is not queued again for stale rows. A refresh that
+ * could not stamp a row (it failed, or the row was added after it) would otherwise be queued on every calendar read.
+ * FIELD — Kubernetes restarts a container that keeps failing after 10 s, 20 s, 40 s …, "capped at 300 seconds
+ * (5 minutes)" (kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle, container restart policy). For scale:
+ * Celery's `default_retry_delay` is three minutes; Sidekiq's first retries come at 15, 16, 31, 96, 271 seconds.
+ * It was one hour, ours, from 2026-09-18 to 2026-09-20.
  */
-export const STALE_REQUEUE_WAIT_MS = 60 * 60 * 1000;
+export const STALE_REQUEUE_WAIT_MS = 5 * 60 * 1000;
+
+type RefreshJobLike = { status?: string | null; finished_at?: string | null; payload?: { writer_version?: unknown } | null };
+
+/**
+ * Why a stale plan is NOT queued for another refresh, or null to queue it. A refresh is queued or running; or one by
+ * the CURRENT writer version finished inside `STALE_REQUEUE_WAIT_MS`.
+ * ⛔ A REFRESH BY AN OLDER WRITER VERSION NEVER HOLDS THE NEXT ONE BACK (2026-09-20). New code went live since, so
+ * nothing is being repeated. That day two deploys 17 minutes apart left a plan on the first deploy's words for an
+ * hour, because the wait could not tell "the same refresh again" from "a newer writer".
+ */
+export function staleSkipReason(jobs: RefreshJobLike[], nowMs: number): 'already_queued' | 'running' | 'refreshed_recently' | null {
+  if (jobs.some((j) => j.status === 'queued')) return 'already_queued';
+  if (jobs.some((j) => j.status === 'running')) return 'running';
+  const cutoff = nowMs - STALE_REQUEUE_WAIT_MS;
+  const byThisWriter = jobs.some((j) =>
+    !!j.finished_at && Date.parse(j.finished_at) > cutoff && Number(j.payload?.writer_version) >= PLAN_WRITER_VERSION);
+  return byThisWriter ? 'refreshed_recently' : null;
+}
 
 export type QueueResult = { queued: boolean; reason: string; rows_pending: number };
 
 /**
  * Queue one refresh of this plan. `why: 'stale'` (get-week) skips when a refresh for the plan is queued or
- * running, or finished within `STALE_REQUEUE_WAIT_MS`; `why: 'reprice'` (a number was accepted) skips only when
+ * running, or one by the current writer version finished within `STALE_REQUEUE_WAIT_MS` (`staleSkipReason`);
+ * `why: 'reprice'` (a number was accepted) skips only when
  * one is still queued, because a running refresh may have read the number before it changed.
  * Writes `config.reprice_job` at queue time so a screen polling `reprice_status` has a count at once.
  * Never throws.
@@ -168,7 +191,7 @@ export async function queuePlanRefresh(supabase: any, args: {
   try {
     const { data: recent } = await supabase
       .from('jobs')
-      .select('id, status, finished_at, created_at')
+      .select('id, status, finished_at, created_at, payload')
       .eq('kind', PLAN_REFRESH_KIND)
       .eq('user_id', userId)
       .eq('payload->>plan_id', planId)
@@ -177,11 +200,8 @@ export async function queuePlanRefresh(supabase: any, args: {
     const jobs = Array.isArray(recent) ? recent : [];
     if (jobs.some((j: { status?: string }) => j.status === 'queued')) return { queued: false, reason: 'already_queued', rows_pending: rowsPending };
     if (why === 'stale') {
-      if (jobs.some((j: { status?: string }) => j.status === 'running')) return { queued: false, reason: 'running', rows_pending: rowsPending };
-      const cutoff = Date.now() - STALE_REQUEUE_WAIT_MS;
-      if (jobs.some((j: { finished_at?: string | null }) => j.finished_at && Date.parse(j.finished_at) > cutoff)) {
-        return { queued: false, reason: 'refreshed_recently', rows_pending: rowsPending };
-      }
+      const skip = staleSkipReason(jobs, Date.now());
+      if (skip) return { queued: false, reason: skip, rows_pending: rowsPending };
     }
     const { error } = await supabase.from('jobs').insert({
       kind: PLAN_REFRESH_KIND,
