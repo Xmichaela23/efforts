@@ -36,14 +36,13 @@
  * that every writer has to keep in step; this is the same read, from the same rows, by the same code,
  * thrown away when those rows change. A miss is slower, never different.
  */
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildAthleticRecord } from './record.ts';
-import { rankAthleticRecords, type RankableWorkout } from '../_shared/athletic-record/rank.ts';
-import { athleticTotals, type TotallableWorkout } from '../_shared/athletic-record/totals.ts';
 // The screen prints strings, never metres and seconds — the phone does not convert a unit the server
 // can (`record.ts` has sent a `display` beside every `seconds` since 2026-09-10 for the same reason).
-import { displayStandings, displayTotals, monthDisplay, unitsOf } from '../_shared/athletic-record/display.ts';
+import { monthDisplay, unitsOf } from '../_shared/athletic-record/display.ts';
+import { buildHistoryPayload, cacheIsStale, type HistoryPayload } from '../_shared/athletic-record/build.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -53,9 +52,6 @@ const cors = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-
-/** What the cache row holds: the two halves built from the workout history, already formatted. */
-type CachedHistory = { standings: unknown; totals: unknown };
 
 /**
  * Service-role client, for the cache row only. The request's own client is RLS-scoped and may read
@@ -84,19 +80,23 @@ Deno.serve(async (req) => {
      * the slow path still gives the right answer.
      */
     const cacheDb = cacheClient();
-    let cached: CachedHistory | null = null;
+    let cached: HistoryPayload | null = null;
+    let staleRefreshNeeded = false;
     try {
       const { data } = await cacheDb
         .from('athletic_record_cache')
         .select('payload, as_of')
         .eq('user_id', userId)
         .maybeSingle();
-      if (data && String(data.as_of).slice(0, 10) === asOf) cached = data.payload as CachedHistory;
+      if (data) {
+        cached = data.payload as HistoryPayload;
+        staleRefreshNeeded = cacheIsStale(data.as_of, asOf);
+      }
     } catch (e) {
       console.warn('[athletic-record] cache read failed, computing:', e);
     }
 
-    const [goals, ftp, rides, bl, history] = await Promise.all([
+    const [goals, ftp, rides, bl] = await Promise.all([
       supabase
         .from('goals')
         .select('id, name, target_date, distance, sport, current_value')
@@ -122,53 +122,9 @@ Deno.serve(async (req) => {
         .select('performance_numbers, learned_fitness, locked_baselines, updated_at, units')
         .eq('user_id', userId)
         .maybeSingle(),
-      /**
-       * ⛔ NAMED JSON KEYS, NEVER `computed` WHOLE. `computed.analysis.series` holds every recorded
-       * sample of every session; selecting the column would pull megabytes per athlete and time the
-       * query out — the same trap `_shared/workout-list-select.ts` was written for.
-       *
-       * ⚠️ `workout_status` IS NOT FILTERED TO 'completed' HERE. Older rows carry no status at all,
-       * and `.eq('workout_status','completed')` would silently drop them from the totals. Planned
-       * rows are excluded by name instead, and `athleticTotals` checks again.
-       */
-      cached
-        ? Promise.resolve({ data: [], error: null })
-        : supabase
-          .from('workouts')
-          .select('id, date, name, type, workout_status, distance, elevation_gain, moving_time, elapsed_time, duration, run_records:computed->run_records, ride_records:computed->ride_records, power_curve:computed->power_curve, overall:computed->overall')
-          .eq('user_id', userId)
-          .or('workout_status.is.null,workout_status.neq.planned')
-          .order('date', { ascending: true }),
     ]);
-    for (const r of [goals, ftp, rides, bl, history]) if (r.error) throw r.error;
+    for (const r of [goals, ftp, rides, bl]) if (r.error) throw r.error;
 
-    // One row shape, two readers: the ranker wants the per-workout record objects, the totals want
-    // the durations. Both are pure and neither knows where the rows came from.
-    const rows = (history.data ?? []) as Array<Record<string, unknown>>;
-    const rankable: RankableWorkout[] = rows.map((w) => ({
-      id: String(w.id),
-      date: String(w.date),
-      name: (w.name as string | null) ?? null,
-      type: (w.type as string | null) ?? null,
-      distance: (w.distance as number | null) ?? null,
-      elevation_gain: (w.elevation_gain as number | null) ?? null,
-      computed: {
-        run_records: (w.run_records ?? null) as never,
-        ride_records: (w.ride_records ?? null) as never,
-        power_curve: (w.power_curve ?? null) as never,
-      },
-    }));
-    const totallable: TotallableWorkout[] = rows.map((w) => ({
-      date: String(w.date),
-      type: (w.type as string | null) ?? null,
-      workout_status: (w.workout_status as string | null) ?? null,
-      distance: (w.distance as number | null) ?? null,
-      moving_time: (w.moving_time as number | null) ?? null,
-      elapsed_time: (w.elapsed_time as number | null) ?? null,
-      duration: (w.duration as number | null) ?? null,
-      elevation_gain: (w.elevation_gain as number | null) ?? null,
-      computed: { overall: (w.overall ?? null) as never },
-    }));
 
     // The athlete's own units, not the sport's and not the distance label's.
     const units = unitsOf((bl.data as { units?: unknown } | null)?.units);
@@ -190,17 +146,27 @@ Deno.serve(async (req) => {
      * ⛔ THE CACHE IS WRITTEN AFTER THE ANSWER IS BUILT, AND ITS FAILURE CHANGES NOTHING. A cache that
      * can make a request fail is worse than no cache.
      */
-    const history_payload: CachedHistory = cached ?? {
-      standings: displayStandings(rankAthleticRecords(rankable), units),
-      totals: displayTotals(athleticTotals(totallable, asOf), units),
-    };
+    const history_payload: HistoryPayload = cached ?? await buildHistoryPayload(cacheDb, userId, asOf, units);
     if (!cached) {
+      // Only a brand-new athlete reaches this, and they have almost no history to read.
       try {
         await cacheDb
           .from('athletic_record_cache')
           .upsert({ user_id: userId, as_of: asOf, payload: history_payload, generated_at: new Date().toISOString() });
       } catch (e) {
         console.warn('[athletic-record] cache write failed, answer unaffected:', e);
+      }
+    } else if (staleRefreshNeeded) {
+      /**
+       * ⛔ A DAY-OLD ROW IS SERVED NOW AND REBUILT BEHIND THE ATHLETE. `as_of` expires the row every
+       * midnight with no workout involved, and making the first open of the day pay 3.1 s for that is
+       * what he saw as a broken screen. The numbers move by at most one day of training; a blank tab
+       * does not. Queued, not awaited — `run-jobs` owns the rebuild.
+       */
+      try {
+        await cacheDb.from('jobs').insert({ kind: 'warm-athletic-record', user_id: userId, payload: {} });
+      } catch (e) {
+        console.warn('[athletic-record] could not queue the date-roll refresh:', e);
       }
     }
 

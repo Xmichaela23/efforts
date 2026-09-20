@@ -435,7 +435,18 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         </div>
       )}
 
-      {loading ? (
+      {/*
+        ⛔ ONE SCREEN LOADING, NOT A SCREEN THAT FAILED (2026-09-20, after he saw it on a device).
+        Race results comes from a direct `goals` read that returns in milliseconds; everything else
+        waits on `athletic-record`. When that call was slow or failed, the page dropped `loading` and
+        drew the race card ALONE — a single five-month-old race on an otherwise empty screen, which
+        reads as broken rather than as loading. So the whole body waits on BOTH, and a failure keeps
+        waiting rather than rendering a half-answer. ⚠️ The real fix is that the call is now fast:
+        the cache is built off a tap (`warm-athletic-record`) and a day-old row is served while it
+        refreshes, so this branch should be a flash. Do not "fix" a slow screen by loosening it back
+        to partial rendering — that is the bug, not the symptom.
+      */}
+      {loading || (recordFailed && !record) ? (
         <div className="flex justify-center py-10">
           <Loader2 className="w-6 h-6 animate-spin text-white/40" />
         </div>
@@ -465,10 +476,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               way Strava's My Stats does it — the Running and Cycling cards are no longer separate
               sections below a switch. Race results and Strength stay their own sections: they are
               not per-sport, so a sport switch has nothing to say about them. */}
-          {/* ⚠️ NOT DRAWN AT ALL WHEN THE CALL FAILED AND NOTHING WAS CACHED IN STATE. A panel of
-              dashes reads as "you have done nothing"; an absent panel reads as "not loaded", which is
-              what actually happened. Same for Strength below. */}
-          {!(recordFailed && !totals) && <RecordSportPanel
+          <RecordSportPanel
             standings={standings}
             totals={totals}
             ftp={record?.ftp_best ?? null}
@@ -487,7 +495,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 )}
               </div>
             }
-          />}
+          />
 
           <div className={RECORD_CARD}>
             {/* ⛔ NO EXPLAINER LINE (Michael, 2026-09-20). "Official finish times, start line to
@@ -568,7 +576,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             exists to hold two unrelated leftovers is how the screen grew the wrong name in the first
             place.
           */}
-          {!(recordFailed && !record) && <div className={RECORD_CARD}>
+          <div className={RECORD_CARD}>
             <h3 className="text-sm font-semibold text-white">Strength</h3>
             <ul className="text-sm mt-2">
               {([
@@ -592,7 +600,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 );
               })}
             </ul>
-          </div>}
+          </div>
 
           {/* Milestones came off 2026-09-20 (audit §3 G): it was a placeholder sentence promising
               streaks and highlights, and nothing ever filled it. An empty promise on a record screen
