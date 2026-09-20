@@ -63,7 +63,14 @@ export default function StateTab({
   const coachBusy = loading || Boolean(revalidating);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
-  const [stateLens, setStateLens] = useState<StateLens>(() => takePendingStateLens() ?? 'status'); // State-as-hub: Status / Adjust / Schedule / Record (D-316)
+  // State-as-hub: Status / Adjust / Record (D-316). ⚠️ Schedule is HIDDEN from the tab row
+  // (StateHubTabs, 2026-09-20) but the lens below is intact for when it comes back — so a pending
+  // 'schedule' from anywhere is sent to Status rather than opening a tab the athlete cannot see or
+  // leave. Nothing sets it today; this is the guard for when something does.
+  const [stateLens, setStateLens] = useState<StateLens>(() => {
+    const pending = takePendingStateLens();
+    return pending && pending !== 'schedule' ? pending : 'status';
+  });
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
@@ -615,6 +622,8 @@ export default function StateTab({
       {/* Record — the personal-records screen, a lens since 2026-09-20 (it was `/profile/athletic-record`,
           opened from the header menu; both are gone). It fetches `athletic-record` itself. */}
       {stateLens === 'record' && <AthleticRecordPage onClose={() => setStateLens('status')} />}
+      {/* ⛔ UNREACHABLE WHILE SCHEDULE IS HIDDEN, and kept deliberately (2026-09-20). Deleting it
+          would make bringing the tab back a rebuild instead of removing one `hidden: true`. */}
       {stateLens === 'schedule' && (
         <div className="px-2 py-10 text-center text-label-secondary text-footnote leading-snug">
           Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.
