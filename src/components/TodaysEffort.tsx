@@ -423,27 +423,50 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return () => el.removeEventListener('touchmove', onTouchMove);
   }, []);
 
+  /**
+   * ⛔ FAST SWIPES NEVER LEAVE THE DAY OFF SCREEN (2026-09-21, Michael: swiping fast "jams up" and the panel went
+   * blank). A second swipe during the first one's exit sent two day changes; the second change cancelled the first
+   * one's slide-home, and the day stayed parked off the side. Now: while a day is leaving, a new swipe is ignored
+   * (about 0.2 s); the slide-home is never cancelled, only skipped if a newer arrival or a finger took over; and if
+   * the day change never lands, the panel comes back after 0.8 s.
+   */
+  const dayLeavingRef = useRef(false);
+  const dayArrivalSeq = useRef(0);
   const commitDaySwipe = (dir: 'prev' | 'next') => {
+    if (dayLeavingRef.current) return;
+    dayLeavingRef.current = true;
     const w = scrollRef.current?.clientWidth || 360;
     pendingDayDir.current = dir;
     setDaySlideRaw(false);
     // Leave the way it was pushed: next = content exits to the left.
     setDaySlideX(dir === 'next' ? -w : w);
     window.setTimeout(() => handleDayNav(dir), DAY_SLIDE_MS - 20);
+    window.setTimeout(() => {
+      if (!dayLeavingRef.current) return;
+      dayLeavingRef.current = false;
+      pendingDayDir.current = null;
+      setDaySlideRaw(false);
+      setDaySlideX(0);
+    }, DAY_SLIDE_MS * 4);
   };
   // The new day lands: place it just off the far side with no transition, then let it slide home.
   useEffect(() => {
     const dir = pendingDayDir.current;
     if (!dir) return;
     pendingDayDir.current = null;
+    dayLeavingRef.current = false;
+    const seq = ++dayArrivalSeq.current;
     const w = scrollRef.current?.clientWidth || 360;
     setDaySlideRaw(true);
     setDaySlideX(dir === 'next' ? w : -w);
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => { setDaySlideRaw(false); setDaySlideX(0); });
-    });
-    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+    const slideHome = () => {
+      if (seq !== dayArrivalSeq.current || (daySwipe.current.active && daySwipe.current.axis === 'x')) return;
+      setDaySlideRaw(false);
+      setDaySlideX(0);
+    };
+    requestAnimationFrame(() => { requestAnimationFrame(slideHome); });
+    // Frames can pause (the app in the background, a busy phone); the day still comes home.
+    window.setTimeout(slideHome, DAY_SLIDE_MS + 60);
   }, [activeDate]);
 
   const handleWeekNav = (direction: 'prev' | 'next') => {
@@ -1783,6 +1806,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // A gesture that starts inside a deck is the deck's. Its movement is cleared all the same, or the tap
           // guard below would read the last day swipe's distance and swallow a real tap on the deck.
           if ((e.target as Element | null)?.closest?.('[data-deck]')) { daySwipe.current = { ...daySwipe.current, active: false, axis: null, movedAny: 0 }; return; }
+          // A day is still leaving: this touch waits (see dayLeavingRef).
+          if (dayLeavingRef.current) { daySwipe.current = { ...daySwipe.current, active: false, axis: null, movedAny: 0 }; return; }
           daySwipe.current = {
             active: true, startX: e.clientX, startY: e.clientY, originX: e.clientX,
             samples: [{ x: e.clientX, t: e.timeStamp }], dx: 0, axis: null, movedAny: 0,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   parseWorkoutWeatherDataForDisplay,
@@ -59,10 +59,13 @@ export function useWeather({
   // ⛔ The hot-day line, decided by `get-weather` (2026-09-10, audit H-T07). Null means say nothing.
   const [heatNote, setHeatNote] = useState<string | null>(() => keptAtMount()?.heatNote ?? null);
   const [loading, setLoading] = useState(false);
+  /** The day the reading on screen belongs to, so a refresh of the same day keeps it up while it loads. */
+  const shownDayRef = useRef<string | null>(keptAtMount() ? String(timestamp).slice(0, 10) : null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled || lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng) || !timestamp) {
+      shownDayRef.current = null;
       setWeather(null);
       setHeatNote(null);
       setLoading(false);
@@ -74,6 +77,7 @@ export function useWeather({
     const cacheKey = JSON.stringify([Number(lat).toFixed(2), Number(lng).toFixed(2), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]);
     const kept = READING_CACHE.get(cacheKey);
     if (kept && Date.now() - kept.at < readingKeepMs(timestamp, current)) {
+      shownDayRef.current = String(timestamp).slice(0, 10);
       setWeather(kept.weather);
       setHeatNote(kept.heatNote);
       setLoading(false);
@@ -81,9 +85,13 @@ export function useWeather({
       return;
     }
     // ⛔ A NEW DAY CLEARS THE OLD READING FIRST (2026-09-17) — otherwise yesterday's weather sits under today's date
-    // until the fetch lands, now that the Today card asks for every day.
-    setWeather(null);
-    setHeatNote(null);
+    // until the fetch lands, now that the Today card asks for every day. The SAME day keeps its reading on screen
+    // while the fresh one loads (2026-09-21): an aged-out reading used to blank the block for the round trip.
+    const day = String(timestamp).slice(0, 10);
+    if (shownDayRef.current !== day) {
+      setWeather(null);
+      setHeatNote(null);
+    }
 
     const fetchWeather = async () => {
       if (cancelled) return;
@@ -112,6 +120,7 @@ export function useWeather({
           const parsed = parseWorkoutWeatherDataForDisplay(data.weather);
           const note = typeof data?.heat_note === 'string' && data.heat_note ? data.heat_note : null;
           if (parsed) READING_CACHE.set(cacheKey, { weather: parsed, heatNote: note, at: Date.now() });
+          shownDayRef.current = parsed ? day : null;
           setWeather(parsed);
           setHeatNote(note);
         } else if (data?.error) {
