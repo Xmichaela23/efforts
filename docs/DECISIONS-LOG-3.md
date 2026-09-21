@@ -1900,6 +1900,11 @@ athlete's tap (see D-468). Expected after apply: squat rows "105 × 1-5" with th
 
 ## D-470 — The lift retest is a calendar row; the rebuild reads the latest tested session per lift, any week (2026-09-05)
 
+> **2026-09-20 (D-481 §7):** as built, the retest insert FAILED on any day that already held a lifting or plyo session
+> (`ux_planned_unique_key` allows one strength row per plan day) and the app fell back to the older test launcher. The
+> index now exempts rows tagged `retest`, a second tap reuses today's row, and `restateFromTest` skips `retest` rows.
+> Everything below still stands.
+
 **Ruling (Michael, 2026-09-05):** "lift retest = calendar row today, tagged like the week-one test, linked to the plan;
 the rebuild reads the latest tested session per lift, any week. Attach a test run to its row by tag within a day, not
 the exact date." Trace that led here: `docs/WORKORDER-adjust-tests-2026-09-05.md` (the Adjust lift test wrote

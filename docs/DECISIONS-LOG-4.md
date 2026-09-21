@@ -244,3 +244,37 @@ ledger row in `STATE-SOURCES.md`. Dips stay a pick; no dip chip.
 
 **Back-annotated:** D-455; the Slice 7 notes in `strength-gear.ts`, `TrainingBaselines.tsx`, `strength-grid/taxonomy.ts`.
 
+## D-481 — Today's narrative, the plyo card, equipment on the rebuild, and three refresh rules (2026-09-20, Michael)
+
+> One consolidated entry for the engineer terminal's day (docs kept light on purpose). ⚠️ D-480 was another terminal's
+> entry, still uncommitted when this was written; the number here skips it.
+
+1. **A hard run or ride reads a narrative on Today's card.** pp231–239 print no words for a single workout: one purpose
+   paragraph per type, then a column of numbers. The narrative is that column said in order with the athlete's pace or
+   watts, and the page's word for a rest (`_shared/planned-narrative.ts` → `computed.narrative`, stamped by
+   materialize-plan beside `step_lines`, passed by get-week, printed by `today-lines.ts` above the purpose line). Today
+   only: the session sheet, week view and device sends keep the list. No narrative when an effort has no pace or watts.
+   Michael threw out two drafts as invented language ("There are 6 rounds. Each round is…"; "The same two paces for
+   each pair after that") — the ladder now leads with its count of sets in the list's own "Set 1 / Set 2" shape.
+2. **The plyo card.** Each drill prints its sourced how-to (the logger's text); its benefit opens behind an (i); p227's
+   drill line prints once under the title, written to "you"; the first sentence counts the drills listed ("Pick one or
+   two / one to three of these drills.", p275). The block description bars second person, so it keeps the third-person
+   form (`P227_DRILL_LINE_FOR_DESCRIPTION`).
+3. **All three foot-speed drills need the Agility ladder chip** (their own how-tos start at a ladder). With no ladder
+   the plyo day holds two drills, inside p275's "one to three". Bodyweight dips stay out of the plan: the only slot they
+   fit is a speed row at a set percentage, which bodyweight cannot be set to (ACE chest study; McKenzie 2022).
+4. **New equipment reaches an existing plan only on the athlete's tap.** "Rebuild upcoming sessions" under the
+   equipment chips (and on Adjust) sends `use_current_equipment`; the block then stores that kit. The automatic refresh,
+   a logged test and a locked number keep the stored kit, because new equipment can change a session's movement.
+5. **The refresh pairs a stored row with its slot** (`source_row`, the book cell that authored it), by name inside the
+   slot and then in order. Name-and-cell matching left 36 of 60 lifting sessions unchanged on a home → gym switch. A
+   plyo drill's slot is its family: a stored drill the kit no longer reaches comes off, a newly reachable one is added.
+   A row tagged `retest` is never matched to the day's lifting session.
+6. **The wait before a stale plan is queued again is five minutes** (FIELD: Kubernetes' restart back-off cap, 300 s),
+   and only behind a refresh by the CURRENT writer version. It was one hour, ours; two deploys 17 minutes apart left
+   a plan on the first deploy's words.
+7. **A retest is exempt from the one-strength-row-per-plan-day index** (migration
+   `20260920230000_planned_unique_key_exempts_retest.sql`, applied by Michael in the SQL editor). The insert had failed
+   on any day holding a lifting or plyo session, five in seven. A second tap hands back today's retest.
+8. **Baselines' Strength card has real buttons**: two retests and a rebuild under the numbers, a rebuild under the
+   equipment; one owner with Adjust (`src/lib/plan-actions.ts`). The run and ride cards keep the link.

@@ -53,6 +53,18 @@ next morning: the rows belong to two different accounts with the same Garmin his
 ## QUEUED (2026-09-18, Michael: "so we have an ours thing happening?") — THE PERFORMANCE WORKLOAD "usual" RANGE IS OURS
 
 The workload chip on Performance prints "usual 36–54" (`src/components/AdherenceChips.tsx:319-331`, server
+## AWAITING MICHAEL (2026-09-20, D-481 — all PUSHED, DEPLOYED, live-checked on throwaway plans; NOT seen on a device)
+
+- [ ] **Baselines → Strength card on efforts.work:** two Retest buttons and "Rebuild upcoming sessions" under the numbers;
+      "Rebuild upcoming sessions" with "Changes made to equipment will be adjusted here for future sessions." under the
+      chips; no "Retest or rebuild on Adjust" link on this card. (Seen on the local server only.)
+- [ ] **Equipment on his own plan:** check a chip, tap the rebuild under the chips, and the sessions ahead use it (with
+      Agility ladder: Wednesday's plyo warm-up goes from two drills to three).
+- [ ] **A retest on a day that has a lifting session:** Lower lifts / Upper lifts opens a test in the logger and the row
+      sits on today's calendar beside the lift.
+- [ ] **The two-drill plyo card** ("Pick one or two of these drills.") — he saw the three-drill card with the (i).
+- [x] Today's narrative on his own plan — the reworded Descending Ladder card, seen 2026-09-20.
+
 `typical_low/typical_high`): the athlete's own middle half of that sport's sessions, at least 5 sessions. The framing
 borrows Strava's Relative Effort and Garmin's Training Load bands, but the method is ours (ledger row added
 2026-09-18, b75b3114). Replace it with one named app's own method, or take the range off.

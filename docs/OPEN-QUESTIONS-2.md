@@ -1464,3 +1464,27 @@ print their values and their labels on top of one another: "53 90%60 of 85 min 5
 It predates the 2026-09-12 visual work — it is visible in screenshots taken before any of it landed — and
 it was noticed while checking something else, so it has not been traced. Its own change, not a fold-in.
 
+## Q-302 — The live site's 45-day workouts list timed out once (57014) — **unverified, a LEAD** (2026-09-20)
+
+efforts.work showed an empty Today at about 2:50 pm PDT: the client's `useWorkouts` list query returned 500, "canceling
+statement due to statement timeout". A reload minutes later loaded. Same failure as 2026-09-10 (`workout-list-select.ts`
+exists because of it). **Hypothesis, not timed:** the list selects ~35 keys out of `workouts.computed` by
+`alias:column->key`, and each `->` re-reads the whole multi-megabyte value; `run_records` and `ride_records` were added
+2026-09-19 (b54ed7042). Also that day, before any deploy, a Supabase request from a local test server stalled for 20
+minutes. **What settles it:** an EXPLAIN ANALYZE of that query on Michael's rows (read-only, needs his go-ahead).
+
+## Q-303 — "Ladder Drills" has no how-to — **known, left** (2026-09-20)
+
+p227 prints "ladder drills" as a category, not one drill, so `EXECUTION_HOW_TO` has no entry and Today's plyo card
+shows the name and the (i) with nothing under it. Only an athlete with the Agility ladder chip sees it (D-481 §3).
+
+## Q-304 — The Surge, Sustain, Surge ride's 4-minute rest prints no "easy spin" in the list — **filed** (2026-09-20)
+
+`step-words.ts` holds p237's word under `inRound`, the expander tags that rest `between`, so at levels 1–2 the step
+reaches the list and the Garmin description bare ("4:00 between"). Today's narrative reads the word itself
+(`planned-narrative.ts stepPhrase`). A background task chip was spawned with the full trace.
+
+## Q-305 — CLAUDE.md said Netlify; the site builds on Vercel — **fixed in the doc** (2026-09-20)
+
+A Vercel "Production deployment failed" email and GitHub's commit status (context `Vercel`) showed it. A build can be
+checked without `gh`: `curl -s https://api.github.com/repos/Xmichaela23/efforts/commits/<sha>/status`.
