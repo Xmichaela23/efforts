@@ -227,12 +227,20 @@ export function plyoBenefitLine(family: PlyoFamilyId): string {
 }
 
 /**
- * ⛔ UNDER THE "Plyo warm-up" TITLE (2026-09-19, Michael's words, pinned). p275's strength note; p246, p274 and p278 name
- * the session a warm-up. Today's lift card prints it under the title of a session tagged `plyo`.
- * 2026-09-20: p227's drill line follows it there, ONCE (`plyoTitleNote`) — it printed under each of the three drills.
+ * ⛔ UNDER THE "Plyo warm-up" TITLE: HOW MANY TO PICK, THEN p227's DRILL LINE, ONCE (2026-09-20, Michael's words,
+ * pinned: "no ladder - pick one or 2, for 3 pick 1-3 and then the instructions"). p275: "The midweek plyo warm-up may
+ * be anywhere from one to three plyometric skills." The card lists two drills for a kit with no agility ladder and three
+ * with one, so the sentence counts what is listed. It replaced "The midweek plyo warm-up can include one to three
+ * plyometric skills.", which read wrong over a list of two and told the athlete nothing to do.
+ * ⚠️ get-week writes it as `title_note` at read time, off the row's own drill count; nothing is stored.
  */
-// p275, reworded (Michael approved the words 2026-09-19); the page: "The midweek plyo warm-up may be anywhere from one to three plyometric skills."
-export const P275_WARMUP_LINE = 'The midweek plyo warm-up can include one to three plyometric skills.';
+// p275, reworded (Michael approved the words 2026-09-20); the page: "may be anywhere from one to three plyometric skills"
+export const P275_PICK_THREE_LINE = 'Pick one to three of these drills.';
+// p275, reworded (Michael approved the words 2026-09-20); two drills listed, inside the page's one to three
+export const P275_PICK_TWO_LINE = 'Pick one or two of these drills.';
 
-/** The lines under the plyo warm-up's title on Today: p275's sentence, then p227's drill line, once. */
-export const plyoTitleNote = (): string => `${P275_WARMUP_LINE} ${P227_DRILL_LINE}`;
+/** The lines under the plyo warm-up's title on Today. A day with one drill listed has nothing to pick. */
+export function plyoTitleNote(drillCount: number): string {
+  const pick = drillCount >= 3 ? P275_PICK_THREE_LINE : drillCount === 2 ? P275_PICK_TWO_LINE : null;
+  return pick ? `${pick} ${P227_DRILL_LINE}` : P227_DRILL_LINE;
+}

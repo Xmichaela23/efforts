@@ -323,3 +323,11 @@ Deno.test('⛔ with no ladder, a stored foot-speed drill comes off the plyo day 
   const after = kept.rows.find((r) => r.id === 'l');
   assert(!after || (after.strength_exercises as { name: string }[]).some((e) => e.name === 'Face Pull'), 'a lifting row was dropped');
 });
+
+Deno.test('the line under the title counts the drills listed: one or two with no ladder, one to three with one (2026-09-20)', async () => {
+  const { plyoTitleNote, P227_DRILL_LINE } = await import('./plyo.ts');
+  assertEquals(plyoTitleNote(2), `Pick one or two of these drills. ${P227_DRILL_LINE}`);
+  assertEquals(plyoTitleNote(3), `Pick one to three of these drills. ${P227_DRILL_LINE}`);
+  // One drill listed: nothing to pick, the drill line alone.
+  assertEquals(plyoTitleNote(1), P227_DRILL_LINE);
+});

@@ -1656,9 +1656,10 @@ Deno.serve(async (req)=>{
         is_deload: /deload/i.test(String(p.name ?? item.name ?? '')),
         // A lifting day's title, in the book's terms (`_shared/intent-title.ts`, 2026-09-18): `ME: Upper` → "Maximum Effort: Upper".
         intent_title: String(p.type ?? item.type ?? '').toLowerCase() === 'strength' ? intentTitle(p.name ?? item.name ?? null) || null : null,
-        // The lines under the session's title (2026-09-19): p275's sentence on the plyo warm-up, then p227's drill line
-        // once (2026-09-20, `plyoTitleNote`); nothing on any other session.
-        title_note: Array.isArray(p.tags) && p.tags.map((t: unknown) => String(t).toLowerCase()).includes('plyo') ? plyoTitleNote() : null,
+        // The lines under the plyo warm-up's title (2026-09-20, `plyoTitleNote`): how many of the listed drills to pick
+        // (p275), then p227's drill line, once. Counted off the row's own drills; nothing on any other session.
+        title_note: Array.isArray(p.tags) && p.tags.map((t: unknown) => String(t).toLowerCase()).includes('plyo')
+          ? plyoTitleNote(Array.isArray(p.strength_exercises) ? p.strength_exercises.length : 0) : null,
         // The day's listing order (H-T16); the same number sits on the item and on completed_workout.
         day_order: item.day_order ?? null,
         export_hints: p.export_hints ?? null,
