@@ -254,6 +254,14 @@ export function restateFromTest(args: {
      *   3. inside the cut week, only the days AFTER the last test session are restated.
      */
     if (isDone(row)) continue;
+    /**
+     * ⛔ THE ATHLETE'S OWN RETEST IS NOT THE DAY'S LIFTING SESSION (2026-09-20). A mid-block retest is a second strength
+     * row on the day (`rematerialize-standing-block`, `schedule_retest`, tagged `retest`). Matching is by week, weekday
+     * and movement name, so beside a lifting day its Back Squat would be read as that day's squat and rewritten with
+     * the session's sets and weight. The composer did not write it and never rewrites it. ⚠️ Week one's test rows carry
+     * `1rm_test` without `retest`: those ARE the composer's sessions for their day and are still matched.
+     */
+    if ((Array.isArray(row?.tags) ? row.tags : []).map((t: unknown) => String(t)).includes('retest')) continue;
     const date = String(row?.date ?? '').slice(0, 10);
     if (week < args.afterWeek) continue;
     // 2026-09-03: rows on or before the test-day cutoff keep their WEIGHTS (the test is not over), but a change

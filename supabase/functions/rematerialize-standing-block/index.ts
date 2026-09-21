@@ -202,6 +202,18 @@ Deno.serve(async (req: Request) => {
         units: (config?.units === 'metric' ? 'metric' : 'imperial'),
         tags: ['standing_plan', '1rm_test', 'retest'],
       };
+      /**
+       * ⛔ A SECOND TAP OPENS THE SAME RETEST (2026-09-20). Retest rows are exempt from the one-strength-row-per-plan-day
+       * rule (migration `20260920230000_planned_unique_key_exempts_retest.sql` — the rule blocked a retest on any day
+       * that already held a lifting or plyo session, five days in seven on the All Rounder), so nothing else stops a
+       * double tap from writing two. Today's unstarted retest of the same half is handed back as it is.
+       */
+      const { data: already } = await supabase.from('planned_workouts').select('*')
+        .eq('user_id', userId).eq('training_plan_id', plan.id).eq('date', today).eq('name', row.name)
+        .contains('tags', ['retest']).eq('workout_status', 'planned').limit(1);
+      if (Array.isArray(already) && already.length > 0) {
+        return json({ success: true, scheduled: true, planned: already[0], current_week: currentWeek, reused: true });
+      }
       const { data: inserted, error: insErr } = await supabase.from('planned_workouts').insert(row).select('*').single();
       if (insErr || !inserted) return json({ success: false, reason: 'retest_insert_failed', details: insErr?.message ?? null }, 500);
       console.log(`[standing-restate] retest scheduled plan=${plan.id} week=${currentWeek} row=${inserted.id} lifts=${lifts.join(',')}`);

@@ -357,3 +357,23 @@ Deno.test('⛔ a kit that gains the agility ladder gains the foot-speed drill on
     assertEquals(names.length, 3);
   }
 });
+
+Deno.test('⛔ the athlete\'s own retest beside a lifting day is never rewritten as that day\'s session (2026-09-20)', async () => {
+  const { restateFromTest } = await import('./restate.ts');
+  const { composeBlock } = await import('./compose.ts');
+  const composed = composeBlock({ ...BASE, weeks: 12, taperWeeks: [] } as never);
+  const monday = new Date('2030-01-07T12:00:00Z');
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const lift = composed[2].sessions.find((x) => x.type === 'strength' && !x.tags.includes('plyo'))!;
+  const d = new Date(monday); d.setUTCDate(d.getUTCDate() + 14 + DAYS.indexOf(lift.day));
+  const date = d.toISOString().slice(0, 10);
+  const firstLift = String(lift.strength_exercises![0].name);
+  // The retest's row for the same movement: p215's three steps, nothing like the day's sets.
+  const retestRows = [{ name: firstLift, sets: 3, reps: '6, 5, max', weight: 135, load_prescribed: false, slot_intent: 'ME' }];
+  const planned = [
+    { id: 'lift', week_number: 3, date, tags: lift.tags, strength_exercises: lift.strength_exercises ?? [] },
+    { id: 'retest', week_number: 3, date, tags: ['standing_plan', '1rm_test', 'retest'], strength_exercises: retestRows },
+  ];
+  const restated = restateFromTest({ composed, planned, afterWeek: 0 } as never);
+  assert(!restated.rows.some((r) => r.id === 'retest'), 'the retest row was rewritten');
+});
