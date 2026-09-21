@@ -328,7 +328,7 @@ Also dead: the LLM's `headline` and `next_session_guidance` — **parsed, typed,
 | capability | entry point | status | note |
 |---|---|---|---|
 | Strava OAuth exchange | `strava-token-exchange/index.ts:33` | PARTIAL | `userId` from **body**, no JWT verification |
-| Strava push webhook | `strava-webhook/index.ts:19` | BUILT | `verify_jwt=false` (correct); fans out to `ingest-activity` |
+| Strava push webhook | `strava-webhook/index.ts:19` | BUILT | `verify_jwt=false` (correct); fans out to `ingest-activity`; since 2026-09-20 an athlete removing the app on Strava's side (`object_type: athlete`, `authorized: "false"`) deletes our Strava connection rows and logs `connection_events` `deauthorized` (`handleAthleteDeauthorized`) |
 | Strava webhook subscribe/unsubscribe | `strava-webhook-manager/index.ts:16` | PARTIAL | no auth; client calls it with the **anon key** as bearer, so the request carries no identity **by construction** |
 | Strava history import | `import-strava-history/index.ts:653` | PARTIAL | tokens supplied by the client |
 | **Strava token refresh (standalone)** | `strava-refresh/index.ts:17` | 🔴 **DEAD + DEPLOYED + UNAUTHENTICATED** | takes `userId` from the body, **no auth check**, and **returns the access token** (`:93`). The anon key that reaches it is public. **Delete it.** Live refresh is `_shared/strava-access-token.ts`. |

@@ -30,7 +30,50 @@
 > Baselines buttons on efforts.work, the equipment rebuild and a retest on HIS plan · Q-303 Ladder Drills has no how-to ·
 > Q-304 the sandwich ride's rest prints no "easy spin" in the list (task chip spawned).
 
-## 🧭 NEXT SESSION — START HERE (updated 2026-09-20 evening — main = `7326c1135`, PUSHED; 8 functions DEPLOYED; both migrations RUN; **VERIFIED on Michael's phone** — "it works")
+## 🧭 NEXT SESSION — START HERE (updated 2026-09-20 night, PM chat — menu fix + Strava "removed the app" PUSHED (`b229a30e4`, `b05ddc85f`); `strava-webhook` DEPLOYED; iOS synced; **NOT checked signed in or on a device**)
+
+> **How to talk to Michael (read first):** the voice example at the top of `~/.claude/CLAUDE.md`. This chat lost him
+> three times with long answers and once with "you said…" — answer from the page or the code, in a few spoken sentences.
+>
+> **Your job:** none was named. The three priorities picked in this chat are closed or waiting on him: (1) the menu —
+> built, he checks it on the phone; (2) Strava "athlete removed the app" — deployed, he resubmits the Developer Program
+> form; (3) the test day in the logger — WITHDRAWN, nothing to build. The Record banner below is still the map of the
+> last big piece of work, and its one live thread still stands: `spacing-line.ts` is modified in the tree and NOT
+> committed (another terminal's). ⚠️ `get-week` IS deployed now (from `e96ec0193`, 2026-09-20 night, the two-a-day
+> fix); the uncommitted `spacing-line.ts` was not in that deploy and is still not live.
+>
+> **What shipped — do not redo.**
+> - **The menu, four causes** (punch list "THE MENU IS UNRELIABLE" has the full note). Gear and Import are paths now
+>   (`/gear`, `/import`: `App.tsx`, one effect in `AppLayout.tsx` after the `/help` effect; `handleGearClick` /
+>   `handleImportClick` navigate there; `handleBackToDashboard` leaves them). Opened by a flag alone they lost the
+>   render chain to any path-driven screen and to the + screen. `Gear.tsx` no longer draws its own `MobileHeader`.
+>   Import is drawn inside the layout (the early `return <FitFileImporter/>` is gone). `MobileHeader`'s Import has a
+>   default. The toast list (`ui/toast.tsx`) sits below the header and is click-through: at `top-0` it covered the
+>   whole header while a toast was up — checked in the browser on `/support`, before and after.
+> - **Strava:** `strava-webhook` `handleAthleteDeauthorized` — `object_type: athlete` + `updates.authorized: "false"`
+>   deletes the Strava rows in both connection tables and writes `connection_events` `deauthorized`. No call to Strava;
+>   logged workouts stay, as on a disconnect inside Efforts.
+> - **The test day stays p215's three sets (D-480).** p214 and p215 were read off the photos (`book-sources/`). The app
+>   matches the page: `_shared/standing-plan/working-number.ts` (0.75 → ×1.10 → ×1.15, Epley and Brzycki averaged,
+>   × 0.96). With no number on file the first set is the page's own guess and the logger fills sets 2 and 3 from it
+>   (`compose.ts:2060`, built 2026-09-09). The 2026-09-01 ladder item is withdrawn on the punch list.
+>
+> **UNVERIFIED, and what settles it:** the menu signed in, on web and phone (he walks it: every item from every other
+> item's screen and from +, Import with the header, the menu straight after a save) · that the toast was the cause of
+> "the menu does not always open" — it is a proven mechanism, not a proven cause · the `connection_events` row for the
+> fake event sent after the deploy (athlete `999999999999`, should read `matched: false`; the call returned 200, the
+> row was not read back — a prod read needs his go) · whether Strava's API agreement requires deleting the athlete's
+> Strava workouts on removal — not read; Garmin's does and `garmin-webhook-user` deletes them.
+>
+> **One wrong claim from this chat, because it is the usual shape:** "with no number on file the test shows no
+> weights" — read off `pretestSession` returning null, without reading the branch ten lines below it that handles
+> exactly that case. Read around it before saying what the athlete sees.
+>
+> **Rules that bind you:** commit exact files, never `-a` (terminals share this tree; HEAD is `stage/one-truth-drift`
+> and is pushed with `git push origin HEAD:main`) · commit, push and deploy wait for his word · prod reads need his
+> go-ahead per session.
+
+## (older banner) THE RECORD TAB (written 2026-09-20 evening — main = `7326c1135`, PUSHED; 8 functions DEPLOYED; both migrations RUN; **VERIFIED on Michael's phone** — "it works")
 
 > **How to talk to Michael (read first):** the voice example at the top of `~/.claude/CLAUDE.md`. Short spoken
 > sentences: what he gets, then what you'd do next. Never "worth knowing", "worth noting" or any cousin — he reads

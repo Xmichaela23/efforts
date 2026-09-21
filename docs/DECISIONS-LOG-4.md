@@ -244,6 +244,21 @@ ledger row in `STATE-SOURCES.md`. Dips stay a pick; no dip chip.
 
 **Back-annotated:** D-455; the Slice 7 notes in `strength-gear.ts`, `TrainingBaselines.tsx`, `strength-grid/taxonomy.ts`.
 
+## D-480 — The strength test stays the page's three sets; no ladder, no retest interval (2026-09-20, Michael)
+
+Michael: "keep it by the book." p214: test a 5-rep max before the program; a heavy single is guesswork, 5 to 6 reps
+is the most reliable. p215: about 75% of the predicted max for 6 (a guess is allowed: a weight good for 8, near
+failure at 10), + 10% for 5, + 5% more for max reps; Epley and Brzycki averaged; × 0.96 is the training max. Both
+pages read off the photos in `book-sources/` on 2026-09-20. The app already does this
+(`_shared/standing-plan/working-number.ts`; the no-number branch at `compose.ts:2060`, 2026-09-09).
+
+Withdrawn: the 2026-09-01 ruling that the test climbs until the reps break and then always asks (punch list, "THE
+LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY"). Not adopted: a retest every N weeks — a search of
+`SOURCE-viada-hybrid-athlete.md` for "retest" finds no interval, and its notes read "progress without retesting";
+a retest is the athlete's tap on Adjust. Field check the same day: JuggernautAI and Fitbod also estimate a max from
+a heavy set of reps; StrongLifts and Fitbod fill a new lifter's first weights rather than leave them blank, which
+the page's own guess line covers here.
+
 ## D-481 — Today's narrative, the plyo card, equipment on the rebuild, and three refresh rules (2026-09-20, Michael)
 
 > One consolidated entry for the engineer terminal's day (docs kept light on purpose). ⚠️ D-480 was another terminal's

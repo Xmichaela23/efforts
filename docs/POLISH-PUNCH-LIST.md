@@ -14,11 +14,62 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## [x] FIXED 2026-09-20 (d11a76c72 … e96ec0193) — THE CALENDAR SAVED ONE SESSION PER SPORT PER DAY
+
+> Fixed: `planned_workouts.day_seq` (migration 20260921000000, run by Michael) joins the unique index; activate-plan
+> saves both. Re-checked on throwaway builds after deploy: every composed run and ride saved (7 of 7, 6 of 6), Saturday
+> and Sunday long-ride pins hold. Point 7 of the ripple is open under AWAITING MICHAEL. Everything below is history.
+
+**What was measured** (`scripts/_burner-builder-answers-2026-09-20.mjs`, 16 builds, run before and after 6e974a2ed's
+deploy; the account was deleted afterwards). "Composed" is `plans.sessions_by_week`; "saved" is `planned_workouts`
+for that plan. Runs and rides only, every week of 12:
+
+| build | composed a week | saved a week |
+|---|---|---|
+| Ride + Strength, 7 rides, nothing pinned (p278 prints two rides on day 3 and on day 5) | 7 | 5 |
+| Ride + Strength, 6 rides | 6 | 4 |
+| Ride + Strength, 7 rides, hard ride pinned Wednesday, Thursday off | 7 | 3 |
+| Run + Strength, Wednesday and Friday off (two runs forced onto one day) | 4 | 3 |
+| Run + Strength, hard run pinned onto the long-run Sunday | 4 | 3 |
+| Run + Ride + Strength, hard run pinned onto the long-run Sunday | 5 | 4 |
+
+A run and a ride on the same day both survive; two of the same sport do not. Nothing tells the athlete.
+
+**The saving step** (read 2026-09-20, before the other session's edit): `activate-plan/index.ts` built rows from
+`sessions_by_week` and kept a set of `${weekNum}-${dow}-${date}-${type}` keys; a second session with the same key was
+skipped with only a `console.warn` ("Skipping duplicate session"). The brick bike/run split checked the same set.
+`materialize-plan` inserts nothing and is not the cause.
+
+**The database rule:** unique index `ux_planned_unique_key` on `planned_workouts (training_plan_id, week_number,
+day_number, date, type)`, rebuilt by `20260920230000_planned_unique_key_exempts_retest.sql` with a `retest` tag
+exemption only. Removing the skip alone would turn the silent drop into an insert error — both have to change.
+
+**How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
+line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
+
 ## QUEUED (2026-09-18) — HEAVY LIFTERS GET SEVEN WARM-UP SETS OF FIVE
 
 Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb squat or 400 lb deadlift gets seven
 sets of five before the work. Many coaches drop reps as the weight climbs (5, 3, 2, 1); that needs its own named
 source before it changes. Not urgent: light and middle lifters get two to five sets.
+
+## AWAITING MICHAEL (2026-09-20, two sessions of one sport on one day — d11a76c72 … e96ec0193 PUSHED, DEPLOYED, checked on throwaway plans; NOT seen on a device)
+
+- [ ] **Point 7 — READ, NOT TESTED.** Deleting an older finished ride that has no link to its planned session now puts
+      back only the session it was matched to, not every same-sport session that day (`src/hooks/useWorkouts.ts`, the
+      date + type fallback). Phone code; read and type-checked only. No throwaway build reaches it.
+
+## AWAITING MICHAEL (2026-09-20, D-481 — all PUSHED, DEPLOYED, live-checked on throwaway plans; NOT seen on a device)
+
+- [ ] **Baselines → Strength card on efforts.work:** two Retest buttons and "Rebuild upcoming sessions" under the numbers;
+      "Rebuild upcoming sessions" with "Changes made to equipment will be adjusted here for future sessions." under the
+      chips; no "Retest or rebuild on Adjust" link on this card. (Seen on the local server only.)
+- [ ] **Equipment on his own plan:** check a chip, tap the rebuild under the chips, and the sessions ahead use it (with
+      Agility ladder: Wednesday's plyo warm-up goes from two drills to three).
+- [ ] **A retest on a day that has a lifting session:** Lower lifts / Upper lifts opens a test in the logger and the row
+      sits on today's calendar beside the lift.
+- [ ] **The two-drill plyo card** ("Pick one or two of these drills.") — he saw the three-drill card with the (i).
+- [x] Today's narrative on his own plan — the reworded Descending Ladder card, seen 2026-09-20.
 
 ## AWAITING MICHAEL (2026-09-20, b229a30e4 PUSHED, iOS synced; NOT checked signed in or on a device) — THE MENU (☰) IS UNRELIABLE
 
@@ -53,18 +104,6 @@ next morning: the rows belong to two different accounts with the same Garmin his
 ## QUEUED (2026-09-18, Michael: "so we have an ours thing happening?") — THE PERFORMANCE WORKLOAD "usual" RANGE IS OURS
 
 The workload chip on Performance prints "usual 36–54" (`src/components/AdherenceChips.tsx:319-331`, server
-## AWAITING MICHAEL (2026-09-20, D-481 — all PUSHED, DEPLOYED, live-checked on throwaway plans; NOT seen on a device)
-
-- [ ] **Baselines → Strength card on efforts.work:** two Retest buttons and "Rebuild upcoming sessions" under the numbers;
-      "Rebuild upcoming sessions" with "Changes made to equipment will be adjusted here for future sessions." under the
-      chips; no "Retest or rebuild on Adjust" link on this card. (Seen on the local server only.)
-- [ ] **Equipment on his own plan:** check a chip, tap the rebuild under the chips, and the sessions ahead use it (with
-      Agility ladder: Wednesday's plyo warm-up goes from two drills to three).
-- [ ] **A retest on a day that has a lifting session:** Lower lifts / Upper lifts opens a test in the logger and the row
-      sits on today's calendar beside the lift.
-- [ ] **The two-drill plyo card** ("Pick one or two of these drills.") — he saw the three-drill card with the (i).
-- [x] Today's narrative on his own plan — the reworded Descending Ladder card, seen 2026-09-20.
-
 `typical_low/typical_high`): the athlete's own middle half of that sport's sessions, at least 5 sessions. The framing
 borrows Strava's Relative Effort and Garmin's Training Load bands, but the method is ours (ledger row added
 2026-09-18, b75b3114). Replace it with one named app's own method, or take the range off.
@@ -1730,7 +1769,7 @@ beside it** — the fix here is scope-at-creation and visibility, NOT a third pa
 
 ## [x] WITHDRAWN 2026-09-20 (Michael: "keep it by the book") — THE LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY (filed 2026-09-01)
 
-> The ladder ruling below is withdrawn. The test stays p215's three fixed sets (75% × 6, +10% × 5, +5% × max reps).
+> D-480. The ladder ruling below is withdrawn. The test stays p215's three fixed sets (75% × 6, +10% × 5, +5% × max reps).
 > No retest interval: a search of SOURCE-viada-hybrid-athlete.md for "retest" finds none, and its notes say progress
 > carries on without retesting; a retest is the athlete's tap on Adjust. Everything below is history.
 
