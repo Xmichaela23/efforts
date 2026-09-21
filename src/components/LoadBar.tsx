@@ -117,14 +117,6 @@ export function Dot() {
  * on one, the workload paragraph on another. The boundary falls between the two subjects: what a
  * workload point is, and what form is.
  */
-export function LoadKeyWorkload() {
-  return (
-    <p className="text-caption text-label-secondary leading-snug">
-      Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.
-    </p>
-  );
-}
-
 export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
   // ⛔ THE TABLE IS THE COACH'S (`load.form_zones`, H-T21) — ranges, words and the current zone. A payload
   // without it prints no table rather than a copy kept here.
@@ -141,10 +133,12 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
         * ⚠️ THE NUMBERS ARE LIVE — his "47 − 63 = −16" is the shape, not the values. The sentence is
         * dropped entirely when either number is missing, rather than printed with a blank in it.
         */}
+      {/* ⛔ THE KEY, APPROVED BY MICHAEL 2026-09-21, VERBATIM — TrainingPeaks' own explanation of its Performance
+          Management Chart: TSS (one hour at threshold = 100), fitness = 42-day and fatigue = 7-day averages of daily
+          TSS, form = fitness − fatigue. It replaced two paragraphs, one of which described week-change numbers the
+          card no longer prints. One paragraph, so State's ⓘ and Today's ⓘ print the same words. */}
       <p>
-        Form is fitness minus fatigue. Below zero you are training harder than usual, building but tired. Above zero you are rested.
-        {/* ⛔ NO EQUATION (Michael, 2026-09-16: "drop it"). The "Today: a − b = c" line printed the numbers entering
-            today beside the bar's end-of-today numbers; TrainingPeaks prints no equation. */}
+        Every workout gets a score for how long and how hard it was. One hour at your threshold scores 100. Fitness is your average daily score over 6 weeks. Fatigue is your average daily score over 7 days. Form is fitness minus fatigue: positive is fresh, negative is tired.
       </p>
       {rows.length > 0 && (
         <table className="mt-1 text-caption tabular-nums">
@@ -167,7 +161,6 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
 export function LoadKey({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
   return (
     <div className="mt-1.5 max-w-[min(100%,360px)] space-y-1">
-      <LoadKeyWorkload />
       <LoadKeyForm ff={ff} zones={zones} />
     </div>
   );
@@ -201,13 +194,7 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   // the coach still sends them. Every word is the coach's, printed as sent. What this replaced: one wrapped row
   // of three numbers at 13 px with 10.5–11 px grey labels, changes and windows — 11 of its 20 lines measured
   // under 4.5:1 over the card's glow. The calmer background the rule asks for is the plate's own (`plate-calm` on State's top plate).
-  const Reading = ({ label, value, window: w }: { label: string; value: string | null; window: string | null }) => (
-    <div>
-      <div className="text-footnote font-medium text-label-secondary">{label}</div>
-      <div className="readout-num text-body font-medium">{value ?? '—'}</div>
-      {w && <div className="text-caption text-label-secondary">{w}</div>}
-    </div>
-  );
+
 
   return (
     <div className="px-3 py-3">
@@ -217,22 +204,28 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
           <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary normal-case tracking-normal font-normal text-subhead align-baseline">ⓘ</button>
         </span>
         {rd && rd.form.value != null ? (
-          <>
-            <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          /* ⛔ ONE ROW (Michael 2026-09-21: "it takes up too much space", "form can be a little larger"). Form, the
+             number the zone word reads, is the biggest figure; fitness and fatigue sit on the same line at the right.
+             Their windows (6 weeks, 7 days) moved into the ⓘ. OURS — form at 1.3× Title 1 (about 36 px). */
+          <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div className="flex items-baseline gap-x-2">
               <span className="text-footnote font-medium text-label-secondary">form</span>
-              <span className="readout-num text-title1 font-semibold">{rd.form.value}</span>
+              <span className="readout-num font-semibold" style={{ fontSize: 'calc(var(--type-title1) * 1.3)', lineHeight: 1.1 }}>{rd.form.value}</span>
               {zone && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zone}</span>}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-x-4">
-              <Reading label="fitness" value={rd.fitness.value} window={rd.fitness.window} />
-              <Reading label="fatigue" value={rd.fatigue.value} window={rd.fatigue.window} />
+            <div className="flex items-baseline gap-x-1.5 text-subhead tabular-nums">
+              <span className="text-label-secondary">fitness</span>
+              <span className="readout-num font-medium">{rd.fitness.value ?? '—'}</span>
+              <span className="text-label-secondary">·</span>
+              <span className="text-label-secondary">fatigue</span>
+              <span className="readout-num font-medium">{rd.fatigue.value ?? '—'}</span>
             </div>
-          </>
+          </div>
         ) : (
           <div className="mt-2 text-subhead text-label-secondary">no sessions logged yet</div>
         )}
         {weekLine && (
-          <div className="mt-3 flex flex-wrap items-baseline gap-x-2 leading-snug">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 leading-snug">
             <span className="text-footnote font-medium text-label-secondary shrink-0">This week</span>
             <span className="text-subhead text-label tabular-nums">{weekLine}</span>
           </div>
