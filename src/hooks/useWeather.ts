@@ -49,9 +49,15 @@ export function useWeather({
   enabled = true,
   current,
 }: UseWeatherProps) {
-  const [weather, setWeather] = useState<SessionWeatherForDisplay | null>(null);
+  // A kept reading paints on the first frame, not one frame after (2026-09-21).
+  const keptAtMount = (() => {
+    if (!enabled || lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng) || !timestamp) return null;
+    const k = READING_CACHE.get(JSON.stringify([Number(lat).toFixed(2), Number(lng).toFixed(2), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]));
+    return k && Date.now() - k.at < readingKeepMs(timestamp, current) ? k : null;
+  });
+  const [weather, setWeather] = useState<SessionWeatherForDisplay | null>(() => keptAtMount()?.weather ?? null);
   // ⛔ The hot-day line, decided by `get-weather` (2026-09-10, audit H-T07). Null means say nothing.
-  const [heatNote, setHeatNote] = useState<string | null>(null);
+  const [heatNote, setHeatNote] = useState<string | null>(() => keptAtMount()?.heatNote ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +70,8 @@ export function useWeather({
     }
 
     let cancelled = false;
-    const cacheKey = JSON.stringify([Number(lat), Number(lng), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]);
+    // Places match to 2 decimals (about 1 km): a fresh location a few metres off is the same weather (2026-09-21).
+    const cacheKey = JSON.stringify([Number(lat).toFixed(2), Number(lng).toFixed(2), timestamp, workoutId ?? null, durationSeconds ?? null, current ?? null]);
     const kept = READING_CACHE.get(cacheKey);
     if (kept && Date.now() - kept.at < readingKeepMs(timestamp, current)) {
       setWeather(kept.weather);

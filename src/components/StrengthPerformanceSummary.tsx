@@ -207,8 +207,8 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
         previousByExercise={previousByExercise}
         workoutId={workoutId}
         onAdjustmentSaved={() => {
-          // A saved adjustment changes upcoming planned sessions. `plan:adjusted` reached no screen (cache job 3,
-          // 2026-09-21); the planned list and the week feed are the ones that show those sessions.
+          // A corrected logged set changes this workout's totals (the week feed shows its volume). `plan:adjusted`
+          // reached no screen (cache job 3, 2026-09-21), so the week kept the old total until something else refreshed.
           window.dispatchEvent(new CustomEvent('planned:invalidate'));
           window.dispatchEvent(new CustomEvent('week:invalidate'));
           onRecompute?.();

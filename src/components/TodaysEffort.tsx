@@ -133,6 +133,19 @@ interface TodaysEffortProps {
   onEditEffort?: (workout: any) => void;
 }
 
+/**
+ * ⛔ HOME REMEMBERS WHERE IT IS WHILE THE APP IS OPEN (2026-09-21, Michael: the weather took a moment to show every
+ * time he came back to Home). Each visit asked the phone for its location again, looked the city up again, and the
+ * fresh coordinates differed by a few metres, so the kept weather reading never matched. The last place and its
+ * city are kept in memory (nothing is saved to the phone); the phone is asked again after 10 minutes, the same age
+ * the location request already accepts. Places match to 2 decimals (about 1 km).
+ */
+let LAST_DAY_LOC: { loc: { lat: number; lng: number }; at: number } | null = null;
+const CITY_BY_PLACE = new Map<string, string | null>();
+const LOC_KEEP_MS = 10 * 60 * 1000;
+const placeKey = (l: { lat: number; lng: number }) => `${l.lat.toFixed(2)},${l.lng.toFixed(2)}`;
+const lastDayLocFresh = () => !!LAST_DAY_LOC && Date.now() - LAST_DAY_LOC.at < LOC_KEEP_MS;
+
 const TodaysEffort: React.FC<TodaysEffortProps> = ({ 
   selectedDate, 
   onAddEffort, 
@@ -193,9 +206,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    */
   const garminDerived = useGarminDataPresence();
   const [baselines, setBaselines] = useState<any | null>(null);
-  const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
+  // Home opens with the place and city it had last time (see LAST_DAY_LOC), so the weather shows at once.
+  const [dayLoc, setDayLocState] = useState<{ lat: number; lng: number } | null>(() => LAST_DAY_LOC?.loc ?? null);
+  const setDayLoc = (loc: { lat: number; lng: number }) => { LAST_DAY_LOC = { loc, at: Date.now() }; setDayLocState(loc); };
   const [locTried, setLocTried] = useState(false);
-  const [cityName, setCityName] = useState<string | null>(null);
+  const [cityName, setCityName] = useState<string | null>(() => (LAST_DAY_LOC ? CITY_BY_PLACE.get(placeKey(LAST_DAY_LOC.loc)) ?? null : null));
   const scrollRef = useRef<HTMLDivElement | null>(null);
   /**
    * ⛔ §3d — the grid drifts against the scroll and the bleed follows the session in view. Both are
@@ -714,7 +729,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   useEffect(() => {
     if (locTried) return;
     if (activeDate !== today) return;
-    if (dayLoc) return;
+    if (dayLoc && lastDayLocFresh()) return;
     setLocTried(true);
     try {
       if (!('geolocation' in navigator)) return;
@@ -726,7 +741,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Secondary attempt: if initial geolocation didn't run (e.g., blocked), try once more on mount
   useEffect(() => {
-    if (dayLoc) return;
+    if (dayLoc && lastDayLocFresh()) return;
     if (activeDate !== today) return;
     if (locTried) return;
     try {
@@ -744,6 +759,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       setCityName(null);
       return;
     }
+
+    const kept = CITY_BY_PLACE.get(placeKey(dayLoc));
+    if (kept !== undefined) { setCityName(kept); return; }
 
     // Use OpenStreetMap Nominatim for reverse geocoding (free, no API key needed)
     const fetchCityName = async () => {
@@ -777,6 +795,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // etc.
         }
         
+        CITY_BY_PLACE.set(placeKey(dayLoc), city);
         setCityName(city);
       } catch (err) {
         // Silently fail - city name is optional
