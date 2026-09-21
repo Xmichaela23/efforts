@@ -48,7 +48,7 @@ import { emptyDayLine } from '../_shared/empty-day-line.ts';
 import { planRestDates } from '../_shared/plan-overview.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
-import { P275_WARMUP_LINE } from '../_shared/standing-plan/plyo.ts';
+import { plyoTitleNote } from '../_shared/standing-plan/plyo.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 import { athleteToday, isStandingPlanConfig, queueRefreshIfStale } from '../_shared/plan-refresh.ts';
@@ -1656,8 +1656,9 @@ Deno.serve(async (req)=>{
         is_deload: /deload/i.test(String(p.name ?? item.name ?? '')),
         // A lifting day's title, in the book's terms (`_shared/intent-title.ts`, 2026-09-18): `ME: Upper` → "Maximum Effort: Upper".
         intent_title: String(p.type ?? item.type ?? '').toLowerCase() === 'strength' ? intentTitle(p.name ?? item.name ?? null) || null : null,
-        // The line under the session's title (2026-09-19): p275's sentence on the plyo warm-up, nothing on any other session.
-        title_note: Array.isArray(p.tags) && p.tags.map((t: unknown) => String(t).toLowerCase()).includes('plyo') ? P275_WARMUP_LINE : null,
+        // The lines under the session's title (2026-09-19): p275's sentence on the plyo warm-up, then p227's drill line
+        // once (2026-09-20, `plyoTitleNote`); nothing on any other session.
+        title_note: Array.isArray(p.tags) && p.tags.map((t: unknown) => String(t).toLowerCase()).includes('plyo') ? plyoTitleNote() : null,
         // The day's listing order (H-T16); the same number sits on the item and on completed_workout.
         day_order: item.day_order ?? null,
         export_hints: p.export_hints ?? null,

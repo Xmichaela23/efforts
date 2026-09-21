@@ -86,6 +86,30 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY SPEAK IN THEIR OWN NOTE, NOT IN AN 
   assertEquals(test.cue, 'Work up to a heavy single.');
 });
 
+Deno.test('⛔ A PLYO DRILL READS ITS HOW-TO; ITS BENEFIT WAITS BEHIND THE (i) (2026-09-20)', () => {
+  const howTo = 'Jog a few steps, then push off one foot and lift the other knee until the thigh is level with your hip.';
+  const [line] = liftLinesFor(
+    lift([{
+      name: 'Bounding', how_to: howTo, benefit_line: 'Benefit: running gait and speed.',
+      notes: 'Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.',
+    }], ['standing_plan', 'plyo']),
+    bar,
+  );
+  assertEquals(line.kind, null);
+  assertEquals(line.cue, howTo);
+  assertEquals(line.info, 'Benefit: running gait and speed.');
+  const [card] = liftCardLinesFor(lift([{ name: 'Bounding', how_to: howTo, benefit_line: 'Benefit: running gait and speed.' }], ['standing_plan', 'plyo']), bar);
+  assertEquals(card.cues, [howTo]);
+  assertEquals(card.info, 'Benefit: running gait and speed.');
+  // A drill row built before the (i) carries no `benefit_line` and reads its whole note, as it did.
+  const [old] = liftLinesFor(lift([{ name: 'Bounding', how_to: howTo, notes: 'Benefit: running gait and speed. Repeat each drill…' }], ['standing_plan', 'plyo']), bar);
+  assertEquals(old.cue, 'Benefit: running gait and speed. Repeat each drill…');
+  assertEquals(old.info, null);
+  // No other row has an (i): a lift's how-to stays in the logger.
+  const [bench] = liftLinesFor(lift([{ slot_intent: 'ME', name: 'barbell bench press', how_to: 'x' }]), bar);
+  assertEquals(bench.info, null);
+});
+
 Deno.test('the movement shows the execution the athlete’s kit reaches', () => {
   const row = liftLinesFor(lift([{ name: 'rear delt machine', execution_name: 'incline rear delt fly', slot_intent: 'HYP' }]), bar)[0];
   assertEquals(row.movement, 'incline rear delt fly');

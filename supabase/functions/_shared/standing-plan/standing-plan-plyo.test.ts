@@ -153,7 +153,8 @@ Deno.test('the drills rotate week to week — he asks for the variety outright',
   // encouraged."* ⚠️ MUTATION-TESTED by freezing the week index.
   for (const family of PLYO_FAMILY_IDS) {
     assert(PLYO_FAMILIES[family].drills.length >= 2, `${family} has one drill and cannot rotate`);
-    assert(drillForWeek(family, 2) !== drillForWeek(family, 3), `${family} did not move week to week`);
+    // The foot-speed family rotates for an athlete with an agility ladder; without one it has one drill (below).
+    assert(drillForWeek(family, 2, ['Agility ladder']) !== drillForWeek(family, 3, ['Agility ladder']), `${family} did not move week to week`);
   }
   // ⛔ AND NO DRILL IS PRESCRIBED TWICE IN A WEEK — one from each family, and the families are
   // disjoint, so a repeat would mean the same family was read twice.
@@ -234,3 +235,16 @@ Deno.test('⛔ NO DRILL AN ATHLETE CANNOT DO — ladder drills need an agility l
   assert(withLadder.includes('Ladder Drills'), 'an athlete with a ladder never sees the ladder drill');
 });
 
+Deno.test('⛔ hopscotch and ladder drills need the agility ladder; the week\'s pick and the swap list ask one rule (2026-09-20)', async () => {
+  const { plyoSwapGroups } = await import('./swap-groups.ts');
+  // No ladder: the foot-speed family gives the Ickey Shuffle every week, never the two ladder drills.
+  for (let w = 1; w <= 12; w++) assertEquals(drillForWeek('footspeed', w, ['Barbell', 'Dumbbells']), 'Ickey Shuffle');
+  // With the ladder it walks all three, in p89's order.
+  assertEquals([1, 2, 3, 4].map((w) => drillForWeek('footspeed', w, ['Agility ladder'])), ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch', 'Ladder Drills']);
+  // The swap list under the Ickey Shuffle: nothing to offer without the ladder, both with it.
+  assertEquals(plyoSwapGroups('Ickey Shuffle', ['Barbell']), []);
+  assertEquals(plyoSwapGroups('Ickey Shuffle', ['Agility ladder'])[0].options.map((o) => o.name), ['Ladder Drills', 'Hopscotch']);
+  // The other two families need nothing.
+  assertEquals(drillForWeek('bounding', 4, []), 'Bounding');
+  assertEquals(drillForWeek('ground_contact', 4, null), 'Single-Leg Hops');
+});

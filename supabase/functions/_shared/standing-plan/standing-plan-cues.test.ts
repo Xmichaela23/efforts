@@ -190,6 +190,11 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () =>
     'a drill row lost p227\'s words or its Benefit label');
   assert(drills.some((d) => String(d.notes) === `Benefit: running gait and speed. ${P227_DRILL_LINE}`),
     'the bounding drill does not read "Benefit: running gait and speed."');
+  // 2026-09-20: the benefit alone rides each drill row too (Today's (i)), and p227's line is written to "you".
+  assert(drills.every((d) => String(d.notes).startsWith(`${String((d as { benefit_line?: unknown }).benefit_line)} `)),
+    'a drill row\'s benefit_line is not the head of its note');
+  assert(drills.some((d) => (d as { benefit_line?: unknown }).benefit_line === 'Benefit: running gait and speed.'));
+  assert(/you feel confident in it/.test(P227_DRILL_LINE) && !/the athlete/.test(P227_DRILL_LINE));
   const test = week(1).sessions.filter((s) => (s.tags ?? []).includes('test_week'));
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {

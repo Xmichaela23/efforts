@@ -327,6 +327,8 @@ export function restateFromTest(args: {
       // ⛔ A PLYO DRILL'S NOTE IS SHAPE TOO (2026-09-19): the composer's `plyoDrillNote` is its only writer, so a row built
       // before the approved words ("…Full rest between. Tired or sloppy, stop.") gets them on the next rebuild.
       if (PLYO_DRILL_NAMES.has(nameOf(fresh)) && typeof fr.notes === 'string' && fr.notes !== er.notes) shape.notes = fr.notes;
+      // …and so is its benefit line (2026-09-20): a drill row built before Today's (i) gets it on the next rebuild.
+      if (PLYO_DRILL_NAMES.has(nameOf(fresh)) && (fr.benefit_line ?? null) !== (er.benefit_line ?? null)) shape.benefit_line = fr.benefit_line;
       if (shapeOnly) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;

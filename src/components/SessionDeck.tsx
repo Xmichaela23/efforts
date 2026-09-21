@@ -73,7 +73,11 @@ function weightLabelFor(ex: Record<string, unknown> | undefined): string | null 
 export type DeckCard = { key: string; name: string; kind: string | null; cue: string | null; meta: string | null };
 
 /** One line of the lift card: a row, or a superset pair read as one (§3i). */
-export type LiftCardRow = { key: string; name: string; kind: string | null; cues: string[]; meta: string | null; rows: number };
+export type LiftCardRow = {
+  key: string; name: string; kind: string | null; cues: string[]; meta: string | null; rows: number;
+  /** What opens behind the (i) beside the name — a plyo drill's benefit (`today-lines.ts`), or null. */
+  info: string | null;
+};
 
 /**
  * The lines the lift card draws, in session order, a superset pair folded into one (§3i). The
@@ -96,6 +100,7 @@ export function liftCardRowsFor(session: TodayRow, useImperial: boolean): LiftCa
         cues: line.cues,
         meta: unique.length > 0 ? unique.join(' · ') : null,
         rows: line.rows.length,
+        info: line.info,
       };
     })
     .filter((c) => c.name);
@@ -274,6 +279,8 @@ export const LiftSessionCard: React.FC<{
   const titleNote = typeof rawTitleNote === 'string' && rawTitleNote.trim() ? rawTitleNote : null;
 
   const [open, setOpen] = React.useState(false);
+  // Which rows' (i) is open, by row key. ⛔ CLOSED BY DEFAULT, like the day's own (i) (`TodaySpacingLine`, §2.1).
+  const [openInfo, setOpenInfo] = React.useState<Record<string, boolean>>({});
   const reduced = React.useMemo(reducedMotion, []);
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
@@ -298,7 +305,9 @@ export const LiftSessionCard: React.FC<{
     const ro = new ResizeObserver(measure);
     ro.observe(list);
     return () => ro.disconnect();
-  }, [cards.length]);
+    // ⚠️ AN OPENED (i) ADDS A LINE INSIDE THE LIST, whose own box is held at a fixed height — so the observer does not
+    // fire for it and the rows are measured again here.
+  }, [cards.length, openInfo]);
 
   if (cards.length === 0) return null;
   // `N more` counts EXERCISES (§3h), so a superset line past the fold counts both of its rows.
@@ -363,12 +372,32 @@ export const LiftSessionCard: React.FC<{
                 {c.kind ? (
                   <span className="text-caption uppercase tracking-[0.08em]" style={{ color: colour, whiteSpace: 'nowrap' }}>{c.kind}</span>
                 ) : null}
+                {/* ⛔ THE ROW'S (i) (Michael, 2026-09-20: "benefit should be an (i) to not suck up too much real estate").
+                    The same icon and tone as the day's "Workout order" (i). It stops the card's own toggle, so opening
+                    the benefit and opening the card stay two taps. */}
+                {c.info ? (
+                  <button
+                    type="button"
+                    aria-label={`About ${c.name}`}
+                    aria-expanded={!!openInfo[c.key]}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenInfo((m) => ({ ...m, [c.key]: !m[c.key] })); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                    className="bg-transparent border-none p-0 cursor-pointer text-white/40 hover:text-white/70 transition-colors self-center"
+                    style={{ lineHeight: 0 }}
+                  >
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                ) : null}
               </div>
               <span className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
                 {/* server-word: materialize-plan stamps `weight_display: 'By feel'` (2026-09-17, Stage C). */}
                 {c.meta ?? ''}
               </span>
             </div>
+            {/* server-word: the row's `benefit_line` (p227's table, `plyo.ts plyoBenefitLine`), open only after the (i) is tapped. */}
+            {c.info && openInfo[c.key] ? (
+              <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label)' }}>{c.info}</div>
+            ) : null}
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
             {c.cues.map((cue) => (
               <div key={cue} className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{cue}</div>

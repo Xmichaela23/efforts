@@ -85,7 +85,8 @@ import {
   PLYO_FAMILIES,
   PLYO_FAMILIES_PER_DAY,
   PLYO_FAMILY_MIX_IS_OURS,
-  P227_DRILL_LINE,
+  P227_DRILL_LINE_FOR_DESCRIPTION,
+  plyoBenefitLine,
   plyoDrillNote,
 } from './plyo.ts';
 /**
@@ -272,6 +273,9 @@ export type StrengthExercise = {
   /** How to do the home version of a machine movement, in Michael's words (2026-09-08). Display only,
    *  behind an (i) beside the name. Absent when the athlete has the station or the name alone is enough. */
   how_to?: string;
+  /** A plyo drill's benefit alone ("Benefit: running gait and speed."), p227's table — behind the (i) beside the
+   *  drill's name on Today's card (2026-09-20, `plyo.ts plyoBenefitLine`). Absent on every other row. */
+  benefit_line?: string;
   /**
    * ⛔ A ROW PRESCRIBED IN WORDS, NOT SETS AND REPS (p226 carries, Michael 2026-09-13). Every surface
    * prints `name · words` and no dose; the row carries no `sets` and blank `reps`.
@@ -2177,10 +2181,13 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
   if (!notes.some((n) => n.text === PLYO_DOSE.effortCountIsOurs)) {
     notes.push({ kind: 'ours', text: PLYO_DOSE.effortCountIsOurs });
     // ⛔ 2026-09-18 (pass 6): p227's own words (p227.jpg), one owner `plyo.ts`, replace the old paraphrase.
-    notes.push({ kind: 'source', text: P227_DRILL_LINE, cite: PLYO_DOSE.stopRuleIsHis });
+    // 2026-09-20: the third-person form — this note reaches the block description, which bars second person.
+    notes.push({ kind: 'source', text: P227_DRILL_LINE_FOR_DESCRIPTION, cite: PLYO_DOSE.stopRuleIsHis });
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
-  return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) })).map(({ family, name }) => ({
+  // A family none of whose drills the athlete's kit reaches gives no row that week (`drillForWeek` → null).
+  return PLYO_FAMILIES_PER_DAY.map((family) => ({ family, name: drillForWeek(family, args.week, args.equipment) }))
+    .filter((d): d is { family: typeof d.family; name: string } => d.name != null).map(({ family, name }) => ({
     name,
     // Every movement carries its how-to (2026-09-18, `EXECUTION_HOW_TO`), the drills included.
     ...(executionHowTo(name, args.equipment ?? null) ? { how_to: executionHowTo(name, args.equipment ?? null)! } : {}),
@@ -2206,7 +2213,8 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     // Tired or sloppy, stop."). Pass 6: p227's own words, read off p227.jpg (`plyo.ts`, one owner).
     // 2026-09-19: led by the p227 table's "Benefit:" label and the family's entry (`plyoDrillNote`).
     notes: plyoDrillNote(family),
-
+    // 2026-09-20: the benefit alone, for the (i) beside the drill's name on Today's card (`plyoBenefitLine`).
+    benefit_line: plyoBenefitLine(family),
   }));
 }
 

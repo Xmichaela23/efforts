@@ -28,6 +28,10 @@ export type TodayStrengthRow = {
   prescription_words?: string | null;
   /** Rows of one printed superset (p274) share this mark; the composer stamps it. */
   superset_group?: string | null;
+  /** How to do the movement, sourced, written by the server (`strength-grid/grid.ts`). The plyo card prints it. */
+  how_to?: string | null;
+  /** A plyo drill's benefit alone (p227's table), written by the server; it opens behind the (i) beside the name. */
+  benefit_line?: string | null;
 };
 
 /** A planned or completed row as `get-week` hands it over. Only the fields this file reads. */
@@ -113,7 +117,11 @@ export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
  * reps, 1 to 2 in reserve" for HYP (p218: 6 to 12, 0 to 2) and carried a DE stop rule no page prints.
  */
 
-export type LiftLine = { key: string; movement: string; kind: string | null; cue: string | null };
+export type LiftLine = {
+  key: string; movement: string; kind: string | null; cue: string | null;
+  /** What opens behind the (i) beside the name — a plyo drill's benefit. Null on every other row. */
+  info: string | null;
+};
 
 /**
  * One line per row, in the row's order. The cue REPEATS when the kind repeats — three hypertrophy
@@ -143,22 +151,34 @@ export function liftLinesFor(
     // kit actually reaches, `name` is the key everything else matches on.
     const movement = String(ex?.execution_name || ex?.name || '').replace(/_/g, ' ').trim();
     const key = `${movement}:${i}`;
-    if (!movement) return { key, movement: '', kind: null, cue: null };
+    if (!movement) return { key, movement: '', kind: null, cue: null, info: null };
 
     if (noteOnly) {
       const note = typeof ex?.notes === 'string' && ex.notes.trim() ? ex.notes.trim() : null;
-      return { key, movement, kind: null, cue: note };
+      /**
+       * ⛔ A PLYO DRILL READS ITS HOW-TO, AND ITS BENEFIT OPENS BEHIND AN (i) (Michael, 2026-09-20: "benefit should be
+       * an (i) to not suck up too much real estate"; "a general sourced cue on how to do the exercise"). Both are the
+       * server's words on the row — `how_to` is the sourced text the logger already shows, `benefit_line` is p227's
+       * table — and p227's drill line prints once under the title (`title_note`) instead of under every drill.
+       * ⚠️ A ROW WITH NO `benefit_line` WAS BUILT BEFORE THIS and reads its whole note, as it did.
+       */
+      const benefit = typeof ex?.benefit_line === 'string' && ex.benefit_line.trim() ? ex.benefit_line.trim() : null;
+      if (hasTag(session, 'plyo') && benefit) {
+        const howTo = typeof ex?.how_to === 'string' && ex.how_to.trim() ? ex.how_to.trim() : null;
+        return { key, movement, kind: null, cue: howTo, info: benefit };
+      }
+      return { key, movement, kind: null, cue: note, info: null };
     }
 
     const intent = intentOf(ex);
     // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): no kind word and no cue; its words are in the corner.
     if (!intent || (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim())) {
-      return { key, movement, kind: null, cue: null };
+      return { key, movement, kind: null, cue: null, info: null };
     }
 
     const cue = intentLine(intent);
 
-    return { key, movement, kind: KIND_WORD[intent], cue };
+    return { key, movement, kind: KIND_WORD[intent], cue, info: null };
   });
 }
 
@@ -182,6 +202,8 @@ export type LiftCardLine = {
   cues: string[];
   /** The indexes into `strength_exercises` this line stands for: one, or the two of a pair. */
   rows: number[];
+  /** What opens behind the (i) beside the name (a plyo drill's benefit), or null. */
+  info: string | null;
 };
 
 export function liftCardLinesFor(
@@ -209,11 +231,12 @@ export function liftCardLinesFor(
         kind: uniqueKinds.length > 0 ? `${uniqueKinds.join(' + ')} ${SUPERSET_WORD}` : SUPERSET_WORD,
         cues: cues.filter((c, at) => cues.indexOf(c) === at),
         rows: [i, i + 1],
+        info: line.info ?? next.info ?? null,
       });
       i += 1;
       continue;
     }
-    out.push({ key: line.key, movement: line.movement, kind: line.kind, cues: line.cue ? [line.cue] : [], rows: [i] });
+    out.push({ key: line.key, movement: line.movement, kind: line.kind, cues: line.cue ? [line.cue] : [], rows: [i], info: line.info });
   }
   return out;
 }

@@ -68,8 +68,10 @@ import { localDateInTz } from './local-date.ts';
 //   said off the same steps as `computed.step_lines`.
 // 23 (2026-09-20): the descending ladder's narrative leads with its count of sets and reads in the list's own shape
 //   ("2 sets. Set 1: … After each one: … Set 2 repeats set 1 from the 2:00 effort.").
+// 24 (2026-09-20): the plyo drill line is written to "you"; each drill row carries its benefit alone (`benefit_line`,
+//   behind the (i) on Today's card); hopscotch needs the agility ladder, like ladder drills.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 23;
+export const PLAN_WRITER_VERSION = 24;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

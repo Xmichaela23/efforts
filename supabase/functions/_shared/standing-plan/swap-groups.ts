@@ -17,7 +17,7 @@
  */
 import { cellOptions, builderReaches, executionHowTo, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
 import { shownNameOnKit } from '../strength/shown-name.ts';
-import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from './plyo.ts';
+import { drillAllowed, PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from './plyo.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
 import { canonicalize } from '../canonicalize.ts';
 
@@ -41,8 +41,8 @@ function kitWords(name: string, equipment: string[] | null | undefined): Pick<Sw
 }
 
 // ⛔ THE PLYO ROW'S LIST, MOVED FROM THE LOGGER (2026-09-18) word for word: the other drills in the drill's own family
-// (p227), and ladder drills only with an agility ladder in the kit.
-const PLYO_LADDER_DRILLS = new Set(['ladder drills']);
+// (p227), and a drill that needs an agility ladder only with one in the kit — `plyo.ts drillAllowed`, the same rule
+// the week's pick asks (2026-09-20; this file kept its own copy, which knew ladder drills and not hopscotch).
 export function plyoFamilyFor(name: string): PlyoFamily | null {
   const n = String(name || '').trim().toLowerCase();
   for (const id of PLYO_FAMILY_IDS) {
@@ -54,11 +54,10 @@ export function plyoFamilyFor(name: string): PlyoFamily | null {
 export function plyoSwapGroups(name: string, equipment: string[] | null | undefined): SwapGroup[] {
   const fam = plyoFamilyFor(name);
   if (!fam) return [];
-  const hasLadder = (equipment || []).some((e) => /agility ladder/i.test(String(e)));
   const n = String(name || '').trim().toLowerCase();
   const options = fam.drills
     .filter((d) => d.toLowerCase() !== n)
-    .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
+    .filter((d) => drillAllowed(d, equipment))
     .map((d) => ({ name: d, display: shownNameOnKit(d, equipment ?? []), ...kitWords(d, equipment ?? []) }));
   return options.length > 0 ? [{ heading: null, page: 'p227', options }] : [];
 }

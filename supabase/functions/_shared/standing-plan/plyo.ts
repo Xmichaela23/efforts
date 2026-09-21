@@ -155,17 +155,24 @@ export const PLYO_ROTATION_ORDER_IS_HIS =
  * so nothing downstream sees a new movement — a drill simply arrives in a different week.
  */
 /** ⛔ NO DRILL AN ATHLETE CANNOT DO (WORKORDER-plyo-screen §3, 2026-09-02). Ladder drills need an agility
- *  ladder; the Ickey Shuffle is usually taught in one but does not require it; hopscotch is equipment-free.
+ *  ladder; the Ickey Shuffle is usually taught in one but does not require it.
+ *  ⛔ HOPSCOTCH NEEDS THE LADDER TOO (Michael, 2026-09-20: "make it an equipment choice thing"; the Agility ladder
+ *  chip already exists). It read "equipment-free" here, while the drill's own sourced how-to — the text the logger
+ *  and Today's card print — starts "Stand at the bottom of an agility ladder" (`strength-grid/grid.ts`).
+ *  ⛔ ONE OWNER: the week's pick (`drillForWeek`) and the swap list (`swap-groups.ts plyoSwapGroups`) both ask
+ *  `drillAllowed`. The swap list kept its own one-drill copy of this table until 2026-09-20.
  *  Matched by substring against the athlete's equipment strings, the way lifting kit already is. */
-const DRILL_REQUIRES: Record<string, RegExp> = { 'ladder drills': /agility ladder/i };
+const DRILL_REQUIRES: Record<string, RegExp> = { 'ladder drills': /agility ladder/i, 'hopscotch': /agility ladder/i };
 export function drillAllowed(drill: string, equipment?: string[] | null): boolean {
   const req = DRILL_REQUIRES[drill.toLowerCase()];
   if (!req) return true;
   return (equipment ?? []).some((e) => req.test(String(e)));
 }
 
-export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: string[] | null): string {
+/** The family's drill for the week, or null when the athlete's kit reaches none of its drills. */
+export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: string[] | null): string | null {
   const order = PLYO_FAMILIES[family].rotation.filter((d) => drillAllowed(d, equipment));
+  if (order.length === 0) return null;
   const w = Math.max(1, Math.round(week));
   return order[(w - 1) % order.length];
 }
@@ -185,9 +192,16 @@ export const P227_SESSION_LINE = 'The point here is that each drill is done on i
   + 'several times with plenty of rest, giving full attention to technique, balance and consistent quality.';
 // ⚠️ Cut after "no-no's" (the page ends "…no-no's here!"): the line also reaches the plan description, whose voice
 // gate bars an exclamation mark.
-// p227, reworded (Michael approved the words 2026-09-19); the page's words are quoted above
-export const P227_DRILL_LINE = 'Repeat each drill until the movement is at its best for the day and the athlete '
+// p227, reworded (Michael approved the words 2026-09-19); the page's words are quoted above.
+// ⛔ THE BLOCK DESCRIPTION KEEPS THIS THIRD-PERSON FORM (2026-09-20). The description's voice gate bars second person
+// ("The", not "Your" — `standing-plan-live.test.ts`), and the drill line is one of the source notes it prints. The
+// card, the row note and the logger read the "you" form below.
+export const P227_DRILL_LINE_FOR_DESCRIPTION = 'Repeat each drill until the movement is at its best for the day and the athlete '
   + 'is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.';
+// p227, reworded and written to the athlete as "you" (Michael approved the words 2026-09-20; the page says "the
+// athlete develops confidence in it"); the page's words are quoted above
+export const P227_DRILL_LINE = 'Repeat each drill until the movement is at its best for the day and you feel '
+  + 'confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.';
 
 /**
  * ⛔ EACH DRILL ROW'S NOTE (2026-09-19, Michael's words, pinned): the p227 table's column label and the drill's
@@ -195,11 +209,25 @@ export const P227_DRILL_LINE = 'Repeat each drill until the movement is at its b
  */
 // p227 — the table's "Benefit" column, then the page's drill line
 export const plyoDrillNote = (family: PlyoFamilyId): string =>
-  `Benefit: ${PLYO_FAMILIES[family].benefit}. ${P227_DRILL_LINE}`;
+  `${plyoBenefitLine(family)} ${P227_DRILL_LINE}`;
+
+/**
+ * ⛔ THE BENEFIT ON ITS OWN (2026-09-20, Michael: "benefit should be an (i) to not suck up too much real estate").
+ * Today's plyo card prints each drill's how-to under its name and opens this behind an (i) beside the name; the
+ * row carries it as `benefit_line`. The row's `notes` (`plyoDrillNote`) is unchanged for the logger and the drawer.
+ */
+// p227 — the table's "Benefit" column and the family's entry in it
+export function plyoBenefitLine(family: PlyoFamilyId): string {
+  return `Benefit: ${PLYO_FAMILIES[family].benefit}.`;
+}
 
 /**
  * ⛔ UNDER THE "Plyo warm-up" TITLE (2026-09-19, Michael's words, pinned). p275's strength note; p246, p274 and p278 name
  * the session a warm-up. Today's lift card prints it under the title of a session tagged `plyo`.
+ * 2026-09-20: p227's drill line follows it there, ONCE (`plyoTitleNote`) — it printed under each of the three drills.
  */
 // p275, reworded (Michael approved the words 2026-09-19); the page: "The midweek plyo warm-up may be anywhere from one to three plyometric skills."
 export const P275_WARMUP_LINE = 'The midweek plyo warm-up can include one to three plyometric skills.';
+
+/** The lines under the plyo warm-up's title on Today: p275's sentence, then p227's drill line, once. */
+export const plyoTitleNote = (): string => `${P275_WARMUP_LINE} ${P227_DRILL_LINE}`;
