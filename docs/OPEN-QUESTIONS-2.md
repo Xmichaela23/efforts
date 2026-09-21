@@ -1473,7 +1473,11 @@ exists because of it). **Hypothesis, not timed:** the list selects ~35 keys out 
 2026-09-19 (b54ed7042). Also that day, before any deploy, a Supabase request from a local test server stalled for 20
 minutes. **What settles it:** an EXPLAIN ANALYZE of that query on Michael's rows (read-only, needs his go-ahead).
 
-## Q-303 — "Ladder Drills" has no how-to — **known, left** (2026-09-20)
+## Q-303 — "Ladder Drills" has no how-to — **CLOSED 2026-09-20** (`0ad23667a`)
+
+> Closed the same night: `EXECUTION_HOW_TO['ladder drills']` now carries the article's "fast feet" drill (Marathon
+> Handbook, the Hopscotch how-to's source), words approved by Michael; the row keeps the book's name. Live check: 36 of
+> 36 drill rows carry a how-to on a kit with the ladder. Everything below is history.
 
 p227 prints "ladder drills" as a category, not one drill, so `EXECUTION_HOW_TO` has no entry and Today's plyo card
 shows the name and the (i) with nothing under it. Only an athlete with the Agility ladder chip sees it (D-481 §3).
