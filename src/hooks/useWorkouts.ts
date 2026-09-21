@@ -925,6 +925,9 @@ export const useWorkouts = () => {
           fetchWorkouts();
           try {
             window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+            // Today and the calendar read the week feed, not this list: a synced workout must reach them too.
+            // No loop: the week fetch reads workouts, it never writes them.
+            window.dispatchEvent(new CustomEvent('week:invalidate'));
           } catch (e) {
             console.warn('[useWorkouts] realtime workouts:invalidate dispatch failed:', e);
           }

@@ -1404,6 +1404,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       // Invalidate planned range caches and notify weekly to bust week cache
       try {
         window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        // Today and the calendar read the week feed (60 min fresh), so a pull has to refresh it by name.
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
         window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
       } catch (e) {
         console.warn('[AppLayout] pull-refresh invalidate dispatch failed:', e);
