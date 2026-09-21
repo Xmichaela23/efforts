@@ -1,5 +1,31 @@
 # Engine State
 
+## 🧭 ALSO READ — 2026-09-21 (D-483): one client cache · day swipe · Home weather · the LOAD card
+
+> **All PUSHED (main `2c9519fa0` … `ed615b10f`). CLIENT ONLY — no edge function or migration changed, nothing to deploy
+> but Netlify. iOS synced each step.** Seen on Michael's phone: the soft day swipe ("much better") and the LOAD card
+> ("looks good"). Everything else checked in the dev browser on his account, reading only; no throwaway account.
+> 1. **One shared cache (D-483).** Planned list, coaching context, State trends config, strength calibration and the
+>    baselines row now live in react-query and every screen reads that copy. Map + remaining work:
+>    `docs/AUDIT-client-cache-2026-09-21.md`. Baselines: `loadUserBaselines` shares one read for 30 s (OURS) and every
+>    client write calls `markBaselinesStale()` (`src/lib/baselines-stale.ts`) — **a new baselines writer must call it.**
+> 2. **Bugs this closed:** pull-to-refresh and a synced workout never refreshed Today/the calendar (week feed is 60 min
+>    fresh) · the completed-workout screen built a second workouts list whose close removed the app's realtime channel
+>    (library returns the channel by name) · `plans:invalidate` and `plan:adjusted` had no listener · pause/edit plan
+>    mutated `detailedPlans` in place · State/Adjust wrote back a stale `ui_prefs` copy.
+> 3. **Today's day swipe** (`TodaysEffort.tsx`): release speed over the last 100 ms (OURS 0.1 px/ms), 1:1 follow, a
+>    cancelled touch counts as a release; swipes during the ~0.2 s exit are ignored and the slide-home is never cancelled
+>    (a fast double swipe used to park the day off screen — Michael's blank panel).
+> 4. **Home weather**: last place + city kept in memory 10 min, kept readings match to 2 decimals (~1 km, OURS), a
+>    same-day refresh keeps the old reading up. First open after launch still waits for GPS (nothing is saved to disk,
+>    by his 2026-09-17 rule).
+> 5. **LOAD card** (`LoadBar.tsx`): one row, form at Title 3 with no glow, windows moved into the ⓘ; the ⓘ is one
+>    approved paragraph (TrainingPeaks' PMC) plus the zone table, on State and Today.
+>
+> **NOT DONE / UNVERIFIED:** most custom window events still exist (screens outside the cache still need them) · the
+> endurance checkpoint is left uncached on purpose (a kept "due" could reopen an answered sheet) · deleting a planned
+> lift and pausing a plan were not run · a pull-to-refresh logs 406/400 responses in the browser, not traced.
+
 ## 🧭 ALSO READ — 2026-09-20 night (D-482): the plan builder builds what is tapped · a day keeps two sessions of one sport
 
 > **All PUSHED (main `9f55375fa`), DEPLOYED (31 functions from a clean worktree of `f1e5d1f2f`, then `get-week` from

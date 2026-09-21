@@ -1,5 +1,9 @@
 # Client cache audit — 2026-09-21
 
+> **STATUS (end of 2026-09-21, D-483):** gaps 1–2 fixed; kinds 1, 2, 3, 5 (listeners + state), 6, 8 and the plans
+> screen / workout detail refresh done; step 7 (retire events) only the two dead ones. Still open: the remaining window
+> events, AppContext's workouts and plans as their own queries, goals, the endurance checkpoint (left on purpose).
+
 Read-only inventory of how the client holds server data, to plan moving it all onto the one react-query cache
 (the field standard: show what the phone has, refetch in the background, mark stale after any change, prefetch next).
 "(inferred)" = read from code, not run. Items marked VERIFIED were confirmed by reading the exact lines.

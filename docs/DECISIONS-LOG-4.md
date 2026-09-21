@@ -322,3 +322,21 @@ the page's own guess line covers here.
 6. **The long-ride day reaches the builder on the bike-primary path too** (`create-goal-and-materialize-plan`).
 7. **Left on purpose:** point 7 untested (rare, low cost) · no wording for three hard rides on one day · the strength
    logger and yoga logger on a two-session day (the engineer's "two small ones").
+
+## D-483 — One client cache: every screen reads the same copy of server data (2026-09-21, Michael)
+
+> One consolidated entry (docs kept light). The map and the work left: `docs/AUDIT-client-cache-2026-09-21.md`.
+
+1. **The field standard, adopted:** show the copy the phone has, refresh in the background, mark data old after any
+   change, fetch the next screen early (Strava, TrainingPeaks; react-query's own model). The tool was already in the app
+   and used by 8 files; the rest held their own copies in state, refs and module maps.
+2. **Moved onto it:** the planned list (one list, user in the key), the week's coaching context (one copy per user and
+   day; screens opening within 60 s share one check, OURS, cleared by any change event), State's trends config, the
+   strength calibration read, and the baselines row (one read kept 30 s, OURS, each caller gets a clone).
+3. **Every baselines write says so** (`markBaselinesStale`). It is a separate event from `baseline:saved` because that
+   one also reloads Training Baselines' form. A workout change also marks baselines old: the learner writes the row
+   after a sync.
+4. **Rejected: deleting the custom window events now.** Screens outside the cache (AppContext's lists, the workout
+   screen's own copy, goals) still refresh through them. They go when those copies move.
+5. **Left on purpose:** the endurance checkpoint (a kept "due" would reopen an answered sheet); the plans screen keeps
+   its per-week store but clears it on every change event.

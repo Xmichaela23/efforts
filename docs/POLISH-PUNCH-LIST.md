@@ -53,6 +53,13 @@ Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb s
 sets of five before the work. Many coaches drop reps as the weight climbs (5, 3, 2, 1); that needs its own named
 source before it changes. Not urgent: light and middle lifters get two to five sets.
 
+## AWAITING MICHAEL (2026-09-21, D-483 — client only, PUSHED, iOS synced; swipe + LOAD card SEEN on his phone)
+
+- [ ] **Pull down on Today after a ride syncs** — Today and the calendar should show it without reopening the app.
+- [ ] **Open State twice** — the second open should be filled in at once.
+- [ ] **Swipe days fast** — the panel should never go blank.
+- [ ] **Leave Home and come back** — the weather should already be there.
+
 ## AWAITING MICHAEL (2026-09-20, two sessions of one sport on one day — d11a76c72 … e96ec0193 PUSHED, DEPLOYED, checked on throwaway plans; NOT seen on a device)
 
 - [ ] **Point 7 — READ, NOT TESTED.** Deleting an older finished ride that has no link to its planned session now puts
