@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { movePatch } from '@/lib/session-move';
@@ -368,6 +369,8 @@ function derivePlannedCellLabel(w: any): string | null {
  * selection bar over the row). On the week's day rows and session lines only.
  */
 const NO_TEXT_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
+/** No WebKit drag snapshot on a touch screen — see `isTouchDevice`. */
+const NO_NATIVE_DRAG = { WebkitUserDrag: 'none' } as React.CSSProperties;
 
 export default function WorkoutCalendar({
   onAddEffort,
@@ -496,11 +499,38 @@ export default function WorkoutCalendar({
    * stealing that gesture is how a calendar becomes impossible to scroll past.
    */
   const daysGridRef = useRef<HTMLDivElement | null>(null);
-  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; row: any; from: string } | null>(null);
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; row: any; from: string; el: HTMLElement | null } | null>(null);
   const [touchDragId, setTouchDragId] = useState<string | null>(null);
   const [touchDragOver, setTouchDragOver] = useState<string | null>(null);
   /** Refs as well as state: the native listener below reads them without re-binding on every drag. */
   const touchDragRef = useRef<{ row: any; from: string; over: string | null } | null>(null);
+
+  /**
+   * ⛔ NO HTML5 DRAG ON A TOUCH SCREEN (2026-09-21, from Michael's iPhone: a white bar on hold). iOS WebKit runs its
+   * own drag on a long press of a `draggable` element and shows its white snapshot, which fought the hold below. The
+   * mouse keeps `draggable`; a finger gets only the hold and the grip.
+   */
+  const isTouchDevice = useMemo(() => {
+    try { return window.matchMedia('(hover: none) and (pointer: coarse)').matches; } catch { return false; }
+  }, []);
+
+  /**
+   * ⛔ THE CARRIED SESSION (2026-09-21): while a finger moves a session it shows as a lifted card — shadow, a little
+   * larger, the sport colour on its edge — that follows the finger up and down. The row it came from dims and the
+   * day under the finger lights. The card is drawn once at pickup from the row it lifted; it has no words of its own.
+   */
+  type Carry = { name: string; meta: string; colour: string; left: number; width: number; height: number; grabY: number; y: number };
+  const [carry, setCarry] = useState<Carry | null>(null);
+  const carryFrom = (el: HTMLElement | null, row: any, fingerY: number): Carry | null => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      name: deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase()),
+      meta: sessionLineMeta(row),
+      colour: getDisciplineColor(displayDisciplineOf(row)),
+      left: r.left, width: r.width, height: r.height, grabY: fingerY - r.top, y: fingerY,
+    };
+  };
 
   const cancelLongPress = useCallback(() => {
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
@@ -508,6 +538,7 @@ export default function WorkoutCalendar({
     touchDragRef.current = null;
     setTouchDragId(null);
     setTouchDragOver(null);
+    setCarry(null);
   }, []);
 
   const beginLongPress = useCallback((e: React.TouchEvent, row: any, from: string) => {
@@ -516,14 +547,17 @@ export default function WorkoutCalendar({
     const t = e.touches[0];
     if (!t) return;
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    const el = e.currentTarget as HTMLElement;
     longPress.current = {
       x: t.clientX,
       y: t.clientY,
       row,
       from,
+      el,
       timer: setTimeout(() => {
         touchDragRef.current = { row, from, over: null };
         setTouchDragId(String(row.id));
+        setCarry(carryFrom(el, row, longPress.current?.y ?? t.clientY));
         // ⚠️ A NUDGE SO THE HOLD IS FELT, where the device offers one. Silent on the rest.
         try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
       }, 450),
@@ -542,6 +576,8 @@ export default function WorkoutCalendar({
     longPress.current = null;
     touchDragRef.current = { row, from, over: null };
     setTouchDragId(String(row.id));
+    const t = e.touches[0];
+    setCarry(carryFrom((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, row, t?.clientY ?? 0));
     try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
   }, []);
 
@@ -571,6 +607,7 @@ export default function WorkoutCalendar({
       if (!touchDragRef.current) return;
 
       e.preventDefault();
+      setCarry((c) => (c ? { ...c, y: t.clientY } : c));
       const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
       const day = under?.closest('[data-day]') as HTMLElement | null;
       const over = day?.getAttribute('data-day') ?? null;
@@ -590,6 +627,7 @@ export default function WorkoutCalendar({
     touchDragRef.current = null;
     setTouchDragId(null);
     setTouchDragOver(null);
+    setCarry(null);
     if (drag?.over && drag.over !== drag.from) void beginReschedule(drag.row, drag.over);
   }, [beginReschedule]);
 
@@ -1426,11 +1464,16 @@ export default function WorkoutCalendar({
                 paddingRight: 2,
                 minWidth: 0,
                 ...NO_TEXT_SELECT,
-                background: isToday
-                  ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
+                ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
+                // ⛔ THE DAY UNDER THE FINGER LIGHTS, today included, in the carried session's colour (2026-09-21).
+                background: touchDragOver === key && carry
+                  ? `linear-gradient(90deg, ${hexA(carry.colour, 0.18)}, ${hexA(carry.colour, 0.06)})`
                   : dragOverDate === key || touchDragOver === key
-                    ? 'rgba(255,255,255,0.05)'
-                    : 'transparent',
+                    ? 'rgba(255,255,255,0.08)'
+                    : isToday
+                      ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
+                      : 'transparent',
+                boxShadow: touchDragOver === key && carry ? `inset 0 0 0 1px ${hexA(carry.colour, 0.55)}` : undefined,
               }}
             >
               {/* ⛔ TODAY'S 3 px BAR, at the pane's left edge. */}
@@ -1486,7 +1529,7 @@ export default function WorkoutCalendar({
                       key={`${key}-${i}`}
                       role="button"
                       tabIndex={0}
-                      draggable={planned && !!row?.id}
+                      draggable={!isTouchDevice && planned && !!row?.id}
                       onDragStart={(e) => planned && row?.id && handleDragStart(e, row)}
                       onDragEnd={handleDragEnd}
                       /**
@@ -1507,9 +1550,10 @@ export default function WorkoutCalendar({
                       className="grid items-center gap-2.5 text-[15px] min-w-0"
                       style={{
                         gridTemplateColumns: '10px minmax(0,1fr) auto minmax(16px,auto)',
-                        opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.45 : 1,
+                        opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.3 : 1,
                         cursor: planned && row?.id ? 'grab' : 'pointer',
                         ...NO_TEXT_SELECT,
+                        ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
                       }}
                     >
                       <span
@@ -1602,6 +1646,27 @@ export default function WorkoutCalendar({
           {/* Prefetch disabled for performance */}
         </>
       )}
+
+      {/* ⛔ THE LIFTED CARD (2026-09-21) — follows the finger vertically, over everything, and never under it:
+          `pointer-events: none`, so the day beneath is still what the finger is over. */}
+      {carry ? createPortal(
+        <div
+          aria-hidden="true"
+          className="fixed z-[70] grid items-center gap-2.5 text-[15px] rounded-[10px]"
+          style={{
+            left: carry.left, width: carry.width, top: carry.y - carry.grabY, minHeight: carry.height,
+            gridTemplateColumns: '10px minmax(0,1fr) auto', padding: '6px 10px',
+            background: 'rgba(28,28,30,0.97)', borderLeft: `3px solid ${carry.colour}`,
+            boxShadow: `0 14px 32px rgba(0,0,0,0.55), 0 0 0 1px ${hexA(carry.colour, 0.35)}`,
+            transform: 'scale(1.04)', transformOrigin: 'center', pointerEvents: 'none', ...NO_TEXT_SELECT,
+          }}
+        >
+          <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: carry.colour, boxShadow: `0 0 8px ${carry.colour}` }} />
+          <span className="truncate" style={{ color: 'rgba(242,240,236,1)' }}>{carry.name}</span>
+          <span className="text-[14px] tabular-nums" style={{ color: 'rgba(242,240,236,0.62)' }}>{carry.meta}</span>
+        </div>,
+        document.body,
+      ) : null}
 
       {/* Validation Popup */}
       {showValidationPopup && validationResult && reschedulePending && (
