@@ -156,6 +156,40 @@ function frameRotatedArchetype(
   return usable[(Math.max(1, week) - 1) % usable.length];
 }
 
+/**
+ * ⛔⛔ A PICKED LENGTH BUILDS THE SESSION THE CHIPS WERE MEASURED ON, EVERY WEEK (2026-09-20, found
+ * by `builder-answers-sweep.test.ts`).
+ *
+ * ⛔ THE DEFECT, BUILT AND READ OVER TWELVE WEEKS. The All Rounder's day-4 ride (p274 "Cyc endurance
+ * (level 1)") takes a length chip — 60, 75, 90 or 100 min — and `slotLengthOptions` measures those
+ * chips on the conversion's pin, the frame's pin, or with neither the family's FIRST shape (the
+ * steady ride). The build then rotated `steady` / `mixed` by week, and p239's level-1 mixed ride is
+ * PRINTED at 85 min (20 + 20 + 45): every even week built 85 whatever was picked, and nothing said so.
+ *
+ * ⛔ THE RULE. An easy or long row whose length the athlete picked builds the shape that length was
+ * offered on. p239 offers both rides at each level and says to do the more intense ones "sparingly
+ * unless an event is coming", so the steady ride every week is the page's own option.
+ * ⚠️ OURS — which of the page's two rides a week builds is ours either way (the weekly rotation is
+ * ours too); this only stops the rotation overriding an answer the athlete gave.
+ * ⚠️ NO PICK, NO CHANGE. A row with no length answer rotates exactly as it did, so Ride + Strength
+ * and every hard row are untouched. ⚠️ READ AT BOTH SITES, like the two resolvers below it.
+ */
+function archetypeForSlot(
+  slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
+  assigned: { substituted?: boolean; family: string; archetype?: string },
+  level: number,
+  week: number,
+  lengthPicked: boolean,
+): string | undefined {
+  const pinned = frameRotatedArchetype(slot, assigned, level, week) ?? assigned.archetype;
+  if (pinned) return pinned;
+  if (lengthPicked && !isHardSlot(slot)) {
+    const first = archetypesFor(assigned.family as never, level as never)[0]?.id;
+    if (first) return first;
+  }
+  return rotatedArchetype(assigned.family, level, week);
+}
+
 function rotatedArchetype(family: string, level: number, week: number): string | undefined {
   const rules = (FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>)[family];
   if (!rules) return undefined;
@@ -2801,9 +2835,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         out.push({
           family: a.family,
           level: levelForFamily(a.family, a.level),
-          archetype: frameRotatedArchetype(slot, a, levelForFamily(a.family, a.level), args.week)
-            ?? a.archetype
-            ?? rotatedArchetype(a.family, levelForFamily(a.family, a.level), args.week),
+          // ⛔ A picked length holds the shape it was offered on — see `archetypeForSlot`.
+          archetype: archetypeForSlot(
+            slot, a, levelForFamily(a.family, a.level), args.week,
+            Number.isFinite(Number(args.sportMix?.minutes?.[`${d.day}:${i}`] ?? NaN)),
+          ),
           sport: a.sport,
           // ⛔ THE FRAME'S ROLE, so the easy ride and the long ride get their own ceilings (`ladderCeilingFor`).
           role: slotRoleOf(slot),
@@ -3301,11 +3337,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * may have substituted a ride, whose shapes are its own family's — so a substituted slot
        * falls through to the rules below exactly as it did before.
        */
-      const slotArchetype = frameRotatedArchetype(
+      // ⛔ A picked length holds the shape it was offered on — see `archetypeForSlot`.
+      const slotArchetype = archetypeForSlot(
         slot, assigned, levelForFamily(assigned.family, assigned.level), args.week,
-      )
-        ?? assigned.archetype
-        ?? rotatedArchetype(assigned.family, levelForFamily(assigned.family, assigned.level), args.week);
+        Number.isFinite(Number(args.sportMix?.minutes?.[`${day.day}:${i}`] ?? NaN)),
+      );
       /**
        * ⛔ THE ATHLETE'S OWN LENGTH FOR THIS SESSION, WHERE A SCREEN ASKED — see `SportMix.minutes`.
        * ⚠️ THE FRAME'S ROLE DECIDES WHETHER IT IS HONOURED, never a family name: quality doses are the

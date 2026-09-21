@@ -103,15 +103,43 @@ const isHardFamily = (family: string): boolean => isHardSlot({ family: family as
 const tagValue = (s: PlanSession, prefix: string): string =>
   (s.tags ?? []).find((t) => t.startsWith(prefix))?.slice(prefix.length) ?? '';
 
-/** The frame's endurance slots in the order `composeWeek` emits them. Read off `FRAMES`. */
-function frameEnduranceSlots(frame: FrameId, column: ColumnKind): Array<'long' | 'hard' | null> {
-  const out: Array<'long' | 'hard' | null> = [];
+/**
+ * The frame's endurance slots in the order `composeWeek` emits them. Read off `FRAMES`.
+ *
+ * ⛔⛔ TWO DEFECTS CLOSED HERE, 2026-09-20, both found by `builder-answers-sweep.test.ts` on
+ * Ride + Strength (p278), and both the "did not count as hard, in silence" class `sport-slots.ts`
+ * records for the All Rounder:
+ *   1. **The frame's own `role: 'hard'` was dropped.** The caller classed a session hard by FAMILY
+ *      alone, and `HARDNESS` ranks neither `ride_vo2` nor `ride_sprints` (written before any frame
+ *      printed them). So a VO2 or sprint ride was never hard here, and a day the athlete stacked two
+ *      of them on built with no note naming it. The slot's family travels now, and a session that IS
+ *      the frame's own hard slot counts as hard.
+ *      ⚠️ A hard slot the athlete declined builds easy running of another family, so it still reads
+ *      easy — the family has to match the slot's.
+ *   2. **The six-ride week was zipped against seven slots** (`fewerRidesDropsSlot`), so every role
+ *      after day 2 sat one session late and the long ride was classed as something else. The slot
+ *      the composer drops is dropped here too, when the week carries exactly one session fewer.
+ */
+function frameEnduranceSlots(
+  frame: FrameId,
+  column: ColumnKind,
+  builtCount?: number,
+): Array<{ role: 'long' | 'hard' | null; family: string }> {
+  const all: Array<{ role: 'long' | 'hard' | null; family: string; key: string }> = [];
   for (const d of FRAMES[frame].columns[column]) {
-    for (const slot of d.endurance) {
-      out.push(isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : null);
-    }
+    d.endurance.forEach((slot, i) => {
+      all.push({
+        role: isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : null,
+        family: String(slot.family),
+        key: `${d.day}:${i}`,
+      });
+    });
   }
-  return out;
+  const drop = FRAMES[frame].fewerRidesDropsSlot;
+  if (drop && builtCount != null && builtCount === all.length - 1) {
+    return all.filter((x) => x.key !== `${drop.day}:${drop.index}`);
+  }
+  return all;
 }
 
 /**
@@ -159,7 +187,9 @@ export function typedSessionsOf(
   const isEnd = (s: PlanSession) => s.type === 'run' || s.type === 'ride' || s.type === 'swim';
   const isAddOn = (s: PlanSession) =>
     (s.tags ?? []).includes('swim_addon') || (s.tags ?? []).includes('advanced_tier');
-  const slots = frameEnduranceSlots(frame, column);
+  const slots = frameEnduranceSlots(
+    frame, column, sessions.filter((s) => isEnd(s) && !isAddOn(s) && !(s.tags ?? []).includes('plyo')).length,
+  );
   const out: TypedSession[] = [];
   let si = 0;
   for (const s of sessions) {
@@ -177,7 +207,8 @@ export function typedSessionsOf(
     }
     if (!isEnd(s)) continue;
     if (isAddOn(s)) { out.push({ s, load: 'easy' }); continue; }
-    const role = slots[si];
+    const slot = slots[si];
+    const role = slot?.role ?? null;
     si += 1;
     const family = tagValue(s, 'family:');
     const sport = tagValue(s, 'sport:');
@@ -185,7 +216,7 @@ export function typedSessionsOf(
       s,
       load: role === 'long'
         ? (sport === 'ride' ? 'long_ride' : 'long_run')
-        : (isHardFamily(family) ? 'hard_cardio' : 'easy'),
+        : (isHardFamily(family) || (role === 'hard' && family === slot?.family) ? 'hard_cardio' : 'easy'),
     });
   }
   return out;
