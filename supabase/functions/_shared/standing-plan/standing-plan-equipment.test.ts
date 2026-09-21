@@ -491,3 +491,39 @@ function dateFor(wk: number, day: string): string {
   assertEquals(weekdayOf(iso), day, `the fixture built ${iso} for ${day}`);
   return iso;
 }
+
+/**
+ * ⛔ A KIT CHANGE REACHES EVERY SLOT ON THE REBUILD (2026-09-20). Found on a throwaway plan built on a home kit and
+ * rebuilt on Commercial gym: 36 of 60 lifting sessions still differed from a plan built at the gym, because the refresh
+ * matched rows by name and replaced a movement only with one from the same grid cell. Rows now pair by the book cell
+ * that authored them (`source_row`), so the rebuilt calendar names the same movements, in the same order, as a block
+ * composed on the new kit.
+ */
+Deno.test('⛔ home kit → Commercial gym, and back: the rebuilt calendar is the block composed on the new kit', () => {
+  const HOME = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Incline bench', 'Pull-up bar', 'Resistance bands', 'Ab wheel'];
+  const GYM = ['Commercial gym'];
+  const block = (equipment: string[]) => composeBlock({ ...BASE, weeks: 12, taperWeeks: [], workingNumbers: WORKING, equipment } as never);
+  const calendarOf = (composed: ReturnType<typeof block>) => {
+    const planned: { id: string; week_number: number; date: string; tags: string[]; strength_exercises: unknown }[] = [];
+    for (const wk of composed) for (const sess of wk.sessions) {
+      if (sess.type !== 'strength') continue;
+      planned.push({ id: `${wk.week}-${sess.day}`, week_number: wk.week, date: dateFor(wk.week, sess.day), tags: sess.tags, strength_exercises: sess.strength_exercises ?? [] });
+    }
+    return planned;
+  };
+  for (const [from, to, label] of [[HOME, GYM, 'home → gym'], [GYM, HOME, 'gym → home']] as const) {
+    const stored = calendarOf(block(from));
+    const fresh = block(to);
+    const restated = restateFromTest({ composed: fresh, planned: stored, afterWeek: 0 } as never);
+    const rewritten = new Map(restated.rows.map((r) => [r.id, (r.strength_exercises as { name: string }[]).map((e) => e.name)]));
+    let sessions = 0;
+    for (const wk of fresh) for (const sess of wk.sessions) {
+      if (sess.type !== 'strength') continue;
+      sessions += 1;
+      const id = `${wk.week}-${sess.day}`;
+      const now = rewritten.get(id) ?? (stored.find((p) => p.id === id)!.strength_exercises as { name: string }[]).map((e) => e.name);
+      assertEquals(now, (sess.strength_exercises ?? []).map((e) => e.name), `${label}: week ${wk.week} ${sess.day}`);
+    }
+    assert(sessions >= 48, `${label}: only ${sessions} sessions compared`);
+  }
+});

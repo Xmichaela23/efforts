@@ -22,6 +22,7 @@
 // accepts both numbers.
 // ============================================================================
 
+import { placeOf } from '../day-seq.ts';
 import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
 import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 // ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
@@ -305,14 +306,50 @@ export function restateFromTest(args: {
       const family = plyoFamilyOf(e);
       return family ? `plyo|${family}` : `${viadaCategoryOf(String(e.name)) ?? '?'}|${viadaPatternOf(String(e.name)) ?? '?'}`;
     };
+    /**
+     * ⛔ A ROW IS ITS SLOT FIRST, ITS NAME SECOND (2026-09-20). Every row the frame's table writes carries `source_row`,
+     * the book cell that authored it ("which book cell authored this row"). A stored row and a fresh row with the same
+     * `source_row` are the same slot of the same session, whatever movement fills it.
+     *
+     * Found on a throwaway plan built on a home kit and rebuilt on Commercial gym: 36 of 60 lifting sessions still
+     * differed from a plan built at the gym. The home stand-in for a machine slot is filed in a DIFFERENT grid cell from
+     * the machine (DB Bench Press is a secondary push; the Smith machine press it stands in for is braced), so the
+     * same-cell pairing below never met them and the stand-in stayed. And matching by name cross-wired two slots: the
+     * home day's third row and the gym day's fifth row are both "Bulgarian Split Squat".
+     *
+     * Rows of one slot pair by name where the name survives, then in order. ⚠️ A row with no `source_row` (a plyo drill,
+     * a row the accessory floor added, a row built before the field) keeps the name match and the cell pairing below.
+     */
+    const slotOf = (e: StrengthExercise | null | undefined): string | null =>
+      typeof e?.source_row === 'string' && e.source_row.trim() ? e.source_row.trim() : null;
+    const slotPair = new Map<StrengthExercise, StrengthExercise>();
+    {
+      const bySource = (rows: StrengthExercise[]) => {
+        const m = new Map<string, StrengthExercise[]>();
+        for (const r of rows) { const k = slotOf(r); if (k) m.set(k, [...(m.get(k) ?? []), r]); }
+        return m;
+      };
+      const want = bySource(wanted);
+      for (const [k, have] of bySource(existing)) {
+        const open = [...(want.get(k) ?? [])];
+        const unnamed: StrengthExercise[] = [];
+        for (const ex of have) {
+          const at = open.findIndex((w) => nameOf(w) === nameOf(ex));
+          if (at >= 0) { slotPair.set(ex, open[at]); open.splice(at, 1); } else unnamed.push(ex);
+        }
+        for (const ex of unnamed) { const w = open.shift(); if (w) slotPair.set(ex, w); }
+      }
+    }
+    const slotPaired = new Set<StrengthExercise>(slotPair.values());
     const existingNames = new Set(existing.map(nameOf));
-    const freshUnplaced = wanted.filter((w) => !existingNames.has(nameOf(w)));
+    const freshUnplaced = wanted.filter((w) => !slotPaired.has(w) && !existingNames.has(nameOf(w)));
     const replacement = new Map<StrengthExercise, StrengthExercise>();
     // ⚠️ TWO SIGNALS FOR "by feel", because rows written before `load_prescribed` was carried have
     // only the second: the composer never prices an accessory, so its weight is the string "By feel".
     // A plyo drill carries no load at all ("Bodyweight"), so it is never a priced row either.
     const byFeel = (e: StrengthExercise) => e?.load_prescribed === false || /by feel/i.test(String(e?.weight ?? '')) || plyoFamilyOf(e) != null;
     for (const ex of existing) {
+      if (slotPair.has(ex)) continue;
       if (!byFeel(ex)) continue;
       if (wanted.some((w) => nameOf(w) === nameOf(ex))) continue;
       const cell = cellOf(ex);
@@ -331,13 +368,16 @@ export function restateFromTest(args: {
      */
     const plyoDayStill = wanted.some((w) => plyoFamilyOf(w) != null);
     const dropped = new Set<StrengthExercise>(plyoDayStill
-      ? existing.filter((ex) => plyoFamilyOf(ex) != null && !replacement.has(ex) && !wanted.some((w) => nameOf(w) === nameOf(ex)))
+      ? existing.filter((ex) => plyoFamilyOf(ex) != null && !slotPair.has(ex) && !replacement.has(ex) && !wanted.some((w) => nameOf(w) === nameOf(ex)))
       : []);
     if (dropped.size > 0) touched = true;
     const next = existing.filter((ex) => !dropped.has(ex)).map((ex) => {
       const swapped = replacement.get(ex);
       if (swapped) { touched = true; return { ...swapped }; }
-      const fresh = wanted.find((w) => String(w.name).toLowerCase() === String(ex?.name ?? '').toLowerCase());
+      // The slot's own fresh row. A different movement in the same slot replaces the stored one wholesale.
+      const slotFresh = slotPair.get(ex) ?? null;
+      if (slotFresh && nameOf(slotFresh) !== nameOf(ex)) { touched = true; return { ...slotFresh }; }
+      const fresh = slotFresh ?? wanted.find((w) => !slotPaired.has(w) && String(w.name).toLowerCase() === String(ex?.name ?? '').toLowerCase());
       // ⛔ A ROW THE COMPOSER NO LONGER AUTHORS IS LEFT ALONE. The accessory floor can fill a session
       // differently between runs; silently deleting a movement the athlete can already see on their
       // calendar is a bigger change than this function is allowed to make.
@@ -589,6 +629,8 @@ const TEST_ROW_TAGS = new Set(['assessment', 'run_test', 'ftp_test', 'ftp_test_5
 
 export type EndurancePlannedRowish = PlannedRowish & {
   type?: string | null;
+  /** Which of the day's sessions of the plan's sport (`_shared/day-seq.ts`). */
+  day_seq?: number | null;
   name?: string | null;
   description?: string | null;
   duration?: number | null;
@@ -668,7 +710,10 @@ export function restateEndurance(args: {
     const [w, day] = key.split('|');
     const week = Number(w);
     if (week < args.afterWeek) continue;
-    const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')) || String(a.id).localeCompare(String(b.id)));
+    // ⛔ FIRST WITH FIRST (2026-09-20): a day can hold two rides, and by id alone (random) the composer's first ride
+    // could be written onto the second row. The row's place in its day (`day_seq`) is the order the plan listed them.
+    const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? ''))
+      || placeOf(a.day_seq) - placeOf(b.day_seq) || String(a.id).localeCompare(String(b.id)));
     if (have.length === 0) { unmatched.push({ week, day, reason: 'no materialized row for this day' }); continue; }
     // OURS — `restateEndurance` unmatched-row reason: a diagnostic count of rows, not plan copy.
     if (have.length !== wanted.length) { unmatched.push({ week, day, reason: `composer has ${wanted.length} session(s), calendar has ${have.length}` }); continue; }
