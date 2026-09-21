@@ -191,6 +191,18 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Gate weekly render while week is being materialized/refetched to avoid flicker
   const [weekLoading, setWeekLoading] = useState<boolean>(false);
   const weekCacheRef = useRef<Map<string, any[]>>(new Map());
+  /**
+   * ⛔ A CHANGE ANYWHERE CLEARS THE WEEKS THIS SCREEN KEPT (2026-09-21, cache job 2). The weeks read here were kept
+   * for as long as the screen stayed open, so a session moved, swapped or rebuilt from another screen still showed
+   * its old day here. Any change the app announces now empties that store and reads the open week again.
+   */
+  const [weekReloadNonce, setWeekReloadNonce] = useState(0);
+  useEffect(() => {
+    const onChange = () => { weekCacheRef.current.clear(); setWeekReloadNonce((n) => n + 1); };
+    const events = ['planned:invalidate', 'week:invalidate', 'plans:invalidate', 'plans:refresh'];
+    events.forEach((n) => window.addEventListener(n, onChange));
+    return () => { events.forEach((n) => window.removeEventListener(n, onChange)); };
+  }, []);
   
   // Add workout edit mode state
   const [workoutViewMode, setWorkoutViewMode] = useState<'summary' | 'edit'>('summary');
@@ -933,7 +945,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         setWeekLoading(false);
       }
     })();
-  }, [selectedPlanDetail?.id, selectedWeek]);
+  }, [selectedPlanDetail?.id, selectedWeek, weekReloadNonce]);
 
   // Pull-to-refresh signal from AppLayout: bust current week cache and reload
   useEffect(() => {

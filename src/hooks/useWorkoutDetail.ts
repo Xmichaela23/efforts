@@ -41,6 +41,8 @@ function stripEphemeralSessionDetailFields(
   return rest as Record<string, unknown>;
 }
 
+let workoutChangedTimer: ReturnType<typeof setTimeout> | undefined;
+
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
@@ -253,6 +255,31 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     return () => {
       if (t) clearTimeout(t);
       window.removeEventListener('workout-detail:invalidate', detailHandler);
+    };
+  }, [queryClient]);
+
+  /**
+   * ⛔ A CHANGED WORKOUT REACHES THE DETAIL PANELS (2026-09-21, cache job 2). The workout screen's header and the
+   * app's selected workout both re-read on `workout:invalidate` / `workouts:invalidate` (a sync, an attach, a finished
+   * analysis), but the panels below them read this cache, which only heard `workout-detail:invalidate`, so they could
+   * show the analysis from before the change. They now refresh too. Bursts collapse into one read (750 ms, the delay
+   * the handler above already uses), and no session recompute is forced. No loop: `workout-detail` reads the
+   * workout, it never writes it.
+   */
+  useEffect(() => {
+    const onWorkoutChanged = () => {
+      // One timer for every open copy of this hook: each copy used to refresh on its own, several reads per change.
+      if (workoutChangedTimer) clearTimeout(workoutChangedTimer);
+      workoutChangedTimer = setTimeout(() => {
+        workoutChangedTimer = undefined;
+        queryClient.invalidateQueries({ queryKey: ['workout-detail'] }, { cancelRefetch: false });
+      }, 750);
+    };
+    window.addEventListener('workout:invalidate', onWorkoutChanged);
+    window.addEventListener('workouts:invalidate', onWorkoutChanged);
+    return () => {
+      window.removeEventListener('workout:invalidate', onWorkoutChanged);
+      window.removeEventListener('workouts:invalidate', onWorkoutChanged);
     };
   }, [queryClient]);
 
