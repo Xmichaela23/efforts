@@ -363,11 +363,12 @@ Deno.serve(async (req)=>{
                 };
                 if (stepsPreset) insertRow.steps_preset = stepsPreset;
                 if (workoutStructure) insertRow.workout_structure = workoutStructure;
-                // ⛔ A LIFTING LIST ONLY ON A LIFTING ROW, as activate-plan writes it (2026-09-20). The plan's ride sessions carry
-                // `strength_exercises: []`; copied onto a re-created ride, the empty list made the rebuild's lift pass
-                // (`restateFromTest`, which takes every row of the day holding a list) write that day's plyo drills and
-                // name onto the ride. Found on a throwaway plan: a second ride re-created here came back "Plyo warm-up".
-                if (strength && normType === 'strength') insertRow.strength_exercises = strength;
+                // ⛔ A LIFTING LIST ONLY ON A LIFTING ROW, and NULL everywhere else, as activate-plan's rows hold it (2026-09-20).
+                // A re-created ride holding a list — the plan session's `[]`, or the column's default when the key is left
+                // out — was taken by the rebuild's lift pass (`restateFromTest` reads every row of the day holding a list),
+                // which wrote the day's plyo drills and name onto it. Found on a throwaway plan: "Plyo warm-up" on a ride.
+                if (normType === 'strength') { if (strength) insertRow.strength_exercises = strength; }
+                else insertRow.strength_exercises = null;
                 if (mobility) insertRow.mobility_exercises = mobility;
                 if (tags) insertRow.tags = tags;
                 if (exportHints) insertRow.export_hints = exportHints;
