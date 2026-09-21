@@ -6,7 +6,7 @@ import { movePatch } from '@/lib/session-move';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore, STATUS_COLORS } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bike, GripVertical, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
 import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
 // ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the server's, the same answer Today's cards use. See the glyph.
 import { useSportSwapIds } from '@/hooks/useSwapSheet';
@@ -363,6 +363,12 @@ function derivePlannedCellLabel(w: any): string | null {
   } catch { return null; }
 }
 
+/**
+ * ⛔ A HOLD PICKS THE SESSION UP, IT DOES NOT SELECT TEXT (2026-09-21, from Michael's iPhone: the hold put a white
+ * selection bar over the row). On the week's day rows and session lines only.
+ */
+const NO_TEXT_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
+
 export default function WorkoutCalendar({
   onAddEffort,
   onSelectType,
@@ -522,6 +528,21 @@ export default function WorkoutCalendar({
         try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
       }, 450),
     };
+  }, []);
+
+  /**
+   * ⛔ THE GRIP PICKS THE SESSION UP AT ONCE (2026-09-21). Touch on the six dots starts the move with no hold; the
+   * hold elsewhere on the row is unchanged. The row's own `touchend` / `touchcancel` finish or drop it, the same
+   * path as the hold.
+   */
+  const beginGripDrag = useCallback((e: React.TouchEvent, row: any, from: string) => {
+    e.stopPropagation();
+    if (!row?.id) return;
+    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    longPress.current = null;
+    touchDragRef.current = { row, from, over: null };
+    setTouchDragId(String(row.id));
+    try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
   }, []);
 
   /**
@@ -1404,6 +1425,7 @@ export default function WorkoutCalendar({
                 paddingLeft: 10,
                 paddingRight: 2,
                 minWidth: 0,
+                ...NO_TEXT_SELECT,
                 background: isToday
                   ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
                   : dragOverDate === key || touchDragOver === key
@@ -1450,6 +1472,8 @@ export default function WorkoutCalendar({
                   const done = String(row?.workout_status ?? '').toLowerCase() === 'completed';
                   const planned = !done && String(row?.workout_status ?? '').toLowerCase() !== 'skipped';
                   const missed = planned && isPast;
+                  /** Planned, not done, today or later: the rows that carry the grip. */
+                  const movable = planned && !isPast && !!row?.id;
                   const swapped = isDisciplineSwapped(row as never);
                   const sport = displayDisciplineOf(row);
                   const colour = getDisciplineColor(sport);
@@ -1482,9 +1506,10 @@ export default function WorkoutCalendar({
                       onTouchCancel={cancelLongPress}
                       className="grid items-center gap-2.5 text-[15px] min-w-0"
                       style={{
-                        gridTemplateColumns: '10px minmax(0,1fr) auto 16px',
+                        gridTemplateColumns: '10px minmax(0,1fr) auto minmax(16px,auto)',
                         opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.45 : 1,
                         cursor: planned && row?.id ? 'grab' : 'pointer',
+                        ...NO_TEXT_SELECT,
                       }}
                     >
                       <span
@@ -1522,7 +1547,10 @@ export default function WorkoutCalendar({
                       {/* ⛔ ONE MARK, OR NOTHING: a check when it is done, the swap arrow when the
                           row no longer matches the plan. Never both — a swapped session that is done
                           is done, and that is the fact worth the pixels. */}
-                      <span className="text-[14px] text-right flex-shrink-0" style={{ width: 16 }}>
+                      {/* ⛔ THE GRIP (2026-09-21) sits in this column on every planned, not-done, future row: six dots in the
+                          row's secondary colour, no words. A finger on it picks the session up at once (`beginGripDrag`);
+                          a tap on it does nothing, so the name still opens the day. Beside the swap arrow when both apply. */}
+                      <span className="text-[14px] text-right flex-shrink-0 inline-flex items-center justify-end gap-1.5" style={{ minWidth: 16 }}>
                         {done ? (
                           <span aria-label="Done" style={{ color: 'var(--label-secondary)' }}>✓</span>
                         ) : swapped ? (
@@ -1531,6 +1559,18 @@ export default function WorkoutCalendar({
                             className="inline-block w-3.5 h-3.5"
                             style={{ color: missed ? STATUS_COLORS.risk : 'rgba(242,240,236,0.36)' }}
                           />
+                        ) : null}
+                        {movable && !done ? (
+                          <span
+                            data-grip="true"
+                            aria-hidden="true"
+                            onTouchStart={(e) => beginGripDrag(e, row, key)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center justify-center -my-2 -mr-1 py-2 pl-1 pr-1"
+                            style={{ color: 'rgba(242,240,236,0.62)', touchAction: 'none', cursor: 'grab' }}
+                          >
+                            <GripVertical className="w-4 h-4" />
+                          </span>
                         ) : null}
                       </span>
                     </div>
