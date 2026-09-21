@@ -23,6 +23,7 @@
 // ============================================================================
 
 import { placeOf } from '../day-seq.ts';
+import { planDateOf } from '../moved-from.ts';
 import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
 import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 // ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
@@ -124,7 +125,8 @@ export function testDayCutoff(
   if (testDays.size === 0) return null;
   const dates = (planned ?? [])
     .filter((r) => Number(r?.week_number) === testWeekIndex)
-    .filter((r) => testDays.has(fold(weekdayOf(r?.date))))
+    // ⛔ The plan's day (`moved_from:`), so a moved test session is still found as the test.
+    .filter((r) => testDays.has(fold(weekdayOf(planDateOf(r)))))
     .map((r) => String(r?.date ?? '').slice(0, 10))
     .filter(Boolean)
     .sort();
@@ -269,7 +271,9 @@ export function restateFromTest(args: {
     // to the plan's SHAPE — the superset mark, the book's word, the reserve — reaches every unstarted row,
     // test week included. Michael tapped rebuild and the Pull day did not change.
     const shapeOnly = week === args.afterWeek && (!cutoff || !date || date <= cutoff);
-    const day = weekdayOf(row?.date);
+    // ⛔ THE PLAN'S DAY, NOT THE CALENDAR'S (2026-09-21): a moved session is still that day's session
+    // (`_shared/moved-from.ts`). The today gate below keeps reading the row's own date.
+    const day = weekdayOf(planDateOf(row));
     if (!day || !row?.id) continue;
     const wanted = bySlot.get(`${week}|${day}`);
     if (!wanted) continue;
@@ -696,7 +700,8 @@ export function restateEndurance(args: {
     const type = planSportOf(row);
     if (!ENDURANCE_TYPES.has(type) || !row?.id) continue;
     if (tokensOf(row?.tags).some((t) => TEST_ROW_TAGS.has(t))) continue;
-    const day = weekdayOf(row?.date);
+    // ⛔ The plan's day, as for the lifts above (`_shared/moved-from.ts`).
+    const day = weekdayOf(planDateOf(row));
     if (!day) continue;
     const key = `${week}|${day}|${type}`;
     plannedBySlot.set(key, [...(plannedBySlot.get(key) ?? []), row]);

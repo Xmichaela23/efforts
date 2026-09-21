@@ -23,6 +23,7 @@
 // still inserted — that is the whole point of the backfill, and the tests pin it.
 
 import { freeDaySeq } from '../_shared/day-seq.ts';
+import { planDateOf } from '../_shared/moved-from.ts';
 
 /** The subset of a planned row this module needs. */
 export type PlannedKeyRow = {
@@ -74,7 +75,8 @@ export function buildExistsKeys(rows: ReadonlyArray<PlannedKeyRow>): Set<string>
   const keys = new Set<string>();
   for (const r of rows ?? []) {
     const planId = r?.training_plan_id;
-    const date = r?.date;
+    // ⛔ THE PLAN'S DAY, NOT TODAY'S (2026-09-21): a moved row fills the day the plan put it on (`moved_from:`).
+    const date = planDateOf(r);
     keys.add(plannedKey(planId, date, r?.type));
     const origin = swappedOrigin(r);
     if (origin) keys.add(plannedKey(planId, date, origin));
@@ -92,9 +94,12 @@ export function buildExistsCounts(rows: ReadonlyArray<PlannedKeyRow>): Map<strin
   const counts = new Map<string, number>();
   const bump = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
   for (const r of rows ?? []) {
-    bump(plannedKey(r?.training_plan_id, r?.date, r?.type));
+    // ⛔ A MOVED ROW COUNTS ON THE DAY THE PLAN PUT IT, AND ONLY THERE (2026-09-21, `_shared/moved-from.ts`).
+    // Counted on its new day it would stand in for that day's own session, which would then never be re-created.
+    const date = planDateOf(r);
+    bump(plannedKey(r?.training_plan_id, date, r?.type));
     const origin = swappedOrigin(r);
-    if (origin && origin !== norm(r?.type)) bump(plannedKey(r?.training_plan_id, r?.date, origin));
+    if (origin && origin !== norm(r?.type)) bump(plannedKey(r?.training_plan_id, date, origin));
   }
   return counts;
 }

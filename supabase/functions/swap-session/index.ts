@@ -41,6 +41,7 @@ import { loadWorkoutMinutes } from '../_shared/session-swap/workout-choice.ts';
 // ⛔ A SWAP ON A STANDING PLAN BLOCK IS A `plan_adjustments` ROW AND THE PLAN REWRITES ITSELF (2026-09-19).
 import { isStandingPlanConfig } from '../_shared/plan-refresh.ts';
 import { enduranceSlotName, swapClassOf, writeSwapAdjustment } from '../_shared/session-swap/plan-adjustments.ts';
+import { planDateOf } from '../_shared/moved-from.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -151,10 +152,11 @@ Deno.serve(async (req) => {
       const slot = typeof lift.slot === 'string' ? lift.slot.trim() : '';
       const substitute = typeof lift.substitute === 'string' ? lift.substitute.trim() : '';
       if (!liftId || !slot || !substitute) return json({ success: false, error: 'planned_id, slot and substitute required' }, 400);
-      const { data: row } = await db.from('planned_workouts').select('id, date, training_plan_id')
+      const { data: row } = await db.from('planned_workouts').select('id, date, tags, training_plan_id')
         .eq('id', liftId).eq('user_id', userId).maybeSingle();
       if (!row) return json({ success: false, error: 'Planned session not found' }, 404);
-      const date = String(row.date).slice(0, 10);
+      // ⛔ The plan's date (`_shared/session-swap/lift-swap.ts`): a lift swap is read on the plan's day, like a run's.
+      const date = planDateOf(row);
       const scope = lift.scope === 'rest_of_plan' ? 'rest_of_plan' : 'today';
       // ⛔ THE SLOT'S OWN MOVEMENT IS BACK TO THE PLAN — the swap list offers it first after a swap (`swapGroupsFor`).
       const back = substitute.toLowerCase() === slot.toLowerCase();
@@ -214,7 +216,8 @@ Deno.serve(async (req) => {
     let rewrite;
     if (session.training_plan_id) {
       const { data: plan } = await db.from('plans').select('id, config').eq('id', session.training_plan_id).eq('user_id', userId).maybeSingle();
-      const date = String(session.date ?? '').slice(0, 10);
+      // ⛔ The plan's date (`_shared/moved-from.ts`): a swap names the plan's slot, so a moved session keeps its slot.
+      const date = planDateOf(session);
       const slot = enduranceSlotName(date, session);
       if (plan && slot && isStandingPlanConfig(plan.config)) {
         rewrite = async (swap) => {

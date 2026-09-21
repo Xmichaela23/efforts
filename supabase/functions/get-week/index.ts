@@ -20,6 +20,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // ⛔ THE MEMBERSHIP KEY LIVES IN ITS OWN FILE so it can be unit-tested without a database — the
 // duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
 import { buildExistsCounts, plannedKey, takeFreeDaySeq, usedDaySeqs } from './planned-exists-key.ts';
+import { MOVED_FROM_PREFIX } from '../_shared/moved-from.ts';
 // The ONE answer to "what block is this, on this date" — same function the coach payload's block
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
@@ -206,7 +207,20 @@ Deno.serve(async (req)=>{
          * well, using the `swapped_from:` tag the swap writes. The blob is never touched.
          */
         const { data: prePlanned } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type,tags,day_seq').eq('user_id', userId).gte('date', fromISO).lt('date', addDays(toISO, 1));
-        const existsCount = buildExistsCounts(Array.isArray(prePlanned) ? prePlanned : []);
+        /**
+         * ⛔ AND THE ROWS MOVED OUT OF THIS WINDOW (2026-09-21, `_shared/moved-from.ts`). A session moved from Sunday
+         * to next Monday is dated outside this week, but its plan day is inside it; without it the count below finds
+         * Sunday empty and re-creates the session there. Matched on the `moved_from:` tag for each day in the window.
+         */
+        const movedOut: any[] = [];
+        {
+          const originTags: string[] = [];
+          for (let cur = fromISO; cur <= toISO; cur = addDays(cur, 1)) originTags.push(`${MOVED_FROM_PREFIX}${cur}`);
+          const { data: moved } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type,tags,day_seq').eq('user_id', userId).overlaps('tags', originTags);
+          const inWindow = new Set((Array.isArray(prePlanned) ? prePlanned : []).map((r: any) => String(r.id)));
+          for (const r of Array.isArray(moved) ? moved : []) if (!inWindow.has(String(r.id))) movedOut.push(r);
+        }
+        const existsCount = buildExistsCounts([...(Array.isArray(prePlanned) ? prePlanned : []), ...movedOut]);
         const daySeqUsed = usedDaySeqs(Array.isArray(prePlanned) ? prePlanned : []);
         // How many blob sessions of each `plan|date|type` this read has walked — the second ride is the one at 1.
         const blobSeen = new Map<string, number>();

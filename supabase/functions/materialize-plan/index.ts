@@ -173,30 +173,8 @@ function applyAdjustment(
   return { weight: adjustedWeight, adjusted: true, adjustmentId: adjustment.id };
 }
 
-// Adapt-a-plan permanent swap: if an active swap targets this slot on this date, return the substitute
-// exercise name (else null). Same name-matching + date-window rules as applyAdjustment, so a swap and a
-// weight override read the slot identically. The caller re-resolves the substitute's weight from ITS
-// own reference — no weight is carried across a swap.
-function resolveSwap(
-  exerciseName: string,
-  adjustments: PlanAdjustment[],
-  workoutDate: string,
-): string | null {
-  if (!adjustments.length) return null;
-  const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
-  // ⛔ THE LATEST SWAP COVERING THE DATE WINS (2026-09-19): a "Just today" swap is a one-date row inside a "Rest of plan"
-  // one's window, and it has to beat it on that date. Latest start, then latest made.
-  const swap = adjustments.filter(adj => {
-    if (adj.status !== 'active') return false;
-    if (!adj.substitute_exercise_name) return false;
-    const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
-    if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
-    if (adj.applies_from > workoutDate) return false;
-    if (adj.applies_until && adj.applies_until < workoutDate) return false;
-    return true;
-  }).sort((a, b) => String(b.applies_from).localeCompare(String(a.applies_from)) || String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))[0];
-  return swap?.substitute_exercise_name ?? null;
-}
+// Adapt-a-plan permanent swap: `resolveLiftSwap` (`_shared/session-swap/lift-swap.ts`), read on the session's PLAN day
+// (2026-09-21). The caller re-resolves the substitute's weight from ITS own reference — no weight is carried across a swap.
 
 function parseStrengthExercisesRaw(row: any): any[] {
   const raw = row?.strength_exercises;
@@ -344,6 +322,7 @@ type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
 import { PLAN_WRITER_VERSION } from '../_shared/plan-refresh.ts';
+import { resolveLiftSwap } from '../_shared/session-swap/lift-swap.ts';
 import { ftpTestSteps, P210_STRIDE_COUNT, P210_STRIDE_LABEL, runTestSteps, RUN_TEST_TRIAL_MIN, type ProtocolStep } from '../_shared/baseline-test-rows.ts';
 
 /**
@@ -2628,7 +2607,7 @@ export function expandTokensForRow(
           // AFTER equipment sub and BEFORE weight resolution. isSlotSwapped forces the weight to
           // re-resolve from the NEW exercise's own reference below (no old weight carried across). With
           // no swap row, isSlotSwapped is false and everything below is byte-identical to before.
-          const swapTarget = resolveSwap(name, adjustments, workoutDate);
+          const swapTarget = resolveLiftSwap(name, adjustments, row);
           const isSlotSwapped = !!swapTarget && String(swapTarget).toLowerCase().trim() !== String(name).toLowerCase().trim();
           if (isSlotSwapped) name = swapTarget as string;
           // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a
@@ -3079,7 +3058,7 @@ export function expandTokensForRow(
           // AFTER equipment sub and BEFORE weight resolution. isSlotSwapped forces the weight to
           // re-resolve from the NEW exercise's own reference below (no old weight carried across). With
           // no swap row, isSlotSwapped is false and everything below is byte-identical to before.
-          const swapTarget = resolveSwap(name, adjustments, workoutDate);
+          const swapTarget = resolveLiftSwap(name, adjustments, row);
           const isSlotSwapped = !!swapTarget && String(swapTarget).toLowerCase().trim() !== String(name).toLowerCase().trim();
           if (isSlotSwapped) name = swapTarget as string;
           // Q-180: a substitution can change the UNIT, not just the name. A 20 m sled push swapped for a

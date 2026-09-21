@@ -26,6 +26,7 @@ import {
 } from './progression.ts';
 import { prescribe, type ViadaPattern } from '../strength-grid/index.ts';
 import { weekdayOf } from './restate.ts';
+import { planDateOf } from '../moved-from.ts';
 
 /**
  * ⚠️ DB shape, deliberately loose — a completed strength workout joined to its planned week.
@@ -375,7 +376,8 @@ export function earnedMeSets(args: {
     // an answer is the dead guard this codebase keeps deleting (`lowerBodyHaircut` lost one the same
     // way). ⛔ The boundary itself is load-bearing — it lives on the index build.
     if (!Number.isFinite(week)) continue;
-    const day = weekdayOf(wkRow?.date);
+    // ⛔ The plan's day (`_shared/moved-from.ts`): a moved session is still that day's ME session.
+    const day = weekdayOf(planDateOf(wkRow));
     if (!day) continue;
     const exercises = Array.isArray(wkRow?.strength_exercises) ? wkRow.strength_exercises : [];
     for (const ex of exercises as Record<string, unknown>[]) {

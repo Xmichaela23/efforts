@@ -19,6 +19,7 @@ import RescheduleDatePicker from './RescheduleDatePicker';
 // Unified path only; remove legacy planned_workouts hooks
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
+import { movePatch } from '@/lib/session-move';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
@@ -1754,13 +1755,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               
               // ⛔ A same-sport session already on the target day STAYS (Michael, 2026-09-20: "Both stay"). This used
               // to delete it before the move.
-              // Clear week_number and day_number so it's no longer tied to plan structure
-              // This prevents the repairPlan function from reverting it to canonical date
-              const result = await updatePlannedWorkout(reschedulePending.workoutId, {
-                date: reschedulePending.newDate,
-                week_number: null,
-                day_number: null
-              });
+              // ⛔ THE SESSION STAYS THE PLAN'S (2026-09-21, `@/lib/session-move`): it keeps its week and day and records
+              // the plan date it left, so the calendar does not re-add it there and a rebuild keeps it where it was moved.
+              const result = await updatePlannedWorkout(
+                reschedulePending.workoutId,
+                await movePatch(reschedulePending.workoutId, reschedulePending.newDate),
+              );
               
               console.log('[Reschedule] Update result:', result);
               
@@ -1833,14 +1833,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
                 // ⛔ A same-sport session already on the target day STAYS (2026-09-20).
 
-                // Move the workout
-                // Clear week_number and day_number so it's no longer tied to plan structure
-                // This prevents the repairPlan function from reverting it to canonical date
-                await updatePlannedWorkout(reschedulePending.workoutId, {
-                  date: targetDate,
-                  week_number: null,
-                  day_number: null
-                });
+                // Move the workout — ⛔ it stays the plan's session (`@/lib/session-move`).
+                await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, targetDate));
 
                 invalidateWorkoutScreens();
 

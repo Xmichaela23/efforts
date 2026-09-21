@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { ageFromBirthday } from '@/lib/resolve-current-max-hr';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
+import { movedOrigin } from '@/lib/session-move';
 
 export interface WorkoutInterval {
   id: string;
@@ -936,7 +937,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Load all planned rows for this plan
     const { data: rows } = await supabase
       .from('planned_workouts')
-      .select('id,date,type,week_number,day_number,workout_status')
+      .select('id,date,type,week_number,day_number,workout_status,tags')
       .eq('user_id', userId)
       .eq('training_plan_id', planId);
     const list = Array.isArray(rows) ? rows : [];
@@ -970,7 +971,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updates.push({ id: r.id, workout_status: 'planned', date: canonical }); repaired += 1; continue;
       }
       // 2) If row is planned but date drifted, restore canonical date
-      if (String((r as any).workout_status||'').toLowerCase()!=='completed' && String(r.date) !== canonical) {
+      // ⛔ NOT A SESSION THE ATHLETE MOVED (2026-09-21, `@/lib/session-move`) — its date is theirs, not drift.
+      if (String((r as any).workout_status||'').toLowerCase()!=='completed' && String(r.date) !== canonical && !movedOrigin(r as any)) {
         updates.push({ id: r.id, date: canonical }); repaired += 1; continue;
       }
     }

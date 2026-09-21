@@ -30,6 +30,7 @@
 // upcoming session stamped older, and the endurance re-price after an accepted number queues the same job.
 // `run-jobs` calls it with the service key and the job's `user_id`.
 import { daySeqForType } from '../_shared/day-seq.ts';
+import { planDateOf } from '../_shared/moved-from.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
 import { athleteToday, isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
@@ -235,12 +236,13 @@ Deno.serve(async (req: Request) => {
     // ⛔ THE PLANNED ROW CARRIES THE WEEK **AND THE DATE**. The date was added 2026-08-24 for the ME
     // ladder: `earnedMeSets` matches on week + WEEKDAY + movement, the same three keys the restater
     // uses, and a logged workout carries neither the plan week nor the plan's weekday of its own.
-    const weekById = new Map<string, { week: number; date: string | null; isTest: boolean; isRetest: boolean }>();
+    // ⛔ `tags` TRAVEL TOO (2026-09-21): a moved session's `moved_from:` note is how the ME ladder finds its plan day.
+    const weekById = new Map<string, { week: number; date: string | null; tags: unknown[]; isTest: boolean; isRetest: boolean }>();
     for (const r of plannedRows ?? []) {
       if (r?.id && typeof r.week_number === 'number') {
         const tags = (Array.isArray(r.tags) ? r.tags : []).map((t: unknown) => String(t).toLowerCase());
         // ⛔ THE ONE TEST-SESSION RULE (2026-09-16) — the same function the test save and the result card use.
-        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null, isTest: isTestSession({ name: r.name, tags: r.tags }), isRetest: tags.includes('retest') });
+        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null, tags: Array.isArray(r.tags) ? r.tags : [], isTest: isTestSession({ name: r.name, tags: r.tags }), isRetest: tags.includes('retest') });
       }
     }
     const { data: doneRows } = await supabase
@@ -254,6 +256,7 @@ Deno.serve(async (req: Request) => {
     const joined = (doneRows ?? []).map((w: Record<string, unknown>) => ({
       week_number: weekById.get(String(w?.planned_id))?.week ?? null,
       date: weekById.get(String(w?.planned_id))?.date ?? null,
+      tags: weekById.get(String(w?.planned_id))?.tags ?? [],
       // ⛔ A TEST SESSION IS A TEST WHATEVER ITS WEEK (the mid-block retest, 2026-09-05); nothing else is (2026-09-16).
       is_test: weekById.get(String(w?.planned_id))?.isTest === true,
       is_retest: weekById.get(String(w?.planned_id))?.isRetest === true,
@@ -571,7 +574,8 @@ Deno.serve(async (req: Request) => {
       const bySlot = new Map<string, Array<{ date: string; options: string[] }>>();
       for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
         if (!isRefreshable(r, writeFrom)) continue;
-        const date = String(r.date ?? '').slice(0, 10);
+        // ⛔ The plan's date (`_shared/moved-from.ts`): a swap names the plan's slot, so a moved session keeps its slot.
+        const date = planDateOf(r);
         const planSport = originOf(r as never) ?? disciplineOf(String(r.type ?? ''));
         const slot = planSport ? enduranceSlotName(date, r as never) : null;
         if (!planSport || !slot) continue;
@@ -601,7 +605,8 @@ Deno.serve(async (req: Request) => {
     // The calendar date of a block week's weekday — the stored rows say it; the block's Monday-anchored weeks otherwise.
     const dateByWeekDay = new Map<string, string>();
     for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
-      if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(String(r.date))}`, String(r.date).slice(0, 10));
+      // ⛔ The plan's date, not a moved row's (`_shared/moved-from.ts`) — this maps the plan's slots.
+      if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(planDateOf(r))}`, planDateOf(r));
     }
     const planned = applyEnduranceAdjustments(composed, swaps, (week, day) => dateByWeekDay.get(`${week}|${day}`) ?? null);
 
@@ -638,11 +643,11 @@ Deno.serve(async (req: Request) => {
     // ── THE SWAP TAP: the sessions the adjustment reaches, the tapped one first ────────────────────────
     if (swapTap) {
       if (!tapRow) return json({ success: false, reason: 'swap_session_not_in_plan' }, 200);
-      const from = String(swapTap.from ?? tapDate).slice(0, 10);
+      const from = String(swapTap.from ?? (tapRow ? planDateOf(tapRow) : tapDate)).slice(0, 10);
       const until = swapTap.until ? String(swapTap.until).slice(0, 10) : null;
       const reached = new Set((plannedRows ?? [])
         .filter((r: Record<string, unknown>) => {
-          const d = String(r.date ?? '').slice(0, 10);
+          const d = planDateOf(r);
           if (String(r.id) === String(tapRow.id)) return true;
           return enduranceSlotName(d, r as never) === String(swapTap.slot) && d >= from && (!until || d <= until);
         })
@@ -661,7 +666,7 @@ Deno.serve(async (req: Request) => {
         } catch (e) { console.warn(`[standing-restate] swap expansion failed ${u.id}: ${(e as Error)?.message ?? String(e)}`); }
       }
       const matched = ids.includes(String(tapRow.id))
-        || !endurance.unmatched.some((x) => `${x.week}|${x.day}` === `${tapRow.week_number}|${weekdayOfDate(String(tapDate))}`);
+        || !endurance.unmatched.some((x) => `${x.week}|${x.day}` === `${tapRow.week_number}|${weekdayOfDate(planDateOf(tapRow))}`);
       console.log(`[standing-restate] swap plan=${plan.id} row=${tapRow.id} slot=${swapTap.slot} ${from}→${until ?? 'end'} written=${ids.length} migrated=${migrated}`);
       if (!matched) return json({ success: false, reason: 'swap_session_not_matched' }, 200);
       // ⛔ THE SESSIONS THE SWAP REACHES, the tapped one first — rewritten now or already as chosen — which is what the

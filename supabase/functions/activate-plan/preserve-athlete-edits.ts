@@ -24,6 +24,7 @@
 // a week that is otherwise identical; it does not try to port edits onto a different plan.
 
 import { DAY_SEQ_STRIDE, placeOf } from '../_shared/day-seq.ts';
+import { movedOrigin, planDateOf, tagsAfterMove } from '../_shared/moved-from.ts';
 
 /** The subset of a planned row this module reads or writes. Loosely typed — the caller holds rows. */
 export type PlannedRowLike = {
@@ -45,8 +46,12 @@ export type PlannedRowLike = {
 /** The tag `session-discipline-swap.ts` writes. It is what makes a swap recognisable after the fact. */
 export const SWAP_TAG = 'discipline_swapped';
 
+/**
+ * ⛔ THE PLAN'S DATE, NOT THE ROW'S (2026-09-21). A moved row carries `moved_from:<plan date>` and keeps its week and
+ * day (`_shared/moved-from.ts`); it is still the plan's session for the day it left, so it pairs with that slot.
+ */
 const slotKey = (r: PlannedRowLike): string =>
-  `${r.week_number ?? ''}|${r.day_number ?? ''}|${String(r.date ?? '').slice(0, 10)}`;
+  `${r.week_number ?? ''}|${r.day_number ?? ''}|${planDateOf(r)}`;
 
 const typeKey = (r: PlannedRowLike): string =>
   `${slotKey(r)}|${String(r.type ?? '').toLowerCase()}|${Number(r.day_seq ?? 0)}`;
@@ -149,7 +154,7 @@ export function preserveAthleteEdits(
   for (const [k, olds] of oldBySlot) {
     const news = newBySlot.get(k);
     if (!news || news.length !== olds.length) {
-      const edited = olds.filter((o) => hasSwapTag(o) || String(o.workout_status ?? '').toLowerCase() === 'skipped');
+      const edited = olds.filter((o) => hasSwapTag(o) || movedOrigin(o) != null || String(o.workout_status ?? '').toLowerCase() === 'skipped');
       if (edited.length > 0) {
         notes.push(`slot ${k}: the rebuilt week has a different shape, so ${edited.length} athlete edit(s) were not carried over`);
       }
@@ -163,6 +168,17 @@ export function preserveAthleteEdits(
         if (oldRow.skip_reason != null) newRow.skip_reason = oldRow.skip_reason;
         if (oldRow.skip_note != null) newRow.skip_note = oldRow.skip_note;
         notes.push(`slot ${k}: kept the athlete's skip`);
+      }
+
+      /**
+       * ⛔ THE MOVE (2026-09-21). A session the athlete moved goes back to the day they moved it to, with its note.
+       * ⚠️ NOT A COMPLETED ONE: completion is not carried here (see above), and a fresh row is a session not yet done.
+       */
+      const movedTo = movedOrigin(oldRow) ? String(oldRow.date ?? '').slice(0, 10) : '';
+      if (movedTo && String(oldRow.workout_status ?? '').toLowerCase() !== 'completed') {
+        newRow.tags = tagsAfterMove(newRow, movedTo);
+        newRow.date = movedTo;
+        notes.push(`slot ${k}: kept the athlete's move to ${movedTo}`);
       }
 
       if (!hasSwapTag(oldRow)) continue;
@@ -184,6 +200,9 @@ export function preserveAthleteEdits(
       // The swap clears the source discipline's token on purpose; carry that decision, not the token.
       newRow.steps_preset = oldRow.steps_preset ?? null;
       newRow.tags = Array.isArray(oldRow.tags) ? [...oldRow.tags] : [SWAP_TAG];
+      // ⚠️ The old tags carry any `moved_from:` note too. Re-read against the row's date, so a move not restored
+      // above (a completed row) loses its note rather than claiming a day the row is not on.
+      newRow.tags = tagsAfterMove(newRow, String(newRow.date ?? ''));
       claimedTypes.add(wouldBe);
       notes.push(`slot ${k}: kept the athlete's ${from} → ${to} swap`);
     }
