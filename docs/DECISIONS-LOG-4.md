@@ -293,6 +293,11 @@ the page's own guess line covers here.
    on any day holding a lifting or plyo session, five in seven. A second tap hands back today's retest.
 8. **Baselines' Strength card has real buttons**: two retests and a rebuild under the numbers, a rebuild under the
    equipment; one owner with Adjust (`src/lib/plan-actions.ts`). The run and ride cards keep the link.
+   **They are actions, not pills**: `GalaxyButton` `shape="button"`, `md`, the two retests side by side under a
+   "Retest" label, each rebuild full width, on both screens. Their face is `.action-bed` (`src/index.css`): the top
+   bar's warm-to-violet wash and the dot grid at low strength, NO sport colour and NO coloured edge, because the orange
+   edge is the selected equipment chip's language and these sit beside those chips (Michael: "not competing with the
+   selected pills").
 
 ## D-482 — The builder builds what is tapped, and a day keeps two sessions of one sport (2026-09-20, Michael)
 

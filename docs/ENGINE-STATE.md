@@ -48,7 +48,8 @@
 > 5. **Refresh wait: 5 minutes, only behind a refresh by the current writer version.** `PLAN_WRITER_VERSION` is **28** (`0ad23667a`, the Ladder Drills how-to; 27 was `d11a76c72`). Next bump: 29.
 > 6. **Retest works on a lifting day**: migration `20260920230000_planned_unique_key_exempts_retest.sql` was APPLIED by
 >    Michael in the SQL editor; a second tap reuses today's row. **Baselines' Strength card has four real buttons**
->    (`src/lib/plan-actions.ts`, shared with Adjust).
+>    (`src/lib/plan-actions.ts`, shared with Adjust), drawn as actions (`GalaxyButton`, `.action-bed` face in
+>    `src/index.css`), never as pills: the pill with an orange edge means a SELECTED chip.
 >
 > ⛔ **`get-week` IS DEPLOYED NOW — and the unapproved `spacing-line.ts` is still NOT live.** Every deploy this day ran
 > from a clean `git worktree` of the pushed commit (`git worktree add --detach <dir> <sha>`, deploy from it, remove it),

@@ -1222,6 +1222,25 @@ body.wizard-active { --tabbar-h: 0px; }
   background-size: 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
   filter: blur(0.16px) saturate(1.10) contrast(1.02);
 }
+/* ACTION BED — an action button's own face (2026-09-20, Michael, on the Strength card's Retest and Rebuild buttons:
+   "give those buttons a little texture and color maybe … not competing with the selected pills … just something").
+   The top bar's warm-to-violet wash and the instrument's dot-and-grid print, at a fraction of a card's strength, so an
+   action reads as part of the instrument rather than as one more chip. ⛔ NO SPORT COLOUR AND NO COLOURED EDGE: the
+   orange edge is the SELECTED chip's language, and these sit right beside those chips. */
+.action-bed { position: relative; isolation: isolate; overflow: hidden; }
+.action-bed::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit;
+  background-image:
+    radial-gradient(ellipse at 6% 0%, rgba(255, 196, 92, 0.17) 0%, transparent 58%),
+    radial-gradient(ellipse at 52% -30%, rgba(183, 148, 246, 0.13) 0%, transparent 62%),
+    radial-gradient(ellipse at 96% 8%, rgba(138, 104, 230, 0.20) 0%, transparent 60%),
+    radial-gradient(circle, rgba(255,255,255,0.060) 0.8px, transparent 1.55px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.038) 0px, rgba(255,255,255,0.038) 1px, transparent 1px, transparent 9px);
+  background-size: cover, cover, cover, 14px 14px, 9px 9px, 9px 9px;
+}
+
 /* SPECTRAL — for a card whose data spans EVERY discipline (State's LOAD + planned-vs-actual, the
    Home load rows). One sport's colour would be a lie there, so it takes the top bar's own multi-hue
    wash instead: the same five tints, in the same positions, as `.mobile-header::before`. */

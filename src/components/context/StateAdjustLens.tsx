@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { Dumbbell, Activity, Bike, Layers, Feather, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { openLiftRetest, rebuildUpcomingSessions, REBUILD_NOTE } from '@/lib/plan-actions';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { getDisciplineColor } from '@/lib/context-utils';
@@ -408,7 +409,8 @@ export default function StateAdjustLens({ mainLifts }: {
   const sections: Section[] = [
     { id: 'block', label: 'The block', Icon: Layers, body: (
       <>
-        <button type="button" disabled={rebuilding} onClick={rebuild} className={pill}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+        {/* An action is a button, a choice is a chip (`ui/galaxy-button.tsx`); the same control as Baselines' Strength card. */}
+        <GalaxyButton variant="secondary" size="md" fullWidth className="action-bed" disabled={rebuilding} onClick={rebuild}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</GalaxyButton>
         <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched. Changes made to equipment will be adjusted here for future sessions.</p>
         {rebuildNote && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNote}</p>}
       </>
@@ -431,12 +433,12 @@ export default function StateAdjustLens({ mainLifts }: {
             <Row key={lt.key} id={lt.key} name={lt.label} row={lt.row} sport="strength" />
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3 mt-1.5">
+        <div className="mt-3">
           <span className="text-subhead text-label">Retest</span>
-          <span className="flex flex-wrap gap-2 justify-end">
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
-          </span>
+          <div className="flex gap-2 mt-1.5">
+            <GalaxyButton variant="secondary" size="md" className="flex-1 action-bed" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></GalaxyButton>
+            <GalaxyButton variant="secondary" size="md" className="flex-1 action-bed" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></GalaxyButton>
+          </div>
         </div>
         <p className="text-footnote text-label-secondary mt-2 leading-snug">A retest opens today, in the logger.</p>
         {saveNote && lastSaved === 'strength' && <p className="text-footnote text-label-secondary mt-1.5">{saveNote}</p>}

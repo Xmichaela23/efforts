@@ -1117,21 +1117,24 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           <div className="space-y-1.5">{liftRows}</div>
           {/* ⛔ THE BUTTONS SIT WHERE THE CHANGE IS MADE (Michael, 2026-09-20: "retest x 2, rebuild x 1 (if you manually
               change), then equipment rebuild"). The same actions and words as the Adjust tab (`@/lib/plan-actions`). */}
-          <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3 mt-2">
+          {/* ⛔ ACTIONS ARE BUTTONS, CHOICES ARE CHIPS (`ui/galaxy-button.tsx`). These read as round pills beside the
+              equipment chips (Michael, 2026-09-20: "should they pop more to separate from the other pills?"; "retest
+              should be larger"), so an action looked like one more option to pick. */}
+          <div className="mt-3">
             <span className="text-subhead text-label">Retest</span>
-            <span className="flex flex-wrap gap-2 justify-end">
+            <div className="flex gap-2 mt-1.5">
               {(['Lower', 'Upper'] as const).map((which) => (
-                <button key={which} type="button" disabled={retestBusy != null}
-                  onClick={() => { setRetestBusy(which); void openLiftRetest(which).finally(() => setRetestBusy(null)); }}
-                  className={`${pillClass} inline-flex items-center gap-1`}>{retestBusy === which ? 'Opening…' : `${which} lifts`}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
+                <GalaxyButton key={which} variant="secondary" size="md" className="flex-1 action-bed" disabled={retestBusy != null}
+                  onClick={() => { setRetestBusy(which); void openLiftRetest(which).finally(() => setRetestBusy(null)); }}>
+                  {retestBusy === which ? 'Opening…' : `${which} lifts`}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></GalaxyButton>
               ))}
-            </span>
+            </div>
           </div>
           <p className="text-footnote text-label-secondary mt-2 leading-snug">A retest opens today, in the logger.</p>
           <div className="mt-3">
-            <button type="button" disabled={rebuildBusy != null} className={pillClass}
+            <GalaxyButton variant="secondary" size="md" fullWidth className="action-bed" disabled={rebuildBusy != null}
               onClick={() => { setRebuildBusy('numbers'); setRebuildNotes((n) => ({ ...n, numbers: undefined })); void rebuildUpcomingSessions().then((r) => setRebuildNotes((n) => ({ ...n, numbers: REBUILD_NOTE[r] }))).finally(() => setRebuildBusy(null)); }}>
-              {rebuildBusy === 'numbers' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+              {rebuildBusy === 'numbers' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</GalaxyButton>
             <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
             {rebuildNotes.numbers && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNotes.numbers}</p>}
           </div>
@@ -1150,10 +1153,10 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
               onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
           </div>
           {!hasCommercialGym && equipmentChips('strength', homeGymEquipmentOptions)}
-          <div className="pt-1">
-            <button type="button" disabled={rebuildBusy != null} className={pillClass}
+          <div className="pt-3">
+            <GalaxyButton variant="secondary" size="md" fullWidth className="action-bed" disabled={rebuildBusy != null}
               onClick={() => { setRebuildBusy('equipment'); setRebuildNotes((n) => ({ ...n, equipment: undefined })); void rebuildUpcomingSessions({ useCurrentEquipment: true }).then((r) => setRebuildNotes((n) => ({ ...n, equipment: REBUILD_NOTE[r] }))).finally(() => setRebuildBusy(null)); }}>
-              {rebuildBusy === 'equipment' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+              {rebuildBusy === 'equipment' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</GalaxyButton>
             {/* Michael's words, 2026-09-20. */}
             <p className="text-footnote text-label-secondary mt-2 leading-snug">Changes made to equipment will be adjusted here for future sessions.</p>
             {rebuildNotes.equipment && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNotes.equipment}</p>}

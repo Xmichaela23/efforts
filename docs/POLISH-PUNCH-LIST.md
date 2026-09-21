@@ -63,7 +63,8 @@ source before it changes. Not urgent: light and middle lifters get two to five s
 
 - [ ] **Baselines → Strength card on efforts.work:** two Retest buttons and "Rebuild upcoming sessions" under the numbers;
       "Rebuild upcoming sessions" with "Changes made to equipment will be adjusted here for future sessions." under the
-      chips; no "Retest or rebuild on Adjust" link on this card. (Seen on the local server only.)
+      chips; no "Retest or rebuild on Adjust" link on this card. The four are squared buttons with a faint wash and
+      dot grid (two retests side by side, rebuilds full width), the same on Adjust. (Seen on the local server only.)
 - [ ] **Equipment on his own plan:** check a chip, tap the rebuild under the chips, and the sessions ahead use it (with
       Agility ladder: Wednesday's plyo warm-up goes from two drills to three).
 - [ ] **A retest on a day that has a lifting session:** Lower lifts / Upper lifts opens a test in the logger and the row
