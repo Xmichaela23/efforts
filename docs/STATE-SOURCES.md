@@ -916,3 +916,14 @@ Every number the per-workout record finder uses. The finder is `src/lib/best-eff
 | A row at `workout_status = 'planned'`, or dated after today, is not counted | `_shared/athletic-record/totals.ts isDone` | **OURS** — `workouts` holds planned rows as well as done ones; counting one would put sessions that have not happened into the year's total | 2026-09-20 |
 | "All time" is labelled from the athlete's earliest synced workout | `_shared/athletic-record/totals.ts PeriodTotals.since` | FIELD — Strava's connect import is 90 days and Garmin's is capped at 180 (`StravaCallback.tsx:55-86`, `import-garmin-history:107,138`), so an unlabelled all-time figure claims more than the data holds | 2026-09-20 |
 | Today's narrative for a hard run or ride leaves a session unsaid when one "round" is longer than 6 steps (level 3's three full ladders, p237 level 3's nested sets — no plan prescribes either) | `_shared/planned-narrative.ts MAX_ROUND_STEPS` | **OURS** — a guard on when to say nothing, not a training number. The longest round on pp231–239 is five steps (p233, threshold with a surge); a longer one is the step grouping missing the page's sets, and said aloud it is a paragraph. Every sentence shape in that file was approved by Michael word for word, 2026-09-20 | 2026-09-20 |
+
+## Move check (2026-09-21, WORKORDER-lost-day "Move check rebuilt on the book")
+
+| Number | Where | Source | Date |
+|---|---|---|---|
+| Two sessions on the target day → the two-a-day note (6–8 h, 4–6 h after an easy session under an hour, a full meal between) | `_shared/move-check/index.ts checkMove` | FIELD — Viada p108 | 2026-09-21 |
+| Lift gap over 9 days → the "one every 8 to 9 days" note; 3–4 days is the ideal and gets no note | `_shared/move-check/index.ts LIFT_GAP_MAX_DAYS`, `LIFT_GAP_IDEAL` | FIELD — Viada p80 | 2026-09-21 |
+| A day off is the only refusal | `_shared/move-check/index.ts checkMove` | The athlete's own answer (no-hard-gates rule), not a book number | 2026-09-21 |
+| "Days that fit", lifts: ordered by the gap closest to 3–4 days | `_shared/move-check/index.ts daysThatFit` | FIELD — Viada p80 | 2026-09-21 |
+| "Days that fit", runs and rides: nearest day to the one the session is on first | `_shared/move-check/index.ts daysThatFit` | **OURS** — the book gives no order for moving an endurance session; nearest keeps the week's shape | 2026-09-21 |
+| "Days that fit": at most three, ties to the earlier date | `_shared/move-check/index.ts daysThatFit` | **OURS** — three is Michael's spec (2026-09-21); the earlier-date tie-break only makes two reads of one week agree | 2026-09-21 |

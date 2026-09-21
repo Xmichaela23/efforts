@@ -600,31 +600,17 @@ export default function WorkoutCalendar({
     setValidationResult(null);
   };
 
-  // Handle suggestion click
-  const handleSuggestionClick = async (date: string) => {
-    if (!reschedulePending) return;
-
+  // "Days that fit" (2026-09-21): tapping a day moves the session there, the same write as Move.
+  const handleFitDayClick = async (date: string) => {
+    if (!reschedulePending || !updatePlannedWorkout) return;
     try {
-      // Re-validate for suggested date
-      const { data, error } = await supabase.functions.invoke('validate-reschedule', {
-        body: {
-          workout_id: reschedulePending.workoutId,
-          new_date: date
-        }
-      });
-
-      if (error) {
-        console.error('Validation error:', error);
-        return;
-      }
-
-      setValidationResult(data);
-      setReschedulePending({
-        ...reschedulePending,
-        newDate: date
-      });
+      await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, date));
+      invalidateWorkoutScreens();
+      setShowValidationPopup(false);
+      setReschedulePending(null);
+      setValidationResult(null);
     } catch (err) {
-      console.error('Error validating suggestion:', err);
+      console.error('Error rescheduling workout:', err);
     }
   };
 
@@ -1580,14 +1566,13 @@ export default function WorkoutCalendar({
       {/* Validation Popup */}
       {showValidationPopup && validationResult && reschedulePending && (
         <RescheduleValidationPopup
-          workoutId={reschedulePending.workoutId}
           workoutName={reschedulePending.workoutName}
           oldDate={reschedulePending.oldDate}
           newDate={reschedulePending.newDate}
           validation={validationResult}
           onConfirm={handleConfirmReschedule}
           onCancel={handleCancelReschedule}
-          onSuggestionClick={handleSuggestionClick}
+          onDayClick={handleFitDayClick}
         />
       )}
     </div>

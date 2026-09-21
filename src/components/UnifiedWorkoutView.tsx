@@ -1434,10 +1434,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         }
 
                         try {
-                          console.log('[Reschedule] Fetching coach options for:', { workoutId, currentDate });
+                          console.log('[Reschedule] Fetching days that fit for:', { workoutId, currentDate });
                           
-                          // Call validate-reschedule with current date to get coach options
-                          // (new_date = old_date means "show me options" without actually moving)
+                          // new_date = the session's own date asks only for the days that fit (`validate-reschedule`)
                           const { data, error } = await supabase.functions.invoke('validate-reschedule', {
                             body: {
                               workout_id: workoutId,
@@ -1451,9 +1450,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             return;
                           }
 
-                          console.log('[Reschedule] Coach options:', data);
+                          console.log('[Reschedule] Days that fit:', data);
 
-                          // Show validation popup with coach options
+                          // Show the move popup with the days that fit
                           setRescheduleValidation(data);
                           setReschedulePending({
                             workoutId: workoutId,
@@ -1740,7 +1739,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Reschedule Validation Popup */}
       {showReschedulePopup && rescheduleValidation && reschedulePending && (
         <RescheduleValidationPopup
-          workoutId={reschedulePending.workoutId}
           workoutName={reschedulePending.workoutName}
           oldDate={reschedulePending.oldDate}
           newDate={reschedulePending.newDate}
@@ -1785,81 +1783,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             setReschedulePending(null);
             setRescheduleValidation(null);
           }}
-          onSuggestionClick={async (date: string) => {
-            if (!reschedulePending) return;
-            try {
-              const { data, error } = await supabase.functions.invoke('validate-reschedule', {
-                body: {
-                  workout_id: reschedulePending.workoutId,
-                  new_date: date
-                }
-              });
-              if (error) {
-                console.error('Validation error:', error);
-                return;
-              }
-              setRescheduleValidation(data);
-              setReschedulePending({
-                ...reschedulePending,
-                newDate: date
-              });
-            } catch (err) {
-              console.error('Error validating suggestion:', err);
-            }
-          }}
-          onCoachOptionClick={async (option) => {
+          onDayClick={async (date: string) => {
+            // "Days that fit" (2026-09-21): tapping a day moves the session there, the same write as Move.
             if (!reschedulePending || !updatePlannedWorkout) return;
-
             try {
-              if (option.action === 'move' && option.targetDateOffset !== undefined) {
-                // Calculate target date
-                const oldDateObj = new Date(reschedulePending.oldDate + 'T12:00:00');
-                oldDateObj.setDate(oldDateObj.getDate() + option.targetDateOffset);
-                const targetDate = oldDateObj.toISOString().split('T')[0];
-
-                // Validate the move first
-                const { data, error } = await supabase.functions.invoke('validate-reschedule', {
-                  body: {
-                    workout_id: reschedulePending.workoutId,
-                    new_date: targetDate
-                  }
-                });
-
-                if (error) {
-                  console.error('[Reschedule] Validation error:', error);
-                  alert('Error validating reschedule. Please try again.');
-                  return;
-                }
-
-                // ⛔ A same-sport session already on the target day STAYS (2026-09-20).
-
-                // Move the workout — ⛔ it stays the plan's session (`@/lib/session-move`).
-                await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, targetDate));
-
-                invalidateWorkoutScreens();
-
-                setShowReschedulePopup(false);
-                setReschedulePending(null);
-                setRescheduleValidation(null);
-                setTimeout(() => onClose(), 100);
-              } else if (option.action === 'skip') {
-                if (confirm(`Skip "${reschedulePending.workoutName}"? This will remove it from your plan.`)) {
-                  await deletePlannedWorkout(reschedulePending.workoutId);
-
-                  invalidateWorkoutScreens();
-
-                  setShowReschedulePopup(false);
-                  setReschedulePending(null);
-                  setRescheduleValidation(null);
-                  setTimeout(() => onClose(), 100);
-                }
-              } else if (option.action === 'split') {
-                // Split functionality - show message for now
-                alert('Split functionality coming soon. For now, you can manually create two shorter workouts on different days.');
-              }
+              await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, date));
+              invalidateWorkoutScreens();
+              setShowReschedulePopup(false);
+              setReschedulePending(null);
+              setRescheduleValidation(null);
+              setTimeout(() => onClose(), 100);
             } catch (err) {
-              console.error('[Reschedule] Error executing coach option:', err);
-              alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+              console.error('[Reschedule] Error rescheduling workout:', err);
+              alert(`Error rescheduling workout: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
           }}
         />
