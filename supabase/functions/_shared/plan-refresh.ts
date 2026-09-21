@@ -70,8 +70,10 @@ import { localDateInTz } from './local-date.ts';
 //   ("2 sets. Set 1: … After each one: … Set 2 repeats set 1 from the 2:00 effort.").
 // 24 (2026-09-20): the plyo drill line is written to "you"; each drill row carries its benefit alone (`benefit_line`,
 //   behind the (i) on Today's card); hopscotch needs the agility ladder, like ladder drills.
+// 25 (2026-09-20): the rewrite replaces a stored plyo drill the composer no longer gives (Hopscotch on a kit with no
+//   agility ladder) with its family's current drill; it had been left as built, old note and all.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 24;
+export const PLAN_WRITER_VERSION = 25;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

@@ -284,13 +284,26 @@ export function restateFromTest(args: {
      * successor is still left alone — and never on a session already done (gated above).
      */
     const nameOf = (e: StrengthExercise | null | undefined) => String(e?.name ?? '').toLowerCase();
-    const cellOf = (e: StrengthExercise) => `${viadaCategoryOf(String(e.name)) ?? '?'}|${viadaPatternOf(String(e.name)) ?? '?'}`;
+    /**
+     * ⛔ A PLYO DRILL'S CELL IS ITS FAMILY (2026-09-20). The drills are not in the lifting grid, so `viadaCategoryOf`
+     * had no cell for them and the pairing below skipped them: when hopscotch went behind the agility ladder, a plan
+     * built before that kept its stored Hopscotch row through every refresh — old note, no how-to, no (i) — while a new
+     * plan got the Ickey Shuffle (Michael's own Wednesday, and reproduced on a throwaway plan the same day). p227's
+     * table gives each family one slot on the plyo day, so the family is the slot.
+     */
+    const plyoFamilyOf = (e: StrengthExercise): string | null =>
+      Object.values(PLYO_FAMILIES).find((f) => f.drills.some((d) => d.toLowerCase() === nameOf(e)))?.id ?? null;
+    const cellOf = (e: StrengthExercise) => {
+      const family = plyoFamilyOf(e);
+      return family ? `plyo|${family}` : `${viadaCategoryOf(String(e.name)) ?? '?'}|${viadaPatternOf(String(e.name)) ?? '?'}`;
+    };
     const existingNames = new Set(existing.map(nameOf));
     const freshUnplaced = wanted.filter((w) => !existingNames.has(nameOf(w)));
     const replacement = new Map<StrengthExercise, StrengthExercise>();
     // ⚠️ TWO SIGNALS FOR "by feel", because rows written before `load_prescribed` was carried have
     // only the second: the composer never prices an accessory, so its weight is the string "By feel".
-    const byFeel = (e: StrengthExercise) => e?.load_prescribed === false || /by feel/i.test(String(e?.weight ?? ''));
+    // A plyo drill carries no load at all ("Bodyweight"), so it is never a priced row either.
+    const byFeel = (e: StrengthExercise) => e?.load_prescribed === false || /by feel/i.test(String(e?.weight ?? '')) || plyoFamilyOf(e) != null;
     for (const ex of existing) {
       if (!byFeel(ex)) continue;
       if (wanted.some((w) => nameOf(w) === nameOf(ex))) continue;

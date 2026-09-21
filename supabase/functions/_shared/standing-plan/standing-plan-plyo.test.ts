@@ -248,3 +248,35 @@ Deno.test('⛔ hopscotch and ladder drills need the agility ladder; the week\'s 
   assertEquals(drillForWeek('bounding', 4, []), 'Bounding');
   assertEquals(drillForWeek('ground_contact', 4, null), 'Single-Leg Hops');
 });
+
+Deno.test('⛔ a stored Hopscotch row becomes the family\'s current drill on the refresh, with its how-to and benefit (2026-09-20)', async () => {
+  const { restateFromTest } = await import('./restate.ts');
+  const { composeBlock } = await import('./compose.ts');
+  const NO_LADDER = ['Barbell', 'Squat rack', 'Bench', 'Dumbbells', 'Pull-up bar'];
+  const composed = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: NO_LADDER } as never);
+  // The calendar as a plan built before hopscotch needed the ladder has it: Hopscotch, the old note, no benefit line.
+  const monday = new Date('2030-01-07T12:00:00Z');
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const planned: { id: string; week_number: number; date: string; tags: string[]; strength_exercises: unknown }[] = [];
+  for (const wk of composed) for (const sess of wk.sessions) {
+    if (!sess.tags.includes('plyo')) continue;
+    const d = new Date(monday); d.setUTCDate(d.getUTCDate() + (wk.week - 1) * 7 + DAYS.indexOf(sess.day));
+    const stored = (sess.strength_exercises ?? []).map((e) => e.name === 'Ickey Shuffle'
+      ? { name: 'Hopscotch', sets: 1, reps: '', weight: 'Bodyweight', load_prescribed: false, how_to: 'Stand at the bottom of an agility ladder on your left foot.', notes: 'Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.' }
+      : e);
+    planned.push({ id: `${wk.week}`, week_number: wk.week, date: d.toISOString().slice(0, 10), tags: sess.tags, strength_exercises: stored });
+  }
+  assert(planned.length === 12, `expected 12 plyo days, got ${planned.length}`);
+  const restated = restateFromTest({ composed, planned, afterWeek: 0 } as never);
+  assertEquals(restated.rows.length, 12, 'not every plyo day was rewritten');
+  for (const row of restated.rows) {
+    const names = (row.strength_exercises as { name: string }[]).map((e) => e.name);
+    assert(!names.includes('Hopscotch'), `week ${row.week} still carries Hopscotch`);
+    const ickey = (row.strength_exercises as Record<string, unknown>[]).find((e) => e.name === 'Ickey Shuffle')!;
+    assert(ickey, `week ${row.week} has no Ickey Shuffle`);
+    assertEquals(ickey.benefit_line, 'Benefit: general foot and leg control.');
+    assert(/^Stand at one side of an agility ladder/.test(String(ickey.how_to)), String(ickey.how_to));
+    assert(/you feel confident in it/.test(String(ickey.notes)));
+    assertEquals(names.length, 3, 'the day lost or gained a drill');
+  }
+});
