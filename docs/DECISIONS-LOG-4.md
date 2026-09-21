@@ -293,3 +293,27 @@ the page's own guess line covers here.
    on any day holding a lifting or plyo session, five in seven. A second tap hands back today's retest.
 8. **Baselines' Strength card has real buttons**: two retests and a rebuild under the numbers, a rebuild under the
    equipment; one owner with Adjust (`src/lib/plan-actions.ts`). The run and ride cards keep the link.
+
+## D-482 — The builder builds what is tapped, and a day keeps two sessions of one sport (2026-09-20, Michael)
+
+> One consolidated entry for the PM chat's night and its two engineer terminals (docs kept light on purpose).
+
+1. **"Did the athlete get what they tapped" is a permanent test.** `builder-answers-sweep.test.ts` crosses days off ×
+   long day × hard days × run-or-ride in full on all three frames, and sweeps each workout, length and lift pick one at
+   a time — those do not move a session's day, so the full cross product (about 80 billion on the All Rounder) buys
+   nothing. It reads the screen's own option lists (`slotVariantOptions`, `slotLengthOptions`, `picksForFrame`), so it
+   cannot offer an answer the athlete is never offered.
+2. **A picked length builds the shape the chips were measured on, every week** (`archetypeForSlot`). p274 day 4 prints
+   "Cyc endurance (level 1)" and p239 offers a steady ride or a mixed one, "sparingly unless an event is coming". Which
+   of the two a week builds is OURS either way; the weekly rotation no longer overrides a length the athlete gave.
+   ⚠️ The easy row always asks a length, so the mixed ride no longer appears as the All Rounder's easy ride.
+3. **A session is hard when the frame's own slot says so**, not only when `HARDNESS` ranks its family
+   (`week-conflicts.ts`). A declined hard slot builds another family and still reads easy.
+4. **A day keeps every session the athlete or the page puts on it.** `day_seq` joins the unique key rather than the
+   key being dropped, so a double activation still cannot duplicate a row. Rejected: keeping one row per sport per day
+   and merging the sessions — p278 prints two rides on one day as two sessions, and a merge has no place for two swaps.
+5. **A drag never deletes.** The calendar used to delete a same-sport session on the target day ("This will replace
+   it"). Field practice: a move touches only the session moved (TrainingPeaks, TrainerRoad, intervals.icu, Wahoo).
+6. **The long-ride day reaches the builder on the bike-primary path too** (`create-goal-and-materialize-plan`).
+7. **Left on purpose:** point 7 untested (rare, low cost) · no wording for three hard rides on one day · the strength
+   logger and yoga logger on a two-session day (the engineer's "two small ones").

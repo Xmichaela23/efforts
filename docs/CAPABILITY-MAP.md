@@ -227,7 +227,9 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 | Week optimizer (sole day-placement authority) | `_shared/week-optimizer.ts:1103` (`deriveOptimalWeek`) | BUILT | only `generate-combined-plan` routes through it | ⟨A31⟩
 | Same-day compatibility matrix | `_shared/schedule-session-constraints.ts:337` (`ROWS` → `SAME_DAY_COMPATIBLE:362`) | BUILT | `:131` `ADJACENCY_HOURS_ROWS` is a separate gap-hours table — do not confuse them | ⟨A31⟩
 | Pause / resume / end / delete plan | `pause-plan` · `resume-plan` · `end-plan` → `_shared/end-plan-core.ts:8` · `delete-plan` | BUILT | pause and end **delete all future planned rows** |
-| Drag-reschedule | `validate-reschedule/` + `WorkoutCalendar.tsx:397` | PARTIAL | athlete IS asked — but confirm also **silently deletes same-type conflicting planned rows** (`:431`), which the popup never mentions |
+| Drag-reschedule | `validate-reschedule/` + `WorkoutCalendar.tsx` `beginReschedule` | ✅ WARNS, NEVER DELETES (D-482, 2026-09-20) | press-and-hold or drag → server check → popup → confirm. A same-sport session on the target day STAYS ("This day already has a ride. Both stay."); only a finished session is refused |
+| **Two sessions of one sport on one day** | `_shared/day-seq.ts` → `planned_workouts.day_seq` (in `ux_planned_unique_key`) | ✅ SHIPPED 2026-09-20 (D-482) | activate-plan, get-week refill, auto-attach, swap-session, rematerialize all key on it. p278 prints two rides on days 3 and 5 |
+| **"Did the athlete get what they tapped" sweep** | `_shared/standing-plan/builder-answers-sweep.test.ts` | ✅ 108,763 builds, all three frames (D-482) | run from the repo root, ~9 min. Starts at the composer — it cannot see `create-goal`'s forwarding or the calendar save |
 | Auto-attach a completed workout to its planned row | `auto-attach-planned/index.ts` | BUILT | |
 | Sweep a week (materialize missing + attach) | `sweep-week/index.ts:22` | BUILT | fires on calendar load |
 | Extract races from free text | `extract-races/index.ts:14` | BUILT | Claude + web search; returns MULTIPLE races sorted with A/B priority; `marathon` is in its distance enum. ⚠️ **Only caller is `ArcSetupWizard.tsx:836`** (+ `:1099` prior-finish). The call is a plain `functions.invoke` — the picker UI is inline in the wizard, not a component |
@@ -275,7 +277,7 @@ still open, including the intake's shape and the owed solver collapse.
 | **Strength weight auto-progression / deload** | ⛔ **DELETED 2026-07-23 (D-315).** The silent auto-write on every ingest is gone (consent-first, extends D-285). Weights now change ONLY on the athlete's tap: State adjust modal, `adapt-plan` accept, or a swap/add. The `suggest` path still computes the progression signal (now phase-aware, matching the stamped target); the State strength row surfaces it; the athlete applies it. | **YES — always asked now.** |
 | Strength week relayout | `adapt-plan:750` on plan-JSON fingerprint change | NO on auto; YES on suggest→accept |
 | Manual 1RM override | ⛔ STALE (re-verified 2026-08-24): `StrengthAdjustmentModal.tsx` has zero importers (D-434); StateTab no longer mounts it. Live adjust paths: logger swap/add + adapt-plan `str_tm_*` tap. | dead code, not a capability |
-| Drag-reschedule | `WorkoutCalendar.tsx:397` | PARTLY (see above) |
+| Drag-reschedule | `WorkoutCalendar.tsx` | YES — warns, never deletes (D-482) |
 | Sweep | on week load | NO (idempotent) |
 | Pause / End | athlete or `GoalsScreen.tsx:911/971` (auto) | YES / **NO on the auto path** |
 

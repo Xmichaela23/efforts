@@ -1,5 +1,38 @@
 # Engine State
 
+## 🧭 ALSO READ — 2026-09-20 night (D-482): the plan builder builds what is tapped · a day keeps two sessions of one sport
+
+> **All PUSHED (main `9f55375fa`), DEPLOYED (31 functions from a clean worktree of `f1e5d1f2f`, then `get-week` from
+> `e96ec0193`; client on Netlify), CHECKED with real throwaway builds on the live server. NOT seen on a device.**
+> Run by a PM chat with two engineer terminals; the plyo terminal's day is the section below.
+> 1. **THE ANSWERS SWEEP** — `_shared/standing-plan/builder-answers-sweep.test.ts`, 108,763 builds over all three frames
+>    (`strength_5k`, `all_rounder`, `cycling_base`). It asks ONE thing: did the athlete get what they tapped — days off,
+>    long day, hard days (all stacked on one day included), run or ride per row, the workout picked, the length picked,
+>    6 or 7 rides, test week or current numbers, every lift pick the screen draws. Every check was mutation-tested.
+>    ⚠️ Run from the REPO ROOT (it needs `deno.json`), ~9 min; one `--filter <frame>` per terminal runs them in parallel.
+>    ⚠️ NOT swept: a mid-week start date, seven days off, the race generators. It does not compare a week to a page —
+>    `golden-block`, `cycling-base-frame`, `native-ride-slots` and `fuzz-builder` do that.
+> 2. **What it found, all fixed:** a picked length on the All Rounder's day-4 ride built p239's printed 85-min mixed ride
+>    every even week (`archetypeForSlot`, `compose.ts`) · `week-conflicts.ts` classed a session hard by FAMILY alone, so
+>    `ride_vo2` / `ride_sprints` (unranked in `HARDNESS`) never counted and two stacked hard rides got no day-named note ·
+>    the six-ride week was zipped against seven slots, so every role after day 2 sat one session late.
+> 3. **What only the live builds found** (the sweep starts after both): Ride + Strength dropped the picked long-ride day
+>    (`create-goal` sent `bike.long_ride_day` only when the bike rode beside a run) · **the calendar kept one session per
+>    sport per day and dropped the second in silence** — p278 prints two rides on days 3 and 5, so 7 composed, 5 saved.
+> 4. **TWO SESSIONS OF ONE SPORT ON ONE DAY** — `planned_workouts.day_seq` (0, 1, …) is in `ux_planned_unique_key`
+>    (migration `20260921000000_planned_unique_key_day_seq.sql`, APPLIED by Michael in the SQL editor; the retest
+>    exemption is kept). `_shared/day-seq.ts` owns the number. activate-plan saves both; a drag onto a same-sport day
+>    keeps both ("This day already has a ride. Both stay." — his words); a swap, a skip and a finished-ride match land on
+>    the session they were made on; `get-week`'s refill writes `strength_exercises: null` on a non-lifting row (a `[]`,
+>    or the column default, made the rebuild write the day's plyo onto a re-created ride).
+> 5. **The stacked-day note** counts a repeated pair: "Tuesday has two hard rides on it. Six to eight hours between them,
+>    and the second one starts on legs that have already worked." The 6–8 h is p108 / rule 6; applying it to two
+>    endurance sessions is OURS.
+>
+> **UNVERIFIED:** point 7 of the two-a-day ripple — deleting an older finished ride resets only its own match — is phone
+> code, read and compiled, never run (punch list, AWAITING MICHAEL) · three hard rides on one day still lists them one
+> by one; no wording approved, deliberately left · `.burner-builder-answers-2026-09-20.json`'s account may still exist.
+
 ## 🧭 ALSO READ — the engineer terminal's 2026-09-20 (D-481): Today narrative · plyo card · equipment rebuild · retest
 
 > **ALSO 2026-09-20 — the engineer terminal's day (D-481). All PUSHED to main, DEPLOYED, and checked on the LIVE server
@@ -12,7 +45,7 @@
 >    through "Rebuild upcoming sessions" under the chips or on Adjust** (`use_current_equipment`); the block stores the kit.
 > 4. **`restateFromTest` pairs rows by `source_row` (slot first)**; a plyo family is a slot (drop / gain a drill); `retest`
 >    rows are skipped. Live check home → Commercial gym: 0 of 60 lifting sessions differ from a gym-built plan.
-> 5. **Refresh wait: 5 minutes, only behind a refresh by the current writer version.** `PLAN_WRITER_VERSION` is **27** (`d11a76c72`).
+> 5. **Refresh wait: 5 minutes, only behind a refresh by the current writer version.** `PLAN_WRITER_VERSION` is **28** (`0ad23667a`, the Ladder Drills how-to; 27 was `d11a76c72`). Next bump: 29.
 > 6. **Retest works on a lifting day**: migration `20260920230000_planned_unique_key_exempts_retest.sql` was APPLIED by
 >    Michael in the SQL editor; a second tap reuses today's row. **Baselines' Strength card has four real buttons**
 >    (`src/lib/plan-actions.ts`, shared with Adjust).
