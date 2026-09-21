@@ -2942,6 +2942,20 @@ Deno.serve(async (req: Request) => {
               ...(gsBikeKept
                 ? { bike: { ...(gsRideHours ? { hours: gsRideHours } : {}), ...(gsRideDays ? { days: gsRideDays } : {}), ...(gsLongRide ? { long_ride_day: gsLongRide } : {}) } }
                 : {}),
+              /**
+               * ⛔ THE LONG-RIDE DAY ON THE BIKE-PRIMARY PATH (2026-09-20, found by
+               * `scripts/_burner-builder-answers-2026-09-20.mjs`). Ride + Strength (run out, bike
+               * maintained) never took the block above, so `preferred_days.long_ride` stopped here
+               * and `generate-strength-plan` — which reads the pin only as `bike.long_ride_day` —
+               * built the long ride wherever the rotation put it: Saturday picked, Sunday built.
+               * ⚠️ THE DAY ONLY. Hours and days stay off this object: the hours already travel as
+               * `target_weekly_ride_hours` below, and a `bike` object with no `days` makes the
+               * generator's mix take its default ride count — measured inert on `cycling_base`
+               * (128 local builds, rides 0 vs 2, byte-identical weeks).
+               */
+              ...(!gsBikeKept && gsSport === 'bike' && gsLongRide
+                ? { bike: { long_ride_day: gsLongRide } }
+                : {}),
               // Retained for the bike-PRIMARY path (run out, bike maintained), where `enduranceSport`
               // is already 'bike' and the block above deliberately does not fire.
               ...(gsRideHours ? { target_weekly_ride_hours: gsRideHours } : {}),

@@ -612,16 +612,22 @@ export function weekConflicts(args: {
     for (const [day, xs] of byDay) {
       if (xs.length < 2) continue;
       const names = xs.map(phraseFor);
-      const list = names.length === 2
-        ? `${names[0]} and ${names[1]}`
-        : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+      // ⛔ SAME SPORT TWICE IS COUNTED, NOT LISTED (Michael, 2026-09-20, approved words): "two hard
+      // rides" / "two hard runs", never "the hard ride and the hard ride". Mixed pairs keep the list.
+      const same = names.length === 2 && names[0] === names[1]
+        && (names[0] === 'the hard ride' || names[0] === 'the hard run');
+      const list = same
+        ? (names[0] === 'the hard ride' ? 'two hard rides' : 'two hard runs')
+        : names.length === 2
+          ? `${names[0]} and ${names[1]}`
+          : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
       push({
         kind: 'cost',
         rule: 'two_hard_one_day',
         days: [day],
         sessions: xs.map((t) => t.s.name),
         // Viada p108 / p145: at least 6-8 hours between two sessions in one day.
-        text: `${day} has ${list} on it. Six to eight hours between them, and the second one runs `
+        text: `${day} has ${list} on it. Six to eight hours between them, and the second one starts `
           + 'on legs that have already worked.',
       });
     }
