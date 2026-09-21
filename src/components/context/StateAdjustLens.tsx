@@ -422,7 +422,7 @@ export default function StateAdjustLens({ mainLifts }: {
     { id: 'block', label: 'The block', Icon: Layers, body: (
       <>
         <button type="button" disabled={rebuilding} onClick={rebuild} className={pill}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
-        <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched. Changes made to equipment will be adjusted here for future sessions.</p>
         {rebuildNote && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNote}</p>}
       </>
     ) },
