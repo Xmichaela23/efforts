@@ -200,6 +200,15 @@ function classifyWorkoutPurpose(workout: any): WorkoutPurpose {
  */
 
 /** A planned row's stored workload, or null when the server has not priced it yet. */
+/** The sport word the drag warning prints (Michael, 2026-09-20: run / ride / lift). */
+function sportWord(type: unknown): string {
+  const t = String(type ?? '').toLowerCase();
+  if (t === 'strength') return 'lift';
+  if (t === 'bike' || t === 'cycling') return 'ride';
+  if (t === 'pilates_yoga') return 'yoga session';
+  return t || 'session';
+}
+
 function posLoad(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
@@ -683,17 +692,19 @@ Deno.serve(async (req) => {
       console.log('[validate-reschedule] No plan structure found for day', targetDayNumber);
     }
     
-    // Warn about conflicts (will be replaced automatically)
+    /**
+     * ⛔ BOTH STAY (Michael, 2026-09-20). A session moved onto a day that already has one of its sport used to
+     * replace it: the phone deleted every row listed here before the move. Build what the athlete tapped and
+     * warn; never drop. A day may now hold two rides by design (activate-plan `day_seq`), and the delete would
+     * have taken both. The rows are no longer returned as `conflicts`, so a phone still running the old delete
+     * has nothing to delete.
+     */
     if (sameTypeWorkouts.length > 0) {
       if (severity === 'green') severity = 'yellow';
-      const conflictNames = sameTypeWorkouts.map(c => c.name || `${c.type} workout`).join(', ');
       reasons.push({
         code: 'same_type_conflict',
-        message: `Already a ${workout.type} workout here (${conflictNames}). This will replace it.`,
-        data: {
-          conflicts: sameTypeWorkouts,
-          suggestion: 'Make sure you want to keep this one instead'
-        }
+        message: `This day already has a ${sportWord(workout.type)}. Both stay.`,
+        data: { same_type: sameTypeWorkouts }
       });
     }
     
@@ -1187,9 +1198,6 @@ Deno.serve(async (req) => {
       } : {
         isPlanWorkout: false
       },
-      conflicts: sameTypeWorkouts.length > 0 ? {
-        sameTypeWorkouts
-      } : undefined,
       coachOptions
     };
 

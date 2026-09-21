@@ -14,6 +14,7 @@
  * `swapSessionLine` over the session the tap will write, resolved by the same `resolveSwapWrite` the
  * write uses — which is what `SwapPreviewLine` did on the phone.
  */
+import { daySeqForType } from '../day-seq.ts';
 import {
   availableDisciplines,
   disciplineOf,
@@ -223,6 +224,18 @@ export type ApplyResult =
  * ⚠️ THE LATER ROWS' OWN WEEKS ARE NOT LOADED, as before: the sports on offer come from this
  * session's week and the ground-impact gate is "not asked" (the treadmill is offered, nothing else).
  */
+/**
+ * ⛔ A SWAP INTO A SPORT THE DAY ALREADY HAS (2026-09-20). A run swapped to a ride on a day with a ride repeated the
+ * ride's key in `ux_planned_unique_key` and the write failed ("duplicate key value"). The row keeps its place in its
+ * day on a free key (`_shared/day-seq.ts`); both sessions stay.
+ */
+// deno-lint-ignore no-explicit-any
+async function withFreeDaySeq(db: Db, row: any, patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const to = typeof patch?.type === 'string' ? patch.type : null;
+  if (!to || to === String(row?.type ?? '')) return patch;
+  return { ...patch, day_seq: await daySeqForType(db, row, to) };
+}
+
 export async function applySwap(args: {
   db: Db;
   userId: string;
@@ -260,7 +273,7 @@ export async function applySwap(args: {
   const write = await resolveSwapWrite(db, userId, session, option);
   // ⛔ A RESTORE THAT FOUND NOTHING IS NOT A RESTORE (§8).
   if (write.ok === false) return { ok: false, error: 'The plan no longer holds this session' };
-  const { error } = await db.from('planned_workouts').update(write.patch).eq('id', session.id).eq('user_id', userId);
+  const { error } = await db.from('planned_workouts').update(await withFreeDaySeq(db, session, write.patch)).eq('id', session.id).eq('user_id', userId);
   if (error) return { ok: false, error: error.message ?? 'Could not write the session' };
   // ⛔ A LIBRARY SESSION IS TOKENS; it is not a session until the expander has run.
   if (write.needsMaterialize) await materialize(String(session.id));
@@ -289,7 +302,7 @@ export async function applySwap(args: {
         if (!same) continue;
         const laterWrite = await resolveSwapWrite(db, userId, row, same);
         if (laterWrite.ok === false) continue;
-        const { error: e2 } = await db.from('planned_workouts').update(laterWrite.patch).eq('id', row.id).eq('user_id', userId);
+        const { error: e2 } = await db.from('planned_workouts').update(await withFreeDaySeq(db, row, laterWrite.patch)).eq('id', row.id).eq('user_id', userId);
         if (e2) continue;
         if (laterWrite.needsMaterialize) await materialize(String(row.id));
         ids.push(String(row.id));

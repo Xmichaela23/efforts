@@ -74,8 +74,10 @@ import { localDateInTz } from './local-date.ts';
 //   agility ladder) with its family's current drill; it had been left as built, old note and all.
 // 26 (2026-09-20): the Ickey Shuffle needs the agility ladder too, so a kit with no ladder composes two plyo drills;
 //   the rewrite takes a stored ladder drill off such a plan's plyo day.
+// 27 (2026-09-20): a day keeps two sessions of one sport (`planned_workouts.day_seq`, `_shared/day-seq.ts`); the rewrite
+//   pairs the composer's first ride with the first ride row, and a swap reaches only the ride it was made on.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 26;
+export const PLAN_WRITER_VERSION = 27;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

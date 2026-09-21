@@ -22,6 +22,8 @@
 // ⚠️ THE SELF-HEAL MUST STILL WORK. A session the plan holds and the calendar genuinely lacks is
 // still inserted — that is the whole point of the backfill, and the tests pin it.
 
+import { freeDaySeq } from '../_shared/day-seq.ts';
+
 /** The subset of a planned row this module needs. */
 export type PlannedKeyRow = {
   training_plan_id?: string | null;
@@ -78,4 +80,45 @@ export function buildExistsKeys(rows: ReadonlyArray<PlannedKeyRow>): Set<string>
     if (origin) keys.add(plannedKey(planId, date, origin));
   }
   return keys;
+}
+
+/**
+ * ⛔ HOW MANY OF EACH, NOT WHETHER ANY (2026-09-20). A day can hold two rides by design (activate-plan `day_seq`).
+ * With the set above, one ride on the calendar made `plan|date|ride` present and the second ride the plan holds
+ * was never re-created — the same silent drop activate-plan used to make. `get-week` now counts the blob's
+ * sessions per key in order and inserts the ones past this count. A swapped row counts for both keys, as above.
+ */
+export function buildExistsCounts(rows: ReadonlyArray<PlannedKeyRow>): Map<string, number> {
+  const counts = new Map<string, number>();
+  const bump = (k: string) => counts.set(k, (counts.get(k) ?? 0) + 1);
+  for (const r of rows ?? []) {
+    bump(plannedKey(r?.training_plan_id, r?.date, r?.type));
+    const origin = swappedOrigin(r);
+    if (origin && origin !== norm(r?.type)) bump(plannedKey(r?.training_plan_id, r?.date, origin));
+  }
+  return counts;
+}
+
+/**
+ * The `day_seq` places already taken per `plan|date|type`, by the row's CURRENT type — the unique index is on
+ * the type the row holds. A re-created row keeps its place on a free key (`_shared/day-seq.ts`), so it never hits the index.
+ */
+export function usedDaySeqs(rows: ReadonlyArray<PlannedKeyRow & { day_seq?: number | null }>): Map<string, Set<number>> {
+  const used = new Map<string, Set<number>>();
+  for (const r of rows ?? []) {
+    const k = plannedKey(r?.training_plan_id, r?.date, r?.type);
+    const set = used.get(k) ?? new Set<number>();
+    set.add(Number(r?.day_seq ?? 0));
+    used.set(k, set);
+  }
+  return used;
+}
+
+/** The `day_seq` for the blob's session at `place` in its day, on a key `used` does not hold; recorded as taken. */
+export function takeFreeDaySeq(used: Map<string, Set<number>>, key: string, place: number): number {
+  const set = used.get(key) ?? new Set<number>();
+  const seq = freeDaySeq(place, set);
+  set.add(seq);
+  used.set(key, set);
+  return seq;
 }

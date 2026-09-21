@@ -22,6 +22,7 @@
 // accepts both numbers.
 // ============================================================================
 
+import { placeOf } from '../day-seq.ts';
 import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
 import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 // ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
@@ -628,6 +629,8 @@ const TEST_ROW_TAGS = new Set(['assessment', 'run_test', 'ftp_test', 'ftp_test_5
 
 export type EndurancePlannedRowish = PlannedRowish & {
   type?: string | null;
+  /** Which of the day's sessions of the plan's sport (`_shared/day-seq.ts`). */
+  day_seq?: number | null;
   name?: string | null;
   description?: string | null;
   duration?: number | null;
@@ -707,7 +710,10 @@ export function restateEndurance(args: {
     const [w, day] = key.split('|');
     const week = Number(w);
     if (week < args.afterWeek) continue;
-    const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')) || String(a.id).localeCompare(String(b.id)));
+    // ⛔ FIRST WITH FIRST (2026-09-20): a day can hold two rides, and by id alone (random) the composer's first ride
+    // could be written onto the second row. The row's place in its day (`day_seq`) is the order the plan listed them.
+    const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? ''))
+      || placeOf(a.day_seq) - placeOf(b.day_seq) || String(a.id).localeCompare(String(b.id)));
     if (have.length === 0) { unmatched.push({ week, day, reason: 'no materialized row for this day' }); continue; }
     // OURS — `restateEndurance` unmatched-row reason: a diagnostic count of rows, not plan copy.
     if (have.length !== wanted.length) { unmatched.push({ week, day, reason: `composer has ${wanted.length} session(s), calendar has ${have.length}` }); continue; }

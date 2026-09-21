@@ -23,12 +23,16 @@
 // and an unmatched slot preserves NOTHING — the new plan wins. This restores what the athlete did to
 // a week that is otherwise identical; it does not try to port edits onto a different plan.
 
+import { DAY_SEQ_STRIDE, placeOf } from '../_shared/day-seq.ts';
+
 /** The subset of a planned row this module reads or writes. Loosely typed — the caller holds rows. */
 export type PlannedRowLike = {
   week_number?: number | null;
   day_number?: number | null;
   date?: string | null;
   type?: string | null;
+  /** Place among the day's sessions of the same type, 0 first (`activate-plan`, 2026-09-20). */
+  day_seq?: number | null;
   name?: string | null;
   description?: string | null;
   steps_preset?: string[] | null;
@@ -45,10 +49,46 @@ const slotKey = (r: PlannedRowLike): string =>
   `${r.week_number ?? ''}|${r.day_number ?? ''}|${String(r.date ?? '').slice(0, 10)}`;
 
 const typeKey = (r: PlannedRowLike): string =>
-  `${slotKey(r)}|${String(r.type ?? '').toLowerCase()}`;
+  `${slotKey(r)}|${String(r.type ?? '').toLowerCase()}|${Number(r.day_seq ?? 0)}`;
 
 const hasSwapTag = (r: PlannedRowLike): boolean =>
   Array.isArray(r.tags) && r.tags.some((t) => String(t) === SWAP_TAG);
+
+/** The sport the plan wrote for a row: its `swapped_from:` tag when swapped, its type otherwise. */
+const originOf = (r: PlannedRowLike): string => {
+  for (const t of r.tags ?? []) {
+    const raw = String(t);
+    if (raw.startsWith('swapped_from:') && raw.length > 'swapped_from:'.length) return raw.slice('swapped_from:'.length).toLowerCase();
+  }
+  return String(r.type ?? '').toLowerCase();
+};
+
+/**
+ * ⛔ PAIR BY SPORT AND PLACE, NOT BY LIST POSITION (2026-09-20). The old rows come back from the database in no
+ * set order, and a day can now hold two rides (`day_seq`). Paired by position, a skip on the first ride could
+ * land on the second, or on the lift sharing the day. Each old row is paired with a new row of the sport the plan
+ * wrote for it, first ride with first ride by `day_seq`; the new rows are already in the plan's order.
+ * ⚠️ A swapped row written before `swapped_from:` existed names no origin; when the sports do not line up, the
+ * slot falls back to position, which is what it did before.
+ */
+function pairInSlot(olds: PlannedRowLike[], news: PlannedRowLike[]): Array<[PlannedRowLike, PlannedRowLike]> {
+  const group = (rows: PlannedRowLike[], sport: (r: PlannedRowLike) => string) => {
+    const m = new Map<string, PlannedRowLike[]>();
+    for (const r of rows) m.set(sport(r), [...(m.get(sport(r)) ?? []), r]);
+    return m;
+  };
+  const oldBy = group(olds, originOf);
+  const newBy = group(news, (r) => String(r.type ?? '').toLowerCase());
+  const lined = oldBy.size === newBy.size && [...oldBy].every(([k, v]) => newBy.get(k)?.length === v.length);
+  if (!lined) return olds.map((o, i) => [o, news[i]]);
+  const pairs: Array<[PlannedRowLike, PlannedRowLike]> = [];
+  for (const [k, os] of oldBy) {
+    const sorted = [...os].sort((a, b) => placeOf(a.day_seq) - placeOf(b.day_seq));
+    const ns = newBy.get(k)!;
+    sorted.forEach((o, i) => pairs.push([o, ns[i]]));
+  }
+  return pairs;
+}
 
 export type PreserveResult = {
   /** The same array reference the caller passed, mutated in place — see the note in `apply`. */
@@ -116,9 +156,7 @@ export function preserveAthleteEdits(
       continue;
     }
 
-    for (let i = 0; i < olds.length; i++) {
-      const oldRow = olds[i];
-      const newRow = news[i];
+    for (const [oldRow, newRow] of pairInSlot(olds, news)) {
 
       if (String(oldRow.workout_status ?? '').toLowerCase() === 'skipped') {
         newRow.workout_status = 'skipped';
@@ -132,15 +170,14 @@ export function preserveAthleteEdits(
       const to = String(oldRow.type ?? '').toLowerCase();
       if (!to || to === from) continue;
 
-      // ⛔ NEVER INTO A KEY THAT IS ALREADY TAKEN. Restoring a run→ride swap onto a day the new plan
-      // already rides would violate `(plan, week, day, date, type)` and fail the whole insert — one
-      // athlete edit taking the entire activation down with it.
-      const wouldBe = `${slotKey(newRow)}|${to}`;
-      if (claimedTypes.has(wouldBe)) {
-        notes.push(`slot ${k}: the ${to} swap was not restored — the rebuilt week already has a ${to} that day`);
-        continue;
-      }
+      // ⛔ NEVER INTO A KEY THAT IS ALREADY TAKEN. The index is `(plan, week, day, date, type, day_seq)`;
+      // a run→ride swap on a day the new plan already rides keeps its place and adds 100 to stay off
+      // the ride's key (`_shared/day-seq.ts`, 2026-09-20). Before `day_seq` it could not be restored.
+      let seq = placeOf(newRow.day_seq);
+      while (claimedTypes.has(`${slotKey(newRow)}|${to}|${seq}`)) seq += DAY_SEQ_STRIDE;
+      const wouldBe = `${slotKey(newRow)}|${to}|${seq}`;
       claimedTypes.delete(typeKey(newRow));
+      newRow.day_seq = seq;
       newRow.type = oldRow.type ?? newRow.type;
       if (oldRow.name != null) newRow.name = oldRow.name;
       if (oldRow.description != null) newRow.description = oldRow.description;

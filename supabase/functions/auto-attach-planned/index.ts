@@ -678,6 +678,33 @@ Deno.serve(async (req) => {
       };
     };
 
+    /**
+     * ⛔ NEVER STEAL A LIVE CLAIM — RUN / RIDE / SWIM TOO (2026-09-20). A day can hold two rides by design
+     * (activate-plan `day_seq`). Ride 1 attaches to planned row A; ride 2 arrives, A is still a candidate
+     * (its status is 'completed'), and if ride 2's length fits A better it used to take A and unhook ride 1,
+     * leaving row B unattached. A row linked to a workout that still EXISTS is dropped here, before scoring, the
+     * way GATE 2 declines it on the strength path. A link left by a deleted workout is stale and may be taken.
+     */
+    {
+      const claimants = [...new Set(candidates
+        .map((p: any) => p?.completed_workout_id)
+        .filter((id: any) => id && String(id) !== String(w.id))
+        .map(String))];
+      if (claimants.length) {
+        let live: Set<string>;
+        try {
+          const { data: alive, error: aliveErr } = await supabase.from('workouts').select('id').in('id', claimants);
+          if (aliveErr) throw aliveErr;
+          live = new Set((alive ?? []).map((r: any) => String(r.id)));
+        } catch (e) {
+          // Unknown → treat every claim as LIVE. Declining costs a manual attach; guessing costs the other session its link.
+          console.error('[auto-attach-planned] claimant existence check failed, treating as live:', e);
+          live = new Set(claimants);
+        }
+        candidates = candidates.filter((p: any) => !(p?.completed_workout_id && live.has(String(p.completed_workout_id))));
+      }
+    }
+
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
       const plannedTypeNormalized = sportSubtype((p as any).type).sport;

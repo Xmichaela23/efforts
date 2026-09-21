@@ -29,6 +29,7 @@
 // (`_shared/plan-refresh.ts`); get-week queues `{ refresh: true }` on the job queue when a plan has an
 // upcoming session stamped older, and the endurance re-price after an accepted number queues the same job.
 // `run-jobs` calls it with the service key and the job's `user_id`.
+import { daySeqForType } from '../_shared/day-seq.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveUser } from '../_shared/require-user.ts';
 import { athleteToday, isRefreshable, isStaleRow, PLAN_WRITER_VERSION, STAMP_SELECT } from '../_shared/plan-refresh.ts';
@@ -227,7 +228,7 @@ Deno.serve(async (req: Request) => {
       // `restateFromTest` has to be able to tell a done session from a future one.
       // ⛔ AND THE ENDURANCE COLUMNS, because the runs and rides are restated too (2026-09-05).
       // ⛔ AND THE WRITER VERSION stamped in each row's `computed` (2026-09-18, `_shared/plan-refresh.ts`).
-      .select(`id, week_number, date, type, name, description, duration, steps_preset, strength_exercises, workout_status, completed_workout_id, tags, ${STAMP_SELECT}`)
+      .select(`id, training_plan_id, week_number, date, type, day_seq, name, description, duration, steps_preset, strength_exercises, workout_status, completed_workout_id, tags, ${STAMP_SELECT}`)
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
@@ -615,10 +616,15 @@ Deno.serve(async (req: Request) => {
     const writeEnduranceRow = async (u: typeof endurance.rows[number]) => {
       const intensity = getStepsIntensity(u.steps_preset, u.type) || getDefaultIntensityForType(u.type) || 0.70;
       const load = u.duration > 0 ? Math.round(calculateDurationWorkload(u.duration, intensity)) : 0;
+      // ⛔ A ROW CHANGING SPORT KEEPS ITS PLACE ON A FREE KEY (2026-09-20, `_shared/day-seq.ts`). A run becoming a ride
+      // on a day that already has a ride would repeat the ride's key, and the write failed.
+      const cur = u.type_moved ? (plannedRows ?? []).find((r: Record<string, unknown>) => String(r.id) === u.id) : null;
+      const daySeq = cur ? await daySeqForType(supabase, cur, u.type) : null;
       const { error } = await supabase
         .from('planned_workouts')
         .update({
           type: u.type,
+          ...(daySeq != null ? { day_seq: daySeq } : {}),
           name: u.name, description: u.description, rendered_description: u.description,
           duration: u.duration, steps_preset: u.steps_preset.length ? u.steps_preset : null, tags: u.tags,
           workload_planned: load > 0 ? load : null,

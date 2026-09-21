@@ -385,7 +385,7 @@ export default function WorkoutCalendar({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
-  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
+  const { updatePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
   const coachCtx = useCoachWeekContext();
   
   // Drag and drop state
@@ -576,19 +576,8 @@ export default function WorkoutCalendar({
     if (!reschedulePending || !updatePlannedWorkout) return;
 
     try {
-      // Delete conflicting workouts (same type on same day)
-      if (validationResult?.conflicts?.sameTypeWorkouts) {
-        for (const conflict of validationResult.conflicts.sameTypeWorkouts) {
-          try {
-            await deletePlannedWorkout(conflict.id);
-            console.log(`[Calendar] Deleted conflicting workout: ${conflict.id}`);
-          } catch (err) {
-            console.error(`[Calendar] Error deleting conflict ${conflict.id}:`, err);
-            // Continue anyway - the move will still work
-          }
-        }
-      }
-
+      // ⛔ A same-sport session already on the target day STAYS (Michael, 2026-09-20: "Both stay"). This used to
+      // delete it before the move.
       await updatePlannedWorkout(reschedulePending.workoutId, {
         date: reschedulePending.newDate
       });

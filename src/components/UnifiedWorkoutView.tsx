@@ -1752,19 +1752,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             try {
               console.log('[Reschedule] Confirming reschedule:', reschedulePending);
               
-              // Delete conflicting workouts (same type on same day)
-              if (rescheduleValidation.conflicts?.sameTypeWorkouts) {
-                for (const conflict of rescheduleValidation.conflicts.sameTypeWorkouts) {
-                  try {
-                    await deletePlannedWorkout(conflict.id);
-                    console.log(`[Reschedule] Deleted conflicting workout: ${conflict.id}`);
-                  } catch (err) {
-                    console.error(`[Reschedule] Error deleting conflict ${conflict.id}:`, err);
-                    // Continue anyway - the move will still work
-                  }
-                }
-              }
-              
+              // ⛔ A same-sport session already on the target day STAYS (Michael, 2026-09-20: "Both stay"). This used
+              // to delete it before the move.
               // Clear week_number and day_number so it's no longer tied to plan structure
               // This prevents the repairPlan function from reverting it to canonical date
               const result = await updatePlannedWorkout(reschedulePending.workoutId, {
@@ -1842,17 +1831,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   return;
                 }
 
-                // Delete conflicts if any
-                if (data?.conflicts?.sameTypeWorkouts) {
-                  for (const conflict of data.conflicts.sameTypeWorkouts) {
-                    try {
-                      await deletePlannedWorkout(conflict.id);
-                      console.log(`[Reschedule] Deleted conflicting workout: ${conflict.id}`);
-                    } catch (err) {
-                      console.error(`[Reschedule] Error deleting conflict ${conflict.id}:`, err);
-                    }
-                  }
-                }
+                // ⛔ A same-sport session already on the target day STAYS (2026-09-20).
 
                 // Move the workout
                 // Clear week_number and day_number so it's no longer tied to plan structure

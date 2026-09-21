@@ -40,6 +40,7 @@ import {
   type Venue,
 } from './swap.ts';
 import { librarySwapSession, swapTargetFamily } from './library-session.ts';
+import { placeOf } from '../day-seq.ts';
 import { composedHardSession, hardSlotOf, workoutChoicePatch } from './workout-choice.ts';
 
 // deno-lint-ignore no-explicit-any
@@ -67,10 +68,18 @@ export function addDaysIso(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** The slot an endurance session is: its weekday and the sport the plan wrote there (`swapped_from:` when swapped). */
-export function enduranceSlotName(dateIso: string, session: Pick<SwappableSession, 'type' | 'tags'>): string | null {
+/**
+ * The slot an endurance session is: its weekday and the sport the plan wrote there (`swapped_from:` when swapped).
+ * ⛔ AND WHICH OF THAT DAY'S SESSIONS OF THE SPORT (2026-09-20). A day can hold two rides; a slot of weekday + sport
+ * alone made a swap on one ride apply to both, on every rebuild. The second is `endurance:Tuesday:ride:2`; the first
+ * keeps the name it always had, so every swap already written still names the ride it was made on. The place is the
+ * row's `day_seq` (`_shared/day-seq.ts`), or the composed session's order in its day.
+ */
+export function enduranceSlotName(dateIso: string, session: Pick<SwappableSession, 'type' | 'tags'> & { day_seq?: unknown }): string | null {
   const sport = originOf(session as SwappableSession) ?? disciplineOf(session.type);
-  return sport ? `${ENDURANCE_SLOT_PREFIX}${weekdayOfDate(dateIso)}:${sport}` : null;
+  if (!sport) return null;
+  const place = placeOf(session.day_seq);
+  return `${ENDURANCE_SLOT_PREFIX}${weekdayOfDate(dateIso)}:${sport}${place > 0 ? `:${place + 1}` : ''}`;
 }
 
 /** An endurance row — the lift readers leave it alone. */
@@ -229,11 +238,22 @@ export function applyEnduranceAdjustments(
     }
     return null;
   };
-  return composed.map((wk) => ({
+  return composed.map((wk) => {
+    // The session's place among its day's sessions of the plan's sport, in the order the week lists them — what
+    // activate-plan writes as `day_seq`.
+    const seen = new Map<string, number>();
+    const placeIn = (s: PlanSession): number => {
+      const k = `${s.day}|${originOf(s as SwappableSession) ?? disciplineOf(s.type)}`;
+      const n = seen.get(k) ?? 0;
+      seen.set(k, n + 1);
+      return n;
+    };
+    return {
     ...wk,
     sessions: wk.sessions.map((s) => {
       const date = dateOf(wk.week, String(s.day));
-      const slot = date ? enduranceSlotName(date, s as SwappableSession) : null;
+      const place = placeIn(s);
+      const slot = date ? enduranceSlotName(date, { ...(s as SwappableSession), day_seq: place }) : null;
       if (!date || !slot) return s;
       let cur = s;
       for (const a of live) {
@@ -242,7 +262,8 @@ export function applyEnduranceAdjustments(
       }
       return cur;
     }),
-  }));
+    };
+  });
 }
 
 /** The option a swapped row's own tags say it carries, per class — what a row swapped before this shipped holds. */

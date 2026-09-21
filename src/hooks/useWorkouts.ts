@@ -1635,13 +1635,20 @@ export const useWorkouts = () => {
           if (wasCompleted && date && type) {
             const { data: sameDay } = await supabase
               .from('planned_workouts')
-              .select('id,training_plan_id,week_number,day_number')
+              .select('id,training_plan_id,week_number,day_number,completed_workout_id')
               .eq('user_id', userId)
               .eq('date', date)
               .eq('type', type)
               .in('workout_status', ['completed', 'in_progress'])
               .limit(5);
-            for (const row of (Array.isArray(sameDay) ? sameDay : [])) await revertRow(row);
+            // ⛔ ONE ROW, THE ONE THIS WORKOUT WAS MATCHED TO (2026-09-20). A day can hold two rides by design
+            // (activate-plan `day_seq`); resetting every completed ride that day reset the other ride too. A row
+            // linked to a different workout is that workout's. The workout's own `planned_id` names its row;
+            // without it, a lone unlinked row is taken, and two are left alone rather than guessed.
+            const unlinked = (Array.isArray(sameDay) ? sameDay : []).filter((r: any) => !r.completed_workout_id);
+            const pid = (prior as any)?.planned_id as string | undefined;
+            const mine = (pid && unlinked.find((r: any) => r.id === pid)) || (unlinked.length === 1 ? unlinked[0] : null);
+            if (mine) await revertRow(mine);
           }
         }
 

@@ -8,6 +8,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 // was also silently discarding everything the athlete had done to these rows — skips and discipline
 // swaps alike. The rules live in their own file so they are unit-testable without standing up a plan.
 import { preserveAthleteEdits, type PlannedRowLike } from './preserve-athlete-edits.ts'
+import { freeDaySeq } from '../_shared/day-seq.ts'
 import {
   getStepsIntensity,
   calculateDurationWorkload,
@@ -386,7 +387,7 @@ Deno.serve(async (req) => {
     try {
       const { data: prior } = await supabase
         .from('planned_workouts')
-        .select('week_number,day_number,date,type,name,description,steps_preset,tags,workout_status,skip_reason,skip_note')
+        .select('week_number,day_number,date,type,day_seq,name,description,steps_preset,tags,workout_status,skip_reason,skip_note')
         .eq('training_plan_id', planId)
       priorRows = Array.isArray(prior) ? prior as PlannedRowLike[] : []
     } catch (e) {
@@ -426,9 +427,35 @@ Deno.serve(async (req) => {
     })();
     const defaultPoolLenM = swimUnit === 'yd' ? 22.86 : 25.0;
 
-    // Track inserted rows to prevent duplicates within the same activation
-    // Key format: `${weekNum}-${dow}-${date}-${type}` (matches unique constraint)
-    const insertedKeys = new Set<string>();
+    /**
+     * ⛔ TWO SESSIONS OF ONE SPORT ON ONE DAY ARE BOTH KEPT (2026-09-20). This used to be a set of
+     * `${weekNum}-${dow}-${date}-${type}` keys, and a second ride on a day was skipped with a log line
+     * only: Ride + Strength at seven rides composed 7 a week and saved 5. The plan builds what the
+     * athlete tapped; the calendar may not quietly drop half of it.
+     *
+     * Each row now carries `day_seq` (`_shared/day-seq.ts`): its place among that day's sessions of the
+     * sport the plan wrote there, in the order the plan lists them, 0 first. The unique index includes it
+     * (`20260921000000_planned_unique_key_day_seq.sql`), so the index still refuses a true duplicate.
+     * Re-activation cannot double anything: every row of the plan is deleted above before this runs.
+     */
+    const placeCount = new Map<string, number>();
+    const seqTaken = new Map<string, Set<number>>();
+    const nextDaySeq = (weekNum: number, dow: number, date: string, type: string, planSport: string): number => {
+      const pk = `${weekNum}-${dow}-${date}-${planSport}`;
+      const place = placeCount.get(pk) ?? 0;
+      placeCount.set(pk, place + 1);
+      const tk = `${weekNum}-${dow}-${date}-${type}`;
+      const taken = seqTaken.get(tk) ?? new Set<number>();
+      const seq = freeDaySeq(place, taken);
+      taken.add(seq);
+      seqTaken.set(tk, taken);
+      return seq;
+    };
+    /** The sport the plan wrote for a session: `swapped_from:` on a swapped one, the given type otherwise. */
+    const planSportOf = (s: any, type: string): string => {
+      const t = (Array.isArray(s?.tags) ? s.tags : []).map(String).find((x: string) => x.startsWith('swapped_from:'));
+      return t ? (mapType(t.slice('swapped_from:'.length), false) || type) : type;
+    };
     
     for (const wk of Object.keys(sessionsByWeek)) {
       const weekNum = parseInt(wk, 10)
@@ -449,15 +476,7 @@ Deno.serve(async (req) => {
         const mapped = mapType((s as any)?.discipline || (s as any)?.type, hasMobility)
         // Skip unknown/blank types instead of defaulting to run
         if (!mapped) continue
-        
-        // Deduplication: Check if we've already processed this session
-        // (matches unique constraint: training_plan_id, week_number, day_number, date, type)
-        const dedupeKey = `${weekNum}-${dow}-${date}-${mapped}`
-        if (insertedKeys.has(dedupeKey)) {
-          console.warn(`[activate-plan] Skipping duplicate session: week ${weekNum}, day ${dow}, date ${date}, type ${mapped}`)
-          continue
-        }
-        insertedKeys.add(dedupeKey)
+
         const stepsTokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=> String(t)) : []
         // Check multiple sources for the workout name: name, title, workout_structure.title
         const workoutStructure = (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null
@@ -471,56 +490,50 @@ Deno.serve(async (req) => {
           const runTokens = stepsTokens.filter(t => !/^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
           const halfDur = durationVal > 0 ? durationVal / 2 : 0
           if (bikeTokens.length) {
-            const bikeKey = `${weekNum}-${dow}-${date}-ride`
-            if (!insertedKeys.has(bikeKey)) {
-              insertedKeys.add(bikeKey)
-              rows.push({
-                user_id: userId,
-                training_plan_id: planId,
-                template_id: String(planId),
-                week_number: weekNum,
-                day_number: dow,
-                date,
-                type: 'ride',
-                name: s.name ? `${s.name} — Bike` : 'Ride',
-                description: s.description || '',
-                duration: halfDur,
-                workout_status: 'planned',
-                source: 'training_plan',
-                steps_preset: bikeTokens,
-                rendered_description: s.description || '',
-                computed: null,
-                units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
-                tags: Array.isArray(s?.tags) ? s.tags : [],
-                workload_planned: halfDur > 0 ? estimatePlannedWorkload('ride', halfDur, bikeTokens, athleteMaxHR, athleteRestingHR) : null,
-              })
-            }
+            rows.push({
+              user_id: userId,
+              training_plan_id: planId,
+              template_id: String(planId),
+              week_number: weekNum,
+              day_number: dow,
+              date,
+              type: 'ride',
+              day_seq: nextDaySeq(weekNum, dow, date, 'ride', 'ride'),
+              name: s.name ? `${s.name} — Bike` : 'Ride',
+              description: s.description || '',
+              duration: halfDur,
+              workout_status: 'planned',
+              source: 'training_plan',
+              steps_preset: bikeTokens,
+              rendered_description: s.description || '',
+              computed: null,
+              units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
+              tags: Array.isArray(s?.tags) ? s.tags : [],
+              workload_planned: halfDur > 0 ? estimatePlannedWorkload('ride', halfDur, bikeTokens, athleteMaxHR, athleteRestingHR) : null,
+            })
           }
           if (runTokens.length) {
-            const runKey = `${weekNum}-${dow}-${date}-run`
-            if (!insertedKeys.has(runKey)) {
-              insertedKeys.add(runKey)
-              rows.push({
-                user_id: userId,
-                training_plan_id: planId,
-                template_id: String(planId),
-                week_number: weekNum,
-                day_number: dow,
-                date,
-                type: 'run',
-                name: s.name ? `${s.name} — Run` : 'Run',
-                description: s.description || '',
-                duration: halfDur,
-                workout_status: 'planned',
-                source: 'training_plan',
-                steps_preset: runTokens,
-                rendered_description: s.description || '',
-                computed: null,
-                units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
-                tags: Array.isArray(s?.tags) ? s.tags : [],
-                workload_planned: halfDur > 0 ? estimatePlannedWorkload('run', halfDur, runTokens, athleteMaxHR, athleteRestingHR) : null,
-              })
-            }
+            rows.push({
+              user_id: userId,
+              training_plan_id: planId,
+              template_id: String(planId),
+              week_number: weekNum,
+              day_number: dow,
+              date,
+              type: 'run',
+              day_seq: nextDaySeq(weekNum, dow, date, 'run', 'run'),
+              name: s.name ? `${s.name} — Run` : 'Run',
+              description: s.description || '',
+              duration: halfDur,
+              workout_status: 'planned',
+              source: 'training_plan',
+              steps_preset: runTokens,
+              rendered_description: s.description || '',
+              computed: null,
+              units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
+              tags: Array.isArray(s?.tags) ? s.tags : [],
+              workload_planned: halfDur > 0 ? estimatePlannedWorkload('run', halfDur, runTokens, athleteMaxHR, athleteRestingHR) : null,
+            })
           }
           continue
         }
@@ -537,6 +550,7 @@ Deno.serve(async (req) => {
           day_number: dow,
           date,
           type: mapped,
+          day_seq: nextDaySeq(weekNum, dow, date, mapped, planSportOf(s, mapped)),
           name,
           description: s.description || '',
           duration: durationVal,

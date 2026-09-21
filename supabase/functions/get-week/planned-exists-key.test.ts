@@ -15,9 +15,12 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  buildExistsCounts,
   buildExistsKeys,
   plannedKey,
   swappedOrigin,
+  takeFreeDaySeq,
+  usedDaySeqs,
   SWAPPED_FROM_PREFIX,
 } from './planned-exists-key.ts';
 
@@ -84,4 +87,24 @@ Deno.test('rows with no tags at all are safe', () => {
   const keys = buildExistsKeys([{ training_plan_id: PLAN, date: TUE, type: 'run' }]);
   assertEquals(keys.size, 1);
   assertEquals(swappedOrigin({ type: 'run' }), null);
+});
+
+Deno.test('⛔ two rides the plan holds on one day: one on the calendar leaves the second to re-create, at day_seq 1', () => {
+  const rows = [{ training_plan_id: PLAN, date: TUE, type: 'ride', tags: [], day_seq: 0 }];
+  const counts = buildExistsCounts(rows);
+  assertEquals(counts.get(plannedKey(PLAN, TUE, 'ride')), 1, 'the second blob ride would be treated as present');
+  const used = usedDaySeqs(rows);
+  assertEquals(takeFreeDaySeq(used, plannedKey(PLAN, TUE, 'ride'), 1), 1, 'the re-created second ride lost its place');
+});
+
+Deno.test('a re-created ride keeps its place on a free key: place 0 taken by a swapped-in ride → 100', () => {
+  const used = usedDaySeqs([{ training_plan_id: PLAN, date: TUE, type: 'ride', tags: [], day_seq: 0 }]);
+  assertEquals(takeFreeDaySeq(used, plannedKey(PLAN, TUE, 'ride'), 0), 100);
+  assertEquals(takeFreeDaySeq(used, plannedKey(PLAN, TUE, 'ride'), 1), 1);
+});
+
+Deno.test('a swapped row counts once for its sport and once for the one the plan wrote', () => {
+  const counts = buildExistsCounts([{ training_plan_id: PLAN, date: TUE, type: 'ride', tags: [`${SWAPPED_FROM_PREFIX}run`] }]);
+  assertEquals(counts.get(plannedKey(PLAN, TUE, 'ride')), 1);
+  assertEquals(counts.get(plannedKey(PLAN, TUE, 'run')), 1);
 });

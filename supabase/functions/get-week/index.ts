@@ -19,7 +19,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 // ⛔ THE MEMBERSHIP KEY LIVES IN ITS OWN FILE so it can be unit-tested without a database — the
 // duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
-import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
+import { buildExistsCounts, plannedKey, takeFreeDaySeq, usedDaySeqs } from './planned-exists-key.ts';
 // The ONE answer to "what block is this, on this date" — same function the coach payload's block
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
@@ -205,8 +205,11 @@ Deno.serve(async (req)=>{
          * it on every read. `buildExistsKeys` credits a swapped row to its ORIGINAL discipline as
          * well, using the `swapped_from:` tag the swap writes. The blob is never touched.
          */
-        const { data: prePlanned } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type,tags').eq('user_id', userId).gte('date', fromISO).lt('date', addDays(toISO, 1));
-        const existsKey = buildExistsKeys(Array.isArray(prePlanned) ? prePlanned : []);
+        const { data: prePlanned } = await supabase.from('planned_workouts').select('id,training_plan_id,date,type,tags,day_seq').eq('user_id', userId).gte('date', fromISO).lt('date', addDays(toISO, 1));
+        const existsCount = buildExistsCounts(Array.isArray(prePlanned) ? prePlanned : []);
+        const daySeqUsed = usedDaySeqs(Array.isArray(prePlanned) ? prePlanned : []);
+        // How many blob sessions of each `plan|date|type` this read has walked — the second ride is the one at 1.
+        const blobSeen = new Map<string, number>();
         // Iterate dates in window
         const dates = [];
         {
@@ -330,8 +333,10 @@ Deno.serve(async (req)=>{
                   continue;
                 }
                 const key = plannedKey(plan.id, iso, normType);
-                if (debug) console.log('[get-week] Checking key:', key, 'exists:', existsKey.has(key));
-                if (existsKey.has(key)) {
+                const nth = blobSeen.get(key) ?? 0;
+                blobSeen.set(key, nth + 1);
+                if (debug) console.log('[get-week] Checking key:', key, 'blob session', nth, 'rows', existsCount.get(key) ?? 0);
+                if (nth < (existsCount.get(key) ?? 0)) {
                   if (debug) console.log('[get-week] Skipping - workout already exists');
                   continue;
                 }
@@ -351,6 +356,7 @@ Deno.serve(async (req)=>{
                   day_number: dayIndex[dayName] || 1,
                   date: iso,
                   type: normType,
+                  day_seq: takeFreeDaySeq(daySeqUsed, key, nth),
                   name: name,
                   workout_status: 'planned',
                   source: 'training_plan'
@@ -370,7 +376,6 @@ Deno.serve(async (req)=>{
                     console.error('[get-week] Insert FAILED for:', key, 'error:', insertErr);
                   } else {
                     if (debug) console.log('[get-week] Insert successful for:', key);
-                    existsKey.add(key);
                     if (debug && debugNotes.length < 50) debugNotes.push({
                       where: 'insert',
                       iso,

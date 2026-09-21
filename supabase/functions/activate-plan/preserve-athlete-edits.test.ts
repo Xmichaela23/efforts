@@ -116,3 +116,44 @@ Deno.test('⛔ a COMPLETED session is not re-stamped — completion is not this 
   const { rows } = preserveAthleteEdits(rebuilt, existing);
   assertEquals(rows[0].workout_status, 'planned');
 });
+
+Deno.test('⛔ a run → ride swap on a day that already rides is restored as the second ride (day_seq)', () => {
+  const existing = [
+    row({ type: 'ride', name: 'Easy Ride', steps_preset: null, tags: ['easy', SWAP_TAG], day_seq: 1 }),
+    row({ type: 'ride', name: 'Tempo Ride', steps_preset: ['bike_tempo'], tags: [], day_seq: 0 }),
+  ];
+  const rebuilt = [row({ day_seq: 0 }), row({ type: 'ride', name: 'Tempo Ride', steps_preset: ['bike_tempo'], tags: [], day_seq: 0 })];
+  const { rows } = preserveAthleteEdits(rebuilt, existing);
+  const rides = rows.filter((r) => r.type === 'ride');
+  assertEquals(rides.length, 2, 'the swap was dropped');
+  assertEquals(new Set(rides.map((r) => r.day_seq)).size, 2, 'two rides on one day share a day_seq — the insert would fail');
+});
+
+Deno.test('⛔ two rides on one day: the skip stays on the ride it was made on, whatever order the database returns', () => {
+  const existing = [
+    row({ type: 'ride', name: 'Tempo Ride', day_seq: 1, workout_status: 'skipped', skip_reason: 'travel' }),
+    row({ type: 'strength', name: 'Strength — Deadlift', day_seq: 0 }),
+    row({ type: 'ride', name: 'Easy Ride', day_seq: 0 }),
+  ];
+  const rebuilt = [
+    row({ type: 'ride', name: 'Easy Ride', day_seq: 0 }),
+    row({ type: 'strength', name: 'Strength — Deadlift', day_seq: 0 }),
+    row({ type: 'ride', name: 'Tempo Ride', day_seq: 1 }),
+  ];
+  const { rows } = preserveAthleteEdits(rebuilt, existing);
+  assertEquals(rows[2].workout_status, 'skipped', 'the skip left the second ride');
+  assertEquals(rows[0].workout_status, 'planned', 'the skip landed on the first ride');
+  assertEquals(rows[1].workout_status, 'planned', 'the skip landed on the lift');
+});
+
+Deno.test('a swapped row pairs with the sport the plan wrote (swapped_from:)', () => {
+  const existing = [
+    row({ type: 'ride', name: 'Easy Ride', steps_preset: null, tags: [SWAP_TAG, 'swapped_from:run'], day_seq: 0 }),
+    row({ type: 'strength', name: 'Strength — Deadlift', day_seq: 0, workout_status: 'skipped' }),
+  ];
+  const rebuilt = [row({ type: 'strength', name: 'Strength — Deadlift', day_seq: 0 }), row({ type: 'run', day_seq: 0 })];
+  const { rows } = preserveAthleteEdits(rebuilt, existing);
+  assertEquals(rows[0].workout_status, 'skipped');
+  assertEquals(rows[0].type, 'strength', 'the swap landed on the lift');
+  assertEquals(rows[1].type, 'ride');
+});
