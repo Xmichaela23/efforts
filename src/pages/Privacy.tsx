@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MobileHeader } from '@/components/MobileHeader';
 
 interface PrivacyProps {
@@ -8,6 +8,13 @@ interface PrivacyProps {
 
 export default function Privacy({ onBack }: PrivacyProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // efforts.work/privacy#garmin opens at the Garmin section (Garmin's review asks for a direct link to it).
+  useEffect(() => {
+    if (!location.hash) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView();
+  }, [location.hash]);
   
   const handleBack = () => {
     if (onBack) {
@@ -50,7 +57,7 @@ export default function Privacy({ onBack }: PrivacyProps) {
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-xl font-semibold text-white">Connected Services: Garmin and Strava</h2>
+                <h2 id="garmin" className="text-xl font-semibold text-white scroll-mt-20">Connected Services: Garmin and Strava</h2>
                 <p className="text-white">
                   When you connect a Garmin account, Garmin sends us your activities as you record them. From each activity we read
                   the activity type, start time, duration, distance, calories, speed and pace, heart rate, cadence, power, elevation,
@@ -60,11 +67,26 @@ export default function Privacy({ onBack }: PrivacyProps) {
                 <p className="text-white">
                   When you connect a Strava account, Strava sends us the same kind of activity data, and we read it the same way.
                 </p>
+                <p className="text-white">
+                  We store your Garmin data in our database, which is run by our hosting provider, Supabase. It is encrypted in
+                  transit and at rest. Supabase stores it for us and does not use it for anything else.
+                </p>
+                <p className="text-white">
+                  Three outside services receive the location of an activity, and nothing else from it:
+                </p>
+                <ul className="space-y-2 ml-4">
+                  <li className="text-white">• Open-Meteo receives the start location and time, to look up the weather for that session.</li>
+                  <li className="text-white">• OpenStreetMap receives the start location, to name the place, for example Los Angeles.</li>
+                  <li className="text-white">• MapTiler provides the map under your route. Your phone asks MapTiler for the map of that area, and draws the route itself.</li>
+                </ul>
+                <p className="text-white">
+                  Efforts uses no AI service. Garmin data is never sent to an AI model or used to train one.
+                </p>
                 <ul className="space-y-2 ml-4">
                   <li className="text-white">• When you disconnect Garmin or Strava in Efforts, we tell that service to stop sending us your data and we remove our access to it.</li>
                   <li className="text-white">• When you remove Efforts from your Garmin account, Garmin tells us, we stop reading your Garmin data, and we delete the activities and connection details we received from Garmin. Your Efforts account and everything you logged yourself stay.</li>
                   <li className="text-white">• When you delete your Efforts account, we tell Garmin and Strava to stop, and all of your data, including everything received from them, is permanently deleted.</li>
-                  <li className="text-white">• We do not sell Garmin or Strava data, and we do not share it with anyone else.</li>
+                  <li className="text-white">• We do not sell Garmin or Strava data. Apart from the services named above, we do not share it with anyone.</li>
                 </ul>
               </div>
 
@@ -73,7 +95,7 @@ export default function Privacy({ onBack }: PrivacyProps) {
                 <ul className="space-y-2 ml-4">
                   <li className="text-white">• To provide and improve the Efforts platform</li>
                   <li className="text-white">• To allow you to track and manage your training</li>
-                  <li className="text-white">• We do not sell or share your data with third parties</li>
+                  <li className="text-white">• We do not sell your data. The services that store or process it for us are named under Connected Services.</li>
                 </ul>
                 <p className="text-white">
                   Efforts does not use AI. Every number and every sentence in the app is computed from your data by fixed rules.
