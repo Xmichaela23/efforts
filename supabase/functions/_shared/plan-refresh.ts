@@ -76,8 +76,9 @@ import { localDateInTz } from './local-date.ts';
 //   the rewrite takes a stored ladder drill off such a plan's plyo day.
 // 27 (2026-09-20): a day keeps two sessions of one sport (`planned_workouts.day_seq`, `_shared/day-seq.ts`); the rewrite
 //   pairs the composer's first ride with the first ride row, and a swap reaches only the ride it was made on.
+// 28 (2026-09-20): Ladder Drills carries a how-to (the article's "fast feet"), so the rows that name it take it.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 27;
+export const PLAN_WRITER_VERSION = 28;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

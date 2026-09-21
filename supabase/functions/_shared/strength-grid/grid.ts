@@ -913,6 +913,10 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Barbell Hip Thrust" — https://exrx.net/WeightExercises/GluteusMaximus/BBHipThrust' },
   'hopscotch': { text: 'Stand at the bottom of an agility ladder on your left foot. Hop on that foot through the first three squares, then jump both feet out to either side of the ladder. Hop your right foot back in and hop on it through the next three squares, then jump both feet out again. Keep going to the end, landing only in the squares and never on the rungs.',
     source: 'Amber Sayer, MS, CPT / Marathon Handbook, "10 Agility Ladder Drills" — https://marathonhandbook.com/agility-ladder-drills/; Viada p227 names it' },
+  // p227 prints "ladder drills" as a group, not one drill; this is the article's simplest forward one ("fast feet").
+  // Words approved by Michael 2026-09-20. The row keeps the book's name.
+  'ladder drills': { text: 'Stand at the bottom of an agility ladder. Run on the spot inside the first square with quick steps, about five on each foot. Step your lead foot into the next square and do the same again. Keep going to the end of the ladder.',
+    source: 'Amber Sayer, MS, CPT / Marathon Handbook, "10 Agility Ladder Drills" (Fast Feet) — https://marathonhandbook.com/agility-ladder-drills/; Viada p227 names the group' },
   'ickey shuffle': { text: 'Stand at one side of an agility ladder, facing down it. Step into the first square with the inside foot, then the outside foot, then step out to the side of the next square with the first foot. Repeat the in, in, out pattern into each square, so you move up the ladder from side to side. Keep your feet low to the ground.',
     source: 'Matt Toupalik, ACE CPT / Cactus Athletics, "Ickey Shuffle Ladder Progression #1" — https://cactusathletics.com/ickey-shuffle-ladder-progression-1/' },
   'incline bench press': { text: 'Set the bench to about 30 to 45 degrees and lie back with your feet flat on the floor. Grip the bar a little wider than shoulder-width and lift it off the rack. Lower it to your upper chest, then press it back up until your arms are straight.',
