@@ -7,6 +7,7 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import React, { useEffect, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { Dumbbell, Activity, Bike, Layers, Feather, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
@@ -73,9 +74,13 @@ export default function StateAdjustLens({ mainLifts }: {
     try { localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(next)); } catch { /* device copy only */ }
     const uid = getStoredUserId();
     if (!uid) return;
-    const prefs = { ...((baselines?.ui_prefs && typeof baselines.ui_prefs === 'object') ? baselines.ui_prefs : {}), adjust_section_order: next };
-    void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
-      if (error) console.warn('[Adjust] section order kept on this device only:', error.message);
+    // Read-merge-write (cache job 1, 2026-09-21): never write back an older copy of the other preferences.
+    void supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      const prefs = { ...((data?.ui_prefs && typeof data.ui_prefs === 'object') ? data.ui_prefs as Record<string, unknown> : {}), adjust_section_order: next };
+      void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
+        if (error) console.warn('[Adjust] section order kept on this device only:', error.message);
+        markBaselinesStale();
+      });
     });
   };
   // A section missing from the saved order (the deload row is only there when a block is live) keeps

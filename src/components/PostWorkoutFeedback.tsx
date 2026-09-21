@@ -1,4 +1,5 @@
 import { TALK_TEST_QUESTION } from '@shared/effort-words';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import React, { useState, useEffect } from 'react';
 import { X, Activity, Bike, Plus, Waves } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -125,6 +126,7 @@ export default function PostWorkoutFeedback({
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
       try { await supabase.functions.invoke('learn-fitness-profile', { body: { user_id: uid } }); } catch { /* proposal reads whatever is on file */ }
+      markBaselinesStale();
       if (workoutType === 'run') {
         const { data, error } = await supabase.functions.invoke('save-baselines', { body: { zones: true, today: localToday() } });
         if (cancelled || error || !data?.success) return;

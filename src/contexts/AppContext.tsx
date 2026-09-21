@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -202,6 +204,7 @@ const AppContext = createContext<AppContextType>(defaultAppContext);
 export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
 
@@ -405,6 +408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           today: new Date().toLocaleDateString('en-CA'),
         },
       });
+      markBaselinesStale();
       if (error) throw error;
       if (!saved?.success) throw new Error(saved?.error || 'Could not save baselines');
       return saved;
@@ -414,7 +418,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const loadUserBaselines = async (): Promise<BaselineData | null> => {
+  /**
+   * ⛔ ONE COPY OF THE BASELINES ROW (2026-09-21, cache job 1 — docs/AUDIT-client-cache-2026-09-21.md). Every screen
+   * used to read the row fresh, so opening State ran the same read several times at once. Screens now share one
+   * read, kept 30 s; any write marks it old first (`markBaselinesStale`, `baseline:saved`), and so does a workout
+   * change, since the server's learner writes to this row after a sync. OURS — 30 s, the ceiling on how old a
+   * server-side write the app was not told about can be.
+   */
+  const loadUserBaselines = (): Promise<BaselineData | null> => {
+    const userId = getStoredUserId();
+    if (!userId) return Promise.resolve(null);
+    return queryClient.fetchQuery({
+      queryKey: ['baselines', userId],
+      queryFn: loadUserBaselinesFresh,
+      staleTime: 30 * 1000,
+      retry: false,
+    }).then((b) => (b ? structuredClone(b) : b)); // each screen gets its own copy to edit; the shared one stays clean
+  };
+
+  useEffect(() => {
+    const onStale = () => { queryClient.invalidateQueries({ queryKey: ['baselines'], refetchType: 'none' }); };
+    const events = ['baselines:stale', 'baseline:saved', 'workouts:invalidate'];
+    events.forEach((n) => window.addEventListener(n, onStale));
+    return () => { events.forEach((n) => window.removeEventListener(n, onStale)); };
+  }, [queryClient]);
+
+  const loadUserBaselinesFresh = async (): Promise<BaselineData | null> => {
     try {
       const userId = getStoredUserId();
       if (!userId) return null;

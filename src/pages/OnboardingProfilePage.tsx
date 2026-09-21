@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ export default function OnboardingProfilePage() {
       const ai = { ...(row?.athlete_identity || {}), confirmed_by_user: true, confirmed_at: new Date().toISOString() };
       const { error } = await supabase.from('user_baselines').update({ athlete_identity: ai, updated_at: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
+      markBaselinesStale();
       toast({ title: 'Profile saved' });
       navigate('/');
     } catch (e) {

@@ -9,6 +9,7 @@
 // "derived training zones" preview asks the same function with `preview: true`.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import type { TrainingPaces } from './effort-score';
 
 /** A `user_baselines` row as the builder reads it. */
@@ -73,6 +74,7 @@ export async function saveCalibration(
 ): Promise<{ error: string | null }> {
   try {
     const { data, error } = await supabase.functions.invoke('save-baselines', { body: calibrationBody(input) });
+    markBaselinesStale();
     if (error) return { error: error.message };
     return { error: data?.success ? null : String(data?.error || 'Could not save the calibration') };
   } catch (e) {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
 /**
@@ -45,6 +46,7 @@ export default function FirstRunCard({ id, children }: { id: string; children: R
       const seenMap = (prefs.seen_first_run && typeof prefs.seen_first_run === 'object') ? (prefs.seen_first_run as Record<string, boolean>) : {};
       const next = { ...prefs, seen_first_run: { ...seenMap, [id]: true } };
       void supabase.from('user_baselines').update({ ui_prefs: next }).eq('user_id', uid).then(({ error }) => {
+        markBaselinesStale();
         if (error) console.warn('[FirstRunCard] kept on this device only:', error.message);
       });
     });

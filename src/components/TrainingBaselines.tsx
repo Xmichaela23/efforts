@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
@@ -191,6 +192,7 @@ const uploadPhoto = async (file: File) => {
     const nextProfile = { ...(data.profile ?? {}), photo_url };
     const { error: dbErr } = await supabase.from('user_baselines').update({ profile: nextProfile, updated_at: new Date().toISOString() }).eq('user_id', uid);
     if (dbErr) throw dbErr;
+    markBaselinesStale();
     setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), photo_url } }));
   } catch (e) {
     console.warn('[Profile] photo upload failed:', e);

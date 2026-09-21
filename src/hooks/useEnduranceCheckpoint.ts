@@ -5,6 +5,7 @@
  * `useStrengthCalibration`'s shape: invoke once, keep the read, expose the action.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { supabase } from '@/lib/supabase';
 
 export type CheckpointNumber = {
@@ -77,6 +78,7 @@ export function useEnduranceCheckpoint(enabled = true): CheckpointRead {
   const answer = useCallback(async (decision: 'accept' | 'keep') => {
     try {
       const { data } = await supabase.functions.invoke('endurance-checkpoint', { body: { apply: true, decision } });
+      markBaselinesStale();
       if (!data?.success) return false;
       if (alive.current) setState((s) => ({ ...s, due: false, answered: { decision, rowsRepriced: Number(data.rows_repriced) || 0 } }));
       return true;

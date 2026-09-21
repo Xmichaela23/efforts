@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Check, Dumbbell, Heart, Link2, User, Watch, Wrench } from 'lucide-react';
@@ -321,6 +322,7 @@ export default function WelcomePage() {
         const { data } = await supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle();
         const prefs = (data?.ui_prefs && typeof data.ui_prefs === 'object') ? (data.ui_prefs as Record<string, unknown>) : {};
         await supabase.from('user_baselines').update({ ui_prefs: { ...prefs, intake_done: true } }).eq('user_id', uid);
+        markBaselinesStale();
       }
       try { localStorage.removeItem(STEP_KEY); } catch { /* device copy only */ }
       navigate('/', { replace: true });

@@ -11,6 +11,7 @@
 // the lift key, or 'swim_pace'. The server checks it against the suggestion it built, locks respected.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 
 export type AcceptKind = 'ftp' | 'run_threshold' | 'lift' | 'swim_pace';
 
@@ -36,6 +37,7 @@ const failed = (error: string): AcceptResult => ({ ok: false, error, acceptedVal
 export async function acceptMeasuredNumber(supabase: SupabaseClient, kind: AcceptKind, value: number, lift?: string): Promise<AcceptResult> {
   try {
     const { data, error } = await supabase.functions.invoke('save-baselines', { body: { accept: { kind, value, ...(lift ? { lift } : {}) } } });
+    markBaselinesStale();
     if (error || !data?.success) {
       let message = data?.error ? String(data.error) : error?.message || 'accept failed';
       try {

@@ -9,6 +9,7 @@
 // LIVE on main + server as of 2026-09-04 (the earlier "not yet shipped / provisional" banner was stale).
 
 import { trustedMaxReps } from '@/lib/estimate-1rm';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import React from 'react';
 import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
@@ -1051,10 +1052,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     try { localStorage.setItem(ROW_ORDER_KEY, JSON.stringify(next)); } catch { /* device copy only */ }
     const uid = getStoredUserId();
     if (!uid) return;
-    const prefs = { ...uiPrefsRef.current, state_row_order: next };
-    uiPrefsRef.current = prefs;
-    void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
-      if (error) console.warn('[State] row order kept on this device only (ui_prefs not on the account yet):', error.message);
+    uiPrefsRef.current = { ...uiPrefsRef.current, state_row_order: next };
+    // Read-merge-write (cache job 1, 2026-09-21): the preferences read when State opened can be older than a
+    // flag another screen wrote since, and writing that old copy back erased the flag.
+    void supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      const prefs = { ...((data?.ui_prefs && typeof data.ui_prefs === 'object') ? data.ui_prefs as Record<string, unknown> : {}), state_row_order: next };
+      void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
+        if (error) console.warn('[State] row order kept on this device only (ui_prefs not on the account yet):', error.message);
+        markBaselinesStale();
+      });
     });
   }, []);
   // ⛔ SLICE b — ONE READ, and it must sit ABOVE the early return or the hook order changes between

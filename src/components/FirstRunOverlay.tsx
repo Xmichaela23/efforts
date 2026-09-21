@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { markBaselinesStale } from '@/lib/baselines-stale';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
@@ -75,7 +76,8 @@ export default function FirstRunOverlay({ id = 'overlay', stops = HOME_STOPS, ac
     void supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle().then(({ data }) => {
       const prefs = (data?.ui_prefs && typeof data.ui_prefs === 'object') ? (data.ui_prefs as Record<string, unknown>) : {};
       const seenMap = (prefs.seen_first_run && typeof prefs.seen_first_run === 'object') ? (prefs.seen_first_run as Record<string, boolean>) : {};
-      void supabase.from('user_baselines').update({ ui_prefs: { ...prefs, seen_first_run: { ...seenMap, [ID]: true } } }).eq('user_id', uid);
+      void supabase.from('user_baselines').update({ ui_prefs: { ...prefs, seen_first_run: { ...seenMap, [ID]: true } } }).eq('user_id', uid)
+        .then(() => markBaselinesStale());
     });
   };
   const next = () => { if (step + 1 >= STOPS.length) finish(); else setStep(step + 1); };
