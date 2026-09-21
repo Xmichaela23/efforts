@@ -206,11 +206,12 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
         {rd && rd.form.value != null ? (
           /* ⛔ ONE ROW (Michael 2026-09-21: "it takes up too much space", "form can be a little larger"). Form, the
              number the zone word reads, is the biggest figure; fitness and fatigue sit on the same line at the right.
-             Their windows (6 weeks, 7 days) moved into the ⓘ. OURS — form at 1.3× Title 1 (about 36 px). */
+             Their windows (6 weeks, 7 days) moved into the ⓘ. Form is Title 1 (28 px): 1.3× read off balance beside the row
+             (Michael, same day), and Title 1 is the type scale's own largest step, the size Apple's HIG gives a card's key figure. */
           <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div className="flex items-baseline gap-x-2">
               <span className="text-footnote font-medium text-label-secondary">form</span>
-              <span className="readout-num font-semibold" style={{ fontSize: 'calc(var(--type-title1) * 1.3)', lineHeight: 1.1 }}>{rd.form.value}</span>
+              <span className="readout-num text-title1 font-semibold">{rd.form.value}</span>
               {zone && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zone}</span>}
             </div>
             <div className="flex items-baseline gap-x-1.5 text-subhead tabular-nums">
