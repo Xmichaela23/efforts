@@ -336,9 +336,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * not also a tap.
    */
   const daySwipe = useRef<{
-    active: boolean; startX: number; startY: number; lastX: number; lastT: number;
-    vx: number; dx: number; axis: 'x' | 'y' | null; movedAny: number;
-  }>({ active: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0, dx: 0, axis: null, movedAny: 0 });
+    active: boolean; startX: number; startY: number; originX: number;
+    samples: { x: number; t: number }[]; dx: number; axis: 'x' | 'y' | null; movedAny: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, samples: [], dx: 0, axis: null, movedAny: 0 });
   /** Where the day's content sits, in px. Follows the finger while dragging; animates otherwise. */
   const [daySlideX, setDaySlideX] = useState(0);
   /** True while the content should move WITHOUT a transition (finger down, or the off-screen reset). */
@@ -356,6 +356,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const DAY_SWIPE_FLICK_V = 0.3;   // px per ms
   const DAY_SWIPE_AXIS_PX = 8;     // CardDeck's AXIS_LOCK_PX
   const DAY_SLIDE_MS = 190;
+  /**
+   * ⛔ A SOFT SWIPE GOES (2026-09-21, Michael: a soft swipe "kinda shakes instead of going"). Speed used to be read
+   * from the last move event alone, and a gentle swipe slows right before the finger lifts, so it read as slow and
+   * sprang back. Speed is now read across the last 100 ms, and a release still moving toward a day at 0.1 px/ms or
+   * more goes there. OURS — 100 ms and 0.1 px/ms, chosen so a gentle push counts and a hold-then-lift does not.
+   */
+  const DAY_SWIPE_WINDOW_MS = 100;
+  const DAY_SWIPE_SOFT_V = 0.1;    // px per ms
+  const DAY_SWIPE_SOFT_MIN_PX = 12;
+
+  /** Release speed across the last `DAY_SWIPE_WINDOW_MS`, px per ms, + = rightward. */
+  const daySwipeVelocity = (samples: { x: number; t: number }[]) => {
+    if (samples.length < 2) return 0;
+    const last = samples[samples.length - 1];
+    let first = samples[0];
+    for (const s of samples) { if (last.t - s.t <= DAY_SWIPE_WINDOW_MS) { first = s; break; } }
+    const dt = last.t - first.t;
+    return dt > 0 ? (last.x - first.x) / dt : 0;
+  };
+
+  /** Finger up (or the browser took the touch): go to a day, or slide back. */
+  const releaseDaySwipe = () => {
+    const g = daySwipe.current;
+    g.active = false;
+    if (g.axis !== 'x') return;
+    const v = daySwipeVelocity(g.samples);
+    const dx = g.dx;
+    const movingNext = v < -DAY_SWIPE_SOFT_V && dx < -DAY_SWIPE_SOFT_MIN_PX;
+    const movingPrev = v > DAY_SWIPE_SOFT_V && dx > DAY_SWIPE_SOFT_MIN_PX;
+    // Past the distance, it goes — unless the finger is heading back the other way fast.
+    const farNext = dx < -DAY_SWIPE_COMMIT_PX && v < DAY_SWIPE_FLICK_V;
+    const farPrev = dx > DAY_SWIPE_COMMIT_PX && v > -DAY_SWIPE_FLICK_V;
+    if (movingNext || farNext) commitDaySwipe('next');
+    else if (movingPrev || farPrev) commitDaySwipe('prev');
+    else { setDaySlideRaw(false); setDaySlideX(0); }
+  };
+
+  /**
+   * A sideways swipe keeps the page from scrolling. Without this, a little up-or-down drift mid-swipe let the page
+   * start scrolling, the browser cancelled the swipe, and the day snapped back. Needs a non-passive listener.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onTouchMove = (e: TouchEvent) => {
+      const g = daySwipe.current;
+      if (g.active && g.axis === 'x' && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onTouchMove);
+  }, []);
 
   const commitDaySwipe = (dir: 'prev' | 'next') => {
     const w = scrollRef.current?.clientWidth || 360;
@@ -1714,8 +1765,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           // guard below would read the last day swipe's distance and swallow a real tap on the deck.
           if ((e.target as Element | null)?.closest?.('[data-deck]')) { daySwipe.current = { ...daySwipe.current, active: false, axis: null, movedAny: 0 }; return; }
           daySwipe.current = {
-            active: true, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp,
-            vx: 0, dx: 0, axis: null, movedAny: 0,
+            active: true, startX: e.clientX, startY: e.clientY, originX: e.clientX,
+            samples: [{ x: e.clientX, t: e.timeStamp }], dx: 0, axis: null, movedAny: 0,
           };
         }}
         onPointerMove={(e) => {
@@ -1728,6 +1779,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             if (Math.max(Math.abs(dx), Math.abs(dy)) < DAY_SWIPE_AXIS_PX) return;
             g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
             if (g.axis === 'x') {
+              // The day starts moving from where the finger is now, so it does not jump the 8 px it took to decide.
+              g.originX = e.clientX;
               setDaySlideRaw(true);
               try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
             } else {
@@ -1735,28 +1788,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             }
           }
           if (g.axis !== 'x') return;
-          const dt = Math.max(1, e.timeStamp - g.lastT);
-          const instant = (e.clientX - g.lastX) / dt;
-          g.vx = g.vx === 0 ? instant : g.vx * 0.3 + instant * 0.7;
-          g.lastX = e.clientX; g.lastT = e.timeStamp;
+          g.samples.push({ x: e.clientX, t: e.timeStamp });
+          if (g.samples.length > 12) g.samples.shift();
           g.dx = dx;
-          setDaySlideX(dx * 0.85);
+          // Moves exactly with the finger.
+          setDaySlideX(e.clientX - g.originX);
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
           const g = daySwipe.current;
           if (!g.active) return;
-          g.active = false;
-          if (g.axis !== 'x') return;
-          const flick = Math.abs(g.vx) > DAY_SWIPE_FLICK_V && Math.abs(g.dx) > 10;
-          if (g.dx < -DAY_SWIPE_COMMIT_PX || (flick && g.dx < 0)) commitDaySwipe('next');
-          else if (g.dx > DAY_SWIPE_COMMIT_PX || (flick && g.dx > 0)) commitDaySwipe('prev');
-          else { setDaySlideRaw(false); setDaySlideX(0); }
+          if (g.axis === 'x') {
+            g.samples.push({ x: e.clientX, t: e.timeStamp });
+            g.dx = e.clientX - g.startX;
+          }
+          releaseDaySwipe();
         }}
-        onPointerCancel={() => {
-          const g = daySwipe.current;
-          g.active = false;
-          if (g.axis === 'x') { setDaySlideRaw(false); setDaySlideX(0); }
-        }}
+        // The browser took the touch mid-swipe: treat it as a release, so a swipe already on its way still goes.
+        onPointerCancel={() => { releaseDaySwipe(); }}
         /* ⛔ A SIDEWAYS DRAG IS NOT A TAP (2026-09-17, Michael: sliding between days sometimes opened a workout).
            The browser still fires a click when a swipe lifts over a session card. The chevrons already asked
            `movedAny`; every card under the panel now gets the same answer, caught here before it reaches them.
