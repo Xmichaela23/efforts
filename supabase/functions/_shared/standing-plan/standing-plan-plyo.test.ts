@@ -331,3 +331,29 @@ Deno.test('the line under the title counts the drills listed: one or two with no
   // One drill listed: nothing to pick, the drill line alone.
   assertEquals(plyoTitleNote(1), P227_DRILL_LINE);
 });
+
+Deno.test('⛔ a kit that gains the agility ladder gains the foot-speed drill on the rebuild, in the composer\'s order (2026-09-20)', async () => {
+  const { restateFromTest } = await import('./restate.ts');
+  const { composeBlock } = await import('./compose.ts');
+  const NO_LADDER = ['Barbell', 'Squat rack', 'Bench', 'Dumbbells', 'Pull-up bar'];
+  // The calendar as the no-ladder block stored it: two drills a day.
+  const before = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: NO_LADDER } as never);
+  const monday = new Date('2030-01-07T12:00:00Z');
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const planned: { id: string; week_number: number; date: string; tags: string[]; strength_exercises: unknown }[] = [];
+  for (const wk of before) for (const sess of wk.sessions) {
+    if (!sess.tags.includes('plyo')) continue;
+    const d = new Date(monday); d.setUTCDate(d.getUTCDate() + (wk.week - 1) * 7 + DAYS.indexOf(sess.day));
+    planned.push({ id: `${wk.week}`, week_number: wk.week, date: d.toISOString().slice(0, 10), tags: sess.tags, strength_exercises: sess.strength_exercises ?? [] });
+  }
+  // The athlete checks the ladder and rebuilds: the block re-composes with it.
+  const after = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: [...NO_LADDER, 'Agility ladder'] } as never);
+  const restated = restateFromTest({ composed: after, planned, afterWeek: 0 } as never);
+  assertEquals(restated.rows.length, 12, 'not every plyo day gained its drill');
+  for (const row of restated.rows) {
+    const names = (row.strength_exercises as { name: string }[]).map((e) => e.name);
+    const want = after.find((w) => w.week === row.week)!.sessions.find((x) => x.tags.includes('plyo'))!.strength_exercises!.map((e) => e.name);
+    assertEquals(names, want, `week ${row.week}`);
+    assertEquals(names.length, 3);
+  }
+});

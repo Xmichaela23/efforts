@@ -400,7 +400,9 @@ export default function StateAdjustLens({ mainLifts }: {
       setRebuilding(true);
       setRebuildNote(null);
       try {
-        const { data: rs, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
+        // ⛔ THIS TAP TAKES THE EQUIPMENT ON BASELINES (2026-09-20): a chip checked after the plan was built reaches the
+        // sessions still ahead here, and only here (`rematerialize-standing-block`, `use_current_equipment`).
+        const { data: rs, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true, use_current_equipment: true } });
         if (error) throw error;
         setRebuildNote((rs as any)?.success ? 'Upcoming sessions rebuilt from the plan.' : 'Nothing to rebuild.');
       } catch (e) {

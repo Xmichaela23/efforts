@@ -501,6 +501,22 @@ export function restateFromTest(args: {
       };
     });
     /**
+     * ⛔ A PLYO FAMILY THE ATHLETE'S KIT NOW REACHES GAINS ITS DRILL (2026-09-20). An athlete who adds the agility
+     * ladder and rebuilds composes a foot-speed drill the stored day never had; the map above only walks stored rows,
+     * so the new one was dropped. p227's table gives each family one slot on the plyo day, so a fresh drill whose
+     * family has no row on the day is added, in the composer's order. ⚠️ Plyo days only — a lifting day never gains a
+     * row here (the accessory floor can fill a session differently between runs).
+     */
+    if (plyoDayStill) {
+      const gained = freshUnplaced.filter((w) => plyoFamilyOf(w) != null && !next.some((e) => plyoFamilyOf(e) === plyoFamilyOf(w)));
+      if (gained.length > 0) {
+        touched = true;
+        next.push(...gained.map((w) => ({ ...w })));
+        const order = wanted.map(nameOf);
+        next.sort((x, y) => (order.indexOf(nameOf(x)) < 0 ? 99 : order.indexOf(nameOf(x))) - (order.indexOf(nameOf(y)) < 0 ? 99 : order.indexOf(nameOf(y))));
+      }
+    }
+    /**
      * ⛔ THE SESSION'S WORDS TRAVEL TOO (2026-09-18). The runs and rides already took the composer's name and
      * description; a lifting day kept the ones it was built with, so a change to them reached no calendar. Only
      * when the day holds one composed lifting session (two would leave "which one" unanswered) and never on a test

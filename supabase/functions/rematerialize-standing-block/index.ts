@@ -96,6 +96,15 @@ Deno.serve(async (req: Request) => {
      * only those, the tapped one expanded first. Nothing else in the block is touched.
      */
     const swapTap = p?.swap && typeof p.swap === 'object' && typeof p.swap.planned_id === 'string' ? p.swap : null;
+    /**
+     * ⛔ THE ATHLETE'S REBUILD TAKES THEIR CURRENT EQUIPMENT (2026-09-20, Michael: "add a ladder and they appear? are we
+     * smart to integrate new equipment" — it was not: the block re-composes against the kit it was BUILT with, so a
+     * chip checked later reached only a new plan). The Adjust tab's "Rebuild upcoming sessions" sends
+     * `use_current_equipment: true`; the kit on Baselines then replaces the block's stored one, for this pass and every
+     * later one. ⚠️ ONLY THAT TAP. The automatic refresh, a logged test and a locked number keep the stored kit —
+     * new equipment can change which movement a session uses, and that never happens without the athlete asking.
+     */
+    const useCurrentEquipment = p?.use_current_equipment === true && !isRefresh && !swapTap;
     const willWrite = p?.apply === true || isRefresh || !!swapTap;
     const asOf = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : null;
 
@@ -123,6 +132,16 @@ Deno.serve(async (req: Request) => {
     const sp = config?.standing_plan ?? null;
     if (!sp?.frame || !sp?.test_lift_names) {
       return json({ success: false, reason: 'block_carries_no_standing_plan_config' }, 400);
+    }
+
+    // The kit on Baselines, read the way the builder reads it (`generate-strength-plan`): `equipment.strength`, an
+    // array of the chips' own strings. Not an array → null, and the block keeps the kit it has.
+    let currentKit: string[] | null = null;
+    if (useCurrentEquipment) {
+      const { data: ubKit } = await supabase.from('user_baselines').select('equipment').eq('user_id', userId).maybeSingle();
+      const eq = (ubKit as { equipment?: { strength?: unknown } } | null)?.equipment?.strength;
+      const kit = Array.isArray(eq) ? eq.map((x) => String(x)).filter((x) => x.trim()) : null;
+      currentKit = kit && kit.length > 0 ? kit : null;
     }
 
     const weeks = Number(plan.duration_weeks) || 12;
@@ -371,9 +390,9 @@ Deno.serve(async (req: Request) => {
        * ⚠️ THE OLD TOP-LEVEL KEY IS STILL READ, second. It costs a line, and a block written by
        * anything that does put it there still restates gated.
        */
-      equipment: Array.isArray(sp?.athlete_equipment)
+      equipment: currentKit ?? (Array.isArray(sp?.athlete_equipment)
         ? sp.athlete_equipment
-        : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null),
+        : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null)),
       demonstratedWeeklyMiles: sp.demonstrated_weekly_miles ?? null,
       /**
        * ⛔⛔ THE EXPERIENCE ANSWER THE BLOCK'S LEVELS WERE BUILT FROM, READ BACK (2026-08-27) — and
@@ -711,6 +730,8 @@ Deno.serve(async (req: Request) => {
           ...baseConfig,
           standing_plan: {
             ...sp,
+            // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`).
+            ...(currentKit ? { athlete_equipment: currentKit } : {}),
             taper_weeks: taperWeeks,
             // ⛔ AN EMPTY READ WRITES NO NUMBERS (2026-09-18): an apply before the test keeps what the block had.
             ...(found.length > 0 ? { working_numbers: reading.working, test_read: true } : {}),
