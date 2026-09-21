@@ -1406,7 +1406,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         window.dispatchEvent(new CustomEvent('planned:invalidate'));
         // Today and the calendar read the week feed (60 min fresh), so a pull has to refresh it by name.
         window.dispatchEvent(new CustomEvent('week:invalidate'));
-        window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
+        // A pull refreshes everything the app shares: the plans and the baselines too (cache job 3, 2026-09-21).
+        window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        window.dispatchEvent(new CustomEvent('baselines:stale'));
       } catch (e) {
         console.warn('[AppLayout] pull-refresh invalidate dispatch failed:', e);
       }

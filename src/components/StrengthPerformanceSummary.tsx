@@ -207,7 +207,10 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
         previousByExercise={previousByExercise}
         workoutId={workoutId}
         onAdjustmentSaved={() => {
-          window.dispatchEvent(new CustomEvent('plan:adjusted'));
+          // A saved adjustment changes upcoming planned sessions. `plan:adjusted` reached no screen (cache job 3,
+          // 2026-09-21); the planned list and the week feed are the ones that show those sessions.
+          window.dispatchEvent(new CustomEvent('planned:invalidate'));
+          window.dispatchEvent(new CustomEvent('week:invalidate'));
           onRecompute?.();
         }}
       />
