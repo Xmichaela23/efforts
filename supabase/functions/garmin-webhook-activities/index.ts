@@ -43,22 +43,23 @@ Deno.serve(async (req)=>{
   try {
     // Parse the incoming webhook payload
     const payload = await req.json();
-    // Log the full payload for debugging
-    console.log('Received webhook payload:', JSON.stringify(payload, null, 2));
-    // Respond immediately with 200 OK (as required by Garmin)
-    const response = new Response('OK', {
-      status: 200
-    });
-    // Process activities asynchronously after responding
+    console.log(JSON.stringify({ event: 'garmin_webhook_activities', keys: Object.keys(payload ?? {}), count: (payload?.activities ?? payload?.activityDetails ?? []).length }));
+    // Garmin requires the 200 within 30 seconds, so the work runs after the response. waitUntil keeps the
+    // function alive until the work finishes (FOUNDATION-READINESS B8), the same way garmin-webhook-user does.
+    let work = null;
     if (payload.activities) {
-      processActivities(payload.activities).catch(console.error);
+      work = processActivities(payload.activities);
     } else if (payload.activityDetails) {
-      // If we get activityDetails directly, process them
-      processActivityDetails(payload.activityDetails).catch(console.error);
+      work = processActivityDetails(payload.activityDetails);
     } else {
       console.log('No activities or activityDetails found in payload');
     }
-    return response;
+    if (work) {
+      work = work.catch(console.error);
+      const waitUntil = globalThis.EdgeRuntime?.waitUntil;
+      if (waitUntil) waitUntil(work); else await work;
+    }
+    return new Response('OK', { status: 200 });
   } catch (error) {
     console.error('Error processing webhook:', error);
     // The alarm (docs/WORKORDER-plumbing-2026-09-07.md §2): a 5xx here means Garmin's notice was dropped.
