@@ -1484,7 +1484,12 @@ shows the name and the (i) with nothing under it. Only an athlete with the Agili
 reaches the list and the Garmin description bare ("4:00 between"). Today's narrative reads the word itself
 (`planned-narrative.ts stepPhrase`). A background task chip was spawned with the full trace.
 
-## Q-305 — CLAUDE.md said Netlify; the site builds on Vercel — **fixed in the doc** (2026-09-20)
+## Q-305 — A leftover Vercel project still builds `main`; Netlify serves the site — **noted** (2026-09-20)
 
-A Vercel "Production deployment failed" email and GitHub's commit status (context `Vercel`) showed it. A build can be
-checked without `gh`: `curl -s https://api.github.com/repos/Xmichaela23/efforts/commits/<sha>/status`.
+> Corrected the same night. This entry first said the site builds on Vercel, read off a Vercel "Production deployment
+> failed" email and GitHub's commit status (context `Vercel`). Michael: "Netlify builds it, Vercel is a ghost … Vercel
+> still gets the site." Checked: `curl -sI https://efforts.work` answers `server: Netlify`, and the served bundle carried
+> that day's new sentence.
+
+The Vercel project is only a "does main build" signal (`curl -s https://api.github.com/repos/Xmichaela23/efforts/commits/<sha>/status`)
+and the sender of failure emails. Whether to disconnect it is Michael's call.
