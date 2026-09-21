@@ -746,7 +746,8 @@ Deno.test('the plyo drills are his, and the dose labels survive', () => {
   assertEquals(PLYO_DOSE.drillsPerDay, 3);
   assert(PLYO_DOSE.drillCountIsHis.includes('p227'));
   assert(/gives no number/i.test(PLYO_DOSE.effortCountIsOurs)); // 2026-09-18: no count on the row
-  const wk = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard' });
+  // 2026-09-20: the foot-speed drills are done in an agility ladder, so the three-drill day is a kit that has one.
+  const wk = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard', equipment: [...((BASE_ARGS as { equipment?: string[] }).equipment ?? []), 'Agility ladder'] });
   const plyo = wk.sessions.filter((s) => s.tags.includes('plyo'));
   // ⛔ ONE PLYO SESSION, ON THE FRAME'S OWN DAY, carrying his three drills.
   assertEquals(plyo.length, 1);

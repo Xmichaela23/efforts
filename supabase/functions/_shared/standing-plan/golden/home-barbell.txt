@@ -29,7 +29,6 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Short Threshold Repeats — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -78,7 +77,6 @@ WEEK 02  column=standard
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Race-Specific Repeats — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -127,7 +125,6 @@ WEEK 03  column=standard
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Sub-Threshold Repeats — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -176,7 +173,6 @@ WEEK 04  column=standard
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Long Sub-Threshold Repeats — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -225,7 +221,6 @@ WEEK 05  column=standard
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Threshold with a Surge — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -274,7 +269,6 @@ WEEK 06  column=standard
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Surge into Steady — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -323,7 +317,6 @@ WEEK 07  column=standard
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Short Threshold Repeats — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -372,7 +365,6 @@ WEEK 08  column=standard
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Race-Specific Repeats — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -421,7 +413,6 @@ WEEK 09  column=standard
       tags: standing_plan, plyo
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Sub-Threshold Repeats — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -470,7 +461,6 @@ WEEK 10  column=standard
       tags: standing_plan, plyo
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Long Sub-Threshold Repeats — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -518,7 +508,6 @@ WEEK 11  column=standard
       tags: standing_plan, plyo
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Threshold with a Surge — 79 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -566,7 +555,6 @@ WEEK 12  column=standard
       tags: standing_plan, plyo
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Ickey Shuffle                  1x           @ Bodyweight    | how-to · note: Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Surge into Steady — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard

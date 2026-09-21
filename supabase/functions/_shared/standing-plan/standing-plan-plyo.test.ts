@@ -182,7 +182,8 @@ Deno.test('⛔⛔ THE PLYO DAY IS THE FRAME\'S, AND THIS MODULE HOLDS NO DAY NUM
   for (const column of ['standard', 'taper'] as const) {
     const marked = FRAMES.strength_5k.columns[column].filter((d) => d.plyo === true);
     assertEquals(marked.map((d) => d.day), [3], `${column}: the frame moved its plyo day`);
-    const wk = composeWeek({ ...BASE, week: 2, column } as never);
+    // 2026-09-20: a kit with the agility ladder reaches all three families; without it the day holds two (below).
+    const wk = composeWeek({ ...BASE, week: 2, column, equipment: ['Agility ladder'] } as never);
     const sessions = wk.sessions.filter((s) => s.tags.includes('plyo'));
     assertEquals(sessions.length, 1, `${column}: the week does not hold exactly one plyo session`);
     assertEquals(sessions[0].strength_exercises!.length, PLYO_FAMILIES_PER_DAY.length);
@@ -194,7 +195,8 @@ Deno.test('one drill from each of his three families, and that arrangement is la
   // warm-up at one to three skills. ⚠️ OURS: taking one from each bucket rather than three from one.
   assertEquals(PLYO_FAMILIES_PER_DAY, PLYO_FAMILY_IDS);
   assert(/ours/i.test(PLYO_FAMILY_MIX_IS_OURS));
-  const wk = composeWeek({ ...BASE, week: 2, column: 'standard' } as never);
+  // 2026-09-20: with the agility ladder every family is reachable; the foot-speed family needs it.
+  const wk = composeWeek({ ...BASE, week: 2, column: 'standard', equipment: ['Agility ladder'] } as never);
   const rows = wk.sessions.filter((s) => s.tags.includes('plyo')).flatMap((s) => s.strength_exercises ?? []);
   for (const family of PLYO_FAMILY_IDS) {
     assertEquals(rows.filter((r) => PLYO_FAMILIES[family].drills.includes(r.name)).length, 1,
@@ -229,19 +231,23 @@ Deno.test('⛔ NO DRILL AN ATHLETE CANNOT DO — ladder drills need an agility l
       return wk.sessions.filter((s) => s.tags.includes('plyo')).flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name));
     });
   const noLadder = weeksOfNames(['Barbell + plates', 'Dumbbells', 'Pull-up bar', 'Resistance bands']);
-  assert(!noLadder.includes('Ladder Drills'), 'ladder drills prescribed to an athlete with no ladder');
-  assert(noLadder.some((n) => n === 'Hopscotch' || n === 'Ickey Shuffle'), 'the footspeed family still fills from the same bucket');
+  // 2026-09-20: all three foot-speed drills are done in an agility ladder, so none is prescribed without one.
+  assert(!noLadder.some((n) => /ladder drills|ickey shuffle|hopscotch/i.test(n)), 'a ladder drill prescribed to an athlete with no ladder');
+  assert(noLadder.length === 12, `six plyo days of two drills each, got ${noLadder.length}`);
   const withLadder = weeksOfNames(['Barbell + plates', 'Agility ladder']);
   assert(withLadder.includes('Ladder Drills'), 'an athlete with a ladder never sees the ladder drill');
 });
 
-Deno.test('⛔ hopscotch and ladder drills need the agility ladder; the week\'s pick and the swap list ask one rule (2026-09-20)', async () => {
+Deno.test('⛔ all three foot-speed drills need the agility ladder; the week\'s pick and the swap list ask one rule (2026-09-20)', async () => {
   const { plyoSwapGroups } = await import('./swap-groups.ts');
-  // No ladder: the foot-speed family gives the Ickey Shuffle every week, never the two ladder drills.
-  for (let w = 1; w <= 12; w++) assertEquals(drillForWeek('footspeed', w, ['Barbell', 'Dumbbells']), 'Ickey Shuffle');
-  // With the ladder it walks all three, in p89's order.
+  // No ladder: the foot-speed family gives no drill at all, and the plyo day holds the other two (p275: one to three).
+  for (let w = 1; w <= 12; w++) assertEquals(drillForWeek('footspeed', w, ['Barbell', 'Dumbbells']), null);
+  const day = composeWeek({ ...BASE, week: 4, column: 'standard', equipment: ['Barbell', 'Dumbbells'] } as never)
+    .sessions.filter((x) => x.tags.includes('plyo')).flatMap((x) => (x.strength_exercises ?? []).map((e) => e.name));
+  assertEquals(day, ['Bounding', 'Single-Leg Hops']);
+  // With the ladder it walks all three, in p89's order, and the day holds three.
   assertEquals([1, 2, 3, 4].map((w) => drillForWeek('footspeed', w, ['Agility ladder'])), ['Ladder Drills', 'Ickey Shuffle', 'Hopscotch', 'Ladder Drills']);
-  // The swap list under the Ickey Shuffle: nothing to offer without the ladder, both with it.
+  // The swap list under the Ickey Shuffle offers the other two ladder drills only with the ladder.
   assertEquals(plyoSwapGroups('Ickey Shuffle', ['Barbell']), []);
   assertEquals(plyoSwapGroups('Ickey Shuffle', ['Agility ladder'])[0].options.map((o) => o.name), ['Ladder Drills', 'Hopscotch']);
   // The other two families need nothing.
@@ -249,20 +255,26 @@ Deno.test('⛔ hopscotch and ladder drills need the agility ladder; the week\'s 
   assertEquals(drillForWeek('ground_contact', 4, null), 'Single-Leg Hops');
 });
 
-Deno.test('⛔ a stored Hopscotch row becomes the family\'s current drill on the refresh, with its how-to and benefit (2026-09-20)', async () => {
+Deno.test('⛔ a stored foot-speed drill the composer no longer gives becomes the family\'s current drill on the refresh (2026-09-20)', async () => {
   const { restateFromTest } = await import('./restate.ts');
   const { composeBlock } = await import('./compose.ts');
   const NO_LADDER = ['Barbell', 'Squat rack', 'Bench', 'Dumbbells', 'Pull-up bar'];
-  const composed = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: NO_LADDER } as never);
+  // ⚠️ THE KIT HERE HAS THE LADDER, so the family still gives a drill and the stored one is REPLACED by it. The kit
+  // with no ladder is the next test: there the stored drill comes off the day.
+  const composed = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: [...NO_LADDER, 'Agility ladder'] } as never);
   // The calendar as a plan built before hopscotch needed the ladder has it: Hopscotch, the old note, no benefit line.
   const monday = new Date('2030-01-07T12:00:00Z');
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const planned: { id: string; week_number: number; date: string; tags: string[]; strength_exercises: unknown }[] = [];
+  const wantByWeek = new Map<number, string>();
   for (const wk of composed) for (const sess of wk.sessions) {
     if (!sess.tags.includes('plyo')) continue;
     const d = new Date(monday); d.setUTCDate(d.getUTCDate() + (wk.week - 1) * 7 + DAYS.indexOf(sess.day));
-    const stored = (sess.strength_exercises ?? []).map((e) => e.name === 'Ickey Shuffle'
-      ? { name: 'Hopscotch', sets: 1, reps: '', weight: 'Bodyweight', load_prescribed: false, how_to: 'Stand at the bottom of an agility ladder on your left foot.', notes: 'Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.' }
+    const current = (sess.strength_exercises ?? []).map((e) => e.name).find((n) => /ladder drills|ickey shuffle|hopscotch/i.test(n))!;
+    const other = current === 'Hopscotch' ? 'Ickey Shuffle' : 'Hopscotch';
+    wantByWeek.set(wk.week, current);
+    const stored = (sess.strength_exercises ?? []).map((e) => e.name === current
+      ? { name: other, sets: 1, reps: '', weight: 'Bodyweight', load_prescribed: false, how_to: 'Stand at the bottom of an agility ladder on your left foot.', notes: 'Benefit: general foot and leg control. Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.' }
       : e);
     planned.push({ id: `${wk.week}`, week_number: wk.week, date: d.toISOString().slice(0, 10), tags: sess.tags, strength_exercises: stored });
   }
@@ -270,13 +282,44 @@ Deno.test('⛔ a stored Hopscotch row becomes the family\'s current drill on the
   const restated = restateFromTest({ composed, planned, afterWeek: 0 } as never);
   assertEquals(restated.rows.length, 12, 'not every plyo day was rewritten');
   for (const row of restated.rows) {
-    const names = (row.strength_exercises as { name: string }[]).map((e) => e.name);
-    assert(!names.includes('Hopscotch'), `week ${row.week} still carries Hopscotch`);
-    const ickey = (row.strength_exercises as Record<string, unknown>[]).find((e) => e.name === 'Ickey Shuffle')!;
-    assert(ickey, `week ${row.week} has no Ickey Shuffle`);
-    assertEquals(ickey.benefit_line, 'Benefit: general foot and leg control.');
-    assert(/^Stand at one side of an agility ladder/.test(String(ickey.how_to)), String(ickey.how_to));
-    assert(/you feel confident in it/.test(String(ickey.notes)));
-    assertEquals(names.length, 3, 'the day lost or gained a drill');
+    const rows = row.strength_exercises as Record<string, unknown>[];
+    const want = wantByWeek.get(row.week)!;
+    const now = rows.find((e) => e.name === want);
+    assert(now, `week ${row.week}: the stored drill was not replaced by ${want}`);
+    assertEquals(now!.benefit_line, 'Benefit: general foot and leg control.');
+    assert(/you feel confident in it/.test(String(now!.notes)));
+    assertEquals(rows.length, 3, 'the day lost or gained a drill');
   }
+});
+
+Deno.test('⛔ with no ladder, a stored foot-speed drill comes off the plyo day on the refresh (2026-09-20)', async () => {
+  const { restateFromTest } = await import('./restate.ts');
+  const { composeBlock } = await import('./compose.ts');
+  const NO_LADDER = ['Barbell', 'Squat rack', 'Bench', 'Dumbbells', 'Pull-up bar'];
+  const composed = composeBlock({ ...BASE, weeks: 12, taperWeeks: [], equipment: NO_LADDER } as never);
+  const monday = new Date('2030-01-07T12:00:00Z');
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const planned: { id: string; week_number: number; date: string; tags: string[]; strength_exercises: unknown }[] = [];
+  for (const wk of composed) for (const sess of wk.sessions) {
+    if (!sess.tags.includes('plyo')) continue;
+    assertEquals((sess.strength_exercises ?? []).length, 2, 'a kit with no ladder composes two drills');
+    const d = new Date(monday); d.setUTCDate(d.getUTCDate() + (wk.week - 1) * 7 + DAYS.indexOf(sess.day));
+    // As a plan built earlier the same day stores it: the two drills, then the Ickey Shuffle.
+    const stored = [...(sess.strength_exercises ?? []), { name: 'Ickey Shuffle', sets: 1, reps: '', weight: 'Bodyweight', load_prescribed: false, how_to: 'Stand at one side of an agility ladder, facing down it.', benefit_line: 'Benefit: general foot and leg control.', notes: 'x' }];
+    planned.push({ id: `${wk.week}`, week_number: wk.week, date: d.toISOString().slice(0, 10), tags: sess.tags, strength_exercises: stored });
+  }
+  const restated = restateFromTest({ composed, planned, afterWeek: 0 } as never);
+  assertEquals(restated.rows.length, 12, 'not every plyo day was rewritten');
+  for (const row of restated.rows) {
+    const names = (row.strength_exercises as { name: string }[]).map((e) => e.name);
+    assertEquals(names.length, 2, `week ${row.week}: ${names.join(', ')}`);
+    assert(!names.some((n) => /ladder drills|ickey shuffle|hopscotch/i.test(n)), `week ${row.week} still carries a ladder drill`);
+  }
+  // ⛔ AND NOTHING ELSE IS EVER DROPPED: a lifting day's stored row the composer no longer writes is still left alone.
+  const lift = composed[1].sessions.find((x) => x.type === 'strength' && !x.tags.includes('plyo'))!;
+  const d = new Date(monday); d.setUTCDate(d.getUTCDate() + 7 + DAYS.indexOf(lift.day));
+  const extra = { name: 'Face Pull', sets: 3, reps: '12', weight: 'By feel', load_prescribed: false };
+  const kept = restateFromTest({ composed, planned: [{ id: 'l', week_number: 2, date: d.toISOString().slice(0, 10), tags: lift.tags, strength_exercises: [...(lift.strength_exercises ?? []), extra] }], afterWeek: 0 } as never);
+  const after = kept.rows.find((r) => r.id === 'l');
+  assert(!after || (after.strength_exercises as { name: string }[]).some((e) => e.name === 'Face Pull'), 'a lifting row was dropped');
 });

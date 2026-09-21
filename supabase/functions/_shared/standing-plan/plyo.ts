@@ -154,15 +154,20 @@ export const PLYO_ROTATION_ORDER_IS_HIS =
  * was being read as a ramp; see `PLYO_ROTATION_ORDER_IS_HIS`. ⚠️ The two lists hold the same names,
  * so nothing downstream sees a new movement — a drill simply arrives in a different week.
  */
-/** ⛔ NO DRILL AN ATHLETE CANNOT DO (WORKORDER-plyo-screen §3, 2026-09-02). Ladder drills need an agility
- *  ladder; the Ickey Shuffle is usually taught in one but does not require it.
+/** ⛔ NO DRILL AN ATHLETE CANNOT DO (WORKORDER-plyo-screen §3, 2026-09-02). Ladder drills need an agility ladder.
+ *  ⛔ SO DOES THE ICKEY SHUFFLE (Michael, 2026-09-20, off his own card: "I don't have a ladder checked in equipment").
+ *  It read "usually taught in one but does not require it", while its own sourced how-to starts "Stand at one side of
+ *  an agility ladder". With no ladder the whole foot-speed family gives no drill and the plyo day holds two, inside
+ *  p275's "anywhere from one to three plyometric skills".
  *  ⛔ HOPSCOTCH NEEDS THE LADDER TOO (Michael, 2026-09-20: "make it an equipment choice thing"; the Agility ladder
  *  chip already exists). It read "equipment-free" here, while the drill's own sourced how-to — the text the logger
  *  and Today's card print — starts "Stand at the bottom of an agility ladder" (`strength-grid/grid.ts`).
  *  ⛔ ONE OWNER: the week's pick (`drillForWeek`) and the swap list (`swap-groups.ts plyoSwapGroups`) both ask
  *  `drillAllowed`. The swap list kept its own one-drill copy of this table until 2026-09-20.
  *  Matched by substring against the athlete's equipment strings, the way lifting kit already is. */
-const DRILL_REQUIRES: Record<string, RegExp> = { 'ladder drills': /agility ladder/i, 'hopscotch': /agility ladder/i };
+const DRILL_REQUIRES: Record<string, RegExp> = {
+  'ladder drills': /agility ladder/i, 'ickey shuffle': /agility ladder/i, 'hopscotch': /agility ladder/i,
+};
 export function drillAllowed(drill: string, equipment?: string[] | null): boolean {
   const req = DRILL_REQUIRES[drill.toLowerCase()];
   if (!req) return true;

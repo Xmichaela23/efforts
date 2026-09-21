@@ -72,8 +72,10 @@ import { localDateInTz } from './local-date.ts';
 //   behind the (i) on Today's card); hopscotch needs the agility ladder, like ladder drills.
 // 25 (2026-09-20): the rewrite replaces a stored plyo drill the composer no longer gives (Hopscotch on a kit with no
 //   agility ladder) with its family's current drill; it had been left as built, old note and all.
+// 26 (2026-09-20): the Ickey Shuffle needs the agility ladder too, so a kit with no ladder composes two plyo drills;
+//   the rewrite takes a stored ladder drill off such a plan's plyo day.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 25;
+export const PLAN_WRITER_VERSION = 26;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

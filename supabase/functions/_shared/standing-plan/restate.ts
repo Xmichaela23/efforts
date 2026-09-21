@@ -314,7 +314,19 @@ export function restateFromTest(args: {
       replacement.set(ex, freshUnplaced[at]);
       freshUnplaced.splice(at, 1);
     }
-    const next = existing.map((ex) => {
+    /**
+     * ⛔ A STORED PLYO DRILL WHOSE FAMILY NOW GIVES THIS ATHLETE NOTHING COMES OFF THE DAY (2026-09-20). The three
+     * foot-speed drills all need an agility ladder; without one the composer writes no foot-speed row, so a plan built
+     * before that still showed the Ickey Shuffle — a ladder drill on a kit with no ladder (Michael's own Wednesday).
+     * ⚠️ THE ONE DELETE THIS FUNCTION MAKES, and only on a day the composer still writes plyo drills for, never on a
+     * session already done (gated above), and never a drill the composer still gives or replaces.
+     */
+    const plyoDayStill = wanted.some((w) => plyoFamilyOf(w) != null);
+    const dropped = new Set<StrengthExercise>(plyoDayStill
+      ? existing.filter((ex) => plyoFamilyOf(ex) != null && !replacement.has(ex) && !wanted.some((w) => nameOf(w) === nameOf(ex)))
+      : []);
+    if (dropped.size > 0) touched = true;
+    const next = existing.filter((ex) => !dropped.has(ex)).map((ex) => {
       const swapped = replacement.get(ex);
       if (swapped) { touched = true; return { ...swapped }; }
       const fresh = wanted.find((w) => String(w.name).toLowerCase() === String(ex?.name ?? '').toLowerCase());
