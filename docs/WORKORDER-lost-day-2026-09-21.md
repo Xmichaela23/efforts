@@ -52,6 +52,8 @@ workload caps 120/140 + warnings 80/100, suggestions) comes off. Replaced by boo
 APPROVED COPY (Michael, 2026-09-21) — exact words, [x] = filled by the server:
 1. p108 — "Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy
    session under an hour, with a full meal in between."
+   Fires only when one of the two sessions is a lift (p108 is the gap before the resistance session);
+   a run + ride day gets no note and still counts as fitting (2026-09-21).
 2. p80 — "[Lift]: [n] days until the next one. Consistent improvement needs one every 8 to 9 days."
    Shown only when the gap is over 9 days. The 3–4 day ideal gets no note.
 3. "[Day] is a day off." — the only refusal.

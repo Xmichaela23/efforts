@@ -921,7 +921,7 @@ Every number the per-workout record finder uses. The finder is `src/lib/best-eff
 
 | Number | Where | Source | Date |
 |---|---|---|---|
-| Two sessions on the target day → the two-a-day note (6–8 h, 4–6 h after an easy session under an hour, a full meal between) | `_shared/move-check/index.ts checkMove` | FIELD — Viada p108 | 2026-09-21 |
+| Two sessions on the target day, one of them a lift → the two-a-day note (a run + ride day gets none, and still fits) (6–8 h, 4–6 h after an easy session under an hour, a full meal between) | `_shared/move-check/index.ts checkMove` | FIELD — Viada p108 | 2026-09-21 |
 | Lift gap over 9 days → the "one every 8 to 9 days" note; 3–4 days is the ideal and gets no note | `_shared/move-check/index.ts LIFT_GAP_MAX_DAYS`, `LIFT_GAP_IDEAL` | FIELD — Viada p80 | 2026-09-21 |
 | A day off is the only refusal | `_shared/move-check/index.ts checkMove` | The athlete's own answer (no-hard-gates rule), not a book number | 2026-09-21 |
 | "Days that fit", lifts: ordered by the gap closest to 3–4 days | `_shared/move-check/index.ts daysThatFit` | FIELD — Viada p80 | 2026-09-21 |

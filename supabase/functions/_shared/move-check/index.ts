@@ -92,8 +92,10 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   }
   const notes: MoveNote[] = [];
   // Viada p108: 6–8 h between two-a-days, 4–6 h when the first is an easy session under an hour, a full meal between.
+  // ⛔ ONLY WHEN A LIFT IS ONE OF THE TWO (2026-09-21): p108 is about the gap before the resistance session. A run and
+  // a ride on one day get no note, and such a day still fits.
   const others = args.rows.filter((r) => r.id !== args.session.id && iso(r.date) === to && !isSkipped(r));
-  if (others.length > 0) {
+  if (others.length > 0 && (isLift(args.session) || others.some(isLift))) {
     notes.push({ rule: 'two_sessions', page: 'p108',
       text: 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.' });
   }

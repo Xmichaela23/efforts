@@ -112,3 +112,17 @@ Deno.test('DAYS THAT FIT: a day before today is never offered', () => {
   assertEquals(out.every((d) => d >= '2026-09-24'), true);
   assertEquals(out, ['2026-09-26', '2026-09-27']);
 });
+
+Deno.test('⛔ p108: a run moved onto a ride day gets no note, and that day still fits', () => {
+  const r = run('rr', '2026-09-23');
+  const ride: MoveRow = { id: 'rd', date: '2026-09-24', type: 'ride', name: 'Easy Ride', workout_status: 'planned', training_plan_id: 'p' };
+  assertEquals(checkMove({ session: r, toDate: '2026-09-24', rows: [r, ride], daysOff: [] }).notes, []);
+  // Tue and Thu are both one day from Wednesday; the tie goes to the earlier date. The ride day is offered.
+  assertEquals(daysThatFit({ session: r, fromDate: '2026-09-23', toDate: '2026-09-26', rows: [r, ride], daysOff: [], today: '2026-09-21' }),
+    ['2026-09-22', '2026-09-24', '2026-09-21']);
+});
+
+Deno.test('p108: a run moved onto a lifting day still gets the note', () => {
+  const r = run('rr', '2026-09-23');
+  assertEquals(checkMove({ session: r, toDate: '2026-09-22', rows: [r, HINGE], daysOff: [] }).notes.map((n) => n.text), [P108]);
+});
