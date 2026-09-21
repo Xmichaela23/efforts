@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { Dumbbell, Activity, Bike, Layers, Feather, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
+import { openLiftRetest, rebuildUpcomingSessions, REBUILD_NOTE } from '@/lib/plan-actions';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -259,20 +260,11 @@ export default function StateAdjustLens({ mainLifts }: {
   // the unstarted weeks. Without a standing plan the Baselines launcher session is the fallback (off-plan; it
   // writes the number on file and nothing else).
   const [retestBusy, setRetestBusy] = useState<string | null>(null);
+  // One owner with Baselines' Strength card (`@/lib/plan-actions`, 2026-09-20).
   const openLiftTest = (which: 'Lower' | 'Upper') => {
     void (async () => {
       setRetestBusy(which);
-      try {
-        const { data, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { schedule_retest: which.toLowerCase() } });
-        const d = data as any;
-        if (!error && d?.success && d?.planned) {
-          window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: d.planned } }));
-          window.dispatchEvent(new CustomEvent('week:invalidate'));
-          return;
-        }
-      } catch (e) { console.warn('[StateAdjustLens] retest row failed:', e); }
-      finally { setRetestBusy(null); }
-      window.dispatchEvent(new CustomEvent('baselines:openTest', { detail: { testName: `Baseline Test: ${which}` } }));
+      try { await openLiftRetest(which); } finally { setRetestBusy(null); }
     })();
   };
   const fmtDay = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -399,16 +391,11 @@ export default function StateAdjustLens({ mainLifts }: {
     void (async () => {
       setRebuilding(true);
       setRebuildNote(null);
-      try {
-        // ⛔ THIS TAP TAKES THE EQUIPMENT ON BASELINES (2026-09-20): a chip checked after the plan was built reaches the
-        // sessions still ahead here, and only here (`rematerialize-standing-block`, `use_current_equipment`).
-        const { data: rs, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true, use_current_equipment: true } });
-        if (error) throw error;
-        setRebuildNote((rs as any)?.success ? 'Upcoming sessions rebuilt from the plan.' : 'Nothing to rebuild.');
-      } catch (e) {
-        setRebuildNote('Could not rebuild. Try again.');
-        console.warn('[StateAdjustLens] rebuild failed:', e);
-      } finally { setRebuilding(false); }
+      // ⛔ THIS TAP TAKES THE EQUIPMENT ON BASELINES (2026-09-20): a chip checked after the plan was built reaches the
+      // sessions still ahead here (`rematerialize-standing-block`, `use_current_equipment`).
+      const result = await rebuildUpcomingSessions({ useCurrentEquipment: true });
+      setRebuildNote(REBUILD_NOTE[result]);
+      setRebuilding(false);
     })();
   };
   const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started take the new number. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
+import { openLiftRetest, rebuildUpcomingSessions, REBUILD_NOTE } from '@/lib/plan-actions';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -270,6 +271,10 @@ const [saveMessage, setSaveMessage] = useState('');
 const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'baselines' | 'data-import'>('baselines');
   const [activeSport, setActiveSport] = useState<string | null>(null);
+  // The Strength card's own buttons (2026-09-20): two retests, a rebuild under the numbers, a rebuild under the equipment.
+  const [retestBusy, setRetestBusy] = useState<'Lower' | 'Upper' | null>(null);
+  const [rebuildBusy, setRebuildBusy] = useState<'numbers' | 'equipment' | null>(null);
+  const [rebuildNotes, setRebuildNotes] = useState<{ numbers?: string; equipment?: string }>({});
   const [originalData, setOriginalData] = useState<string>(''); // JSON string for comparison
 
   // Learned fitness profile state
@@ -1107,7 +1112,31 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
       );
     });
     return [
-      { id: 'strength-numbers', label: 'Lifts · 1RM', Icon: Dumbbell, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sessions and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
+      { id: 'strength-numbers', label: 'Lifts · 1RM', Icon: Dumbbell, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sessions and up. A number typed here is also the number on file for a new block.', body: (
+        <>
+          <div className="space-y-1.5">{liftRows}</div>
+          {/* ⛔ THE BUTTONS SIT WHERE THE CHANGE IS MADE (Michael, 2026-09-20: "retest x 2, rebuild x 1 (if you manually
+              change), then equipment rebuild"). The same actions and words as the Adjust tab (`@/lib/plan-actions`). */}
+          <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3 mt-2">
+            <span className="text-subhead text-label">Retest</span>
+            <span className="flex flex-wrap gap-2 justify-end">
+              {(['Lower', 'Upper'] as const).map((which) => (
+                <button key={which} type="button" disabled={retestBusy != null}
+                  onClick={() => { setRetestBusy(which); void openLiftRetest(which).finally(() => setRetestBusy(null)); }}
+                  className={`${pillClass} inline-flex items-center gap-1`}>{retestBusy === which ? 'Opening…' : `${which} lifts`}<ChevronRight className="h-4 w-4 text-label-secondary" aria-hidden="true" /></button>
+              ))}
+            </span>
+          </div>
+          <p className="text-footnote text-label-secondary mt-2 leading-snug">A retest opens today, in the logger.</p>
+          <div className="mt-3">
+            <button type="button" disabled={rebuildBusy != null} className={pillClass}
+              onClick={() => { setRebuildBusy('numbers'); setRebuildNotes((n) => ({ ...n, numbers: undefined })); void rebuildUpcomingSessions().then((r) => setRebuildNotes((n) => ({ ...n, numbers: REBUILD_NOTE[r] }))).finally(() => setRebuildBusy(null)); }}>
+              {rebuildBusy === 'numbers' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+            <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
+            {rebuildNotes.numbers && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNotes.numbers}</p>}
+          </div>
+        </>
+      ) },
       { id: 'strength-equipment', label: 'Equipment', Icon: Wrench, info: 'A commercial gym has everything. A home gym lists what you have; the plan picks movements from it.', body: (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
@@ -1121,6 +1150,14 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
               onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
           </div>
           {!hasCommercialGym && equipmentChips('strength', homeGymEquipmentOptions)}
+          <div className="pt-1">
+            <button type="button" disabled={rebuildBusy != null} className={pillClass}
+              onClick={() => { setRebuildBusy('equipment'); setRebuildNotes((n) => ({ ...n, equipment: undefined })); void rebuildUpcomingSessions({ useCurrentEquipment: true }).then((r) => setRebuildNotes((n) => ({ ...n, equipment: REBUILD_NOTE[r] }))).finally(() => setRebuildBusy(null)); }}>
+              {rebuildBusy === 'equipment' ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+            {/* Michael's words, 2026-09-20. */}
+            <p className="text-footnote text-label-secondary mt-2 leading-snug">Changes made to equipment will be adjusted here for future sessions.</p>
+            {rebuildNotes.equipment && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNotes.equipment}</p>}
+          </div>
         </div>
       ) },
     ];
@@ -1399,9 +1436,11 @@ return (
                           {sec.body}
                         </div>
                       ))}
-                      <div className="px-3 py-3">
+                      {/* The Strength card has no link here, so the strip shows only when there is a save message to print. */}
+                      <div className={activeSport === 'strength' && !(saveMessage && lastSavedSport === activeSport) ? 'hidden' : 'px-3 py-3'}>
                         {saveMessage && lastSavedSport === activeSport && <p className="text-[13px] text-white/75 mb-1.5">{saveMessage}</p>}
-                        <button type="button" onClick={goToAdjust} className={`${pillClass} inline-flex items-center gap-1 outline-none focus:outline-none active:brightness-125`}>Retest or rebuild on Adjust<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
+                        {/* The Strength card carries its own retest and rebuild buttons (2026-09-20); the run and ride cards keep the link. */}
+                        {activeSport !== 'strength' && <button type="button" onClick={goToAdjust} className={`${pillClass} inline-flex items-center gap-1 outline-none focus:outline-none active:brightness-125`}>Retest or rebuild on Adjust<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>}
                       </div>
                     </div>
                   )}
