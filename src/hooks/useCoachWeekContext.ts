@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
@@ -650,9 +651,41 @@ export type CoachWeekContextV1 = {
   };
 };
 
+/**
+ * ⛔ ONE COPY OF THE WEEK'S COACHING CONTEXT (2026-09-21, cache step 6 — docs/AUDIT-client-cache-2026-09-21.md).
+ * Today, the calendar, State and Goals each held their own copy and each asked the server on open, so State
+ * started empty every time. The copy now lives in the shared query cache under the user and the day: a screen
+ * that opens paints the copy another screen already has, and an update from any screen reaches all of them.
+ * A screen that opens within COACH_SHARED_RECHECK_MS of another screen's check skips its own; any change the app
+ * announces (a workout, the plan, a baseline) clears that skip, so the next screen to open checks again.
+ * OURS — 60 s, chosen to cover screens mounting together, not to delay a real change.
+ */
+const COACH_SHARED_RECHECK_MS = 60 * 1000;
+const COACH_CHANGE_EVENTS = ['workouts:invalidate', 'planned:invalidate', 'week:invalidate', 'plans:invalidate', 'plans:refresh', 'baseline:saved'];
+
 export function useCoachWeekContext(date?: string) {
   const focusDate = date || new Date().toLocaleDateString('en-CA');
-  const [data, setData] = useState<CoachWeekContextV1 | null>(null);
+  const queryClient = useQueryClient();
+  const coachKey = ['coach-week', getStoredUserId() ?? 'anon', focusDate];
+  const { data = null } = useQuery<CoachWeekContextV1 | null>({
+    queryKey: coachKey,
+    // Never fetched through the cache: the checks below decide when to ask the server, and write the answer in.
+    queryFn: () => (queryClient.getQueryData<CoachWeekContextV1 | null>(coachKey) ?? null),
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: 6 * 60 * 60 * 1000,
+  });
+  const setData = useCallback(
+    (p: CoachWeekContextV1 | null) => { queryClient.setQueryData(coachKey, p); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient, coachKey.join('|')],
+  );
+
+  useEffect(() => {
+    const onChange = () => { queryClient.invalidateQueries({ queryKey: ['coach-week'], refetchType: 'none' }); };
+    COACH_CHANGE_EVENTS.forEach((n) => window.addEventListener(n, onChange));
+    return () => { COACH_CHANGE_EVENTS.forEach((n) => window.removeEventListener(n, onChange)); };
+  }, [queryClient]);
   const [loading, setLoading] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -777,12 +810,18 @@ export function useCoachWeekContext(date?: string) {
       else setLoading(false);
       if (!isBackground) foregroundPipelineBusy.current = false;
     }
-  }, [focusDate]);
+  }, [focusDate, setData]);
 
   const fetchCoach = useCallback(() => runPipeline(false, { force: true }), [runPipeline]);
 
   useEffect(() => {
     hasCachedData.current = false;
+
+    const shared = queryClient.getQueryState(coachKey);
+    if (shared?.data && !shared.isInvalidated && Date.now() - shared.dataUpdatedAt < COACH_SHARED_RECHECK_MS) {
+      hasCachedData.current = true;
+      return;
+    }
 
     const userId = getStoredUserId();
     if (!userId) {

@@ -327,14 +327,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [plansAuthReady]);
 
-  // Listen for plans:refresh event (triggered after plan generation)
+  // Listen for plans:refresh event (triggered after plan generation). `plans:invalidate` is sent after a goal is
+  // deleted, a wizard is reset or a plan is activated, and nothing used to hear it (cache step 4, 2026-09-21), so
+  // the plan lists stayed old until the next plans:refresh. Both now reload the one copy.
   useEffect(() => {
     const handleRefresh = () => {
-      console.log('[AppContext] Received plans:refresh event');
       loadPlans();
     };
     window.addEventListener('plans:refresh', handleRefresh);
-    return () => window.removeEventListener('plans:refresh', handleRefresh);
+    window.addEventListener('plans:invalidate', handleRefresh);
+    return () => {
+      window.removeEventListener('plans:refresh', handleRefresh);
+      window.removeEventListener('plans:invalidate', handleRefresh);
+    };
   }, []);
 
   /**
@@ -828,14 +833,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error as any;
       if (!data?.success) throw new Error(data?.error || 'Failed to pause plan');
       
-      // Optimistically update detailedPlans to prevent stale reads
-      if (detailedPlans[planId]) {
-        detailedPlans[planId] = {
-          ...detailedPlans[planId],
-          status: 'paused',
-          paused_at: data.paused_at
-        };
-      }
+      // Show the pause right away, then reload the server's copy. This used to edit the plan object in place,
+      // which no screen notices, so the pause did not show until something else reloaded the plans.
+      setDetailedPlans((prev: any) => (prev?.[planId]
+        ? { ...prev, [planId]: { ...prev[planId], status: 'paused', paused_at: data.paused_at } }
+        : prev));
+      loadPlans();
       
       try {
         window.dispatchEvent(new CustomEvent('planned:invalidate'));
@@ -855,13 +858,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('plans').update(updates).eq('id', planId).select().single();
       if (error) throw error;
       
-      // Optimistically update detailedPlans to prevent stale reads
-      if (detailedPlans[planId]) {
-        detailedPlans[planId] = {
-          ...detailedPlans[planId],
-          ...updates
-        };
-      }
+      // Show the edit right away, then reload the server's copy (see pausePlan).
+      setDetailedPlans((prev: any) => (prev?.[planId]
+        ? { ...prev, [planId]: { ...prev[planId], ...updates } }
+        : prev));
+      loadPlans();
       
       try {
         window.dispatchEvent(new CustomEvent('week:invalidate'));

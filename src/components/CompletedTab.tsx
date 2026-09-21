@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/select';
 
 import { useAppContext } from '@/contexts/AppContext';
-import { useWorkouts } from '@/hooks/useWorkouts';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
@@ -83,12 +82,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
    * number.
    */
   const sessionWorkload = typeof sessionDetail?.load?.workload === 'number' ? sessionDetail.load.workload : null;
-  const { useImperial } = useAppContext();
+  // ⛔ ONE COMPLETED-WORKOUTS LIST (2026-09-21, cache step 3). This screen used to build its own second copy of the
+  // list just to save an edit. That copy joined the app's live-update channel (the library hands back the channel
+  // by name) and removed it on close, so after this screen closed, synced workouts stopped arriving until relaunch.
+  const { useImperial, updateWorkout } = useAppContext();
   const compact = useCompact();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
   const [isLoading, setIsLoading] = useState(true);

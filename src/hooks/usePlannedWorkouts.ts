@@ -15,63 +15,61 @@ export type UsePlannedWorkoutsOptions = {
   fetchWindowedPlanned?: boolean;
 };
 
+/**
+ * ⛔ ONE COPY OF THE PLANNED LIST (2026-09-21, cache step 2 — docs/AUDIT-client-cache-2026-09-21.md). The list
+ * used to live in each hook instance's own state, filled by the query function as a side effect. A second screen
+ * that mounted while the cache was fresh never ran that function and showed an empty list. Every instance now reads
+ * the one cached list; edits write into that same list, so every screen sees them.
+ */
+
 export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
   const fetchWindowedPlanned = options?.fetchWindowedPlanned !== false;
-  const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([]);
-  const [loading, setLoading] = useState(fetchWindowedPlanned);
-  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  // The user is in the key so a sign-out and sign-in on one phone never shows the last account's list.
+  const PLANNED_KEY = ['planned', 'windowed', getStoredUserId() ?? 'anon'];
+  const setPlannedWorkouts = (fn: (prev: PlannedWorkout[]) => PlannedWorkout[]) =>
+    queryClient.setQueryData<PlannedWorkout[]>(PLANNED_KEY, (prev) => (prev ? fn(prev) : prev));
 
   // Fetch all planned workouts for the current user
-  const fetchPlannedWorkouts = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const userId = getStoredUserId();
-      if (!userId) {
-        throw new Error('User must be authenticated to fetch planned workouts');
-      }
-
-      // Use get-week edge function (SMART SERVER) - fetches unified data with computed
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const pastIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 7 days
-      const futureIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // next ~4 months
-
-      const { data, error } = await supabase.functions.invoke('get-week', { 
-        body: { from: pastIso, to: futureIso } 
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
-      const plannedItems = items.filter((it: any) => !!it?.planned);
-      const transformedWorkouts: PlannedWorkout[] = plannedItems.map(toPlannedWorkout);
-      setPlannedWorkouts(transformedWorkouts);
-      return transformedWorkouts; // react-query requires a defined value; the state above is what consumers read
-    } catch (err) {
-      console.error('Error fetching planned workouts:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch planned workouts');
-      return [] as PlannedWorkout[];
-    } finally {
-      setLoading(false);
+  const fetchPlannedWorkouts = useCallback(async (): Promise<PlannedWorkout[]> => {
+    const userId = getStoredUserId();
+    if (!userId) {
+      throw new Error('User must be authenticated to fetch planned workouts');
     }
+
+    // Use get-week edge function (SMART SERVER) - fetches unified data with computed
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const pastIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 7 days
+    const futureIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // next ~4 months
+
+    const { data, error } = await supabase.functions.invoke('get-week', { 
+      body: { from: pastIso, to: futureIso } 
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+    const plannedItems = items.filter((it: any) => !!it?.planned);
+    return plannedItems.map(toPlannedWorkout);
   }, []);
 
-  // React Query integration: keep cache warm and allow invalidation
-  const { refetch } = useQuery({
-    queryKey: ['planned', 'windowed'],
+  // Fresh for 10 minutes; a screen that opens after that refetches in the background and shows the cached list meanwhile.
+  const query = useQuery({
+    queryKey: PLANNED_KEY,
     queryFn: fetchPlannedWorkouts,
     enabled: fetchWindowedPlanned,
-    // longer cache to avoid churn; no refetch on focus/mount
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchOnMount: false,
   });
+  const { refetch } = query;
+  const plannedWorkouts: PlannedWorkout[] = query.data ?? [];
+  const loading = fetchWindowedPlanned && query.isLoading;
+  const error = mutationError ?? (query.error ? (query.error instanceof Error ? query.error.message : 'Failed to fetch planned workouts') : null);
 
   // Add a new planned workout
   const addPlannedWorkout = async (workoutData: Omit<PlannedWorkout, 'id'>) => {
@@ -252,8 +250,13 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
       // deleted workout's state — the "resurrection" symptom. A1 closes
       // the eager-cleanup path; A2 in StrengthLogger.tsx is the defensive
       // backstop for any other path that could orphan a session key.
-      const targetRow = plannedWorkouts.find(w => w.id === id);
-      const targetDate = targetRow?.date ?? null;
+      // Read the type from the row itself: a screen that does not load the list (the workout view) has no copy of it.
+      const { data: targetRow } = await supabase
+        .from('planned_workouts')
+        .select('type')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .maybeSingle();
       const targetType = String(targetRow?.type ?? '').toLowerCase();
 
       const { error } = await supabase
@@ -272,9 +275,17 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
       // Non-strength rows don't write to the strength logger key, so the
       // removeItem would be a no-op — but skipping it keeps the intent
       // explicit and avoids confusing future readers.
-      if (targetDate && targetType === 'strength') {
+      // Drafts are keyed `strength_logger_session_${performedDate}_${plannedId}` (D-132), and the performed date can
+      // differ from the planned date, so clear every draft that names this workout.
+      if (targetType === 'strength') {
         try {
-          localStorage.removeItem(`strength_logger_session_${targetDate}`);
+          const suffix = `_${id}`;
+          const doomed: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('strength_logger_session_') && k.endsWith(suffix)) doomed.push(k);
+          }
+          doomed.forEach((k) => localStorage.removeItem(k));
         } catch {}
       }
     } catch (err) {
@@ -313,16 +324,13 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
 
   // Removed extra on-mount fetch; React Query owns fetching
 
-  // Refresh when other views broadcast invalidation
+  // Refresh when other views broadcast invalidation. Marks the one list old; screens showing it refetch.
   useEffect(() => {
     if (!fetchWindowedPlanned) return;
-    const handler = () => {
-      // use refetch to collaborate with React Query cache
-      refetch();
-    };
+    const handler = () => { queryClient.invalidateQueries({ queryKey: ['planned'] }); };
     window.addEventListener('planned:invalidate', handler);
     return () => window.removeEventListener('planned:invalidate', handler);
-  }, [refetch, fetchPlannedWorkouts, fetchWindowedPlanned]);
+  }, [queryClient, fetchWindowedPlanned]);
 
   return {
     plannedWorkouts,

@@ -9,6 +9,7 @@
 // which are config, not computed verdicts.
 
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import {
   disciplineOf,
@@ -47,10 +48,14 @@ export interface StateTrends {
 export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTrends {
   // Declared posture (per_discipline_posture) — config, not computed. The contract's card.posture can lag a
   // stale snapshot, so the Building/Holding grouping reads THIS. One tiny goals read (the same one compute-snapshot does).
-  const [declaredPosture, setDeclaredPosture] = useState<Record<string, string> | null>(null);
+  // Both reads open with the last answer any screen got (cache step 6, 2026-09-21), then read again.
+  const queryClient = useQueryClient();
+  const sharedKey = ['state-trends-config', getStoredUserId() ?? 'anon'];
+  const shared = queryClient.getQueryData<{ posture: Record<string, string> | null; active: string[] }>(sharedKey);
+  const [declaredPosture, setDeclaredPosture] = useState<Record<string, string> | null>(shared?.posture ?? null);
   // Disciplines with a session in the last ~4 weeks — the detraining onset window (VO2max starts dropping
   // at 2–4wk; Garmin's own "Detraining" gate). Drives "still doing it" vs "dropped" for the dim.
-  const [activeDisciplines, setActiveDisciplines] = useState<string[]>([]);
+  const [activeDisciplines, setActiveDisciplines] = useState<string[]>(shared?.active ?? []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -64,10 +69,12 @@ export function useStateTrends(displayContract?: StateDisplayV1 | null): StateTr
       ]);
       if (cancelled) return;
       const prefs = goalR.data?.training_prefs as { per_discipline_posture?: unknown } | null | undefined;
-      setDeclaredPosture((sanitizePosture(prefs?.per_discipline_posture) as Record<string, string>) ?? null);
+      const posture = (sanitizePosture(prefs?.per_discipline_posture) as Record<string, string>) ?? null;
+      setDeclaredPosture(posture);
       const active = new Set<string>();
       for (const w of ((wkR.data ?? []) as Array<{ type?: string }>)) { const d = disciplineOf(w.type); if (d) active.add(d); }
       setActiveDisciplines([...active]);
+      queryClient.setQueryData(sharedKey, { posture, active: [...active] });
     })();
     return () => { cancelled = true; };
   }, []);

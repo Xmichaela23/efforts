@@ -45,7 +45,8 @@
  * was the only working path, and this hook extends it rather than reviving a surface nobody wired.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import type {
   LiftCalibrationStatus,
   StrengthCalibrationEvent,
@@ -86,8 +87,17 @@ export type StrengthCalibrationRead = {
 };
 
 export function useStrengthCalibration(enabled = true): StrengthCalibrationRead {
-  const [byLift, setByLift] = useState<CalibratedLift[]>([]);
-  const [loading, setLoading] = useState<boolean>(enabled);
+  // Opens with the last read any screen made (cache step 6, 2026-09-21), then reads again; State and Performance
+  // no longer start blank. The server read below still runs on every open, so a shown number is never kept.
+  const queryClient = useQueryClient();
+  const sharedKey = ['strength-calibration', getStoredUserId() ?? 'anon'];
+  const shared = enabled ? queryClient.getQueryData<CalibratedLift[]>(sharedKey) : undefined;
+  const [byLift, setByLiftLocal] = useState<CalibratedLift[]>(shared ?? []);
+  const [loading, setLoading] = useState<boolean>(enabled && !shared);
+  const setByLift = (v: CalibratedLift[]) => {
+    setByLiftLocal(v);
+    if (enabled) queryClient.setQueryData(sharedKey, v);
+  };
   // ⚠️ Guards a setState after unmount, and the refetch-after-undo below.
   const alive = useRef(true);
   const [nonce, setNonce] = useState(0);
