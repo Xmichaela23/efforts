@@ -130,7 +130,15 @@ export default function RescheduleValidationPopup({
   const Icon = styles.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    // ⛔ CLEARS THE TAB BAR AND THE SAFE AREA (2026-09-21, from Michael's phone: Cancel / Confirm sat under the tab bar
+    // and could not be reached). The panel fits the space above it and scrolls inside itself.
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        paddingBottom: 'calc(var(--tabbar-h, 56px) + env(safe-area-inset-bottom, 0px) + var(--tabbar-extra, 0px))',
+      }}
+    >
       {/* Backdrop with gradient */}
       <div
         className="absolute inset-0 backdrop-blur-md"
@@ -143,10 +151,11 @@ export default function RescheduleValidationPopup({
 
       {/* Panel with glassmorphism */}
       <div
-        className="relative w-full max-w-lg mx-4 mb-4 p-6 rounded-2xl backdrop-blur-xl border-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] animate-slide-up"
+        className="relative w-full max-w-lg mx-4 mb-4 p-6 max-h-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-2xl backdrop-blur-xl border-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] animate-slide-up"
         style={{
           background: styles.bgGradient,
           borderColor: styles.borderColor,
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Close button */}
@@ -216,7 +225,7 @@ export default function RescheduleValidationPopup({
         {coachOptions && coachOptions.length > 0 && (
           <div className="mb-4">
             <p className="text-xs text-white/60 font-light mb-3">Recommended options:</p>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
               {coachOptions.map((option, idx) => {
                 const getRiskColor = () => {
                   switch (option.riskLevel) {
