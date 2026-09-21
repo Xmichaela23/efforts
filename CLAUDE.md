@@ -107,7 +107,7 @@ Efforts is a hybrid endurance + strength training app for intermediate athletes 
 
 ## Project
 
-**Efforts** — hybrid endurance + strength training app (run / cycling / triathlon / duathlon + integrated strength). React + TypeScript on Vite/Vercel; Supabase (Postgres + Deno edge functions); iOS via Capacitor.
+**Efforts** — hybrid endurance + strength training app (run / cycling / triathlon / duathlon + integrated strength). React + TypeScript on Vite/Netlify; Supabase (Postgres + Deno edge functions); iOS via Capacitor.
 
 ## Context-priming for new sessions
 
@@ -158,7 +158,7 @@ No `npm test`. Some `*.test.ts` / `*.contract.test.ts` live under `supabase/func
 
 ## Deploy policy (the user does NOT deploy)
 
-After any change that affects production, ship it, and `git push origin main` (Vercel auto-deploys — corrected 2026-09-20, it read Netlify; check a build at `https://api.github.com/repos/Xmichaela23/efforts/commits/<sha>/status`). Don't end a task with "you should deploy."
+After any change that affects production, ship it, and `git push origin main` (Netlify auto-deploys efforts.work from main — `curl -sI https://efforts.work` says `server: Netlify`; confirm a client change by the Netlify deploy or the live bundle. The `vercel[bot]` builds serve nothing, `docs/DEPLOY-OWED.md`). Don't end a task with "you should deploy."
 
 ### ⛔ The `_shared` deploy trap — read this every time you touch a shared file
 

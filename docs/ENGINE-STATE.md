@@ -3,7 +3,7 @@
 ## 🧭 ALSO READ — the engineer terminal's 2026-09-20 (D-481): Today narrative · plyo card · equipment rebuild · retest
 
 > **ALSO 2026-09-20 — the engineer terminal's day (D-481). All PUSHED to main, DEPLOYED, and checked on the LIVE server
-> with throwaway plans (deleted, 45 user tables empty each time). Vercel build green at `3fb1c9bf9` and after.**
+> with throwaway plans (deleted, 45 user tables empty each time). The client is Netlify (efforts.work); a Vercel status says nothing about it.**
 > 1. **Today's narrative** for a hard run or ride (`_shared/planned-narrative.ts` → `computed.narrative` → get-week →
 >    `today-lines.ts`). VERIFIED on Michael's own plan (the Descending Ladder card, reworded the same day).
 > 2. **The plyo card**: how-to under each drill, benefit behind an (i), p227's line once under the title in "you", "Pick
@@ -12,7 +12,7 @@
 >    through "Rebuild upcoming sessions" under the chips or on Adjust** (`use_current_equipment`); the block stores the kit.
 > 4. **`restateFromTest` pairs rows by `source_row` (slot first)**; a plyo family is a slot (drop / gain a drill); `retest`
 >    rows are skipped. Live check home → Commercial gym: 0 of 60 lifting sessions differ from a gym-built plan.
-> 5. **Refresh wait: 5 minutes, only behind a refresh by the current writer version.** `PLAN_WRITER_VERSION` is **26**.
+> 5. **Refresh wait: 5 minutes, only behind a refresh by the current writer version.** `PLAN_WRITER_VERSION` is **27** (`d11a76c72`).
 > 6. **Retest works on a lifting day**: migration `20260920230000_planned_unique_key_exempts_retest.sql` was APPLIED by
 >    Michael in the SQL editor; a second tap reuses today's row. **Baselines' Strength card has four real buttons**
 >    (`src/lib/plan-actions.ts`, shared with Adjust).
@@ -21,9 +21,9 @@
 > from a clean `git worktree` of the pushed commit (`git worktree add --detach <dir> <sha>`, deploy from it, remove it),
 > because `supabase functions deploy` bundles the files on disk and this folder holds other terminals' uncommitted work.
 > ⛔ **`git diff <file>` BEFORE `git add <file>` HERE.** `4af18ef0c` swept another terminal's uncommitted `day-seq` hunk
-> of `restate.ts` onto main; the Vercel build and four function deploys failed ("Module not found … day-seq.ts").
-> `3fb1c9bf9` took it out. That terminal's edit and its untracked `_shared/day-seq.ts` are still in the tree, uncommitted;
-> `docs/INVENTORY.md` and `npm run lint:truth` are red on them, not on this work.
+> of `restate.ts` onto main; four function deploys failed ("Module not found … day-seq.ts").
+> `3fb1c9bf9` took it out. That edit was committed whole with `_shared/day-seq.ts` in `d11a76c72` (two sessions of one
+> sport on one day).
 >
 > **UNVERIFIED from this day:** Q-302, the live 45-day workouts list timed out once (57014) — a HYPOTHESIS about
 > `computed->key` re-reads, not timed; an EXPLAIN on his rows needs his go-ahead · not seen on a device: the four
