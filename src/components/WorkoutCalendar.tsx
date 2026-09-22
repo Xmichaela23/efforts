@@ -1501,8 +1501,9 @@ export default function WorkoutCalendar({
                   /* ⛔ `Rest` ONLY WHERE A PLAN SAYS SO, AND THE SERVER SAYS IT (2026-09-17, WORKORDER Stage C).
                      This ran its own copy of Today's rule; both read `empty_day_lines` now. The calendar prints
                      only the rest word — the other three lines belong to the day's own screen.
+                     ⛔ AND "Down" (2026-09-22): a day whose sessions were all moved off it. Same styling.
                      server-word: get-week composes it, this prints it. */
-                  emptyDayLines?.[key] === 'Rest' ? (
+                  emptyDayLines?.[key] === 'Rest' || emptyDayLines?.[key] === 'Down' ? (
                     <span className="text-[14px] italic" style={{ color: 'rgba(242,240,236,0.36)' }}>{emptyDayLines[key]}</span>
                   ) : null
                 ) : items.map((evt: any, i: number) => {

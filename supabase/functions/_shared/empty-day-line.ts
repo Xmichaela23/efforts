@@ -21,6 +21,13 @@
  */
 export const REST_DAY_LINE = 'Rest';  // p278 — "REST"
 
+/**
+ * ⛔ A DAY THE ATHLETE LOST (Michael's word, approved 2026-09-22). A day whose planned sessions were all moved off it —
+ * every one still carries this day as its original day (`moved_from:`, `_shared/moved-from.ts`) — is not a rest day
+ * the plan chose, so it does not say "Rest". Move one back and the day shows the session again, with no line.
+ */
+export const DOWN_DAY_LINE = 'Down';
+
 export type EmptyDayInput = {
   /** ISO date of the day, YYYY-MM-DD. */
   date: string;
@@ -30,6 +37,8 @@ export type EmptyDayInput = {
   hasPlan: boolean;
   /** The start date of a plan that is active but has not opened yet, ISO — else null. */
   upcomingPlanStartsOn?: string | null;
+  /** True when sessions were moved off this day (they carry it as `moved_from:`) and none is left on it. */
+  movedOff?: boolean;
 };
 
 /** "Monday, September 21" — the athlete's own date words, in the app's one locale. */
@@ -41,6 +50,7 @@ function dayWords(iso: string): string | null {
 }
 
 export function emptyDayLine(input: EmptyDayInput): string {
+  if (input.movedOff) return DOWN_DAY_LINE;
   if (input.hasPlan) return REST_DAY_LINE;
   if (input.date < input.today) return 'No effort logged';
   const starts = input.upcomingPlanStartsOn ?? null;
