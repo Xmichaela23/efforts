@@ -11,6 +11,7 @@
  * picture with nothing to drag.
  */
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { movePatch } from '@/lib/session-move';
@@ -29,6 +30,11 @@ const weekdayOf = (d: string) => WEEKDAY[new Date(`${d}T12:00:00`).getDay()];
 const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 /** The calendar's own sport reading, tags included — so a plyo warm-up is the calendar's pink, not the lift orange. */
 const sportOf = (s: Session, tags: Record<string, string[]>) => displayDisciplineOf({ type: s.type ?? '', tags: tags[s.id] ?? [] } as never);
+/**
+ * The move check's p108 note, word for word (`_shared/move-check/index.ts`). ⚠️ The server sends notes as words, so the
+ * sheet recognises this one by its exact text to show it once per day; if the approved words change, change both.
+ */
+const P108_NOTE = 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.';
 const NO_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
 
 export default function LostDaySheet({ date, onClose }: { date: string; onClose: () => void }) {
@@ -130,104 +136,145 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     (byDay[weekdayOf(s.to)] ??= []).push(sportOf(s, tags));
   }
 
-  return (
+  /**
+   * ⛔ THE SHEET OWNS THE SCREEN WHILE IT IS OPEN (2026-09-21, from Michael's iPhone: it could not scroll to its top
+   * and Cancel/Save were cut off). Full height, above the tab bar and everything else, portalled out of the calendar
+   * card. The title and the day chips stay at the top, Cancel and Save stay at the bottom above the safe area, and
+   * ONLY THE WEEK LIST SCROLLS. The page behind does not move: its scroll is locked while the sheet is open, and a
+   * touch that is not on the list cannot scroll anything.
+   */
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    const body = document.body;
+    const before = { overflow: body.style.overflow, overscroll: body.style.overscrollBehavior };
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    const root = rootRef.current;
+    // Non-passive, so it may cancel: a finger outside the list scrolls nothing.
+    const onMove = (e: TouchEvent) => {
+      if (!listRef.current?.contains(e.target as Node)) e.preventDefault();
+    };
+    root?.addEventListener('touchmove', onMove, { passive: false });
+    return () => {
+      body.style.overflow = before.overflow;
+      body.style.overscrollBehavior = before.overscroll;
+      root?.removeEventListener('touchmove', onMove);
+    };
+  }, []);
+
+  /** The two-sessions note (p108) is about a DAY: shown once, under the day, not under each session on it. */
+  const isDayNote = (n: string) => n === P108_NOTE;
+
+  return createPortal(
     <div
+      ref={rootRef}
       data-pull-refresh-ignore
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
-        paddingBottom: 'calc(var(--tabbar-h, 56px) + env(safe-area-inset-bottom, 0px) + var(--tabbar-extra, 0px))',
-      }}
+      className="fixed inset-0 z-[60] flex flex-col"
+      style={{ background: 'rgb(16,16,18)', ...NO_SELECT }}
     >
-      <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(0,0,0,0.65)' }} onClick={onClose} />
-      <div
-        className="relative w-full max-w-lg mx-4 mb-4 p-5 max-h-[calc(100%-1rem)] overflow-y-auto rounded-2xl border border-white/15"
-        style={{ background: 'rgba(20,20,22,0.97)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', ...NO_SELECT }}
-      >
+      <div className="flex-shrink-0 px-4 pb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
         <p className="text-base font-light text-white">Can&apos;t train this day</p>
         <p className="text-xs text-white/50 mt-1">{fmtDay(date)}</p>
-
         {plan ? (
-          <div className={`mt-4 space-y-3 ${busy ? 'opacity-50' : ''} transition-opacity`}>
+          <div className={`mt-3 ${busy ? 'opacity-50' : ''} transition-opacity`}>
             <WeekStrip byDay={byDay} />
-            <div className="rounded-xl border border-white/10 overflow-hidden">
-              {days.map((d) => {
-                const on = dayOrder(plan.sessions.filter((s) => s.to === d));
-                const lost = d === plan.lostDate;
-                return (
-                  <div
-                    key={d}
-                    data-lost-day={d}
-                    className="grid gap-2 px-3 py-2 border-b border-white/10 last:border-b-0"
-                    style={{
-                      gridTemplateColumns: '52px minmax(0,1fr)',
-                      background: lost ? 'rgba(255,255,255,0.02)' : 'transparent',
-                      opacity: lost && !carry.overStyle(d) ? 0.45 : 1,
-                      ...(carry.overStyle(d) ?? {}),
-                    }}
-                  >
-                    <div className="text-[12px] uppercase" style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15 }}>
-                      {new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}
-                      <b className="block text-[16px] font-normal tabular-nums" style={{ color: 'rgba(242,240,236,0.85)' }}>
-                        {new Date(`${d}T12:00:00`).getDate()}
-                      </b>
-                    </div>
-                    <div className="flex flex-col gap-1.5 min-w-0 justify-center">
-                      {on.map((s) => {
-                        const colour = getDisciplineColor(sportOf(s, tags));
-                        const moved = s.to !== s.from;
-                        return (
-                          <div key={s.id} style={{ opacity: carry.carryingId === s.id ? 0.3 : 1 }}>
-                            <div data-lost-session={s.id} className="grid items-center gap-2.5 text-[15px] min-w-0" style={{ gridTemplateColumns: '10px minmax(0,1fr) 24px' }}>
-                              <span
-                                className="inline-block rounded-full"
-                                style={{ width: 8, height: 8, background: moved ? 'transparent' : colour, border: `2px solid ${colour}`, boxSizing: 'border-box' }}
-                              />
-                              <span className="truncate" style={{ color: s.movable ? 'rgba(242,240,236,1)' : 'var(--label-secondary)' }}>{s.name}</span>
-                              {s.movable ? (
-                                <span
-                                  aria-hidden="true"
-                                  onTouchStart={(e) => { e.stopPropagation(); const t = e.touches[0]; if (t) pickUp(e.currentTarget, t.clientY, s); }}
-                                  onPointerDown={(e) => { if (e.pointerType === 'mouse') { e.preventDefault(); pickUp(e.currentTarget, e.clientY, s); } }}
-                                  className="inline-flex items-center justify-center -my-2 py-2"
-                                  style={{ color: 'rgba(242,240,236,0.62)', touchAction: 'none', cursor: 'grab' }}
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </span>
-                              ) : <span />}
-                            </div>
-                            {s.notes.map((n, i) => (
-                              <p key={i} className="mt-1 ml-[20px] text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>{n}</p>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         ) : null}
-        {carry.card}
-
-        <div className="flex gap-3 pt-5">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 rounded-xl font-light text-white/60 bg-white/[0.05] border-2 border-white/10"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => void accept()}
-            disabled={!plan || busy || saving}
-            className="flex-1 px-4 py-3 rounded-xl font-light text-white border-2 disabled:opacity-40"
-            style={{ backgroundColor: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.3)' }}
-          >
-            Save
-          </button>
-        </div>
       </div>
-    </div>
+
+      <div
+        ref={listRef}
+        className="flex-1 min-h-0 overflow-y-auto px-4"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      >
+        {plan ? (
+          <div className={`rounded-xl border border-white/10 overflow-hidden ${busy ? 'opacity-50' : ''} transition-opacity`}>
+            {days.map((d) => {
+              const on = dayOrder(plan.sessions.filter((s) => s.to === d));
+              const lost = d === plan.lostDate;
+              const dayNote = on.some((s) => s.notes.some(isDayNote));
+              return (
+                <div
+                  key={d}
+                  data-lost-day={d}
+                  className="grid gap-2 px-3 py-2 border-b border-white/10 last:border-b-0"
+                  style={{
+                    gridTemplateColumns: '52px minmax(0,1fr)',
+                    background: lost ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    opacity: lost && !carry.overStyle(d) ? 0.45 : 1,
+                    ...(carry.overStyle(d) ?? {}),
+                  }}
+                >
+                  <div className="text-[12px] uppercase" style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15 }}>
+                    {new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' })}
+                    <b className="block text-[16px] font-normal tabular-nums" style={{ color: 'rgba(242,240,236,0.85)' }}>
+                      {new Date(`${d}T12:00:00`).getDate()}
+                    </b>
+                  </div>
+                  <div className="flex flex-col gap-1.5 min-w-0 justify-center">
+                    {on.map((s) => {
+                      const colour = getDisciplineColor(sportOf(s, tags));
+                      const moved = s.to !== s.from;
+                      return (
+                        <div key={s.id} style={{ opacity: carry.carryingId === s.id ? 0.3 : 1 }}>
+                          <div data-lost-session={s.id} className="grid items-center gap-2.5 text-[15px] min-w-0" style={{ gridTemplateColumns: '10px minmax(0,1fr) 24px' }}>
+                            <span
+                              className="inline-block rounded-full"
+                              style={{ width: 8, height: 8, background: moved ? 'transparent' : colour, border: `2px solid ${colour}`, boxSizing: 'border-box' }}
+                            />
+                            <span className="truncate" style={{ color: s.movable ? 'rgba(242,240,236,1)' : 'var(--label-secondary)' }}>{s.name}</span>
+                            {s.movable ? (
+                              <span
+                                aria-hidden="true"
+                                onTouchStart={(e) => { e.stopPropagation(); const t = e.touches[0]; if (t) pickUp(e.currentTarget, t.clientY, s); }}
+                                onPointerDown={(e) => { if (e.pointerType === 'mouse') { e.preventDefault(); pickUp(e.currentTarget, e.clientY, s); } }}
+                                className="inline-flex items-center justify-center -my-2 py-2"
+                                style={{ color: 'rgba(242,240,236,0.62)', touchAction: 'none', cursor: 'grab' }}
+                              >
+                                <GripVertical className="w-4 h-4" />
+                              </span>
+                            ) : <span />}
+                          </div>
+                          {s.notes.filter((n) => !isDayNote(n)).map((n, i) => (
+                            <p key={i} className="mt-1 ml-[20px] text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>{n}</p>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {dayNote ? (
+                      <p className="mt-0.5 ml-[20px] text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>{P108_NOTE}</p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className="h-3" />
+      </div>
+
+      <div
+        className="flex-shrink-0 flex gap-3 px-4 pt-3 border-t border-white/10"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
+        <button
+          onClick={onClose}
+          className="flex-1 px-4 py-3 rounded-xl font-light text-white/60 bg-white/[0.05] border-2 border-white/10"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void accept()}
+          disabled={!plan || busy || saving}
+          className="flex-1 px-4 py-3 rounded-xl font-light text-white border-2 disabled:opacity-40"
+          style={{ backgroundColor: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.3)' }}
+        >
+          Save
+        </button>
+      </div>
+      {carry.card}
+    </div>,
+    document.body,
   );
 }
