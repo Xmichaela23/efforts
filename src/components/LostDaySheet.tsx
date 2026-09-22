@@ -26,7 +26,8 @@ type Plan = { lostDate: string; week: string[]; sessions: Session[] };
 const WEEKDAY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const weekdayOf = (d: string) => WEEKDAY[new Date(`${d}T12:00:00`).getDay()];
 const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const sportOf = (s: Session) => displayDisciplineOf({ type: s.type ?? '' } as never);
+/** The calendar's own sport reading, tags included — so a plyo warm-up is the calendar's pink, not the lift orange. */
+const sportOf = (s: Session, tags: Record<string, string[]>) => displayDisciplineOf({ type: s.type ?? '', tags: tags[s.id] ?? [] } as never);
 const NO_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
 
 export default function LostDaySheet({ date, onClose }: { date: string; onClose: () => void }) {
@@ -36,6 +37,41 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   const [busy, setBusy] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [drag, setDrag] = React.useState<{ id: string; over: string | null } | null>(null);
+  /**
+   * ⛔ THE ROWS' TAGS, FOR THE DISPLAY ONLY (2026-09-21): which session is a plyo warm-up — its colour and its place
+   * in the day. The server's answer carries no tags; this reads them once per set of sessions. Read by tag, never name.
+   */
+  const [tags, setTags] = React.useState<Record<string, string[]>>({});
+  const idsKey = (plan?.sessions ?? []).map((s) => s.id).sort().join(',');
+  React.useEffect(() => {
+    const ids = idsKey ? idsKey.split(',') : [];
+    const missing = ids.filter((id) => !(id in tags));
+    if (missing.length === 0) return;
+    void supabase.from('planned_workouts').select('id, tags').in('id', missing).then(({ data }) => {
+      const next: Record<string, string[]> = {};
+      for (const id of missing) next[id] = [];
+      for (const r of (data ?? []) as Array<{ id: string; tags?: unknown }>) {
+        next[r.id] = Array.isArray(r.tags) ? (r.tags as unknown[]).map((t) => String(t).toLowerCase()) : [];
+      }
+      setTags((t) => ({ ...t, ...next }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey]);
+  const isPlyo = (s: Session) => (tags[s.id] ?? []).includes('plyo');
+  /**
+   * ⛔ A WARM-UP LISTS DIRECTLY BEFORE THE SESSION IT WARMS UP, never after. Its session is the day's first other
+   * session that came from the same day; failing that, the day's first other session.
+   */
+  const dayOrder = (on: Session[]): Session[] => {
+    const rest = on.filter((s) => !isPlyo(s));
+    const out = [...rest];
+    for (const w of on.filter(isPlyo)) {
+      const partner = rest.find((s) => s.from === w.from) ?? rest[0];
+      const i = partner ? out.indexOf(partner) : out.length;
+      out.splice(i < 0 ? out.length : i, 0, w);
+    }
+    return out;
+  };
 
   /** Ask the server for the week, with the athlete's drags so far. */
   const ask = React.useCallback(async (m: Record<string, string>) => {
@@ -101,7 +137,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   const byDay: Record<string, string[]> = {};
   for (const s of plan?.sessions ?? []) {
     if (!plan!.week.includes(s.to)) continue;
-    (byDay[weekdayOf(s.to)] ??= []).push(sportOf(s));
+    (byDay[weekdayOf(s.to)] ??= []).push(sportOf(s, tags));
   }
 
   return (
@@ -125,7 +161,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
             <WeekStrip byDay={byDay} />
             <div className="rounded-xl border border-white/10 overflow-hidden">
               {days.map((d) => {
-                const on = plan.sessions.filter((s) => s.to === d);
+                const on = dayOrder(plan.sessions.filter((s) => s.to === d));
                 const lost = d === plan.lostDate;
                 const over = drag?.over === d;
                 return (
@@ -147,7 +183,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                     </div>
                     <div className="flex flex-col gap-1.5 min-w-0 justify-center">
                       {on.map((s) => {
-                        const colour = getDisciplineColor(sportOf(s));
+                        const colour = getDisciplineColor(sportOf(s, tags));
                         const moved = s.to !== s.from;
                         return (
                           <div key={s.id} style={{ opacity: drag?.id === s.id ? 0.3 : 1 }}>
