@@ -2,8 +2,8 @@
  * ⛔ "CAN'T TRAIN THIS DAY" (2026-09-21, docs/WORKORDER-lost-day-2026-09-21.md Stage 3).
  *
  * The week with the lost day's sessions already placed by the server (`place-lost-day`, on the move check). The
- * athlete can drag any session to another day; every drag re-asks the server. Nothing is written until Accept, and
- * Accept saves each moved session through the calendar's own move path (`@/lib/session-move`), so it records the
+ * athlete can drag any session to another day; every drag re-asks the server. Nothing is written until Save, and
+ * Save stores each moved session through the calendar's own move path (`@/lib/session-move`), so it records the
  * day it left and stays moved.
  *
  * ⚠️ IT PLACES NOTHING. The strip and the list render what the server sent; the notes are the server's words.
@@ -198,7 +198,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
             className="flex-1 px-4 py-3 rounded-xl font-light text-white border-2 disabled:opacity-40"
             style={{ backgroundColor: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.3)' }}
           >
-            Accept
+            Save
           </button>
         </div>
       </div>
