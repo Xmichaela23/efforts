@@ -159,3 +159,11 @@ Shown under the title and date. [Weekday] is the lost day's full weekday name.
 3. Approved copy for a dropped session, under the week: "[Session] comes off this week. There's no day left for it."
    On Save it is skipped through the existing skip (workout_status 'skipped'), so it stays recorded.
 
+### PM review 2026-09-22 — replaces item 2 above
+- A lost day only costs its own sessions: sessions already on other days are never bumped or dropped. The lost
+  sessions compete only for the room left (two-session cap, OURS).
+- Picking order among the lost sessions: lifts first (widest p80 gap first), then the week's speed and
+  subthreshold sessions (p109 floor), then easy sessions longest first (p109 "all minutes count" — the shortest
+  comes off). No spill into next week.
+- A day lost whose sessions all came off (skipped) is closed too, like a "Down" day.
+

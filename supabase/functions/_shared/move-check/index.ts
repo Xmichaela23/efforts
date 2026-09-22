@@ -24,6 +24,8 @@ export type MoveRow = {
   training_plan_id?: string | null;
   /** The composer's tags — `plyo` marks the warm-up block (p274 prints it as that day's warm-up). */
   tags?: unknown;
+  /** Minutes. The lost day uses it to let the longest easy session pick first (p109, "all minutes count"). */
+  duration?: number | null;
 };
 
 export type MoveNote = {
@@ -59,8 +61,8 @@ export const isPlyo = (r: MoveRow): boolean =>
   Array.isArray(r.tags) && (r.tags as unknown[]).some((t) => String(t).toLowerCase() === 'plyo');
 
 /**
- * ⛔ A "DOWN" DAY IS CLOSED (2026-09-22, Michael): a day whose sessions were all moved off it — rows still carry it as
- * their original day (`moved_from:`) and nothing is left on it. Like a day off, it is never a destination: not for
+ * ⛔ A "DOWN" DAY IS CLOSED (2026-09-22, Michael): a day with nothing left on it whose sessions were moved off it (rows
+ * still carry it as their original day, `moved_from:`) or came off it (skipped). Like a day off, it is never a destination: not for
  * "Days that fit" and not for a later lost day. Read off the rows' tags, the same reading get-week's "Down" line makes.
  */
 export function downDates(rows: MoveRow[]): Set<string> {
@@ -68,6 +70,9 @@ export function downDates(rows: MoveRow[]): Set<string> {
   for (const r of rows) {
     const o = movedOrigin(r);
     if (o && o !== iso(r.date)) origins.add(o);
+    // ⚠️ AND A DAY WHOSE SESSIONS CAME OFF (2026-09-22): a lost day's session with no room left is skipped, not moved,
+    // so a day lost that way carries no `moved_from:` — its skipped rows are what mark it.
+    if (isSkipped(r)) origins.add(iso(r.date));
   }
   for (const r of rows) if (!isSkipped(r) && origins.has(iso(r.date))) origins.delete(iso(r.date));
   return origins;

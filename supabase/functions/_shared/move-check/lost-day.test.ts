@@ -23,9 +23,9 @@ const WEEK: MoveRow[] = [
   { ...S('plyo', '2026-09-23', 'strength', 'Plyo warm-up'), tags: ['standing_plan', 'plyo'] },
   S('nt', '2026-09-23', 'run', 'Long Sub-Threshold Repeats', 'planned', 'near'),
   S('pull', '2026-09-24', 'strength', 'Upper body: Pull'),
-  S('easy', '2026-09-24', 'ride', 'Endurance Ride', 'planned', 'vt1_or_easier'),
+  { ...S('easy', '2026-09-24', 'ride', 'Endurance Ride', 'planned', 'vt1_or_easier'), duration: 75 },
   S('lpush', '2026-09-25', 'strength', 'Lower body: Push'),
-  S('long', '2026-09-26', 'ride', 'Long Ride', 'planned', 'vt1_or_easier'),
+  { ...S('long', '2026-09-26', 'ride', 'Long Ride', 'planned', 'vt1_or_easier'), duration: 135 },
   S('hinge-next', '2026-09-29', 'strength', 'Lower body: Hinge'),
 ];
 const plan = (moves?: Record<string, string>, rows = WEEK, today = '2026-09-21') =>
@@ -131,31 +131,64 @@ Deno.test('⛔ A "DOWN" DAY IS CLOSED: after Tuesday is lost and saved, losing F
   assertEquals(p.sessions.some((s) => s.to === '2026-09-22'), false);
 });
 
-Deno.test('⛔ EASY COMES OFF FIRST; EVERY LIFT AND THE p109 FLOOR STAY — two and three days lost in a row', () => {
-  const tue = lose(WEEK, '2026-09-22');
-  const afterTue = saved(WEEK, tue);
-  const wed = lose(afterTue, '2026-09-23');
-  const afterWed = saved(afterTue, wed);
-  const thu = lose(afterWed, '2026-09-24');
-  for (const p of [tue, wed, thu]) {
-    const off = p.sessions.filter((s) => s.dropped);
-    // Every lift is kept.
-    assertEquals(off.filter((s) => s.type === 'strength' && s.name !== 'Plyo warm-up').map((s) => s.name), []);
-    // No day holds three sessions (the warm-up does not count).
-    const per = new Map<string, number>();
-    for (const s of p.sessions) if (!s.dropped && s.name !== 'Plyo warm-up') per.set(s.to, (per.get(s.to) ?? 0) + 1);
-    assertEquals([...per.values()].every((n) => n <= 2), true);
-    // Nothing into next week.
-    assertEquals(p.sessions.every((s) => s.to <= '2026-09-27'), true);
+Deno.test('⛔ A LOST DAY ONLY COSTS ITS OWN SESSIONS — two and three days lost in a row', () => {
+  for (const run of [['2026-09-22', '2026-09-23', '2026-09-24'], ['2026-09-24', '2026-09-25', '2026-09-26']]) {
+    let rows = WEEK;
+    for (const d of run) {
+      const p = lose(rows, d);
+      // Nothing that was on another day moves or comes off.
+      const others = p.sessions.filter((s) => s.from !== d);
+      assertEquals(others.filter((s) => s.dropped || s.to !== s.from).map((s) => s.name), []);
+      // No day holds three sessions (the warm-up does not count), nothing into next week.
+      const per = new Map<string, number>();
+      for (const s of p.sessions) if (!s.dropped && s.name !== 'Plyo warm-up') per.set(s.to, (per.get(s.to) ?? 0) + 1);
+      assertEquals([...per.values()].every((n) => n <= 2), true);
+      assertEquals(p.sessions.every((s) => s.to <= '2026-09-27'), true);
+      rows = saved(rows, p);
+    }
   }
-  // The floor: a speed session and a subthreshold session are still in the week after three days lost.
-  const kept = thu.sessions.filter((s) => !s.dropped).map((s) => s.name);
-  assertEquals(kept.some((n) => n === 'MLSS+ Repeats' || n === 'Progressive Repeats'), true);
-  assertEquals(kept.includes('Long Sub-Threshold Repeats'), true);
+});
+
+Deno.test('⛔ WHO PICKS FIRST: a lift, then a speed/subthreshold session, then the longest easy session', () => {
+  // One open day with room for one more; the lost day holds an easy ride, a threshold run and a lift.
+  const rows: MoveRow[] = [
+    S('x1', '2026-09-21', 'run', 'Run A', 'planned', 'vt1_or_easier'), S('x2', '2026-09-21', 'ride', 'Ride A', 'planned', 'vt1_or_easier'),
+    S('y1', '2026-09-23', 'run', 'Run B', 'planned', 'vt1_or_easier'),
+    S('x3', '2026-09-24', 'run', 'Run C', 'planned', 'vt1_or_easier'), S('x4', '2026-09-24', 'ride', 'Ride C', 'planned', 'vt1_or_easier'),
+    S('x5', '2026-09-25', 'run', 'Run D', 'planned', 'vt1_or_easier'), S('x6', '2026-09-25', 'ride', 'Ride D', 'planned', 'vt1_or_easier'),
+    S('x7', '2026-09-26', 'run', 'Run E', 'planned', 'vt1_or_easier'), S('x8', '2026-09-26', 'ride', 'Ride E', 'planned', 'vt1_or_easier'),
+    { ...S('e', '2026-09-22', 'ride', 'Easy Ride', 'planned', 'vt1_or_easier'), duration: 90 },
+    S('t', '2026-09-22', 'run', 'Threshold Run', 'planned', 'near'),
+    S('l', '2026-09-22', 'strength', 'Lower body: Hinge'),
+  ];
+  const p = placeLostDay({ lostDate: '2026-09-22', rows, daysOff: ['sunday'], today: '2026-09-21' });
+  assertEquals(where(p, 'l').to, '2026-09-23');
+  assertEquals([where(p, 't').dropped, where(p, 'e').dropped], [true, true]);
+});
+
+Deno.test('p109 "all minutes count": of two easy sessions and room for one, the longer one stays', () => {
+  const rows: MoveRow[] = [
+    S('x1', '2026-09-21', 'run', 'Run A', 'planned', 'vt1_or_easier'), S('x2', '2026-09-21', 'ride', 'Ride A', 'planned', 'vt1_or_easier'),
+    S('y1', '2026-09-23', 'run', 'Run B', 'planned', 'vt1_or_easier'),
+    S('x3', '2026-09-24', 'run', 'Run C', 'planned', 'vt1_or_easier'), S('x4', '2026-09-24', 'ride', 'Ride C', 'planned', 'vt1_or_easier'),
+    S('x5', '2026-09-25', 'run', 'Run D', 'planned', 'vt1_or_easier'), S('x6', '2026-09-25', 'ride', 'Ride D', 'planned', 'vt1_or_easier'),
+    S('x7', '2026-09-26', 'run', 'Run E', 'planned', 'vt1_or_easier'), S('x8', '2026-09-26', 'ride', 'Ride E', 'planned', 'vt1_or_easier'),
+    { ...S('short', '2026-09-22', 'run', 'Short Easy Run', 'planned', 'vt1_or_easier'), duration: 30 },
+    { ...S('long2', '2026-09-22', 'ride', 'Long Easy Ride', 'planned', 'vt1_or_easier'), duration: 120 },
+  ];
+  const p = placeLostDay({ lostDate: '2026-09-22', rows, daysOff: ['sunday'], today: '2026-09-21' });
+  assertEquals([where(p, 'long2').dropped, where(p, 'short').dropped], [false, true]);
 });
 
 Deno.test('⛔ THE WARM-UP FOLLOWS ITS OWN DAY\'S SESSION, not one moved onto that day (Tue then Wed lost)', () => {
   const afterTue = saved(WEEK, lose(WEEK, '2026-09-22'));   // Hinge moved Tue → Wed
   const wed = lose(afterTue, '2026-09-23');
   assertEquals(where(wed, 'plyo').to, where(wed, 'nt').to);
+});
+
+Deno.test('⛔ A DAY LOST WHOSE SESSIONS CAME OFF IS CLOSED TOO: Tue, Wed then Thu lost — nothing lands on Wed', () => {
+  const afterTue = saved(WEEK, lose(WEEK, '2026-09-22'));
+  const afterWed = saved(afterTue, lose(afterTue, '2026-09-23'));
+  const thu = lose(afterWed, '2026-09-24');
+  assertEquals(thu.sessions.some((s) => !s.dropped && (s.to === '2026-09-22' || s.to === '2026-09-23') && s.from !== s.to), false);
 });
