@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { movePatch } from '@/lib/session-move';
@@ -370,6 +372,31 @@ function derivePlannedCellLabel(w: any): string | null {
  * selection bar over the row). On the week's day rows and session lines only.
  */
 const NO_TEXT_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
+/**
+ * ⛔ THE DRAG IS FELT ON AN iPHONE (2026-09-21). `navigator.vibrate` does nothing in iOS WebKit, so in the app the
+ * Capacitor Haptics plugin carries it: a light impact when a session is picked up, a selection tick each time the
+ * finger crosses onto a new day. On the web the old vibrate nudge at pickup is unchanged and there is no tick.
+ * ⚠️ Every call is guarded — a haptic that fails must never stop the drag.
+ */
+const dragHaptics = {
+  pickUp() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+        void Haptics.selectionStart().catch(() => {});
+      } else {
+        (navigator as { vibrate?: (n: number) => void }).vibrate?.(12);
+      }
+    } catch { /* not offered */ }
+  },
+  crossDay() {
+    try { if (Capacitor.isNativePlatform()) void Haptics.selectionChanged().catch(() => {}); } catch { /* not offered */ }
+  },
+  end() {
+    try { if (Capacitor.isNativePlatform()) void Haptics.selectionEnd().catch(() => {}); } catch { /* not offered */ }
+  },
+};
+
 /** No WebKit drag snapshot on a touch screen — see `isTouchDevice`. */
 const NO_NATIVE_DRAG = { WebkitUserDrag: 'none' } as React.CSSProperties;
 
@@ -537,6 +564,7 @@ export default function WorkoutCalendar({
   };
 
   const cancelLongPress = useCallback(() => {
+    if (touchDragRef.current) dragHaptics.end();
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
     longPress.current = null;
     touchDragRef.current = null;
@@ -562,8 +590,8 @@ export default function WorkoutCalendar({
         touchDragRef.current = { row, from, over: null };
         setTouchDragId(String(row.id));
         setCarry(carryFrom(el, row, longPress.current?.y ?? t.clientY));
-        // ⚠️ A NUDGE SO THE HOLD IS FELT, where the device offers one. Silent on the rest.
-        try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
+        // ⚠️ THE HOLD IS FELT — `dragHaptics` (the plugin in the app, a vibrate nudge on the web).
+        dragHaptics.pickUp();
       }, 450),
     };
   }, []);
@@ -582,7 +610,7 @@ export default function WorkoutCalendar({
     setTouchDragId(String(row.id));
     const t = e.touches[0];
     setCarry(carryFrom((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, row, t?.clientY ?? 0));
-    try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
+    dragHaptics.pickUp();
   }, []);
 
   /**
@@ -618,6 +646,8 @@ export default function WorkoutCalendar({
       if (touchDragRef.current.over !== over) {
         touchDragRef.current.over = over;
         setTouchDragOver(over);
+        // A tick each time the finger crosses onto a new day.
+        if (over) dragHaptics.crossDay();
       }
     };
     el.addEventListener('touchmove', onMove, { passive: false });
@@ -626,6 +656,7 @@ export default function WorkoutCalendar({
 
   const endLongPress = useCallback(() => {
     const drag = touchDragRef.current;
+    if (drag) dragHaptics.end();
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
     longPress.current = null;
     touchDragRef.current = null;
