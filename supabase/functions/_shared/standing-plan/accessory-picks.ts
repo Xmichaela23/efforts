@@ -43,7 +43,7 @@ import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
 // ⚠️ `WEEKDAYS` left with `dialSentence` (the week-order sort went to `src/lib/dial-copy.ts`).
-import { weekdayForFrameDay, type Weekday } from './day-map.ts';
+import { weekdayForFrameDay, type DayArrangement, type Weekday } from './day-map.ts';
 
 // ── THE SEVEN ────────────────────────────────────────────────────────────────────────────────────
 
@@ -1223,7 +1223,7 @@ export function daysForPick(
   key: ViadaPickKey,
   frame: FrameId = 'strength_5k',
   column: ColumnKind = 'standard',
-  offset = 0,
+  offset: DayArrangement = 0,
 ): Weekday[] {
   return frameDaysForPick(key, frame, column).map((d) => weekdayForFrameDay(d, offset));
 }

@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { movedOrigin } from '../moved-from.ts';
+import { conflictsOfTyped, typedRowsOf } from '../standing-plan/week-conflicts.ts';
 
 export type MoveRow = {
   id: string;
@@ -29,8 +30,9 @@ export type MoveRow = {
 };
 
 export type MoveNote = {
-  rule: 'two_sessions' | 'lift_gap' | 'day_off';
-  /** The book page the note comes from; null only for the day-off refusal, which is the athlete's own answer. */
+  /** `week_rule` = a warning the builder writes for the same week (`week-conflicts.ts`), new with this move. */
+  rule: 'two_sessions' | 'lift_gap' | 'day_off' | 'week_rule';
+  /** The book page the note comes from; null for the day-off refusal (the athlete's own answer) and for a week rule, whose page is in `week-conflicts.ts`. */
   page: 'p108' | 'p80' | null;
   text: string;
 };
@@ -151,11 +153,36 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
         text: `${liftLabel(args.session)}: ${n} days until the next one. Consistent improvement needs one every 8 to 9 days.` });
     }
   }
+  // ⛔ THE BUILDER'S WEEK RULES, ON THE WEEK THIS MOVE MAKES (2026-09-22, one source of logic). The same
+  // sentences the plan's own week shows ("Thursday: heavy legs after hard run…"), and only the ones this move
+  // adds: a clash the week already had is not the move's.
+  // ⚠️ The two-sessions note above already covers a second session on the day; the builder's same-day lines
+  // say something different (what tired legs do), so both can show.
+  for (const text of weekRuleNotes(args.session, to, args.rows)) {
+    notes.push({ rule: 'week_rule', page: null, text });
+  }
   return { refused: false, notes };
 }
 
-/** How far a gap sits outside p80's 3–4 days; 0 inside it or when there is no neighbouring session. */
-const offIdeal = (g: number | null): number =>
+/** The builder's warnings for the Monday–Sunday week holding `to`, after the move and not before it. */
+export function weekRuleNotes(session: MoveRow, to: string, rows: MoveRow[]): string[] {
+  const monday = mondayOf(to);
+  const sunday = addDays(monday, 6);
+  const inWeek = (d: string) => d >= monday && d <= sunday;
+  const live = rows.filter((r) => r.id !== session.id && !isSkipped(r) && inWeek(iso(r.date)));
+  const typed = (xs: MoveRow[]) => typedRowsOf(xs.map((r) => ({ ...r, day: weekdayName(iso(r.date)) })));
+  const before = live.concat(inWeek(iso(session.date)) && !isSkipped(session) ? [session] : []);
+  const after = live.concat([{ ...session, date: to }]);
+  const had = new Set(conflictsOfTyped(typed(before), null).map((c) => c.text));
+  return conflictsOfTyped(typed(after), null).map((c) => c.text).filter((t) => !had.has(t));
+}
+
+/**
+ * How far a gap sits outside p80's 3–4 days; 0 inside it or when there is no neighbouring session.
+ * ⛔ ONE READER OF p80 FOR THE WHOLE APP: the calendar move, the lost day and the week the builder arranges
+ * (`standing-plan/week-arrangement.ts`) all score a lift's spacing through this.
+ */
+export const offIdeal = (g: number | null): number =>
   g == null ? 0 : g < LIFT_GAP_IDEAL[0] ? LIFT_GAP_IDEAL[0] - g : g > LIFT_GAP_IDEAL[1] ? g - LIFT_GAP_IDEAL[1] : 0;
 
 /**
@@ -165,8 +192,9 @@ const offIdeal = (g: number | null): number =>
  * ⛔ THE p108 NOTE DOES NOT DISQUALIFY A DAY (2026-09-21, Michael). It is a note about spacing the two sessions, shown
  * with the move — not a reason the day does not fit.
  *
- * ORDER. Lifts: the day that keeps the lift's gaps closest to 3–4 days (Viada p80). Runs and rides: the day nearest
- * the one the session is on.
+ * ORDER. First, the day that adds the fewest of the builder's week warnings (the same order the builder arranges a
+ * week in). Then lifts: the day that keeps the lift's gaps closest to 3–4 days (Viada p80). Runs and rides: the day
+ * nearest the one the session is on.
  * OURS — nearest-day order for runs and rides: the book gives no order for moving endurance; nearest keeps the week's shape. docs/STATE-SOURCES.md
  * Ties go to the earlier date, so two reads of one week give one answer.
  */
@@ -175,7 +203,7 @@ export function daysThatFit(args: {
 }): string[] {
   const from = iso(args.fromDate), to = iso(args.toDate), today = iso(args.today);
   const monday = mondayOf(from);
-  const cands: Array<{ date: string; cost: number; near: number }> = [];
+  const cands: Array<{ date: string; cost: number; near: number; clashes: number }> = [];
   const down = downDates(args.rows);
   for (let i = 0; i < 7; i++) {
     const d = addDays(monday, i);
@@ -187,9 +215,11 @@ export function daysThatFit(args: {
     const cost = isLift(args.session) && !isPlyo(args.session)
       ? (() => { const g = liftGaps(args.session, d, args.rows); return offIdeal(g.before) + offIdeal(g.after); })()
       : near;
-    cands.push({ date: d, cost, near });
+    // ⛔ THE SAME ORDER THE BUILDER ARRANGES A WEEK IN (`week-arrangement.ts`): the fewest new week warnings first.
+    const clashes = c.notes.filter((n) => n.rule === 'week_rule').length;
+    cands.push({ date: d, cost, near, clashes });
   }
-  cands.sort((a, b) => a.cost - b.cost || a.near - b.near || a.date.localeCompare(b.date));
+  cands.sort((a, b) => a.clashes - b.clashes || a.cost - b.cost || a.near - b.near || a.date.localeCompare(b.date));
   // OURS — at most three days: Michael's spec (2026-09-21), docs/STATE-SOURCES.md "Move check".
   return cands.slice(0, args.max ?? 3).map((c) => c.date);
 }

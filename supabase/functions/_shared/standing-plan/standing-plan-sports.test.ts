@@ -15,6 +15,7 @@ import {
   clampRideLevel,
   hardPairInFrameOrder,
   chooseDayMap,
+  offsetPutting,
   composeBlock,
   composeWeek,
   defaultCompetitionLifts,
@@ -408,7 +409,7 @@ Deno.test('the long session stays on its pinned day whichever sport it is', () =
   const map = chooseDayMap('strength_5k', { longRunDay: 'Sunday' });
   for (const mix of [{ runs: 4 }, { runs: 0, rides: 4 }]) {
     const wk = composeWeek({
-      ...BASE, week: 2, column: 'standard', dayOffset: map.offset,
+      ...BASE, week: 2, column: 'standard', dayOffset: map.order,
       sportMix: mix as Record<string, number>,
     });
     const long = wk.sessions.find((s) => /^Long Run$|^Ride$/.test(s.name) && s.day === 'Sunday');
@@ -463,10 +464,10 @@ Deno.test('the haircut follows the CALENDAR, not the frame — a pinned-away har
     ...BASE, week: 2, column: 'standard',
     sportMix: { runs: 4, rides: 0 },
     endurancePins: pinnedAway,
-    // ⚠️ THE ROTATION THAT SERVES THE LONG PIN, read from the chooser rather than written down.
-    dayOffset: chooseDayMap('strength_5k', {
-      longRunDay: pinnedAway.long, longSlotSport: 'run', hardDays: [...pinnedAway.hard],
-    }).offset,
+    // ⚠️ THE ROTATION THAT SERVES THE LONG PIN. Since 2026-09-22 the chooser would re-arrange this week so a
+    // hard run sits the day before ME Lower (p247's own adjacency), which is the opposite of what this
+    // fixture needs; the rotation is written down so the pinned-away run stays away.
+    dayOffset: offsetPutting(6, pinnedAway.long),
   });
   const meLower = wk.sessions.find((x) => x.name === 'ME: Lower');
   assert(meLower, 'no ME Lower day in the week');

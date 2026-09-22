@@ -1,5 +1,26 @@
 # Engine State
 
+## 🧭 ALSO READ — 2026-09-22: the week is arranged around the athlete's picks, one set of rules
+
+> **Status line is filled in at deploy.**
+> 1. **Every order of the book's days is tried, not only rotations** (`_shared/standing-plan/week-arrangement.ts`,
+>    `chooseDayMap` moved there). Terms in order: days off clear · long day · fewest `weekConflicts` warnings on the
+>    week it builds (a warning the plan's own printed week carries is not counted; a day over the two-session limit
+>    counts) · fewest days moved from the book's order · p80 lift spacing 3–4 days · hard picks on the book's hard days
+>    · lifts on picked days · test days after the start. No picks → the book's week, unchanged.
+> 2. Found on Michael's Run + Strength week (hard Wed + Thu): Thursday was threshold run + heavy legs. Now Thursday is
+>    plyo + threshold, Friday heavy legs (p247's own order). 6,216-week sweep (3 plans × every long day × 0–2 hard picks ×
+>    0–1 day off): weeks with a warning 1,593→161 (Run + Strength), 2,068→912 (All Rounder); Cycling Base total warnings
+>    4,188→2,065, 16 weeks gain one (the book's own VO2 + sweet spot day put back together). No session on a day off.
+> 3. **The judged week is the built week**: endurance placement is one function, `placeEnduranceDays` (compose.ts),
+>    called by the composer and the chooser. The full order is stored as `day_order` (restate reads it; old blocks
+>    fall back to `day_offset`).
+> 4. **The calendar move uses the same rules**: `checkMove` adds the builder's own warning sentences that the move
+>    creates (`conflictsOfTyped` on rows typed by their tags); "Days that fit" puts days with no new warning first.
+>    p80 spacing (`offIdeal`) and the two-session limit are shared from `move-check`.
+> 5. Tests that need a clashing week use `chooseDayMap(..., { rotationsOnly: true })`. `no_rest_day` is no longer reached
+>    by the notes sweep: the chooser keeps a day clear.
+
 ## 🧭 ALSO READ — 2026-09-22 (D-484): a finished endurance session shows the name its plan gave it
 
 > **PUSHED (main `912d14cb8`, feature `217ee36a6`). DEPLOYED from a clean worktree of `912d14cb8`: get-week, coach,

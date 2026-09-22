@@ -120,6 +120,8 @@ export type StandingPlanConfig = {
    * from pins that may since have changed.
    */
   day_offset: number;
+  /** `order[frameDay - 1]` = weekday index, Monday = 0. Null on a block built before 2026-09-22. */
+  day_order: number[] | null;
   /** Which pins the chosen rotation honoured. Surfacing and provenance. */
   pins_honoured: { longRun: boolean; hardDays: number; unavailableDays?: boolean };
   /**
@@ -279,7 +281,7 @@ export function buildStandingPlanRow(args: {
     ...args.compose,
     // ⛔ THE ROTATION REACHES THE COMPOSER HERE AND NOWHERE ELSE. A caller that set `dayOffset`
     // directly AND passed a `dayMap` would have two answers to one question; the map wins.
-    ...(args.dayMap ? { dayOffset: args.dayMap.offset } : {}),
+    ...(args.dayMap ? { dayOffset: args.dayMap.order } : {}),
     weeks,
     taperWeeks: args.taperWeeks ?? [],
   });
@@ -336,7 +338,11 @@ export function buildStandingPlanRow(args: {
         return Object.keys(out).length > 0 ? out : null;
       })(),
       test_read: args.compose.workingNumbers != null,
-      day_offset: args.dayMap?.offset ?? args.compose.dayOffset ?? 0,
+      day_offset: args.dayMap?.offset
+        ?? (typeof args.compose.dayOffset === 'number' ? args.compose.dayOffset : 0),
+      // ⛔ THE FULL ARRANGEMENT (2026-09-22) — a restate reads this back so it re-composes the same week.
+      day_order: args.dayMap?.order
+        ?? (Array.isArray(args.compose.dayOffset) ? [...args.compose.dayOffset] : null),
       unavailable_days: (args.compose.unavailableDays ?? [])
         .map((d) => String(d ?? ''))
         .filter((d) => d !== ''),

@@ -5,9 +5,11 @@
 // days 1-7 and never names a weekday; Rule 8 calls a fixed seven-day microcycle an artificial
 // constraint."* p246 numbers its days and names no weekday anywhere.
 //
-// ⛔ SO THE ONLY MOVE IS A ROTATION, AND A ROTATION COSTS THE FRAME NOTHING. Every frame day shifts
-// by the same amount, so every pairing, every gap between them and the rest day's position survive
-// exactly. What changes is which calendar day the block opens on.
+// ⛔ A ROTATION COSTS THE FRAME NOTHING, SO IT IS ALWAYS TRIED FIRST. Every frame day shifts by the
+// same amount, so every pairing, every gap between them and the rest day's position survive exactly.
+// ⛔ AND SINCE 2026-09-22 IT IS NOT THE ONLY MOVE. When no rotation gives a clean week for the days the
+// athlete picked, the book's days are put in another order — see `week-arrangement.ts`, which owns the
+// choice. This file keeps the day arithmetic and the types.
 //
 // ⚠️ AND THE OLD BEHAVIOUR WAS ITSELF AN UNLABELLED ROTATION. `compose.ts` mapped frame day N onto
 // weekday N — offset zero — which nobody chose and which put the long run on Saturday for every
@@ -36,11 +38,44 @@ export function titleCaseDay(raw: unknown): string {
   return hit ?? '';
 }
 
-/** The weekday a frame day lands on under a given rotation. */
-export function weekdayForFrameDay(frameDay: number, offset: number): Weekday {
+/**
+ * ⛔ HOW THE BOOK'S NUMBERED DAYS SIT ON THE CALENDAR (2026-09-22). A number is a rotation: frame day 1
+ * lands that many days after Monday and every other day follows in the book's order. An array is a
+ * full arrangement: `order[frameDay - 1]` is the weekday index (Monday = 0) that frame day lands on.
+ * The array exists because a rotation cannot put two hard days the athlete picked back to back when
+ * the book prints them two days apart (`week-arrangement.ts`).
+ */
+export type DayArrangement = number | readonly number[];
+
+/** The weekday a frame day lands on under a given rotation or arrangement. */
+export function weekdayForFrameDay(frameDay: number, offset: DayArrangement): Weekday {
   const d = Math.round(frameDay);
-  const o = ((Math.round(offset) % 7) + 7) % 7;
+  if (Array.isArray(offset)) {
+    const w = (offset as readonly number[])[d - 1];
+    if (Number.isInteger(w) && w >= 0 && w < 7) return WEEKDAYS[w];
+    return WEEKDAYS[(((d - 1) % 7) + 7) % 7];
+  }
+  const o = ((Math.round(offset as number) % 7) + 7) % 7;
   return WEEKDAYS[(((d - 1 + o) % 7) + 7) % 7];
+}
+
+/** The frame day (1–7) that lands on `weekday` under a given rotation or arrangement. */
+export function frameDayOn(weekday: Weekday, offset: DayArrangement): number {
+  for (let d = 1; d <= 7; d++) if (weekdayForFrameDay(d, offset) === weekday) return d;
+  return WEEKDAYS.indexOf(weekday) + 1;
+}
+
+/**
+ * ⚠️ A STORED ARRANGEMENT, READ BACK. A block built before 2026-09-22 stored only `day_offset`; a block
+ * built after stores `day_order` too, and `day_order` wins when it is a valid arrangement of all seven days.
+ */
+export function storedArrangement(dayOrder: unknown, dayOffset: unknown): DayArrangement {
+  if (Array.isArray(dayOrder) && dayOrder.length === 7
+    && new Set(dayOrder).size === 7
+    && dayOrder.every((w) => Number.isInteger(w) && w >= 0 && w < 7)) {
+    return dayOrder as number[];
+  }
+  return Number(dayOffset) || 0;
 }
 
 /** The rotation that puts `frameDay` on `weekday`. */
@@ -147,6 +182,11 @@ export type DayMap = {
   frame: FrameId;
   /** Frame day 1 lands `offset` days after Monday. */
   offset: number;
+  /**
+   * ⛔ WHERE EVERY FRAME DAY LANDS — `order[frameDay - 1]` = weekday index, Monday = 0. Equal to the
+   * rotation at `offset` unless the chooser had to change the book's order (`week-arrangement.ts`).
+   */
+  order: number[];
   weekdayFor: (frameDay: number) => Weekday;
   /** ⛔ EVERY PIN THAT COULD NOT BE HONOURED, in plain words. Never silent. */
   compromises: { kind: 'cost'; text: string }[];
@@ -180,297 +220,3 @@ export const LONG_RUN_WINS =
   'When two pinned days cannot both be honoured the long day wins. It is the anchor the rest of the '
   + 'week is built around, and it is the one this app has always asked for first.';
 
-/** Monday = 0 … Sunday = 6. Null when there is no usable date. */
-function startWeekdayIndex(iso: string | null | undefined): number | null {
-  const t = Date.parse(`${String(iso ?? '').slice(0, 10)}T00:00:00Z`);
-  if (!Number.isFinite(t)) return null;
-  // getUTCDay: 0=Sun … 6=Sat → Monday-first index.
-  return (new Date(t).getUTCDay() + 6) % 7;
-}
-
-/**
- * ⛔ CHOOSE THE ROTATION, AND STATE WHAT IT COST.
- *
- * Scoring, in order, and every tie broken deterministically by the smallest offset so the same
- * athlete never gets two different weeks from the same answers:
- *
- *   1. ⛔⛔ **NOTHING FRAME-FIXED LANDS ON A DAY THE ATHLETE CANNOT TRAIN** — lifting first, then the
- *      plyo day (Michael, 2026-08-25 evening: *"blocked days stay untouchable"*). This OUTRANKS the
- *      long pin, and that reverses `LONG_RUN_WINS` for this one comparison. It is safe to reverse
- *      because the long pin no longer needs the rotation at all: `compose.ts` `endurancePins` puts
- *      the long session on the athlete's day whichever way the frame is turned, so a rotation spent
- *      serving it buys nothing and costs the day off. The lifts are the only thing the rotation can
- *      still move, so they are what it is scored on.
- *   2. **the long-run pin** — honoured or not, among the rotations that already clear the days off
- *      (see `LONG_RUN_WINS` for why it beats the hard days).
- *   3. **how many pinned hard days land on a frame hard day.**
- *   4. ⛔ **how much the lifting STACKS onto days that already carry a pinned session** — more is
- *      better (Michael, 2026-08-25 evening). *"Stacking is the release valve… prefer landing on a
- *      day that already has training over eating the rest day."* A tie-break, deliberately: on a
- *      loose week every candidate ties above it and nothing changes, and on a tight one it is what
- *      keeps the clear days clear instead of spreading four lifting days across four empty ones.
- *   5. ⚠️ **week one's test days survive the start date.** `activate-plan:441` drops a week-1
- *      session dated before the block's start, so a rotation that puts the two test days early in a
- *      mid-week-started block would DELETE the test and leave eleven weeks on "By feel" with nothing
- *      said. Not reachable from the live builder — `planWeekStartISO()` always sends a Monday — but
- *      it is reachable by a direct caller and it is silent when it happens.
- *
- * ⛔ IT NEVER REFUSES. D-325 §7 and this work order both: state the cost, always build the week.
- */
-export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind = 'standard'): DayMap {
-  const anchors = anchorDaysFor(frame, column);
-  const frameFixed = frameFixedDaysFor(frame, column);
-  /**
-   * ⛔ THE DAYS THE ATHLETE SAID THEY CANNOT TRAIN. ⚠️ Unrecognised values are dropped rather than
-   * coerced — a bad string must mean "no constraint", never "block a day nobody named".
-   */
-  const blockedDays = new Set(
-    (pins.unavailableDays ?? []).map(titleCaseDay).filter((d) => d !== ''),
-  );
-  /**
-   * ⛔ THE LIVE LONG PIN IS THE ONE MATCHING THE LONG SLOT'S SPORT. One long session, possibly two
-   * pins; the sport decides which is servable and the other is reported below.
-   */
-  const longSlotSport = pins.longSlotSport ?? 'run';
-  /**
-   * ⛔⛔ A PIN ON A DAY THE ATHLETE BLOCKED IS NOT A PIN (Michael, 2026-08-25 afternoon). The blocked
-   * day always wins, so `compose.ts` moves that session off it — and a rotation still scored toward
-   * the day it left would be spending the week's one degree of freedom on a session that is no
-   * longer there. ⚠️ Applied before every read below, so no scoring term can see the void pin.
-   */
-  const livePin = (raw: unknown): string => {
-    const d = titleCaseDay(raw);
-    return d !== '' && blockedDays.has(d) ? '' : d;
-  };
-  const longRunPin = livePin(pins.longRunDay);
-  const longRidePin = livePin(pins.longRideDay);
-  const longPin = longSlotSport === 'ride' ? longRidePin : longRunPin;
-  /** The pin the frame cannot serve at all, because it names the sport the long slot is not. */
-  const orphanPin = longSlotSport === 'ride'
-    ? { day: longRunPin, sport: 'run' as const }
-    : { day: longRidePin, sport: 'ride' as const };
-  const hardPins = [...new Set((pins.hardDays ?? []).map(livePin).filter((d) => d !== ''))];
-  const startIdx = startWeekdayIndex(pins.startDateIso);
-  // The frame days the test week uses. ⛔ Read from the source of that rule, not restated here.
-  // OURS — `TEST_DAY_LIFTS` the test sessions sit on frame days 1 and 2 (working-number.ts).
-  const testDays = [1, 2];
-
-  /** How many blocked days a rotation puts frame-fixed work on. 0 = the athlete's days off are clear. */
-  const blockedHitsAt = (offset: number, frameDays: number[]): number =>
-    frameDays.filter((d) => blockedDays.has(weekdayForFrameDay(d, offset))).length;
-
-  /**
-   * ⛔ EVERY DAY THE ATHLETE HAS ALREADY SPOKEN FOR — their long day and their hard days, clubs
-   * included. A lifting day landing on one of these STACKS; a lifting day landing anywhere else
-   * spends a day that would otherwise be clear. ⚠️ Blocked days are not in here: they are not
-   * "already training", they are untouchable, and term 1 handles them.
-   */
-  const spokenFor = new Set<string>([longPin, ...hardPins].filter((d) => d !== ''));
-
-  type Cand = {
-    offset: number; long: boolean; blockedLifts: number; blockedFixed: number;
-    hard: number; stacked: number; testSafe: boolean;
-  };
-  const candidates: Cand[] = [];
-  for (let offset = 0; offset < 7; offset++) {
-    const long = longPin !== '' && anchors.long != null
-      && weekdayForFrameDay(anchors.long, offset) === longPin;
-    const hard = hardPins.filter((p) =>
-      anchors.hard.some((d) => weekdayForFrameDay(d, offset) === p)).length;
-    const testSafe = startIdx == null
-      || testDays.every((d) => WEEKDAYS.indexOf(weekdayForFrameDay(d, offset)) >= startIdx);
-    candidates.push({
-      offset,
-      long,
-      blockedLifts: blockedHitsAt(offset, frameFixed.lifting),
-      blockedFixed: blockedHitsAt(offset, frameFixed.fixed),
-      hard,
-      stacked: frameFixed.lifting
-        .filter((d) => spokenFor.has(weekdayForFrameDay(d, offset))).length,
-      testSafe,
-    });
-  }
-  /**
-   * ⚠️ STRICTLY GREATER, so the FIRST offset reaching a score keeps it — offset 0 wins every tie
-   * and an athlete with no pins gets exactly the week slice 2 built.
-   *
-   * ⛔⛔ THE BLOCKED-DAY TERMS COME FIRST, AHEAD OF THE LONG PIN (Michael, 2026-08-25 evening).
-   * `LONG_RUN_WINS` still governs pin-against-pin; this is pin-against-a-day-that-does-not-exist,
-   * which is a different comparison. See term 1 in the header for why reversing it costs the long
-   * pin nothing.
-   */
-  const better = (a: Cand, b: Cand) =>
-    a.blockedFixed !== b.blockedFixed ? a.blockedFixed < b.blockedFixed
-      : a.blockedLifts !== b.blockedLifts ? a.blockedLifts < b.blockedLifts
-      : (a.long ? 1 : 0) !== (b.long ? 1 : 0) ? (a.long ? 1 : 0) > (b.long ? 1 : 0)
-      : a.hard !== b.hard ? a.hard > b.hard
-      : a.stacked !== b.stacked ? a.stacked > b.stacked
-      : (a.testSafe ? 1 : 0) > (b.testSafe ? 1 : 0);
-  let best: Cand | null = null;
-  for (const cand of candidates) {
-    if (best == null || better(cand, best)) best = cand;
-  }
-  const chosen = best!;
-  /**
-   * ⛔ WAS THE BLOCKED DAY REACHABLE AT ALL, IGNORING EVERY OTHER PIN? This is what separates *"no
-   * arrangement of this week can clear that day"* from *"an arrangement exists and another pin took
-   * it"* — and it is the difference between a note that explains and the note this replaces, which
-   * asserted the lifting order was the reason when the long pin was.
-   */
-  const clearableAtAll = candidates.some((c) => c.blockedFixed === 0);
-
-  /**
-   * ⛔⛔ A PIN THE ROTATION GAVE UP TO CLEAR A DAY OFF COSTS THE ATHLETE NOTHING, AND MUST NOT BE
-   * REPORTED AS IF IT DID (2026-08-25 evening).
-   *
-   * Reordering the terms above means a reachable long or hard pin is now dropped whenever serving
-   * it would put lifting on a blocked day. The SESSION still lands on the athlete's day —
-   * `compose.ts` `endurancePins` places it there whichever way the frame is turned — so the lines
-   * below would announce a move that never happens. They are suppressed for exactly that case and
-   * for no other: a pin no rotation could reach is still reported, because that one is real.
-   *
-   * ⚠️ THE TEST IS "WAS IT REACHABLE AMONG THE ROTATIONS THAT CLEAR THE DAYS OFF", not "was it
-   * reachable at all" — the second would silence a genuine miss on any week with a day off in it.
-   */
-  const lostToADayOff = (want: (c: Cand) => boolean): boolean =>
-    blockedDays.size > 0
-    && candidates.some((c) => want(c))
-    && !candidates.some((c) =>
-      want(c) && c.blockedFixed === chosen.blockedFixed && c.blockedLifts === chosen.blockedLifts);
-
-  const compromises: { kind: 'cost'; text: string }[] = [];
-  /**
-   * ⛔⛔ A DAY OFF THAT STILL CARRIES A LIFTING DAY — AND THE SENTENCE SAYS WHY (Michael, 2026-08-25).
-   *
-   * The line this replaces read *"Fri carries a lifting day. The lifting order is fixed, so it
-   * stays."* — which was the screen asserting a reason that was not the reason. The order is fixed,
-   * but the rotation is not, and until this pass nothing had tried the other six. Now the chooser
-   * has tried all seven, so when this fires it is TRUE by construction: either another pin took the
-   * only rotation that would have cleared the day, or no rotation clears it at all.
-   *
-   * ⚠️ FIRST IN THE LIST. It is the only cost here that is about a day the athlete cannot train at
-   * all; the rest are about which day a session prefers.
-   */
-  if (chosen.blockedFixed > 0) {
-    /**
-     * ⛔ THE PLYO DAY IS NAMED TOO (2026-08-25, after the fuzz sweep). It used to count only the
-     * LIFTING days, so a week whose drill block sat on a day off either said nothing at all or
-     * listed the lifting days and left the plyo day out of its own sentence. Michael's ruling is
-     * informed-always, and this was under-reporting.
-     *
-     * ⚠️ SPLIT BY WHAT THE DAY ACTUALLY CARRIES, because "Friday carries a lifting day" about the
-     * plyo block would be a sentence the calendar contradicts. A day carrying both is a lifting day
-     * — the barbell is the bigger claim on it, and listing the drills beside it adds nothing the
-     * athlete can act on.
-     */
-    const dayOf = (d: number) => weekdayForFrameDay(d, chosen.offset);
-    const liftHits = [...new Set(
-      frameFixed.lifting.map(dayOf).filter((d) => blockedDays.has(d)),
-    )];
-    const plyoOnlyHits = [...new Set(
-      frameFixed.fixed.map(dayOf)
-        .filter((d) => blockedDays.has(d) && !liftHits.includes(d)),
-    )];
-    const list = (xs: string[]) =>
-      xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-    // ⚠️ "THE JUMP DRILLS", NOT "PLYOMETRICS" — the row on the calendar is named `Plyometrics` and
-    // the athlete can find it, but a sentence about their week says what it is.
-    /**
-     * ⛔ PLAIN WORDS OR NOTHING (Michael, 2026-08-26: "the way you talk makes no sense", on
-     * "carries a lifting day… no arrangement… honours that pin"). The sentence is one lifter
-     * telling another what happened: the day off, what landed on it, and why it would not fit
-     * anywhere else. No "carries", no "honours", no "arrangement".
-     */
-    const named = [...liftHits, ...plyoOnlyHits];
-    const what = [
-      liftHits.length === 0 ? '' : liftHits.length === 1 ? 'a lifting day' : 'lifting days',
-      plyoOnlyHits.length > 0 ? 'the jump drills' : '',
-    ].filter(Boolean).join(' and ');
-    // OURS — `chooseDayMap` compromise note wording; the counts in it are the frame's lifting days (Viada p246 / p274) and the athlete's pins, no number of ours.
-    const offClause = `${list(named)} ${named.length === 1 ? 'is a day off' : 'are days off'}, `
-      + `but the week still puts ${what} there`;
-    const nLifts = frameFixed.lifting.length;
-    const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
-    // OURS — `chooseDayMap` compromise note wording (see above).
-    compromises.push({
-      kind: 'cost',
-      text: clearableAtAll && longPin !== '' && chosen.long
-        ? `${offClause} — ${nLifts} lifting days plus the ${longPin} ${longName} don't fit any other way.`
-        : `${offClause} — the week's sessions don't fit without ${named.length === 1 ? 'it' : 'them'}.`,
-    });
-  }
-  /**
-   * ⛔⛔ THE MISSED-LONG-PIN "rather than" SENTENCE IS DELETED — the same falsehood as the
-   * missed-hard-pin one below (2026-08-26). `compose.ts`'s `enduranceDayFor` returns the athlete's
-   * long pin UNCONDITIONALLY (`if (role === 'long' && pins.long) return pins.long`), so a long pin
-   * the ROTATION could not reach is still honoured in the built week, and "The long run is on
-   * Saturday rather than Sunday" described a discarded intermediate step. What survives is the one
-   * case that stays true on the calendar: a pin on a week that has no long session to place.
-   */
-  if (longPin !== '' && anchors.long == null && !lostToADayOff((c) => c.long)) {
-    const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
-    compromises.push({
-      kind: 'cost',
-      // OURS — `chooseDayMap` compromise note wording (see above).
-      text: `Taper weeks have no ${longName}, so there is nothing to put on ${longPin}.`,
-    });
-  }
-  /**
-   * ⛔⛔ THE MISSED-HARD-PIN COMPROMISE IS DELETED, NOT REWORDED (Michael, 2026-08-26: "I wanna get
-   * rid of this ai slop" → "what are you trying to say" → "its not even right" — and his built week
-   * proved the last one: the note claimed Tuesday and Friday "could not be reached" while the
-   * calendar showed the Hard Ride ON Tuesday and the Hard Run ON Friday).
-   *
-   * It was FALSE BY CONSTRUCTION under pins-win: this function chooses the LIFTING rotation, and a
-   * hard pin the rotation cannot reach is still honoured downstream — `compose.ts`'s endurance
-   * pinning places the session on the tapped day regardless. So the sentence described a discarded
-   * intermediate step, never the built week. The client knew: `NonRaceBuilder`'s tiered-notes
-   * comment (pins-win, 2026-08-25) says these rotation lines "describe an intermediate step rather
-   * than the built week" and drops them wholesale on step 7 — but the confirm screen rendered the
-   * server's copy unfiltered. One source of truth: the server stops writing it.
-   *
-   * ⚠️ AND THE PINS IT NAMED WERE OFTEN NOBODY'S — Q-287's phantom seeds (an untouched wizard
-   * writes hard-day defaults that read back as athlete choices) made it fire on picks no one made.
-   * That write is still Q-287's open work; nothing here fixes it, this just stops narrating it.
-   *
-   * ⚠️ SCOPE: the hard-pin block only. The blocked-day and long-pin compromises above state facts
-   * about days that stay true in the built week; they stand.
-   */
-  /**
-   * ⛔ THE PIN THE FRAME HAS NO SESSION FOR — STATED, NEVER DROPPED (2026-08-24).
-   *
-   * This is the case that escaped: an athlete keeping both sports pins a long run AND a long ride,
-   * the frame carries one long session, and the pin that does not match its sport used to vanish
-   * with nothing said. One sentence, through the channel the preview already renders.
-   */
-  if (orphanPin.day !== '') {
-    const kept = longSlotSport === 'ride' ? 'ride' : 'run';
-    compromises.push({
-      kind: 'cost',
-      // OURS — `chooseDayMap` compromise note wording (see above).
-      text: `This week has one long session, and it's a ${kept}. The long `
-        + `${orphanPin.sport} on ${orphanPin.day} isn't in it.`,
-    });
-  }
-  if (!chosen.testSafe) {
-    compromises.push({
-      kind: 'cost',
-      // ⚠️ NO IMPERATIVE (voice rule 7). The draft here read "Start the block on a Monday"; it states
-      // the condition instead and leaves the decision where it belongs.
-      text: 'The block starts mid-week, so week one is short and the two test sessions fall before '
-        + 'its first day. A block that opens on a Monday runs week one whole.',
-    });
-  }
-
-  return {
-    frame,
-    offset: chosen.offset,
-    weekdayFor: (frameDay: number) => weekdayForFrameDay(frameDay, chosen.offset),
-    compromises,
-    honoured: {
-      longRun: chosen.long,
-      hardDays: chosen.hard,
-      unavailableDays: chosen.blockedFixed === 0,
-    },
-  };
-}

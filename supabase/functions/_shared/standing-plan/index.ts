@@ -20,6 +20,7 @@ export * from './restate.ts';
 export * from './plyo.ts';
 export * from './me-history.ts';
 export * from './day-map.ts';
+export * from './week-arrangement.ts';
 export * from './test-skip.ts';
 export * from './sport-slots.ts';
 export * from './accessory-picks.ts';

@@ -55,7 +55,9 @@ function build(
     longRunDay: longSlotSport === 'ride' ? null : longDay,
     longRideDay: longSlotSport === 'ride' ? longDay : null,
     longSlotSport, hardDays, unavailableDays: blocked,
-  });
+    // ⚠️ ROTATIONS ONLY: these fixtures clash on purpose to check the words, and the full chooser
+    // (2026-09-22) would arrange the clash away.
+  }, 'standard', { rotationsOnly: true });
   const row = buildStandingPlanRow({
     compose: {
       ...BASE, endurancePins: { long: longDay, hard: hardDays },
@@ -64,7 +66,7 @@ function build(
     weeks: 2, taperWeeks: [], dayMap,
   });
   const week = composeWeek({
-    ...BASE, week: 2, column: 'standard', dayOffset: dayMap.offset,
+    ...BASE, week: 2, column: 'standard', dayOffset: dayMap.order,
     endurancePins: { long: longDay, hard: hardDays }, sportMix: m, unavailableDays: blocked,
   } as never);
   return { row, week, dayMap };

@@ -39,6 +39,7 @@ import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import { DELOAD_LINE } from '../_shared/standing-plan/setup-copy.ts';
 import { TEST_LAST_SET_LINE } from '../_shared/strength/test-session.ts';
 import type { FrameId } from '../_shared/standing-plan/frames.ts';
+import { storedArrangement } from '../_shared/standing-plan/day-map.ts';
 import {
   composeBlock,
   earnedMeSets,
@@ -437,7 +438,7 @@ Deno.serve(async (req: Request) => {
        * ⚠️ AND IT IS READ, NOT RECOMPUTED. The athlete's pinned days can change after the block was
        * built; the calendar cannot. `day_offset` is what this block actually ran on.
        */
-      dayOffset: Number(sp.day_offset) || 0,
+      dayOffset: storedArrangement(sp.day_order, sp.day_offset),
       /**
        * ⛔ THE DAYS THAT WERE BLOCKED WHEN THE BLOCK WAS BUILT, READ BACK — same rule as the
        * rotation above. The endurance was stepped off them at build time, so a restate that did not

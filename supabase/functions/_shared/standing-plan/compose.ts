@@ -69,7 +69,7 @@ import {
   type StrengthSlot,
 } from './frames.ts';
 import {
-  WEEKDAYS, frameFixedDaysFor, titleCaseDay, weekdayForFrameDay, type Weekday,
+  WEEKDAYS, frameFixedDaysFor, titleCaseDay, weekdayForFrameDay, type DayArrangement, type Weekday,
 } from './day-map.ts';
 import {
   assignSports, assignedSlot, isHardSlot, isLongSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix,
@@ -524,6 +524,72 @@ function enduranceRelocator(args: ComposeArgs): {
   return { place, moves };
 }
 
+/**
+ * ⛔ WHERE EVERY ENDURANCE SLOT LANDS: pins first, then the frame's own day under the arrangement, each
+ * stepped off a blocked day by `enduranceRelocator`. `${frameDay}:${slotIndex}` → weekday.
+ * ⛔ ONE OWNER (2026-09-22): `composeWeek` and the week chooser (`week-arrangement.ts`) both call this, so
+ * the week the chooser judges and the week the composer builds put every run and ride on the same day.
+ */
+export function placeEnduranceDays(
+  args: Pick<ComposeArgs, 'frame' | 'column' | 'dayOffset' | 'endurancePins' | 'unavailableDays'>,
+  droppedSlots: Set<string> = new Set(),
+): {
+  days: Map<string, Weekday>;
+  moves: EnduranceRelocation[];
+  /** The same relocator, for the sessions placed after the slots (swim add-ons, the advanced tier). */
+  place: (proposed: Weekday, label: string) => Weekday;
+} {
+  const days = FRAMES[args.frame].columns[args.column];
+  const hardSlotIndex = new Map<string, number>();
+  {
+    let n = 0;
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
+      });
+    }
+  }
+  const { place: relocate, moves } = enduranceRelocator(args as ComposeArgs);
+  /**
+   * `${frameDay}:${slotIndex}` → the weekday it ends on. ⛔ EVERY SLOT, not only the pinned ones
+   * (2026-08-26).
+   *
+   * ⚠️ THE FREE SLOTS USED TO BE RESOLVED LAZILY INSIDE THE DAY LOOP, and that made one fact
+   * unknowable at the moment it was needed: the day loop emits frame day 2's LIFTS before it has
+   * decided where frame day 3's, 4's or 6's endurance lands, so the lower-body slots were priced
+   * against a week the composer had not finished placing. `hardRunBeforeLower` below is exactly
+   * that fact, so it has to be answered before a single barbell row is written.
+   *
+   * ⛔⛔ THE ORDER IS UNCHANGED AND THE ORDER IS THE RULING. Pinned slots go through the relocator
+   * FIRST — Michael, 2026-08-25 afternoon: *"the athlete's own days are relocated first, so they get
+   * first choice and an engine-placed session takes what is left"* — then the free ones in frame
+   * order, then (below, after the day loop) the swim add-ons and the advanced tier. That is the same
+   * sequence this file ran before; only the point at which it runs moved.
+   */
+  const enduranceDays = new Map<string, Weekday>();
+  for (const wantPinned of [true, false]) {
+    for (const d of days) {
+      d.endurance.forEach((slot, i) => {
+        const key = `${d.day}:${i}`;
+        if (droppedSlots.has(key)) return; // ⛔ the stated day count removed this slot
+        if (enduranceDays.has(key)) return;
+        const hardIndex = hardSlotIndex.get(key) ?? 0;
+        // ⛔ THE FRAME'S OWN ANSWER, matching `hardSlotIndex` above — see `anchorRoleOf`. The slot's
+        // stated role wins where it has one; the family decides where it does not.
+        const role = anchorRoleOf(slot.family, slot.role);
+        const pinned = role === 'long'
+          ? !!args.endurancePins?.long
+          : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
+        if (pinned !== wantPinned) return;
+        const proposed = enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex);
+        enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
+      });
+    }
+  }
+
+  return { days: enduranceDays, moves, place: relocate };
+}
+
 export type ComposeArgs = {
   frame: FrameId;
   week: number;
@@ -614,7 +680,7 @@ export type ComposeArgs = {
    * ⛔ WHICH CALENDAR DAY THE FRAME OPENS ON — `chooseDayMap` decides it from the athlete's pins.
    * Frame day 1 lands this many days after Monday. Absent = 0 = the Monday-start week.
    */
-  dayOffset?: number;
+  dayOffset?: DayArrangement;
   /**
    * ⛔⛔ THE ATHLETE'S PINNED ENDURANCE DAYS — AND THEY BEAT THE FRAME (Michael, 2026-08-25:
    * *"user choice always wins, it's just informed."* Fork answered 2026-08-25: option 1.)
@@ -3018,43 +3084,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     return { level: at.level, size: at.size };
   };
 
-  const { place: relocate, moves: enduranceMoves } = enduranceRelocator(args);
   /**
-   * `${frameDay}:${slotIndex}` → the weekday it ends on. ⛔ EVERY SLOT, not only the pinned ones
-   * (2026-08-26).
-   *
-   * ⚠️ THE FREE SLOTS USED TO BE RESOLVED LAZILY INSIDE THE DAY LOOP, and that made one fact
-   * unknowable at the moment it was needed: the day loop emits frame day 2's LIFTS before it has
-   * decided where frame day 3's, 4's or 6's endurance lands, so the lower-body slots were priced
-   * against a week the composer had not finished placing. `hardRunBeforeLower` below is exactly
-   * that fact, so it has to be answered before a single barbell row is written.
-   *
-   * ⛔⛔ THE ORDER IS UNCHANGED AND THE ORDER IS THE RULING. Pinned slots go through the relocator
-   * FIRST — Michael, 2026-08-25 afternoon: *"the athlete's own days are relocated first, so they get
-   * first choice and an engine-placed session takes what is left"* — then the free ones in frame
-   * order, then (below, after the day loop) the swim add-ons and the advanced tier. That is the same
-   * sequence this file ran before; only the point at which it runs moved.
+   * ⛔ WHERE EVERY ENDURANCE SLOT LANDS — `placeEnduranceDays`, the one owner (2026-09-22). The week
+   * chooser (`week-arrangement.ts`) asks the same function, so the week it judges is the week built here.
    */
-  const enduranceDays = new Map<string, Weekday>();
-  for (const wantPinned of [true, false]) {
-    for (const d of days) {
-      d.endurance.forEach((slot, i) => {
-        const key = `${d.day}:${i}`;
-        if (droppedSlots.has(key)) return; // ⛔ the stated day count removed this slot
-        if (enduranceDays.has(key)) return;
-        const hardIndex = hardSlotIndex.get(key) ?? 0;
-        // ⛔ THE FRAME'S OWN ANSWER, matching `hardSlotIndex` above — see `anchorRoleOf`. The slot's
-        // stated role wins where it has one; the family decides where it does not.
-        const role = anchorRoleOf(slot.family, slot.role);
-        const pinned = role === 'long'
-          ? !!args.endurancePins?.long
-          : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
-        if (pinned !== wantPinned) return;
-        const proposed = enduranceDayFor(args, d.day, role, hardIndex);
-        enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
-      });
-    }
-  }
+  const { days: enduranceDays, moves: enduranceMoves, place: relocate } = placeEnduranceDays(args, droppedSlots);
 
   /**
    * ⛔⛔ THE HAIRCUT'S CAUSE IS A FACT ABOUT THE CALENDAR, AND IT WAS BEING ASKED OF THE FRAME

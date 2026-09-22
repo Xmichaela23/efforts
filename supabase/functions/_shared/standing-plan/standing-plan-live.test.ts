@@ -59,7 +59,7 @@ Deno.test('a pinned Sunday long run is honoured, not told about', () => {
   assert(map.honoured.longRun, 'the long-run pin was not honoured');
   assertEquals(map.compromises.length, 0, 'a honoured pin still reported a cost');
 
-  const wk = composeBlock({ ...COMPOSE, dayOffset: map.offset, weeks: 2, taperWeeks: [] })[1];
+  const wk = composeBlock({ ...COMPOSE, dayOffset: map.order, weeks: 2, taperWeeks: [] })[1];
   const long = wk.sessions.find((s) => s.type === 'run' && /long/i.test(s.name + s.steps_preset?.join(' ')))!;
   assertEquals(long.day, 'Sunday');
 
@@ -131,7 +131,9 @@ Deno.test('two pins the rotation cannot both reach: the long day wins, and NO co
    */
   const map = chooseDayMap('strength_5k', { longRunDay: 'Sunday', hardDays: ['Wednesday'] });
   assert(map.honoured.longRun, 'the long run lost to a hard day');
-  assertEquals(map.honoured.hardDays, 0);
+  // ⚠️ 2026-09-22: no ROTATION reaches both, but an ARRANGEMENT does (`week-arrangement.ts`), so the
+  // hard pin now lands on a frame hard day too. What this test holds is unchanged: no cost is written.
+  assertEquals(map.honoured.hardDays, 1);
   assertEquals(map.compromises.length, 0);
 });
 
@@ -151,9 +153,13 @@ Deno.test('a long-run pin on a column that has no long run says so', () => {
 });
 
 Deno.test('a hard-day pin is honoured when it does not fight the long day', () => {
-  // Long run Saturday is offset 0; the hard days are then Monday and Wednesday.
+  // ⚠️ 2026-09-22: offset 0 (long run Saturday) is no longer the answer. The first hard pin is the
+  // frame's FIRST hard slot (positional, as `compose.ts` reads it), so offset 0 moved Monday's hard run
+  // onto Wednesday beside the frame's own Wednesday hard run — two hard runs on one day. The arrangement
+  // chooser sees that and opens the week on Wednesday instead.
   const map = chooseDayMap('strength_5k', { longRunDay: 'Saturday', hardDays: ['Wednesday'] });
-  assertEquals(map.offset, 0);
+  assertEquals(map.weekdayFor(1), 'Wednesday');
+  assertEquals(map.weekdayFor(6), 'Saturday');
   assert(map.honoured.longRun);
   assertEquals(map.honoured.hardDays, 1);
   assertEquals(map.compromises.length, 0);
@@ -162,7 +168,7 @@ Deno.test('a hard-day pin is honoured when it does not fight the long day', () =
 Deno.test('a hard-day pin alone rotates the week, with no long day asked for', () => {
   const map = chooseDayMap('strength_5k', { hardDays: ['Friday'] });
   assertEquals(map.honoured.hardDays, 1);
-  assert(anchorDaysFor('strength_5k').hard.some((d) => weekdayForFrameDay(d, map.offset) === 'Friday'));
+  assert(anchorDaysFor('strength_5k').hard.some((d) => weekdayForFrameDay(d, map.order) === 'Friday'));
   assertEquals(map.compromises.length, 0);
 });
 
@@ -223,7 +229,7 @@ Deno.test('with no pins to satisfy, the rotation keeps week one whole on a mid-w
   // ⛔ THE TIE-BREAK EARNS ITS KEEP. Nothing is pinned, so the chooser is free — and it picks an
   // offset whose test days survive a Thursday start rather than the arbitrary zero.
   const map = chooseDayMap('strength_5k', { startDateIso: '2026-09-10' });
-  const testDays = [1, 2].map((d) => WEEKDAYS.indexOf(weekdayForFrameDay(d, map.offset)));
+  const testDays = [1, 2].map((d) => WEEKDAYS.indexOf(weekdayForFrameDay(d, map.order)));
   assert(testDays.every((i) => i >= 3), `the test days landed before a Thursday start: ${testDays}`);
   assertEquals(map.compromises.length, 0);
 });
@@ -454,7 +460,7 @@ Deno.test('the restater re-composes on the block\'s OWN rotation, not on offset 
     new URL('../../rematerialize-standing-block/index.ts', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  assert(/dayOffset:\s*Number\(sp\.day_offset\)/.test(code),
+  assert(/dayOffset:\s*storedArrangement\(sp\.day_order,\s*sp\.day_offset\)/.test(code),
     'the restater re-composes without the block\'s rotation');
   assert(/skipTestWeek:\s*sp\.test_skipped/.test(code),
     'a restate could grow a test week onto a block that skipped one');

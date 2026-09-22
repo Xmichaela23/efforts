@@ -143,3 +143,45 @@ Deno.test('p108: a run moved onto a lifting day still gets the note', () => {
   const r = run('rr', '2026-09-23');
   assertEquals(checkMove({ session: r, toDate: '2026-09-22', rows: [r, HINGE], daysOff: [] }).notes.map((n) => n.text), [P108]);
 });
+
+// ── 4. The builder's week rules, on the week the move makes (2026-09-22, one source of logic) ─────
+
+// Michael's Run + Strength week as the builder now arranges it: Mon long run, Wed upper + hard run,
+// Thu plyo + threshold, Fri heavy legs, Sat upper + easy run, Sun speed legs.
+const WK: MoveRow[] = [
+  { id: 'lsd', date: '2026-09-28', type: 'run', name: 'Long Run', tags: ['family:run_lsd', 'long_run'] },
+  { id: 'meu', date: '2026-09-30', type: 'strength', name: 'ME: Upper', tags: [] },
+  { id: 'mlss', date: '2026-09-30', type: 'run', name: 'Surge and Float', tags: ['family:run_mlss'] },
+  { id: 'plyo', date: '2026-10-01', type: 'strength', name: 'Plyo warm-up', tags: ['plyo'] },
+  { id: 'nt', date: '2026-10-01', type: 'run', name: '8 × 5 min Threshold', tags: ['family:run_near_threshold'] },
+  { id: 'mel', date: '2026-10-02', type: 'strength', name: 'ME: Lower', tags: ['lower:me'] },
+  { id: 'deu', date: '2026-10-03', type: 'strength', name: 'DE: Upper', tags: [] },
+  { id: 'vt1', date: '2026-10-03', type: 'run', name: 'Easy Run', tags: ['family:run_vt1'] },
+  { id: 'del', date: '2026-10-04', type: 'strength', name: 'DE: Lower', tags: ['lower:de'] },
+].map((r) => ({ workout_status: 'planned', training_plan_id: 'p', ...r }));
+const HEAVY_AFTER_HARD = 'Thursday: heavy legs after hard run. Tired legs cause you to lift slowly and establish improper coordination patterns.';
+
+Deno.test('⛔ WEEK RULE: heavy legs moved onto the hard run day earns the builder\'s own sentence', () => {
+  const mel = WK.find((r) => r.id === 'mel')!;
+  const c = checkMove({ session: mel, toDate: '2026-10-01', rows: WK, daysOff: [] });
+  assertEquals(c.notes.map((n) => n.text), [P108, HEAVY_AFTER_HARD]);
+});
+
+Deno.test('WEEK RULE: a move that adds no clash says nothing new, and a clash the week already had is not the move\'s', () => {
+  const vt1 = WK.find((r) => r.id === 'vt1')!;
+  assertEquals(checkMove({ session: vt1, toDate: '2026-09-29', rows: WK, daysOff: [] }).notes, []);
+  // The week already has heavy legs on the threshold day; moving the easy run adds nothing to it.
+  const clashed = WK.map((r) => (r.id === 'mel' ? { ...r, date: '2026-10-01' } : r));
+  assertEquals(checkMove({ session: vt1, toDate: '2026-09-29', rows: clashed, daysOff: [] }).notes, []);
+});
+
+Deno.test('WEEK RULE: "Days that fit" puts the days with no new clash first', () => {
+  // Without the long run, Tuesday is clean and Thursday (the threshold day) is not; Tuesday leads.
+  const wk = WK.filter((r) => r.id !== 'lsd');
+  const mel = wk.find((r) => r.id === 'mel')!;
+  const days = daysThatFit({ session: mel, fromDate: '2026-10-02', toDate: '2026-10-02', rows: wk, daysOff: [], today: '2026-09-28', max: 7 });
+  const clashes = (d: string) => checkMove({ session: mel, toDate: d, rows: wk, daysOff: [] }).notes.filter((n) => n.rule === 'week_rule').length;
+  assertEquals(clashes(days[0]), 0);
+  assertEquals(clashes('2026-10-01'), 1);
+  assertEquals(days.indexOf('2026-10-01') > days.indexOf(days[0]), true);
+});

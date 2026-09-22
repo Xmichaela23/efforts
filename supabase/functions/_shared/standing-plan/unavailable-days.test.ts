@@ -78,7 +78,7 @@ Deno.test('a blocked day is cleared of lifting by rotating the frame, with nothi
   assertEquals(map.compromises.length, 0, 'a day off that WAS honoured still reported a cost');
 
   const lifting = frameFixedDaysFor('strength_5k').lifting
-    .map((d) => weekdayForFrameDay(d, map.offset));
+    .map((d) => weekdayForFrameDay(d, map.order));
   assert(!lifting.includes('Friday'), `a lifting day still landed on Friday: ${lifting.join(', ')}`);
 
   // ⛔ AND THROUGH THE ROW BUILDER, not only the chooser — the wire is the part that breaks.
@@ -401,7 +401,7 @@ Deno.test('⛔ the ROTATION stacks too — a lift is turned onto the athlete\'s 
   assertEquals(map.honoured.hardDays, 1, 'the hard pin was not honoured at all');
 
   const liftsOnWed = frameFixedDaysFor('strength_5k').lifting
-    .filter((d) => weekdayForFrameDay(d, map.offset) === 'Wednesday');
+    .filter((d) => weekdayForFrameDay(d, map.order) === 'Wednesday');
   assert(
     liftsOnWed.length > 0,
     `no lifting day was turned onto the pinned Wednesday (offset ${map.offset}) — the rotation `

@@ -21,7 +21,7 @@ import { buildUnits, type Load, type Session } from '../week-model/model.ts';
 import { unmetNeeds, type Placement } from '../week-model/resolve.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
-import { WEEKDAYS, weekdayForFrameDay, type Weekday } from './day-map.ts';
+import { WEEKDAYS, frameDayOn, weekdayForFrameDay, type DayArrangement, type Weekday } from './day-map.ts';
 import { isHardSlot, isLongSlot } from './sport-slots.ts';
 import type { PlanSession } from './compose.ts';
 
@@ -326,10 +326,9 @@ function framePrintsHardOnHeavyDay(
   frame: FrameId,
   column: ColumnKind,
   day: Weekday,
-  dayOffset: number,
+  dayOffset: DayArrangement,
 ): boolean {
-  const o = ((Math.round(dayOffset) % 7) + 7) % 7;
-  const frameDay = (((WEEKDAYS.indexOf(day) - o) % 7) + 7) % 7 + 1;
+  const frameDay = frameDayOn(day, dayOffset);
   const d = FRAMES[frame].columns[column].find((x) => x.day === frameDay);
   if (!d) return false;
   const heavy = lowerDaysOf(frame, column).me.includes(d.day);
@@ -399,9 +398,56 @@ export function weekConflicts(args: {
   sessions: PlanSession[];
   frame: FrameId;
   column: ColumnKind;
-  dayOffset: number;
+  dayOffset: DayArrangement;
 }): WeekConflict[] {
-  const typed = typedSessionsOf(args.sessions, args.frame, args.column);
+  return conflictsOfTyped(typedSessionsOf(args.sessions, args.frame, args.column), {
+    frame: args.frame, column: args.column, dayOffset: args.dayOffset,
+  });
+}
+
+/**
+ * ⛔ CALENDAR ROWS, TYPED BY THE SAME WORDS (2026-09-22, one source of logic). A row carries the tags the
+ * composer stamped (`lower:me`, `family:`, `long_run`, `plyo`), so the load is read off them rather than
+ * off the frame's slot order. A row with none of those tags reads as upper or easy and triggers nothing.
+ */
+export function typedRowsOf(rows: Array<{ day: string; type?: string | null; name?: string | null; tags?: unknown; duration?: number | null }>): TypedSession[] {
+  const out: TypedSession[] = [];
+  for (const r of rows) {
+    const tags = Array.isArray(r.tags) ? (r.tags as unknown[]).map((t) => String(t)) : [];
+    const s = {
+      day: r.day, type: String(r.type ?? '').toLowerCase(), name: String(r.name ?? ''),
+      description: '', duration: Number(r.duration) || 45, tags,
+    } as PlanSession;
+    if (tags.includes('plyo')) { out.push({ s, load: 'easy' }); continue; }
+    if (s.type === 'strength') {
+      const heavy = tags.includes('lower:me') || s.name === 'ME: Lower' || s.name === 'Test: Lower';
+      out.push({ s, load: heavy ? 'heavy_lower' : 'upper' });
+      continue;
+    }
+    if (s.type !== 'run' && s.type !== 'ride' && s.type !== 'swim') continue;
+    const family = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? '';
+    const load: Load = tags.includes('long_run') || family === 'run_lsd'
+      ? 'long_run'
+      : tags.includes('long_ride')
+        ? 'long_ride'
+        : family !== '' && isHardFamily(family) ? 'hard_cardio' : 'easy';
+    out.push({ s, load });
+  }
+  return out;
+}
+
+/**
+ * ⛔ THE RULES THEMSELVES, ON SESSIONS ALREADY TYPED (2026-09-22, one source of logic). The builder
+ * reaches them through `weekConflicts` with its frame; the calendar move reaches them with rows off the
+ * calendar and no frame (`move-check`), so the same sentence fires for the same week either way.
+ * ⚠️ WITHOUT A FRAME the three frame readings step down: no "the book prints this" exemption (the move
+ * check compares before and after, so a clash the week already had is not new), the speed day is read
+ * off the `lower:de` tag, and the rest-day line is not written.
+ */
+export function conflictsOfTyped(
+  typed: TypedSession[],
+  ctx: { frame: FrameId; column: ColumnKind; dayOffset: DayArrangement } | null,
+): WeekConflict[] {
   const { placements, dayOfLabel, nameOfLabel } = placementsOf(typed);
   const byName = new Map<string, TypedSession>();
   typed.forEach((t, i) => byName.set(`${t.s.name} #${i}`, t));
@@ -450,7 +496,7 @@ export function weekConflicts(args: {
        * His template names a run or a ride; "heavy legs after heavy leg session" is not a sentence he
        * wrote, and the break is real but unworded.
        */
-      if (apart === 'same' && framePrintsHardOnHeavyDay(args.frame, args.column, sDay, args.dayOffset)) {
+      if (apart === 'same' && ctx != null && framePrintsHardOnHeavyDay(ctx.frame, ctx.column, sDay, ctx.dayOffset)) {
         continue;
       }
       if (apart === 'same' && blocker.s.type === 'ride') {
@@ -543,9 +589,10 @@ export function weekConflicts(args: {
   {
     // ⚠️ EVERY DE LOWER DAY THE FRAME HAS, WHICH IS ONE OR NONE TODAY. The All Rounder has none —
     // p274 opens both its lower days on an ME slot — so this rule correctly says nothing there.
-    const lower = lowerDaysOf(args.frame, args.column);
-    for (const deDay of lower.de) {
-      const speedDay = weekdayForFrameDay(deDay, args.dayOffset);
+    const speedDays: Weekday[] = ctx != null
+      ? lowerDaysOf(ctx.frame, ctx.column).de.map((d) => weekdayForFrameDay(d, ctx.dayOffset))
+      : [...new Set(typed.filter((t) => (t.s.tags ?? []).includes('lower:de')).map((t) => t.s.day as Weekday))];
+    for (const speedDay of speedDays) {
       const speed = typed.find((t) =>
         ((t.s.tags ?? []).includes('lower:de') || t.s.name === 'DE: Lower') && t.s.day === speedDay);
       const hard = typed.find((t) => t.load === 'hard_cardio' && t.s.day === speedDay);
@@ -638,11 +685,13 @@ export function weekConflicts(args: {
   //    All Rounder as written still has one, so the athlete is told the shape changed.
   {
     const used = new Set(typed.map((t) => t.s.day as Weekday).filter((d) => WEEKDAYS.includes(d)));
-    const restFrameDay = FRAMES[args.frame].columns[args.column].find((d) => d.rest)?.day ?? null;
+    const restFrameDay = ctx == null
+      ? null
+      : FRAMES[ctx.frame].columns[ctx.column].find((d) => d.rest)?.day ?? null;
     if (used.size >= 7 && restFrameDay != null) {
       // ⚠️ THE DAY NAMED IS THE FRAME'S OWN REST DAY under this rotation, and the sessions are
       // whatever took it — that is the tap the athlete can undo.
-      const restDay = weekdayForFrameDay(restFrameDay, args.dayOffset);
+      const restDay = weekdayForFrameDay(restFrameDay, ctx!.dayOffset);
       const took = typed.filter((t) => t.s.day === restDay);
       push({
         kind: 'cost',

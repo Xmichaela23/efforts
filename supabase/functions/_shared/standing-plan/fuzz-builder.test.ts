@@ -290,7 +290,7 @@ function checkPlacementLaws(
 ): string[] {
   const fails: string[] = [];
   const column: ColumnKind = c.taper && wk === '2' ? 'taper' : 'standard';
-  const dayOf = (frameDay: number) => weekdayForFrameDay(frameDay, built.dayMap.offset);
+  const dayOf = (frameDay: number) => weekdayForFrameDay(frameDay, built.dayMap.order);
   /**
    * ⛔ EVERY SENTENCE THE BLOCK CARRIES. `placement_compromises` is the channel the athlete already
    * reads (`NonRaceBuilder.tsx:2716`); `notes` is what `describeBlock` folds into the plan's own
@@ -377,7 +377,7 @@ function checkPlacementLaws(
       if (namesDay(t.s.day)) { tradeOffs.hardOnLowerWithNote++; continue; }
       // ⚠️ Placement-law note: `checkPlacementLaws` runs 6b before the conflicts are computed below,
       // so this arm re-asks rather than reading them. Same answer, one order later.
-      if (weekConflicts({ sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.offset })
+      if (weekConflicts({ sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.order })
         .some((c) => c.days.includes(t.s.day as Weekday))) {
         tradeOffs.hardOnLowerWithNote++;
         continue;
@@ -430,7 +430,7 @@ function checkPlacementLaws(
    * break produced a conflict, and that the conflict's sentence reached the block.
    */
   const conflicts = weekConflicts({
-    sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.offset,
+    sessions: ss, frame: 'strength_5k', column, dayOffset: built.dayMap.order,
   });
   for (const u of unmetNeeds(view.placements)) {
     const subjectDay = view.dayOfLabel.get(u.unit);
