@@ -19,6 +19,7 @@ import { displayDisciplineOf } from '@/lib/utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import WeekStrip from './WeekStrip';
+import { dragHaptics } from '@/lib/drag-haptics';
 
 type Session = { id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; notes: string[] };
 type Plan = { lostDate: string; week: string[]; sessions: Session[] };
@@ -102,15 +103,19 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     // Keeps the moves coming to the grip while the finger travels; never allowed to stop the drag.
     try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* no live pointer to capture */ }
     setDrag({ id: s.id, over: null });
-    try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
+    dragHaptics.pickUp();
   };
   const onGripMove = (e: React.PointerEvent) => {
     if (!drag) return;
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const over = el?.closest('[data-lost-day]')?.getAttribute('data-lost-day') ?? null;
-    if (over !== drag.over) setDrag({ ...drag, over });
+    if (over !== drag.over) {
+      setDrag({ ...drag, over });
+      if (over) dragHaptics.crossDay();
+    }
   };
   const onGripUp = () => {
+    if (drag) dragHaptics.end();
     if (drag?.over) moveTo(drag.id, drag.over);
     setDrag(null);
   };
@@ -199,7 +204,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                                   onPointerDown={(e) => onGripDown(e, s)}
                                   onPointerMove={onGripMove}
                                   onPointerUp={onGripUp}
-                                  onPointerCancel={() => setDrag(null)}
+                                  onPointerCancel={() => { if (drag) dragHaptics.end(); setDrag(null); }}
                                   className="inline-flex items-center justify-center -my-2 py-2"
                                   style={{ color: 'rgba(242,240,236,0.62)', touchAction: 'none', cursor: 'grab' }}
                                 >
