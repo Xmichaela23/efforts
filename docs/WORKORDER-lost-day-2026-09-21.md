@@ -1,7 +1,7 @@
 # WORKORDER — "Can't train this day" (2026-09-21)
 
 Owner: Michael (architect). PM: planning chat. Engineer: one terminal session per stage.
-Status: APPROVED to build ("lets build it", 2026-09-21). Push / deploy still gated on Michael.
+Status: SHIPPED 2026-09-22 (main `e01c3c427`, functions deployed). Summary + open items: ENGINE-STATE banner.
 
 ## What the athlete gets
 
