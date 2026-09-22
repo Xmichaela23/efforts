@@ -1433,6 +1433,11 @@ export default function WorkoutCalendar({
            * ⚠️ A TODAY WITH NOTHING ON IT gets a neutral bar rather than a borrowed sport colour.
            */
           const leadSport = items.length > 0 ? displayDisciplineOf(items[0]?._src) : null;
+          /** Today or later with a planned, not-done session: the day's name offers "Can't train this day". */
+          const lostEligible = key >= todayKey && items.some((it: any) => {
+            const st = String(it?._src?.workout_status ?? '').toLowerCase();
+            return st === 'planned' || st === '';
+          });
           const todayColour = leadSport ? getDisciplineColor(leadSport) : 'rgba(242,240,236,0.55)';
 
           return (
@@ -1501,15 +1506,13 @@ export default function WorkoutCalendar({
               {/* ⚠️ AN ANCHOR, NOT A TRIGGER: the menu opens only on a day that qualifies. Any other tap falls through
                   to the row, which opens the add menu as before. */}
               <PopoverPrimitive.Anchor asChild>
+              {/* ⛔ A TAPPABLE DATE LOOKS TAPPABLE (2026-09-21): the lost-day screen's day-chip pill, only on the days
+                  where the tap opens "Can't train this day". Past days and empty days keep the plain date. */}
               <div
-                className="text-[12px] uppercase"
+                className={`text-[12px] uppercase${lostEligible ? ' rounded-xl border border-white/10 bg-white/[0.03] text-center py-1.5 mr-2 cursor-pointer' : ''}`}
                 style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
                 onClick={(e) => {
-                  const eligible = key >= todayKey && items.some((it: any) => {
-                    const st = String(it?._src?.workout_status ?? '').toLowerCase();
-                    return st === 'planned' || st === '';
-                  });
-                  if (!eligible) return;
+                  if (!lostEligible) return;
                   e.stopPropagation();
                   setLostMenuDate(key);
                 }}
