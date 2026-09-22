@@ -14,7 +14,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { movePatch } from '@/lib/session-move';
+import { lostDayPatch, movePatch } from '@/lib/session-move';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { displayDisciplineOf } from '@/lib/utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -22,7 +22,13 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import WeekStrip from './WeekStrip';
 import { useCarryDrag } from '@/hooks/useCarryDrag';
 
-type Session = { id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; dropped?: boolean; notes: string[] };
+type Session = {
+  id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; dropped?: boolean; notes: string[];
+  /** The lost day this session belongs to — every session a lost day touches is saved with its mark. */
+  lost_day?: string | null;
+  /** An earlier lost day took it off; placed now, Save puts it back on the plan. */
+  was_dropped?: boolean;
+};
 type Plan = { lostDate: string; week: string[]; sessions: Session[] };
 
 const WEEKDAY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -117,8 +123,15 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     try {
       for (const s of plan.sessions) {
         if (!s.movable) continue;
-        // ⛔ A SESSION THAT COMES OFF IS SKIPPED, the app's existing skip — recorded, never deleted (2026-09-22).
-        if (s.dropped) { await updatePlannedWorkout(s.id, { workout_status: 'skipped', skip_reason: null } as never); continue; }
+        if (s.lost_day) {
+          // ⛔ A LOST DAY'S SESSION: placed or taken off, it is saved with its lost-day mark (`lostDayPatch`). A session
+          // that comes off is skipped — the app's existing skip, recorded, never deleted.
+          if (!s.dropped && !s.was_dropped && s.to === s.from) continue;
+          if (s.dropped && s.was_dropped) continue;
+          await updatePlannedWorkout(s.id, await lostDayPatch(s.id, { to: s.to, lostDay: s.lost_day, dropped: !!s.dropped }) as never);
+          continue;
+        }
+        // Any other session the athlete dragged on this screen: the calendar's own move.
         if (s.to === s.from) continue;
         await updatePlannedWorkout(s.id, await movePatch(s.id, s.to));
       }

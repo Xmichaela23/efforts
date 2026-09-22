@@ -167,3 +167,11 @@ Shown under the title and date. [Weekday] is the lost day's full weekday name.
   comes off). No spill into next week.
 - A day lost whose sessions all came off (skipped) is closed too, like a "Down" day.
 
+### PM review 2026-09-22 (second) — built, held for review
+1. Every lost day in the week is planned together: each new lost day places again all sessions from all lost days
+   that week (including ones an earlier lost day moved or took off) against the room left, same priority order.
+   Sessions never on a lost day still never move.
+2. Lost-day sessions carry `lost_day:<day>` on Save (moved or taken off), so only a lost day counts as closed — a day
+   the athlete skipped themselves stays open. A session an earlier lost day took off comes back on the plan if it is
+   placed. `src/lib/session-move.ts lostDayPatch`.
+

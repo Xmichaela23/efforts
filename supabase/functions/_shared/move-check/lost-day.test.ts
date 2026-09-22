@@ -113,14 +113,16 @@ Deno.test('A DONE SESSION ON THE LOST DAY IS SHOWN AND NEVER MOVED', () => {
 
 // ── More than one day lost (2026-09-22) ──────────────────────────────────────────────────────────
 
-/** What Save writes, applied to the rows: moves carry their first day, drops become skipped. */
+/** What Save writes, applied to the rows: every lost-day session carries `lost_day:`; drops are skipped; a session
+ *  placed again after an earlier drop is back on the plan. */
 function saved(rows: MoveRow[], p: LostDayPlan): MoveRow[] {
   return rows.map((r) => {
     const s = p.sessions.find((x) => x.id === r.id);
-    if (!s) return r;
-    if (s.dropped) return { ...r, workout_status: 'skipped' };
-    if (s.to !== s.from) return { ...r, date: s.to, tags: tagsAfterMove(r, s.to) };
-    return r;
+    if (!s || !s.lost_day) return r;
+    const mark = (tags: string[]) => [...tags.filter((t) => !t.startsWith('lost_day:')), `lost_day:${s.lost_day}`];
+    const base = Array.isArray(r.tags) ? (r.tags as string[]) : [];
+    if (s.dropped) return { ...r, workout_status: 'skipped', tags: mark(base) };
+    return { ...r, date: s.to, workout_status: 'planned', tags: mark(tagsAfterMove({ ...r, tags: base }, s.to)) };
   });
 }
 const lose = (rows: MoveRow[], d: string) => placeLostDay({ lostDate: d, rows, daysOff: ['sunday'], today: '2026-09-21' });
@@ -131,13 +133,13 @@ Deno.test('⛔ A "DOWN" DAY IS CLOSED: after Tuesday is lost and saved, losing F
   assertEquals(p.sessions.some((s) => s.to === '2026-09-22'), false);
 });
 
-Deno.test('⛔ A LOST DAY ONLY COSTS ITS OWN SESSIONS — two and three days lost in a row', () => {
+Deno.test('⛔ LOST DAYS ONLY COST THEIR OWN SESSIONS — two and three days lost in a row', () => {
   for (const run of [['2026-09-22', '2026-09-23', '2026-09-24'], ['2026-09-24', '2026-09-25', '2026-09-26']]) {
     let rows = WEEK;
     for (const d of run) {
       const p = lose(rows, d);
-      // Nothing that was on another day moves or comes off.
-      const others = p.sessions.filter((s) => s.from !== d);
+      // Nothing that was never on a lost day moves or comes off.
+      const others = p.sessions.filter((s) => !s.lost_day);
       assertEquals(others.filter((s) => s.dropped || s.to !== s.from).map((s) => s.name), []);
       // No day holds three sessions (the warm-up does not count), nothing into next week.
       const per = new Map<string, number>();
@@ -191,4 +193,34 @@ Deno.test('⛔ A DAY LOST WHOSE SESSIONS CAME OFF IS CLOSED TOO: Tue, Wed then T
   const afterWed = saved(afterTue, lose(afterTue, '2026-09-23'));
   const thu = lose(afterWed, '2026-09-24');
   assertEquals(thu.sessions.some((s) => !s.dropped && (s.to === '2026-09-22' || s.to === '2026-09-23') && s.from !== s.to), false);
+});
+
+Deno.test('⛔ A DAY THE ATHLETE SKIPPED THEMSELVES STAYS OPEN (no lost-day mark)', () => {
+  const rows: MoveRow[] = [
+    S('sk', '2026-09-24', 'run', 'Easy Run', 'skipped', 'vt1_or_easier'),
+    S('r', '2026-09-23', 'run', 'Tempo Run', 'planned', 'near'),
+  ];
+  const p = placeLostDay({ lostDate: '2026-09-23', rows, daysOff: ['monday', 'tuesday', 'friday', 'saturday', 'sunday'], today: '2026-09-21' });
+  assertEquals(where(p, 'r').to, '2026-09-24');
+});
+
+Deno.test('⛔ EVERY LOST DAY OF THE WEEK IS PLANNED TOGETHER: a session an earlier lost day took off can come back', () => {
+  // Tue lost with no room anywhere: its easy ride comes off. Then Sat is lost: Sat's own session goes, and Tue's
+  // ride is planned again with Sat's room — the whole pool, against the room left.
+  const rows: MoveRow[] = [
+    S('m1', '2026-09-21', 'run', 'Run A', 'planned', 'vt1_or_easier'), S('m2', '2026-09-21', 'ride', 'Ride A', 'planned', 'vt1_or_easier'),
+    { ...S('t1', '2026-09-22', 'ride', 'Easy Ride', 'planned', 'vt1_or_easier'), duration: 60 },
+    S('w1', '2026-09-23', 'run', 'Run B', 'planned', 'vt1_or_easier'), S('w2', '2026-09-23', 'ride', 'Ride B', 'planned', 'vt1_or_easier'),
+    S('th1', '2026-09-24', 'run', 'Run C', 'planned', 'vt1_or_easier'), S('th2', '2026-09-24', 'ride', 'Ride C', 'planned', 'vt1_or_easier'),
+    S('f1', '2026-09-25', 'run', 'Run D', 'planned', 'vt1_or_easier'), S('f2', '2026-09-25', 'ride', 'Ride D', 'planned', 'vt1_or_easier'),
+    S('s1', '2026-09-26', 'run', 'Run E', 'planned', 'vt1_or_easier'), S('s2', '2026-09-26', 'ride', 'Ride E', 'planned', 'vt1_or_easier'),
+  ];
+  const tue = placeLostDay({ lostDate: '2026-09-22', rows, daysOff: ['sunday'], today: '2026-09-21' });
+  assertEquals(where(tue, 't1').dropped, true);
+  const afterTue = saved(rows, tue);
+  const sat = placeLostDay({ lostDate: '2026-09-26', rows: afterTue, daysOff: ['sunday'], today: '2026-09-21' });
+  // Nothing that was never on a lost day moved.
+  assertEquals(sat.sessions.filter((x) => !x.lost_day && x.to !== x.from).map((x) => x.name), []);
+  // Tue's ride is in the pool again (it was off, still off: every other day is full) — and Sat's two sessions too.
+  assertEquals(sat.sessions.filter((x) => x.lost_day).map((x) => x.id).sort(), ['s1', 's2', 't1']);
 });

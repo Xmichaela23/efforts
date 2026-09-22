@@ -17,3 +17,22 @@ export async function movePatch(id: string, newDate: string): Promise<{ date: st
   if (error || !data) throw new Error(error?.message || 'Planned session not found');
   return { date: newDate, tags: tagsAfterMove(data as { date?: unknown; tags?: unknown }, newDate) };
 }
+
+/**
+ * ⛔ WHAT "CAN'T TRAIN THIS DAY" SAVES FOR ONE SESSION (PM review, 2026-09-22). Every session a lost day touches carries
+ * `lost_day:<that day>` — so a later lost day in the week plans it again, and a lost day is told apart from a day the
+ * athlete skipped themselves. A session that comes off is skipped (the app's own skip, recorded, never deleted); one
+ * that is placed — including one an earlier lost day took off — is dated there and back on the plan.
+ */
+export async function lostDayPatch(
+  id: string, s: { to: string; lostDay: string; dropped: boolean },
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.from('planned_workouts').select('date, tags').eq('id', id).maybeSingle();
+  if (error || !data) throw new Error(error?.message || 'Planned session not found');
+  const row = data as { date?: unknown; tags?: unknown };
+  const base = Array.isArray(row.tags) ? (row.tags as unknown[]).map(String) : [];
+  const mark = (tags: string[]) => [...tags.filter((t) => !t.startsWith('lost_day:')), `lost_day:${s.lostDay}`];
+  if (s.dropped) return { workout_status: 'skipped', skip_reason: null, tags: mark(base) };
+  return { date: s.to, workout_status: 'planned', tags: mark(tagsAfterMove({ ...row, tags: base }, s.to)) };
+}
+
