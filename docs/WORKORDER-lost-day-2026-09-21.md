@@ -175,3 +175,10 @@ Shown under the title and date. [Weekday] is the lost day's full weekday name.
    the athlete skipped themselves stays open. A session an earlier lost day took off comes back on the plan if it is
    placed. `src/lib/session-move.ts lostDayPatch`.
 
+### PM review 2026-09-22 (third) — built, held for review
+- The p109 floor counts what the kept week already has: with Monday's MLSS+ meeting "one speed", Progressive Repeats
+  is an extra and picks with the easy sessions, below a missing subthreshold session.
+- A lift prefers a day with no other lift on it (OURS, ledger row).
+- Tue-then-Wed now gives the expected week: Fri Lower Push + Plyo warm-up + Long Sub-Threshold Repeats; Sat Hinge +
+  long ride; Progressive Repeats comes off.
+

@@ -11,9 +11,10 @@
 //   2. A session the athlete dragged stays where they put it.
 //   0. A LOST DAY ONLY COSTS ITS OWN SESSIONS (PM review, 2026-09-22). Sessions already on other days are never
 //      bumped or dropped; the lost day's sessions compete only for the room left (the two-session cap, OURS).
-//   3. Who picks first (OURS, docs/STATE-SOURCES.md "Move check"): lifts, the one whose p80 gap is widest first;
-//      then the week's speed and subthreshold sessions (the p109 floor); then easy sessions, longest first — p109
-//      "all minutes count", so the shortest is the one that comes off.
+//   3. Who picks first (OURS, docs/STATE-SOURCES.md "Move check"): lifts, the one whose p80 gap is widest first, each
+//      preferring a day with no other lift; then a speed or subthreshold session the kept week still lacks (the p109
+//      floor counts what the week already has); then everything else — extras and easy sessions — longest first,
+//      p109 "all minutes count", so the shortest is the one that comes off.
 //   4. Each goes to its first day that fits (`daysThatFit`: not a day off, no third session — OURS — and no lift gap
 //      past nine days, p80). The p108 note is shown with the move and does not stop it.
 //   4a. A plyo warm-up goes with the session it warms up — the lost day's first other session — and is never
@@ -150,7 +151,6 @@ export function placeLostDay(args: {
     return null;
   };
   const isRealLift = (r: MoveRow) => isLift(r) && !isPlyo(r);
-  const isFloor = (r: MoveRow) => { const b = bandOf(r); return !isLift(r) && (b === 'above' || b === 'near' || b === 'below'); };
   /** A lift's widest p80 gap around its own day — the lift most at risk of passing nine days picks first. */
   const liftGapAt = (r: MoveRow) => {
     const g = liftGaps(r, planDateOf(r), current());
@@ -162,24 +162,45 @@ export function placeLostDay(args: {
   const byNearness = (from: string) => (a: string, b: string) =>
     Math.abs(daysBetween(from, a)) - Math.abs(daysBetween(from, b)) || a.localeCompare(b);
 
-  // 3. The pool, in picking order: lifts (widest gap first), then speed/subthreshold, then easy longest first.
-  const tier = (r: MoveRow) => (isRealLift(r) ? 0 : isFloor(r) ? 1 : 2);
-  const toPlace = pool
-    .filter((r) => pending.has(r.id) && !rideAlong(r))
-    .map((r, i) => ({ r, i, t: tier(r), gap: isRealLift(r) ? liftGapAt(r) : 0, min: Number(r.duration ?? 0) || 0, day: planDateOf(r) }))
-    .sort((a, b) => a.t - b.t
-      || (a.t === 0 ? b.gap - a.gap : 0)
-      || (a.t === 2 ? b.min - a.min : 0)
-      || a.day.localeCompare(b.day)
-      || a.i - b.i)
-    .map((x) => x.r);
+  /**
+   * ⛔ THE p109 FLOOR COUNTS WHAT THE KEPT WEEK ALREADY HAS (PM review, 2026-09-22). A speed or subthreshold session
+   * picks with the floor only while the week — the sessions that never move, plus the ones already placed — lacks its
+   * kind. Once "one speed" is met, another speed session is an extra and picks with the easy sessions.
+   */
+  const floorKind = (r: MoveRow): 'speed' | 'subthreshold' | null => {
+    if (isLift(r)) return null;
+    const b = bandOf(r);
+    return b === 'above' ? 'speed' : b === 'near' || b === 'below' ? 'subthreshold' : null;
+  };
+  const weekHas = (k: 'speed' | 'subthreshold') => current()
+    .some((x) => inWeek(iso(x.date)) && status(x) !== 'skipped' && floorKind(x) === k);
+  const hasLiftOn = (d: string, except: string) => current()
+    .some((x) => x.id !== except && iso(x.date) === d && status(x) !== 'skipped' && isRealLift(x));
 
-  for (const s of toPlace) {
+  // 3. Who picks next, read again after every placement: lifts (widest p80 gap first); then a speed or subthreshold
+  // session the week still lacks; then everything else — extras and easy sessions — longest first (p109).
+  const rank = (r: MoveRow) => {
+    const k = floorKind(r);
+    const t = isRealLift(r) ? 0 : k && !weekHas(k) ? 1 : 2;
+    return { t, gap: t === 0 ? liftGapAt(r) : 0, min: Number(r.duration ?? 0) || 0, day: planDateOf(r) };
+  };
+  const remaining = pool.filter((r) => pending.has(r.id) && !rideAlong(r));
+  while (remaining.length > 0) {
+    remaining.sort((a, b) => {
+      const x = rank(a), y = rank(b);
+      return x.t - y.t || (x.t === 0 ? y.gap - x.gap : 0) || (x.t === 2 ? y.min - x.min : 0)
+        || x.day.localeCompare(y.day) || pool.indexOf(a) - pool.indexOf(b);
+    });
+    const s = remaining.shift()!;
     const home = lostOf.get(s.id)!;
+    // OURS — a lift prefers a day with no other lift on it (PM review, 2026-09-22); the order is otherwise unchanged.
+    const liftFirst = (days: string[]) => (isRealLift(s)
+      ? [...days].sort((a, b) => Number(hasLiftOn(a, s.id)) - Number(hasLiftOn(b, s.id)))
+      : days);
     // 4. The first day that fits (`daysThatFit`: the two-session cap, the p80 gap, closed days), then closest with room.
-    let to: string | undefined = daysThatFit({ session: { ...s, date: home }, fromDate: home, toDate: home, rows: current(), daysOff: args.daysOff, today, max: 7 })
-      .filter((d) => !lostDays.has(d))[0];
-    if (!to) to = week.filter(open).filter((d) => countOn(d, s.id) < MAX_SESSIONS_A_DAY).sort(byNearness(home))[0];
+    let to: string | undefined = liftFirst(daysThatFit({ session: { ...s, date: home }, fromDate: home, toDate: home, rows: current(), daysOff: args.daysOff, today, max: 7 })
+      .filter((d) => !lostDays.has(d)))[0];
+    if (!to) to = liftFirst(week.filter(open).filter((d) => countOn(d, s.id) < MAX_SESSIONS_A_DAY).sort(byNearness(home)))[0];
     pending.delete(s.id);
     // 6. No room left: it comes off. Nothing that was never on a lost day moves or comes off for it.
     if (!to) { dropped.add(s.id); continue; }

@@ -224,3 +224,27 @@ Deno.test('⛔ EVERY LOST DAY OF THE WEEK IS PLANNED TOGETHER: a session an earl
   // Tue's ride is in the pool again (it was off, still off: every other day is full) — and Sat's two sessions too.
   assertEquals(sat.sessions.filter((x) => x.lost_day).map((x) => x.id).sort(), ['s1', 's2', 't1']);
 });
+
+Deno.test('⛔ PM EXPECTED WEEK, Tue then Wed lost: Fri Lower Push + warm-up + Long Sub-Threshold; Sat Hinge + long ride; Progressive Repeats off', () => {
+  const afterTue = saved(WEEK, lose(WEEK, '2026-09-22'));
+  const p = lose(afterTue, '2026-09-23');
+  const on = (d: string) => p.sessions.filter((s) => s.to === d && !s.dropped).map((s) => s.id).sort();
+  assertEquals(on('2026-09-25'), ['lpush', 'nt', 'plyo']);
+  assertEquals(on('2026-09-26'), ['hinge', 'long']);
+  assertEquals(p.sessions.filter((s) => s.dropped).map((s) => s.id), ['ana']);
+});
+
+Deno.test('p109 floor counts the kept week: with a speed session kept, a lost speed session ranks with the easy ones', () => {
+  const rows: MoveRow[] = [
+    S('kept', '2026-09-21', 'run', 'MLSS+', 'planned', 'above'), S('k2', '2026-09-21', 'ride', 'Ride A', 'planned', 'vt1_or_easier'),
+    S('w1', '2026-09-23', 'run', 'Run B', 'planned', 'vt1_or_easier'), S('w2', '2026-09-23', 'ride', 'Ride B', 'planned', 'vt1_or_easier'),
+    S('th1', '2026-09-24', 'run', 'Run C', 'planned', 'vt1_or_easier'), S('th2', '2026-09-24', 'ride', 'Ride C', 'planned', 'vt1_or_easier'),
+    S('f1', '2026-09-25', 'run', 'Run D', 'planned', 'vt1_or_easier'), S('f2', '2026-09-25', 'ride', 'Ride D', 'planned', 'vt1_or_easier'),
+    S('s1', '2026-09-26', 'run', 'Run E', 'planned', 'vt1_or_easier'),
+    { ...S('sp', '2026-09-22', 'ride', 'Short Speed Ride', 'planned', 'above'), duration: 45 },
+    { ...S('ez', '2026-09-22', 'ride', 'Long Easy Ride', 'planned', 'vt1_or_easier'), duration: 120 },
+  ];
+  const p = placeLostDay({ lostDate: '2026-09-22', rows, daysOff: ['sunday'], today: '2026-09-21' });
+  // One room left (Saturday): the longer session takes it — the speed ride is an extra.
+  assertEquals([where(p, 'ez').to, where(p, 'sp').dropped], ['2026-09-26', true]);
+});
