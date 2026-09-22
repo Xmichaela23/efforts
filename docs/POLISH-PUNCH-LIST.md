@@ -14,6 +14,11 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## [x] FIXED 2026-09-22 (217ee36a6, main 912d14cb8) — A FINISHED RUN LOST THE NAME ITS PLAN GAVE IT
+
+> The plan said "Descending Ladder"; the Today card and calendar day list printed the Garmin name. Now every surface
+> prints the plan's name when the session is attached (D-484). Deployed; seen on Michael's phone 2026-09-22.
+
 ## [x] FIXED 2026-09-20 (d11a76c72 … e96ec0193) — THE CALENDAR SAVED ONE SESSION PER SPORT PER DAY
 
 > Fixed: `planned_workouts.day_seq` (migration 20260921000000, run by Michael) joins the unique index; activate-plan

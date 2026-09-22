@@ -1,5 +1,17 @@
 # Engine State
 
+## 🧭 ALSO READ — 2026-09-22 (D-484): a finished endurance session shows the name its plan gave it
+
+> **PUSHED (main `912d14cb8`, feature `217ee36a6`). DEPLOYED from a clean worktree of `912d14cb8`: get-week, coach,
+> export-data, send-workout-to-garmin, calendar-sync, run-jobs (the last five bundle `src/lib/derive-workout-title.ts`).
+> Client on Netlify; iOS rebuilt and synced. Seen on Michael's phone: yesterday's Garmin run reads "Descending Ladder".**
+> 1. get-week sets `session_title` once per completed session from its linked planned row (`_shared/session-title.ts`);
+>    `deriveWorkoutTitle` reads it first. Null when nothing is attached, so an unplanned session keeps the provider name.
+> 2. Display only: the stored name on both rows is unchanged. The Today card and the calendar day list now match the
+>    session header. The month-grid chip still prints its code ("RN-VO2 39:00") on purpose.
+> 3. A strength session logged under another name now shows the plan's name on the card, as the header already did.
+> 4. A dead block in `WorkoutCalendar.tsx` (could never fire) was deleted.
+
 ## 🧭 ALSO READ — 2026-09-21/22: moving sessions · "Can't train this day" · the move check on the book
 
 > **All PUSHED (main `086790a67` … `e01c3c427`), DEPLOYED (validate-reschedule + place-lost-day from a clean worktree of

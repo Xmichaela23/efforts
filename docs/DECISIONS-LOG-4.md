@@ -340,3 +340,13 @@ the page's own guess line covers here.
    screen's own copy, goals) still refresh through them. They go when those copies move.
 5. **Left on purpose:** the endurance checkpoint (a kept "due" would reopen an answered sheet); the plans screen keeps
    its per-week store but clears it on every change event.
+
+## D-484 — A finished session shows the name its plan gave it (2026-09-22, Michael)
+
+1. **The plan's name wins on screen.** A completed endurance session attached to a planned row prints the planned
+   row's name on every surface (Today card, calendar day list, session header). The provider's name ("location + sport
+   word" from ingest-activity) shows only when nothing is attached. Field practice: TrainingPeaks and TrainerRoad show
+   the planned workout's name on a completed, matched workout.
+2. **The server decides it once** (get-week `session_title` via `_shared/session-title.ts`); the phone reads it.
+3. **Display only.** Neither row's stored name is rewritten, so unlinking a session brings the provider name back.
+4. **Left on purpose:** the month-grid chip keeps its code, not a name.
