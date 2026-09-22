@@ -1509,7 +1509,9 @@ export default function WorkoutCalendar({
               {/* ⛔ A TAPPABLE DATE LOOKS TAPPABLE (2026-09-21): the lost-day screen's day-chip pill, only on the days
                   where the tap opens "Can't train this day". Past days and empty days keep the plain date. */}
               <div
-                className={`text-[12px] uppercase${lostEligible ? ' rounded-xl border border-white/10 bg-white/[0.03] text-center py-1.5 mr-2 cursor-pointer' : ''}`}
+                // ⚠️ ONE BOX FOR EVERY DATE: the plain date takes the pill's border (transparent) and padding, so every
+                // date's text starts at the same x, pill or not.
+                className={`text-[12px] uppercase rounded-xl border py-1.5 px-2 mr-2 text-left ${lostEligible ? 'border-white/10 bg-white/[0.03] cursor-pointer' : 'border-transparent'}`}
                 style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
                 onClick={(e) => {
                   if (!lostEligible) return;
