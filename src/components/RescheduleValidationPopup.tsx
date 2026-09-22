@@ -1,4 +1,5 @@
 import React from 'react';
+import { getDisciplineColorRgb } from '@/lib/context-utils';
 
 /**
  * ⛔ THE MOVE CHECK, REBUILT ON THE BOOK (2026-09-21, docs/WORKORDER-lost-day-2026-09-21.md "Move check rebuilt on
@@ -14,6 +15,8 @@ export interface MoveCheckResult {
 
 interface RescheduleValidationPopupProps {
   workoutName: string;
+  /** The session's sport as the calendar reads it (`displayDisciplineOf`) — the popup takes its dot's colour. */
+  sport?: string;
   oldDate: string;
   newDate: string;
   validation: MoveCheckResult;
@@ -32,14 +35,17 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function RescheduleValidationPopup({
-  workoutName, oldDate, newDate, validation, onConfirm, onCancel, onDayClick,
+  workoutName, sport, oldDate, newDate, validation, onConfirm, onCancel, onDayClick,
 }: RescheduleValidationPopupProps) {
   const notes = Array.isArray(validation?.notes) ? validation.notes : [];
   const days = Array.isArray(validation?.days_that_fit) ? validation.days_that_fit : [];
   const refused = validation?.refused === true;
   const moving = oldDate !== newDate;
-  // The panel's tint: red for the refusal, amber when there are notes, green when the move is clear.
-  const rgb = refused ? '239, 68, 68' : notes.length ? '250, 204, 21' : '34, 197, 94';
+  /**
+   * ⛔ THE PANEL WEARS THE SESSION'S SPORT COLOUR (2026-09-22) — the same colour as its calendar dot. The old green /
+   * gold severity tints read as sport colours and are gone. A day off (the refusal) stays neutral.
+   */
+  const rgb = refused || !sport ? '242, 240, 236' : getDisciplineColorRgb(sport).replace(/^rgb\(|\)$/g, '');
 
   return (
     // ⛔ CLEARS THE TAB BAR AND THE SAFE AREA (2026-09-21, from Michael's phone: Cancel / Confirm sat under the tab bar
@@ -60,7 +66,8 @@ export default function RescheduleValidationPopup({
         className="relative w-full max-w-lg mx-4 mb-4 p-6 max-h-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-2xl backdrop-blur-xl border-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] animate-slide-up"
         style={{
           background: `linear-gradient(135deg, rgba(${rgb},0.15) 0%, rgba(${rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`,
-          borderColor: `rgba(${rgb}, 0.3)`,
+          borderColor: `rgba(${rgb}, ${refused ? 0.18 : 0.45})`,
+          boxShadow: refused ? undefined : `0 0 24px rgba(${rgb}, 0.18), 0 0 0 1px rgba(${rgb}, 0.12) inset`,
           WebkitOverflowScrolling: 'touch',
         }}
       >

@@ -20,7 +20,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // ⛔ THE MEMBERSHIP KEY LIVES IN ITS OWN FILE so it can be unit-tested without a database — the
 // duplicate-session bug it fixes was invisible until a device showed it. See that file's header.
 import { buildExistsCounts, plannedKey, takeFreeDaySeq, usedDaySeqs } from './planned-exists-key.ts';
-import { MOVED_FROM_PREFIX } from '../_shared/moved-from.ts';
+import { MOVED_FROM_PREFIX, movedOrigin } from '../_shared/moved-from.ts';
 // The ONE answer to "what block is this, on this date" — same function the coach payload's block
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
@@ -1839,10 +1839,22 @@ Deno.serve(async (req)=>{
       // ⛔ ONLY A DAY WITH NOTHING ON IT GETS A LINE (2026-09-19): a day with a session never prints "Rest", and the
       // phone no longer has to decide which days are empty.
       const datesWithItems = new Set((itemsWithPlannedWorkout as any[]).map((it: any) => String(it?.date ?? '').slice(0, 10)));
+      // ⛔ THE DAYS SESSIONS WERE MOVED OFF (2026-09-22, "Down"): every row carrying one of this window's days as its
+      // original day (`moved_from:`), wherever it sits now — next week included.
+      const movedOffDates = new Set<string>();
+      {
+        const originTags: string[] = [];
+        for (let d = fromISO; d <= toISO; d = addDays(d, 1)) originTags.push(`${MOVED_FROM_PREFIX}${d}`);
+        const { data: movedRows } = await supabase.from('planned_workouts').select('date,tags').eq('user_id', userId).overlaps('tags', originTags);
+        for (const r of Array.isArray(movedRows) ? movedRows : []) {
+          const o = movedOrigin(r);
+          if (o && o !== String(r?.date ?? '').slice(0, 10)) movedOffDates.add(o);
+        }
+      }
       const lines: Record<string, string> = {};
       for (let d = fromISO; d <= toISO; d = addDays(d, 1)) {
         if (datesWithItems.has(d)) continue;
-        lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: restDates.has(d), upcomingPlanStartsOn });
+        lines[d] = emptyDayLine({ date: d, today: todayISO, hasPlan: restDates.has(d), upcomingPlanStartsOn, movedOff: movedOffDates.has(d) });
       }
       (responseData as any).empty_day_lines = lines;
     } catch (e) {

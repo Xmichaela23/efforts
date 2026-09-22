@@ -19,6 +19,7 @@ import RescheduleDatePicker from './RescheduleDatePicker';
 // Unified path only; remove legacy planned_workouts hooks
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
+import { displayDisciplineOf } from '@/lib/utils';
 import { movePatch } from '@/lib/session-move';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
@@ -195,7 +196,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showReschedulePopup, setShowReschedulePopup] = useState(false);
   const [rescheduleValidation, setRescheduleValidation] = useState<any>(null);
-  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
+  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string; sport?: string } | null>(null);
   const { plannedWorkouts, updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
   const [showSwapPanel, setShowSwapPanel] = useState(false);
   const [swapping, setSwapping] = useState(false);
@@ -1458,7 +1459,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             workoutId: workoutId,
                             oldDate: currentDate,
                             newDate: currentDate, // Will be updated when user selects an option
-                            workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+                            workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`,
+                            // The popup wears the session's calendar-dot colour (2026-09-22).
+                            sport: displayDisciplineOf(((unifiedWorkout as any) || (workout as any)) ?? null),
                           });
                           setShowReschedulePopup(true);
                         } catch (err) {
@@ -1724,7 +1727,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 workoutId: workoutId,
                 oldDate: currentDate,
                 newDate: newDate,
-                workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`
+                workoutName: (unifiedWorkout as any)?.intent_title || (workout as any)?.intent_title || (unifiedWorkout as any)?.name || (workout as any)?.name || `${(unifiedWorkout as any)?.type || (workout as any)?.type} workout`,
+                sport: displayDisciplineOf(((unifiedWorkout as any) || (workout as any)) ?? null),
               });
               setShowReschedulePopup(true);
             } catch (err) {
@@ -1740,6 +1744,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {showReschedulePopup && rescheduleValidation && reschedulePending && (
         <RescheduleValidationPopup
           workoutName={reschedulePending.workoutName}
+          sport={reschedulePending.sport}
           oldDate={reschedulePending.oldDate}
           newDate={reschedulePending.newDate}
           validation={rescheduleValidation}

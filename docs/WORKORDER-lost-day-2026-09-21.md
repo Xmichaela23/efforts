@@ -1,7 +1,7 @@
 # WORKORDER — "Can't train this day" (2026-09-21)
 
 Owner: Michael (architect). PM: planning chat. Engineer: one terminal session per stage.
-Status: APPROVED to build ("lets build it", 2026-09-21). Push / deploy still gated on Michael.
+Status: SHIPPED 2026-09-22 (main `e01c3c427`, functions deployed). Summary + open items: ENGINE-STATE banner.
 
 ## What the athlete gets
 
@@ -114,9 +114,14 @@ Stop and report. No design until Michael has read Stage 0.
 - Screen: `src/components/LostDaySheet.tsx` — `WeekStrip` (moved out of NonRaceBuilder) + its own day list with a
   grip on each movable session; every drag re-asks the server. Accept saves through `@/lib/session-move`.
 - Entry: tap the day's name in the calendar week (today and later, with a planned not-done session).
-- Worked example result (differs from the hand answer): Hinge → Fri (with Lower Push; p108 + p80 notes),
-  Progressive Repeats → Sat (with the long ride; no note). Mon and Wed already hold two sessions, so the
-  no-three-a-day rule sends Hinge to Friday; Saturday has no lift, so the ride fits there with no note.
+- FIXES 2026-09-21 (Michael): (1) the p108 note no longer disqualifies a day — "Days that fit" = not a day off,
+  no third session (OURS), lift gap not over 9 days (p80); order unchanged. (2) A plyo warm-up moves with the
+  session it warms up (p274 prints it as that day's warm-up), is never placed on its own, and does not count
+  toward the three-session limit.
+- Worked example result, after the fixes: MATCHES the hand answer — Hinge → Wed (with the warm-up and Long
+  Sub-Threshold Repeats; p108 note), Progressive Repeats → Fri (with Lower Push; p108 note).
+- Michael's case: lose Wed → the warm-up and Long Sub-Threshold Repeats both → Fri with Lower Push (p108 note);
+  Sunday stays empty.
 
 ### Stage 1 — server: place the week (read-only endpoint)
 Input: lost date (+ optional athlete moves). Reads this week's uncompleted rows from today forward,
@@ -140,3 +145,40 @@ check every result against the Rules list. Include the worked example above. Rep
 - Never `git commit -a` — add exact files. No push / deploy without Michael's go.
 - Deploy edge functions from a clean worktree of the pushed commit.
 - DB: read-only, and throwaway users only for writes.
+
+### Approved copy, lost-day sheet subtitle (Michael, 2026-09-21)
+"[Weekday]'s sessions moved to the best days left this week. Nothing is saved until you tap Save."
+Shown under the title and date. [Weekday] is the lost day's full weekday name.
+
+### More than one day lost (Michael, 2026-09-22) — built, held for PM review
+1. A "Down" day (its sessions all moved off) is closed like a day off — never a destination for a later lost day or
+   for "Days that fit". `_shared/move-check/index.ts downDates`.
+2. No room without a three-session day → a session comes off instead of stacking: easy (VT1 or below) first; every
+   lift kept; the week keeps one speed and one subthreshold session (p109). No spill into next week. Order OURS,
+   STATE-SOURCES row beside the p109 citation. `lost-day.ts` rule 6.
+3. Approved copy for a dropped session, under the week: "[Session] comes off this week. There's no day left for it."
+   On Save it is skipped through the existing skip (workout_status 'skipped'), so it stays recorded.
+
+### PM review 2026-09-22 — replaces item 2 above
+- A lost day only costs its own sessions: sessions already on other days are never bumped or dropped. The lost
+  sessions compete only for the room left (two-session cap, OURS).
+- Picking order among the lost sessions: lifts first (widest p80 gap first), then the week's speed and
+  subthreshold sessions (p109 floor), then easy sessions longest first (p109 "all minutes count" — the shortest
+  comes off). No spill into next week.
+- A day lost whose sessions all came off (skipped) is closed too, like a "Down" day.
+
+### PM review 2026-09-22 (second) — built, held for review
+1. Every lost day in the week is planned together: each new lost day places again all sessions from all lost days
+   that week (including ones an earlier lost day moved or took off) against the room left, same priority order.
+   Sessions never on a lost day still never move.
+2. Lost-day sessions carry `lost_day:<day>` on Save (moved or taken off), so only a lost day counts as closed — a day
+   the athlete skipped themselves stays open. A session an earlier lost day took off comes back on the plan if it is
+   placed. `src/lib/session-move.ts lostDayPatch`.
+
+### PM review 2026-09-22 (third) — built, held for review
+- The p109 floor counts what the kept week already has: with Monday's MLSS+ meeting "one speed", Progressive Repeats
+  is an extra and picks with the easy sessions, below a missing subthreshold session.
+- A lift prefers a day with no other lift on it (OURS, ledger row).
+- Tue-then-Wed now gives the expected week: Fri Lower Push + Plyo warm-up + Long Sub-Threshold Repeats; Sat Hinge +
+  long ride; Progressive Repeats comes off.
+

@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     if (!workout_id || !new_date) return json({ error: 'Missing workout_id or new_date' }, 400);
 
     const { data: session } = await supabase.from('planned_workouts')
-      .select('id, date, type, name, workout_status, training_plan_id')
+      .select('id, date, type, name, workout_status, training_plan_id, tags')
       .eq('id', workout_id).eq('user_id', user.id).maybeSingle();
     if (!session) return json({ error: 'Workout not found' }, 404);
     // A done session is not moved; the calendar only lets a planned one be dragged. No athlete copy here.
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     const lo = shift(fromDate < toDate ? fromDate : toDate, -WINDOW_DAYS);
     const hi = shift(fromDate > toDate ? fromDate : toDate, WINDOW_DAYS);
     const { data: rows } = await supabase.from('planned_workouts')
-      .select('id, date, type, name, workout_status, training_plan_id')
+      .select('id, date, type, name, workout_status, training_plan_id, tags')
       .eq('user_id', user.id).gte('date', lo).lte('date', hi);
 
     // The athlete's days off: the plan's goal answers (`training_prefs.unavailable_days`).

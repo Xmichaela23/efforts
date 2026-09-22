@@ -1,5 +1,33 @@
 # Engine State
 
+## 🧭 ALSO READ — 2026-09-21/22: moving sessions · "Can't train this day" · the move check on the book
+
+> **All PUSHED (main `086790a67` … `e01c3c427`), DEPLOYED (validate-reschedule + place-lost-day from a clean worktree of
+> `e01c3c427`; get-week + create-goal-and-materialize-plan + plan-overview from `0a48717d2`; client on Netlify).
+> Seen on Michael's phone (iOS build from a clean worktree): drag, grip, lifted card, popup, date pills, lost-day sheet,
+> "Down". Multi-day loss checked on throwaway accounts only.** Plan + approved copy: `docs/WORKORDER-lost-day-2026-09-21.md`;
+> trace: `docs/STAGE0-lost-day-2026-09-21.md`.
+> 1. **A moved session stays moved.** It keeps its original day (swap-style note); the calendar stops re-adding it,
+>    a plan rebuild keeps the move, weight/pace updates match it by its original day. Moving back clears the note.
+> 2. **The move check is the book's, nothing else** (`_shared/move-check`). The Jan 2026 "Coach Brain" (ranked options,
+>    cortisol/48–72h text, workload caps) is deleted. Three notes, approved words: p108 two-a-day gap (only when a lift
+>    is on the day; a note, never a block), p80 lift gap over 9 days, "[Day] is a day off" (the only refusal).
+>    "Days that fit:" = not a day off / not a Down day / no third session (OURS) / p80 gap ok; lifts by gap closest to
+>    3–4 days, runs+rides nearest day (OURS). The plyo warm-up moves with the session it warms up.
+> 3. **Calendar drag**: six-dot grip on future sessions (drag at once), 450 ms hold elsewhere, lifted card, no iOS
+>    native drag / text selection. One shared carry (`src/hooks/useCarryDrag.tsx`) for the calendar and the sheet.
+>    Haptics tried and removed (Michael: adds nothing). Popup tinted by the session's sport colour.
+> 4. **"Can't train this day"**: date pill (today+, with planned work) → full-height sheet with the placed week, drag to
+>    adjust, Save. A lost day only costs its own sessions; all lost days of a week are planned together; priority =
+>    lifts (widest p80 gap, prefer a lift-free day, OURS) → missing p109 floor sessions (what the kept week already has
+>    counts) → easy sessions longest first (OURS). No room = comes off (skipped, tagged `lost_day:<day>`), never into
+>    next week. An emptied day reads "Down" (server word, like "Rest").
+>
+> **OPEN:** the builder's "The lifting days don't fit around your other days any other way" needs new words (proposed
+> "Friday is a day off, but it still has a lift.", not approved) · the builder can move a run/ride off a day off onto a
+> day that already has two sessions · the sheet finds the p108 note by its exact words (change both if the copy changes)
+> · multi-day loss not yet tried on a device.
+
 ## 🧭 ALSO READ — 2026-09-21 (D-483): one client cache · day swipe · Home weather · the LOAD card
 
 > **All PUSHED (main `2c9519fa0` … `ed615b10f`). CLIENT ONLY — no edge function or migration changed, nothing to deploy

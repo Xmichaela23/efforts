@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useCarryDrag, type CarryItem } from '@/hooks/useCarryDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { movePatch } from '@/lib/session-move';
@@ -407,7 +407,7 @@ export default function WorkoutCalendar({
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
-  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
+  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string; sport?: string } | null>(null);
 
   // Handle drag start
   const handleDragStart = (e: React.DragEvent, workout: any) => {
@@ -474,6 +474,8 @@ export default function WorkoutCalendar({
         newDate: targetDate,
         // A lifting day's title in the book's terms, from get-week (2026-09-18).
         workoutName: workout.intent_title || workout.name || `${workout.type} workout`,
+        // The popup wears the session's calendar-dot colour (2026-09-22).
+        sport: displayDisciplineOf(workout),
       });
       setShowValidationPopup(true);
     } catch (err) {
@@ -503,11 +505,8 @@ export default function WorkoutCalendar({
    * stealing that gesture is how a calendar becomes impossible to scroll past.
    */
   const daysGridRef = useRef<HTMLDivElement | null>(null);
-  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; row: any; from: string; el: HTMLElement | null } | null>(null);
-  const [touchDragId, setTouchDragId] = useState<string | null>(null);
-  const [touchDragOver, setTouchDragOver] = useState<string | null>(null);
-  /** Refs as well as state: the native listener below reads them without re-binding on every drag. */
-  const touchDragRef = useRef<{ row: any; from: string; over: string | null } | null>(null);
+  /** A hold not yet fired: where it started, and its timer. */
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number } | null>(null);
 
   /**
    * ⛔ NO HTML5 DRAG ON A TOUCH SCREEN (2026-09-21, from Michael's iPhone: a white bar on hold). iOS WebKit runs its
@@ -519,121 +518,73 @@ export default function WorkoutCalendar({
   }, []);
 
   /**
-   * ⛔ THE CARRIED SESSION (2026-09-21): while a finger moves a session it shows as a lifted card — shadow, a little
-   * larger, the sport colour on its edge — that follows the finger up and down. The row it came from dims and the
-   * day under the finger lights. The card is drawn once at pickup from the row it lifted; it has no words of its own.
+   * ⛔ THE CARRY IS THE SHARED ONE (`useCarryDrag`, 2026-09-21) — the "Can't train this day" sheet moves a session the
+   * same way: no page scroll or pull-to-refresh while carrying, a lifted card under the finger, the day beneath lit.
+   * A drop on another day goes to `beginReschedule`, the one owner of a move, exactly as the mouse's drop does.
    */
-  type Carry = { name: string; meta: string; colour: string; left: number; width: number; height: number; grabY: number; y: number };
-  const [carry, setCarry] = useState<Carry | null>(null);
-  const carryFrom = (el: HTMLElement | null, row: any, fingerY: number): Carry | null => {
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return {
-      name: deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase()),
-      meta: sessionLineMeta(row),
-      colour: getDisciplineColor(displayDisciplineOf(row)),
-      left: r.left, width: r.width, height: r.height, grabY: fingerY - r.top, y: fingerY,
-    };
-  };
+  const drag = useCarryDrag<any>({
+    dayAttr: 'data-day',
+    onDrop: (row, from, to) => { if (to !== from) void beginReschedule(row, to); },
+  });
+  const carryItemOf = (row: any): CarryItem => ({
+    id: String(row?.id ?? ''),
+    name: deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase()),
+    meta: sessionLineMeta(row),
+    colour: getDisciplineColor(displayDisciplineOf(row)),
+  });
 
   const cancelLongPress = useCallback(() => {
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
     longPress.current = null;
-    touchDragRef.current = null;
-    setTouchDragId(null);
-    setTouchDragOver(null);
-    setCarry(null);
   }, []);
 
-  const beginLongPress = useCallback((e: React.TouchEvent, row: any, from: string) => {
+  /** The hold: 450 ms still on a row picks the session up. Any travel over 10 px first hands the gesture back. */
+  const beginLongPress = (e: React.TouchEvent, row: any, from: string) => {
     const planned = String(row?.workout_status ?? '').toLowerCase() !== 'completed';
     if (!planned || !row?.id) return;
     const t = e.touches[0];
     if (!t) return;
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    cancelLongPress();
     const el = e.currentTarget as HTMLElement;
     longPress.current = {
       x: t.clientX,
       y: t.clientY,
-      row,
-      from,
-      el,
       timer: setTimeout(() => {
-        touchDragRef.current = { row, from, over: null };
-        setTouchDragId(String(row.id));
-        setCarry(carryFrom(el, row, longPress.current?.y ?? t.clientY));
-        // ⚠️ A NUDGE SO THE HOLD IS FELT, where the device offers one. Silent on the rest.
-        try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
+        const y = longPress.current?.y ?? t.clientY;
+        longPress.current = null;
+        drag.pickUp(el, y, carryItemOf(row), row, from);
       }, 450),
     };
-  }, []);
+  };
 
-  /**
-   * ⛔ THE GRIP PICKS THE SESSION UP AT ONCE (2026-09-21). Touch on the six dots starts the move with no hold; the
-   * hold elsewhere on the row is unchanged. The row's own `touchend` / `touchcancel` finish or drop it, the same
-   * path as the hold.
-   */
-  const beginGripDrag = useCallback((e: React.TouchEvent, row: any, from: string) => {
+  /** THE GRIP (2026-09-21) picks the session up at once — no hold. */
+  const beginGripDrag = (e: React.TouchEvent, row: any, from: string) => {
     e.stopPropagation();
     if (!row?.id) return;
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
-    longPress.current = null;
-    touchDragRef.current = { row, from, over: null };
-    setTouchDragId(String(row.id));
+    cancelLongPress();
     const t = e.touches[0];
-    setCarry(carryFrom((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, row, t?.clientY ?? 0));
-    try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
-  }, []);
+    drag.pickUp((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, t?.clientY ?? 0, carryItemOf(row), row, from);
+  };
 
   /**
-   * ⛔ A NATIVE, NON-PASSIVE `touchmove` — React's own is passive, and a passive listener cannot
-   * call `preventDefault()`. Without that call the page keeps scrolling under a session the athlete
-   * is trying to carry to another day, which is not a drag, it is a fight.
-   *
-   * ⚠️ IT ONLY TAKES THE GESTURE ONCE THE HOLD HAS FIRED. Before that it does the opposite job:
-   * any travel over 10 px CANCELS the pending hold and hands the gesture back to the page.
+   * ⚠️ BEFORE THE HOLD FIRES, a thumb that starts moving was scrolling or swiping the week: travel over 10 px cancels
+   * the pending hold and the page keeps the gesture. After pickup the shared carry owns every move.
    */
   useEffect(() => {
     const el = daysGridRef.current;
     if (!el) return;
     const onMove = (e: TouchEvent) => {
       const t = e.touches[0];
-      if (!t) return;
-
       const pending = longPress.current;
-      if (pending?.timer && !touchDragRef.current) {
-        if (Math.abs(t.clientX - pending.x) > 10 || Math.abs(t.clientY - pending.y) > 10) {
-          clearTimeout(pending.timer);
-          longPress.current = null;
-        }
-        return;
-      }
-      if (!touchDragRef.current) return;
-
-      e.preventDefault();
-      setCarry((c) => (c ? { ...c, y: t.clientY } : c));
-      const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
-      const day = under?.closest('[data-day]') as HTMLElement | null;
-      const over = day?.getAttribute('data-day') ?? null;
-      if (touchDragRef.current.over !== over) {
-        touchDragRef.current.over = over;
-        setTouchDragOver(over);
-      }
+      if (!t || !pending?.timer) return;
+      if (Math.abs(t.clientX - pending.x) > 10 || Math.abs(t.clientY - pending.y) > 10) cancelLongPress();
     };
-    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: true });
     return () => el.removeEventListener('touchmove', onMove);
-  }, []);
+  }, [cancelLongPress]);
 
-  const endLongPress = useCallback(() => {
-    const drag = touchDragRef.current;
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
-    longPress.current = null;
-    touchDragRef.current = null;
-    setTouchDragId(null);
-    setTouchDragOver(null);
-    setCarry(null);
-    if (drag?.over && drag.over !== drag.from) void beginReschedule(drag.row, drag.over);
-  }, [beginReschedule]);
+  /** A finger lifted before the hold fired is a tap; the carry's own drop handles a lifted session. */
+  const endLongPress = cancelLongPress;
 
   // Handle confirm reschedule
   const handleConfirmReschedule = async () => {
@@ -1429,6 +1380,11 @@ export default function WorkoutCalendar({
            * ⚠️ A TODAY WITH NOTHING ON IT gets a neutral bar rather than a borrowed sport colour.
            */
           const leadSport = items.length > 0 ? displayDisciplineOf(items[0]?._src) : null;
+          /** Today or later with a planned, not-done session: the day's name offers "Can't train this day". */
+          const lostEligible = key >= todayKey && items.some((it: any) => {
+            const st = String(it?._src?.workout_status ?? '').toLowerCase();
+            return st === 'planned' || st === '';
+          });
           const todayColour = leadSport ? getDisciplineColor(leadSport) : 'rgba(242,240,236,0.55)';
 
           return (
@@ -1465,15 +1421,13 @@ export default function WorkoutCalendar({
                 minWidth: 0,
                 ...NO_TEXT_SELECT,
                 ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
-                // ⛔ THE DAY UNDER THE FINGER LIGHTS, today included, in the carried session's colour (2026-09-21).
-                background: touchDragOver === key && carry
-                  ? `linear-gradient(90deg, ${hexA(carry.colour, 0.18)}, ${hexA(carry.colour, 0.06)})`
-                  : dragOverDate === key || touchDragOver === key
-                    ? 'rgba(255,255,255,0.08)'
-                    : isToday
-                      ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
-                      : 'transparent',
-                boxShadow: touchDragOver === key && carry ? `inset 0 0 0 1px ${hexA(carry.colour, 0.55)}` : undefined,
+                background: dragOverDate === key
+                  ? 'rgba(255,255,255,0.08)'
+                  : isToday
+                    ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
+                    : 'transparent',
+                // ⛔ THE DAY UNDER THE FINGER LIGHTS, today included, in the carried session's colour (`useCarryDrag`).
+                ...(drag.overStyle(key) ?? {}),
               }}
             >
               {/* ⛔ TODAY'S 3 px BAR, at the pane's left edge. */}
@@ -1497,15 +1451,15 @@ export default function WorkoutCalendar({
               {/* ⚠️ AN ANCHOR, NOT A TRIGGER: the menu opens only on a day that qualifies. Any other tap falls through
                   to the row, which opens the add menu as before. */}
               <PopoverPrimitive.Anchor asChild>
+              {/* ⛔ A TAPPABLE DATE LOOKS TAPPABLE (2026-09-21): the lost-day screen's day-chip pill, only on the days
+                  where the tap opens "Can't train this day". Past days and empty days keep the plain date. */}
               <div
-                className="text-[12px] uppercase"
+                // ⚠️ ONE BOX FOR EVERY DATE: the plain date takes the pill's border (transparent) and padding, so every
+                // date's text starts at the same x, pill or not.
+                className={`text-[12px] uppercase rounded-xl border py-1.5 px-2 mr-2 text-left ${lostEligible ? 'border-white/10 bg-white/[0.03] cursor-pointer' : 'border-transparent'}`}
                 style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
                 onClick={(e) => {
-                  const eligible = key >= todayKey && items.some((it: any) => {
-                    const st = String(it?._src?.workout_status ?? '').toLowerCase();
-                    return st === 'planned' || st === '';
-                  });
-                  if (!eligible) return;
+                  if (!lostEligible) return;
                   e.stopPropagation();
                   setLostMenuDate(key);
                 }}
@@ -1545,8 +1499,9 @@ export default function WorkoutCalendar({
                   /* ⛔ `Rest` ONLY WHERE A PLAN SAYS SO, AND THE SERVER SAYS IT (2026-09-17, WORKORDER Stage C).
                      This ran its own copy of Today's rule; both read `empty_day_lines` now. The calendar prints
                      only the rest word — the other three lines belong to the day's own screen.
+                     ⛔ AND "Down" (2026-09-22): a day whose sessions were all moved off it. Same styling.
                      server-word: get-week composes it, this prints it. */
-                  emptyDayLines?.[key] === 'Rest' ? (
+                  emptyDayLines?.[key] === 'Rest' || emptyDayLines?.[key] === 'Down' ? (
                     <span className="text-[14px] italic" style={{ color: 'rgba(242,240,236,0.36)' }}>{emptyDayLines[key]}</span>
                   ) : null
                 ) : items.map((evt: any, i: number) => {
@@ -1589,7 +1544,7 @@ export default function WorkoutCalendar({
                       className="grid items-center gap-2.5 text-[15px] min-w-0"
                       style={{
                         gridTemplateColumns: '10px minmax(0,1fr) auto minmax(16px,auto)',
-                        opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.3 : 1,
+                        opacity: drag.carryingId && drag.carryingId === String(row?.id ?? '') ? 0.3 : 1,
                         cursor: planned && row?.id ? 'grab' : 'pointer',
                         ...NO_TEXT_SELECT,
                         ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
@@ -1686,26 +1641,8 @@ export default function WorkoutCalendar({
         </>
       )}
 
-      {/* ⛔ THE LIFTED CARD (2026-09-21) — follows the finger vertically, over everything, and never under it:
-          `pointer-events: none`, so the day beneath is still what the finger is over. */}
-      {carry ? createPortal(
-        <div
-          aria-hidden="true"
-          className="fixed z-[70] grid items-center gap-2.5 text-[15px] rounded-[10px]"
-          style={{
-            left: carry.left, width: carry.width, top: carry.y - carry.grabY, minHeight: carry.height,
-            gridTemplateColumns: '10px minmax(0,1fr) auto', padding: '6px 10px',
-            background: 'rgba(28,28,30,0.97)', borderLeft: `3px solid ${carry.colour}`,
-            boxShadow: `0 14px 32px rgba(0,0,0,0.55), 0 0 0 1px ${hexA(carry.colour, 0.35)}`,
-            transform: 'scale(1.04)', transformOrigin: 'center', pointerEvents: 'none', ...NO_TEXT_SELECT,
-          }}
-        >
-          <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: carry.colour, boxShadow: `0 0 8px ${carry.colour}` }} />
-          <span className="truncate" style={{ color: 'rgba(242,240,236,1)' }}>{carry.name}</span>
-          <span className="text-[14px] tabular-nums" style={{ color: 'rgba(242,240,236,0.62)' }}>{carry.meta}</span>
-        </div>,
-        document.body,
-      ) : null}
+      {/* The lifted card while a session is carried (`useCarryDrag`). */}
+      {drag.card}
 
       {lostDay ? <LostDaySheet date={lostDay} onClose={() => setLostDay(null)} /> : null}
 
@@ -1713,6 +1650,7 @@ export default function WorkoutCalendar({
       {showValidationPopup && validationResult && reschedulePending && (
         <RescheduleValidationPopup
           workoutName={reschedulePending.workoutName}
+          sport={reschedulePending.sport}
           oldDate={reschedulePending.oldDate}
           newDate={reschedulePending.newDate}
           validation={validationResult}
