@@ -2,7 +2,9 @@
 
 ## 🧭 ALSO READ — 2026-09-22: the week is arranged around the athlete's picks, one set of rules
 
-> **Status line is filled in at deploy.**
+> **PUSHED (main `faaabea7d`). DEPLOYED from a clean worktree of `faaabea7d`: all 29 functions that bundle the changed
+> files (generate-strength-plan, rematerialize-standing-block, validate-reschedule, place-lost-day, endurance-checkpoint and
+> the rest listed in INVENTORY.md). No client change. Not yet checked on a device or a throwaway account.**
 > 1. **Every order of the book's days is tried, not only rotations** (`_shared/standing-plan/week-arrangement.ts`,
 >    `chooseDayMap` moved there). Terms in order: days off clear · long day · fewest `weekConflicts` warnings on the
 >    week it builds (a warning the plan's own printed week carries is not counted; a day over the two-session limit
