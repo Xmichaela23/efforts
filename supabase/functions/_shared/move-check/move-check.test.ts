@@ -75,10 +75,27 @@ Deno.test('p80: a run is never given the lift note', () => {
 
 // ── 4. Days that fit ─────────────────────────────────────────────────────────────────────────────
 
-Deno.test('⛔ DAYS THAT FIT: only days that trigger none of the notes — not past, not a day off, not from or to', () => {
-  // Hinge dragged Tue → Wed; today is Monday 09-21. Mon holds Push (and is today), Wed/Thu/Fri/Sat hold sessions,
-  // Sunday is a day off. Nothing fits.
-  assertEquals(daysThatFit({ session: HINGE, fromDate: '2026-09-22', toDate: '2026-09-23', rows, daysOff: ['sunday'], today: '2026-09-21' }), []);
+Deno.test('⛔ DAYS THAT FIT: not a day off, no third session, no lift gap past nine — the p108 note does not disqualify', () => {
+  // Hinge dragged Tue → Wed; today is Monday 09-21. Mon (Push) and Thu (Pull) hold one session each: both fit, with
+  // the p108 note. Fri and Sat would put the gap at 10 and 11 days (p80). Sunday is a day off.
+  // Gap cost: Mon 6/8 → 6, Thu 9/5 → 6; the tie goes to the day nearer Tuesday.
+  assertEquals(daysThatFit({ session: HINGE, fromDate: '2026-09-22', toDate: '2026-09-23', rows, daysOff: ['sunday'], today: '2026-09-21' }),
+    ['2026-09-21', '2026-09-24']);
+});
+
+Deno.test('⛔ DAYS THAT FIT: a day already holding two sessions is not offered (OURS); a plyo warm-up does not count', () => {
+  const r = run('rr', '2026-09-24');
+  const two = [run('a', '2026-09-23'), { ...run('b', '2026-09-23'), type: 'ride' }];
+  const warm = [run('c', '2026-09-25'), { id: 'pw', date: '2026-09-25', type: 'strength', name: 'Plyo warm-up', workout_status: 'planned', training_plan_id: 'p', tags: ['plyo'] } as MoveRow];
+  const out = daysThatFit({ session: r, fromDate: '2026-09-24', toDate: '2026-09-27', rows: [r, ...two, ...warm], daysOff: [], today: '2026-09-21' });
+  assertEquals(out.includes('2026-09-23'), false);
+  assertEquals(out[0], '2026-09-25');
+});
+
+Deno.test('p108: a plyo warm-up is not a session and not a lift — a run beside a run + warm-up gets no note', () => {
+  const r = run('rr', '2026-09-24');
+  const day = [run('c', '2026-09-25'), { id: 'pw', date: '2026-09-25', type: 'strength', name: 'Plyo warm-up', workout_status: 'planned', training_plan_id: 'p', tags: ['plyo'] } as MoveRow];
+  assertEquals(checkMove({ session: r, toDate: '2026-09-25', rows: [r, ...day], daysOff: [] }).notes, []);
 });
 
 Deno.test('⛔ DAYS THAT FIT, LIFTS: ordered by the gap closest to 3–4 days (p80)', () => {

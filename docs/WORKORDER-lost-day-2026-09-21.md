@@ -114,9 +114,14 @@ Stop and report. No design until Michael has read Stage 0.
 - Screen: `src/components/LostDaySheet.tsx` — `WeekStrip` (moved out of NonRaceBuilder) + its own day list with a
   grip on each movable session; every drag re-asks the server. Accept saves through `@/lib/session-move`.
 - Entry: tap the day's name in the calendar week (today and later, with a planned not-done session).
-- Worked example result (differs from the hand answer): Hinge → Fri (with Lower Push; p108 + p80 notes),
-  Progressive Repeats → Sat (with the long ride; no note). Mon and Wed already hold two sessions, so the
-  no-three-a-day rule sends Hinge to Friday; Saturday has no lift, so the ride fits there with no note.
+- FIXES 2026-09-21 (Michael): (1) the p108 note no longer disqualifies a day — "Days that fit" = not a day off,
+  no third session (OURS), lift gap not over 9 days (p80); order unchanged. (2) A plyo warm-up moves with the
+  session it warms up (p274 prints it as that day's warm-up), is never placed on its own, and does not count
+  toward the three-session limit.
+- Worked example result, after the fixes: MATCHES the hand answer — Hinge → Wed (with the warm-up and Long
+  Sub-Threshold Repeats; p108 note), Progressive Repeats → Fri (with Lower Push; p108 note).
+- Michael's case: lose Wed → the warm-up and Long Sub-Threshold Repeats both → Fri with Lower Push (p108 note);
+  Sunday stays empty.
 
 ### Stage 1 — server: place the week (read-only endpoint)
 Input: lost date (+ optional athlete moves). Reads this week's uncompleted rows from today forward,

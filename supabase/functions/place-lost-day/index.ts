@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     // Three weeks either side covers the p80 gap for a lift near the week's edges.
     const { data: rows } = await supabase.from('planned_workouts')
-      .select('id, date, type, name, workout_status, training_plan_id')
+      .select('id, date, type, name, workout_status, training_plan_id, tags')
       .eq('user_id', user.id).gte('date', shift(date, -28)).lte('date', shift(date, 28));
     const all = (rows ?? []) as MoveRow[];
 

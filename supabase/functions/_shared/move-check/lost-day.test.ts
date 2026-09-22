@@ -19,7 +19,7 @@ const WEEK: MoveRow[] = [
   S('mlss', '2026-09-21', 'run', 'MLSS+ Repeats'),
   S('hinge', '2026-09-22', 'strength', 'Lower body: Hinge'),
   S('ana', '2026-09-22', 'ride', 'Progressive Repeats'),
-  S('plyo', '2026-09-23', 'strength', 'Plyometrics'),
+  { ...S('plyo', '2026-09-23', 'strength', 'Plyo warm-up'), tags: ['standing_plan', 'plyo'] },
   S('nt', '2026-09-23', 'run', 'Long Sub-Threshold Repeats'),
   S('pull', '2026-09-24', 'strength', 'Upper body: Pull'),
   S('easy', '2026-09-24', 'ride', 'Endurance Ride'),
@@ -31,25 +31,37 @@ const plan = (moves?: Record<string, string>, rows = WEEK, today = '2026-09-21')
   placeLostDay({ lostDate: '2026-09-22', rows, daysOff: ['sunday'], today, moves });
 const where = (p: ReturnType<typeof plan>, id: string) => p.sessions.find((s) => s.id === id)!;
 
-Deno.test('⛔ WORKED EXAMPLE: Tuesday lost — every day has a session, so nothing "fits"; each goes to the closest open day that is not a third session', () => {
+Deno.test('⛔ WORKED EXAMPLE: Tuesday lost — Hinge to Wednesday, Progressive Repeats to Friday (the hand answer)', () => {
   const p = plan();
-  // Hinge (a lift, placed first): Mon and Wed are one day away but already hold two; Fri is the closest with one.
-  assertEquals(where(p, 'hinge').to, '2026-09-25');
-  // Its notes: p108 (Lower Push is there) and p80 (Sep 15 → Sep 25 is 10 days).
-  assertEquals(where(p, 'hinge').notes, [P108, 'Hinge: 10 days until the next one. Consistent improvement needs one every 8 to 9 days.']);
-  // Progressive Repeats: Saturday holds only the long ride — no lift, one session — so it fits with no note.
-  assertEquals(where(p, 'ana').to, '2026-09-26');
-  assertEquals(where(p, 'ana').notes, []);
+  // Hinge (a lift, placed first): Mon and Thu already hold two; Wednesday holds one — the plyo warm-up does not count
+  // (2026-09-21) — and its gap (8 days after Sep 15) is inside p80. Fri/Sat would pass nine days.
+  assertEquals(where(p, 'hinge').to, '2026-09-23');
+  assertEquals(where(p, 'hinge').notes, [P108]);
+  // Progressive Repeats: Wednesday is now full, Mon and Thu hold two; Friday (one day nearer than Saturday) fits.
+  // The p108 note shows (Lower Push is there) and no longer stops the day.
+  assertEquals(where(p, 'ana').to, '2026-09-25');
+  assertEquals(where(p, 'ana').notes, [P108]);
   // Nothing else moves, nothing lands on Tuesday or Sunday.
   assertEquals(p.sessions.filter((s) => s.to !== s.from).map((s) => s.id).sort(), ['ana', 'hinge']);
   assertEquals(p.sessions.some((s) => s.to === '2026-09-22' || s.to === '2026-09-27'), false);
 });
 
-Deno.test('WORKED EXAMPLE, the athlete drags Hinge to Wednesday: it stays there; the ride is placed around it', () => {
-  const p = plan({ hinge: '2026-09-23' });
-  assertEquals(where(p, 'hinge').to, '2026-09-23');
-  assertEquals(where(p, 'hinge').notes, [P108]);
-  assertEquals(where(p, 'ana').to, '2026-09-26');
+Deno.test('⛔ MICHAEL\'S CASE: Wednesday lost — the plyo warm-up goes with Long Sub-Threshold Repeats to Friday; Sunday stays empty', () => {
+  const p = placeLostDay({ lostDate: '2026-09-23', rows: WEEK, daysOff: ['sunday'], today: '2026-09-21' });
+  assertEquals(where(p, 'nt').to, '2026-09-25');
+  assertEquals(where(p, 'nt').notes, [P108]);
+  assertEquals(where(p, 'plyo').to, '2026-09-25');
+  assertEquals(where(p, 'plyo').notes, []);
+  assertEquals(p.sessions.filter((s) => s.to === '2026-09-27'), []);
+});
+
+Deno.test('WORKED EXAMPLE, the athlete drags Hinge to Saturday: it stays there; the ride is placed around it', () => {
+  const p = plan({ hinge: '2026-09-26' });
+  assertEquals(where(p, 'hinge').to, '2026-09-26');
+  assertEquals(where(p, 'hinge').notes, [P108, 'Hinge: 11 days until the next one. Consistent improvement needs one every 8 to 9 days.']);
+  // Wednesday holds one session (the warm-up does not count) and no lift, so the ride goes there with no note.
+  assertEquals(where(p, 'ana').to, '2026-09-23');
+  assertEquals(where(p, 'ana').notes, []);
 });
 
 Deno.test('⛔ A DAY THAT FITS IS TAKEN FIRST — lifts by the p80 gap', () => {

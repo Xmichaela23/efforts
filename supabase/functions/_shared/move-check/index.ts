@@ -20,6 +20,8 @@ export type MoveRow = {
   name?: string | null;
   workout_status?: string | null;
   training_plan_id?: string | null;
+  /** The composer's tags — `plyo` marks the warm-up block (p274 prints it as that day's warm-up). */
+  tags?: unknown;
 };
 
 export type MoveNote = {
@@ -47,6 +49,18 @@ const mondayOf = (d: string): string => addDays(d, -((new Date(dayMs(iso(d))).ge
 
 const isSkipped = (r: MoveRow) => String(r.workout_status ?? '').toLowerCase() === 'skipped';
 const isLift = (r: MoveRow) => String(r.type ?? '').toLowerCase() === 'strength';
+/**
+ * ⛔ THE PLYO WARM-UP IS NOT A SESSION OF ITS OWN (2026-09-21, Michael). p274 prints it as the day's warm-up: it moves
+ * with the session it warms up and does not count toward the three-session limit. Read by its tag, never its name.
+ */
+export const isPlyo = (r: MoveRow): boolean =>
+  Array.isArray(r.tags) && (r.tags as unknown[]).some((t) => String(t).toLowerCase() === 'plyo');
+
+// OURS — no three-session days: the book is silent; the smallest choice. docs/STATE-SOURCES.md "Move check".
+export const MAX_SESSIONS_A_DAY = 2;
+/** Sessions on `date` other than `exceptId` — skipped rows and plyo warm-ups do not count. */
+export const sessionsOn = (rows: MoveRow[], date: string, exceptId: string): number =>
+  rows.filter((r) => r.id !== exceptId && iso(r.date) === iso(date) && !isSkipped(r) && !isPlyo(r)).length;
 
 /**
  * The lift a session trains, as the plan names it — `Lower body: Hinge` → `Hinge`. ⚠️ THE PATTERN, NOT THE
@@ -94,13 +108,15 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   // Viada p108: 6–8 h between two-a-days, 4–6 h when the first is an easy session under an hour, a full meal between.
   // ⛔ ONLY WHEN A LIFT IS ONE OF THE TWO (2026-09-21): p108 is about the gap before the resistance session. A run and
   // a ride on one day get no note, and such a day still fits.
-  const others = args.rows.filter((r) => r.id !== args.session.id && iso(r.date) === to && !isSkipped(r));
-  if (others.length > 0 && (isLift(args.session) || others.some(isLift))) {
+  // ⚠️ A plyo warm-up is not a session and not a lift here — it rides with its day's session (see `isPlyo`).
+  const realLift = (r: MoveRow) => isLift(r) && !isPlyo(r);
+  const others = args.rows.filter((r) => r.id !== args.session.id && iso(r.date) === to && !isSkipped(r) && !isPlyo(r));
+  if (!isPlyo(args.session) && others.length > 0 && (realLift(args.session) || others.some(realLift))) {
     notes.push({ rule: 'two_sessions', page: 'p108',
       text: 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.' });
   }
   // Viada p80: at least one session every 8 to 9 days per movement. Only past nine; the 3–4 day ideal gets no note.
-  if (isLift(args.session)) {
+  if (realLift(args.session)) {
     const { before, after } = liftGaps(args.session, to, args.rows);
     const n = Math.max(before ?? 0, after ?? 0);
     if (n > LIFT_GAP_MAX_DAYS) {
@@ -117,7 +133,10 @@ const offIdeal = (g: number | null): number =>
 
 /**
  * "Days that fit": up to `max` other days of the session's week — not before today, not a day off, not the day it
- * is on or the day asked for — on which `checkMove` has nothing to say.
+ * is on or the day asked for, not a day that would hold a third session (OURS), and not a day that puts a lift's gap
+ * past nine days (p80).
+ * ⛔ THE p108 NOTE DOES NOT DISQUALIFY A DAY (2026-09-21, Michael). It is a note about spacing the two sessions, shown
+ * with the move — not a reason the day does not fit.
  *
  * ORDER. Lifts: the day that keeps the lift's gaps closest to 3–4 days (Viada p80). Runs and rides: the day nearest
  * the one the session is on.
@@ -134,9 +153,10 @@ export function daysThatFit(args: {
     const d = addDays(monday, i);
     if (d === from || d === to || d < today) continue;
     const c = checkMove({ session: args.session, toDate: d, rows: args.rows, daysOff: args.daysOff });
-    if (c.refused || c.notes.length > 0) continue;
+    if (c.refused || c.notes.some((n) => n.rule === 'lift_gap')) continue;
+    if (!isPlyo(args.session) && sessionsOn(args.rows, d, args.session.id) >= MAX_SESSIONS_A_DAY) continue;
     const near = Math.abs(daysBetween(from, d));
-    const cost = isLift(args.session)
+    const cost = isLift(args.session) && !isPlyo(args.session)
       ? (() => { const g = liftGaps(args.session, d, args.rows); return offIdeal(g.before) + offIdeal(g.after); })()
       : near;
     cands.push({ date: d, cost, near });
