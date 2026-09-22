@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { dragHaptics } from '@/lib/drag-haptics';
+import { useCarryDrag, type CarryItem } from '@/hooks/useCarryDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { movePatch } from '@/lib/session-move';
@@ -504,11 +503,8 @@ export default function WorkoutCalendar({
    * stealing that gesture is how a calendar becomes impossible to scroll past.
    */
   const daysGridRef = useRef<HTMLDivElement | null>(null);
-  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; row: any; from: string; el: HTMLElement | null } | null>(null);
-  const [touchDragId, setTouchDragId] = useState<string | null>(null);
-  const [touchDragOver, setTouchDragOver] = useState<string | null>(null);
-  /** Refs as well as state: the native listener below reads them without re-binding on every drag. */
-  const touchDragRef = useRef<{ row: any; from: string; over: string | null } | null>(null);
+  /** A hold not yet fired: where it started, and its timer. */
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number } | null>(null);
 
   /**
    * ⛔ NO HTML5 DRAG ON A TOUCH SCREEN (2026-09-21, from Michael's iPhone: a white bar on hold). iOS WebKit runs its
@@ -520,125 +516,73 @@ export default function WorkoutCalendar({
   }, []);
 
   /**
-   * ⛔ THE CARRIED SESSION (2026-09-21): while a finger moves a session it shows as a lifted card — shadow, a little
-   * larger, the sport colour on its edge — that follows the finger up and down. The row it came from dims and the
-   * day under the finger lights. The card is drawn once at pickup from the row it lifted; it has no words of its own.
+   * ⛔ THE CARRY IS THE SHARED ONE (`useCarryDrag`, 2026-09-21) — the "Can't train this day" sheet moves a session the
+   * same way: no page scroll or pull-to-refresh while carrying, a lifted card under the finger, the day beneath lit.
+   * A drop on another day goes to `beginReschedule`, the one owner of a move, exactly as the mouse's drop does.
    */
-  type Carry = { name: string; meta: string; colour: string; left: number; width: number; height: number; grabY: number; y: number };
-  const [carry, setCarry] = useState<Carry | null>(null);
-  const carryFrom = (el: HTMLElement | null, row: any, fingerY: number): Carry | null => {
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return {
-      name: deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase()),
-      meta: sessionLineMeta(row),
-      colour: getDisciplineColor(displayDisciplineOf(row)),
-      left: r.left, width: r.width, height: r.height, grabY: fingerY - r.top, y: fingerY,
-    };
-  };
+  const drag = useCarryDrag<any>({
+    dayAttr: 'data-day',
+    onDrop: (row, from, to) => { if (to !== from) void beginReschedule(row, to); },
+  });
+  const carryItemOf = (row: any): CarryItem => ({
+    id: String(row?.id ?? ''),
+    name: deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase()),
+    meta: sessionLineMeta(row),
+    colour: getDisciplineColor(displayDisciplineOf(row)),
+  });
 
   const cancelLongPress = useCallback(() => {
-    if (touchDragRef.current) dragHaptics.end();
     if (longPress.current?.timer) clearTimeout(longPress.current.timer);
     longPress.current = null;
-    touchDragRef.current = null;
-    setTouchDragId(null);
-    setTouchDragOver(null);
-    setCarry(null);
   }, []);
 
-  const beginLongPress = useCallback((e: React.TouchEvent, row: any, from: string) => {
+  /** The hold: 450 ms still on a row picks the session up. Any travel over 10 px first hands the gesture back. */
+  const beginLongPress = (e: React.TouchEvent, row: any, from: string) => {
     const planned = String(row?.workout_status ?? '').toLowerCase() !== 'completed';
     if (!planned || !row?.id) return;
     const t = e.touches[0];
     if (!t) return;
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    cancelLongPress();
     const el = e.currentTarget as HTMLElement;
     longPress.current = {
       x: t.clientX,
       y: t.clientY,
-      row,
-      from,
-      el,
       timer: setTimeout(() => {
-        touchDragRef.current = { row, from, over: null };
-        setTouchDragId(String(row.id));
-        setCarry(carryFrom(el, row, longPress.current?.y ?? t.clientY));
-        // ⚠️ THE HOLD IS FELT — `dragHaptics` (the plugin in the app, a vibrate nudge on the web).
-        dragHaptics.pickUp();
+        const y = longPress.current?.y ?? t.clientY;
+        longPress.current = null;
+        drag.pickUp(el, y, carryItemOf(row), row, from);
       }, 450),
     };
-  }, []);
+  };
 
-  /**
-   * ⛔ THE GRIP PICKS THE SESSION UP AT ONCE (2026-09-21). Touch on the six dots starts the move with no hold; the
-   * hold elsewhere on the row is unchanged. The row's own `touchend` / `touchcancel` finish or drop it, the same
-   * path as the hold.
-   */
-  const beginGripDrag = useCallback((e: React.TouchEvent, row: any, from: string) => {
+  /** THE GRIP (2026-09-21) picks the session up at once — no hold. */
+  const beginGripDrag = (e: React.TouchEvent, row: any, from: string) => {
     e.stopPropagation();
     if (!row?.id) return;
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
-    longPress.current = null;
-    touchDragRef.current = { row, from, over: null };
-    setTouchDragId(String(row.id));
+    cancelLongPress();
     const t = e.touches[0];
-    setCarry(carryFrom((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, row, t?.clientY ?? 0));
-    dragHaptics.pickUp();
-  }, []);
+    drag.pickUp((e.currentTarget as HTMLElement).closest('[role="button"]') as HTMLElement | null, t?.clientY ?? 0, carryItemOf(row), row, from);
+  };
 
   /**
-   * ⛔ A NATIVE, NON-PASSIVE `touchmove` — React's own is passive, and a passive listener cannot
-   * call `preventDefault()`. Without that call the page keeps scrolling under a session the athlete
-   * is trying to carry to another day, which is not a drag, it is a fight.
-   *
-   * ⚠️ IT ONLY TAKES THE GESTURE ONCE THE HOLD HAS FIRED. Before that it does the opposite job:
-   * any travel over 10 px CANCELS the pending hold and hands the gesture back to the page.
+   * ⚠️ BEFORE THE HOLD FIRES, a thumb that starts moving was scrolling or swiping the week: travel over 10 px cancels
+   * the pending hold and the page keeps the gesture. After pickup the shared carry owns every move.
    */
   useEffect(() => {
     const el = daysGridRef.current;
     if (!el) return;
     const onMove = (e: TouchEvent) => {
       const t = e.touches[0];
-      if (!t) return;
-
       const pending = longPress.current;
-      if (pending?.timer && !touchDragRef.current) {
-        if (Math.abs(t.clientX - pending.x) > 10 || Math.abs(t.clientY - pending.y) > 10) {
-          clearTimeout(pending.timer);
-          longPress.current = null;
-        }
-        return;
-      }
-      if (!touchDragRef.current) return;
-
-      e.preventDefault();
-      setCarry((c) => (c ? { ...c, y: t.clientY } : c));
-      const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
-      const day = under?.closest('[data-day]') as HTMLElement | null;
-      const over = day?.getAttribute('data-day') ?? null;
-      if (touchDragRef.current.over !== over) {
-        touchDragRef.current.over = over;
-        setTouchDragOver(over);
-        // A tick each time the finger crosses onto a new day.
-        if (over) dragHaptics.crossDay();
-      }
+      if (!t || !pending?.timer) return;
+      if (Math.abs(t.clientX - pending.x) > 10 || Math.abs(t.clientY - pending.y) > 10) cancelLongPress();
     };
-    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: true });
     return () => el.removeEventListener('touchmove', onMove);
-  }, []);
+  }, [cancelLongPress]);
 
-  const endLongPress = useCallback(() => {
-    const drag = touchDragRef.current;
-    if (drag) dragHaptics.end();
-    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
-    longPress.current = null;
-    touchDragRef.current = null;
-    setTouchDragId(null);
-    setTouchDragOver(null);
-    setCarry(null);
-    if (drag?.over && drag.over !== drag.from) void beginReschedule(drag.row, drag.over);
-  }, [beginReschedule]);
+  /** A finger lifted before the hold fired is a tap; the carry's own drop handles a lifted session. */
+  const endLongPress = cancelLongPress;
 
   // Handle confirm reschedule
   const handleConfirmReschedule = async () => {
@@ -1479,15 +1423,13 @@ export default function WorkoutCalendar({
                 minWidth: 0,
                 ...NO_TEXT_SELECT,
                 ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
-                // ⛔ THE DAY UNDER THE FINGER LIGHTS, today included, in the carried session's colour (2026-09-21).
-                background: touchDragOver === key && carry
-                  ? `linear-gradient(90deg, ${hexA(carry.colour, 0.18)}, ${hexA(carry.colour, 0.06)})`
-                  : dragOverDate === key || touchDragOver === key
-                    ? 'rgba(255,255,255,0.08)'
-                    : isToday
-                      ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
-                      : 'transparent',
-                boxShadow: touchDragOver === key && carry ? `inset 0 0 0 1px ${hexA(carry.colour, 0.55)}` : undefined,
+                background: dragOverDate === key
+                  ? 'rgba(255,255,255,0.08)'
+                  : isToday
+                    ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
+                    : 'transparent',
+                // ⛔ THE DAY UNDER THE FINGER LIGHTS, today included, in the carried session's colour (`useCarryDrag`).
+                ...(drag.overStyle(key) ?? {}),
               }}
             >
               {/* ⛔ TODAY'S 3 px BAR, at the pane's left edge. */}
@@ -1603,7 +1545,7 @@ export default function WorkoutCalendar({
                       className="grid items-center gap-2.5 text-[15px] min-w-0"
                       style={{
                         gridTemplateColumns: '10px minmax(0,1fr) auto minmax(16px,auto)',
-                        opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.3 : 1,
+                        opacity: drag.carryingId && drag.carryingId === String(row?.id ?? '') ? 0.3 : 1,
                         cursor: planned && row?.id ? 'grab' : 'pointer',
                         ...NO_TEXT_SELECT,
                         ...(isTouchDevice ? NO_NATIVE_DRAG : {}),
@@ -1700,26 +1642,8 @@ export default function WorkoutCalendar({
         </>
       )}
 
-      {/* ⛔ THE LIFTED CARD (2026-09-21) — follows the finger vertically, over everything, and never under it:
-          `pointer-events: none`, so the day beneath is still what the finger is over. */}
-      {carry ? createPortal(
-        <div
-          aria-hidden="true"
-          className="fixed z-[70] grid items-center gap-2.5 text-[15px] rounded-[10px]"
-          style={{
-            left: carry.left, width: carry.width, top: carry.y - carry.grabY, minHeight: carry.height,
-            gridTemplateColumns: '10px minmax(0,1fr) auto', padding: '6px 10px',
-            background: 'rgba(28,28,30,0.97)', borderLeft: `3px solid ${carry.colour}`,
-            boxShadow: `0 14px 32px rgba(0,0,0,0.55), 0 0 0 1px ${hexA(carry.colour, 0.35)}`,
-            transform: 'scale(1.04)', transformOrigin: 'center', pointerEvents: 'none', ...NO_TEXT_SELECT,
-          }}
-        >
-          <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: carry.colour, boxShadow: `0 0 8px ${carry.colour}` }} />
-          <span className="truncate" style={{ color: 'rgba(242,240,236,1)' }}>{carry.name}</span>
-          <span className="text-[14px] tabular-nums" style={{ color: 'rgba(242,240,236,0.62)' }}>{carry.meta}</span>
-        </div>,
-        document.body,
-      ) : null}
+      {/* The lifted card while a session is carried (`useCarryDrag`). */}
+      {drag.card}
 
       {lostDay ? <LostDaySheet date={lostDay} onClose={() => setLostDay(null)} /> : null}
 

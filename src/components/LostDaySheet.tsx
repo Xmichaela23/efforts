@@ -19,7 +19,7 @@ import { displayDisciplineOf } from '@/lib/utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import WeekStrip from './WeekStrip';
-import { dragHaptics } from '@/lib/drag-haptics';
+import { useCarryDrag } from '@/hooks/useCarryDrag';
 
 type Session = { id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; notes: string[] };
 type Plan = { lostDate: string; week: string[]; sessions: Session[] };
@@ -37,7 +37,6 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   const [moves, setMoves] = React.useState<Record<string, string>>({});
   const [busy, setBusy] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [drag, setDrag] = React.useState<{ id: string; over: string | null } | null>(null);
   /**
    * ⛔ THE ROWS' TAGS, FOR THE DISPLAY ONLY (2026-09-21): which session is a plyo warm-up — its colour and its place
    * in the day. The server's answer carries no tags; this reads them once per set of sessions. Read by tag, never name.
@@ -95,29 +94,15 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     void ask(next);
   };
 
-  /** One gesture for finger and mouse: pointer events on the grip, the day under the pointer is the target. */
-  const onGripDown = (e: React.PointerEvent, s: Session) => {
+  /**
+   * ⛔ THE CALENDAR'S CARRY (`useCarryDrag`, 2026-09-21): no page scroll or pull-to-refresh while carrying, a lifted
+   * card under the finger, the day beneath lit. A drop on another day re-asks the server with that move.
+   */
+  const carry = useCarryDrag<string>({ dayAttr: 'data-lost-day', onDrop: (id, _from, to) => moveTo(id, to) });
+  const pickUp = (el: HTMLElement, y: number, s: Session) => {
     if (!s.movable) return;
-    e.preventDefault();
-    e.stopPropagation();
-    // Keeps the moves coming to the grip while the finger travels; never allowed to stop the drag.
-    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* no live pointer to capture */ }
-    setDrag({ id: s.id, over: null });
-    dragHaptics.pickUp();
-  };
-  const onGripMove = (e: React.PointerEvent) => {
-    if (!drag) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const over = el?.closest('[data-lost-day]')?.getAttribute('data-lost-day') ?? null;
-    if (over !== drag.over) {
-      setDrag({ ...drag, over });
-      if (over) dragHaptics.crossDay();
-    }
-  };
-  const onGripUp = () => {
-    if (drag) dragHaptics.end();
-    if (drag?.over) moveTo(drag.id, drag.over);
-    setDrag(null);
+    const row = el.closest('[data-lost-session]') as HTMLElement | null;
+    carry.pickUp(row, y, { id: s.id, name: s.name ?? '', colour: getDisciplineColor(sportOf(s, tags)) }, s.id, s.to);
   };
 
   const accept = async () => {
@@ -147,6 +132,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
 
   return (
     <div
+      data-pull-refresh-ignore
       className="fixed inset-0 z-50 flex items-end justify-center"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
@@ -155,8 +141,8 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     >
       <div className="absolute inset-0 backdrop-blur-md" style={{ background: 'rgba(0,0,0,0.65)' }} onClick={onClose} />
       <div
-        className="relative w-full max-w-lg mx-4 mb-4 p-5 max-h-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-2xl border border-white/15"
-        style={{ background: 'rgba(20,20,22,0.97)', WebkitOverflowScrolling: 'touch', ...NO_SELECT }}
+        className="relative w-full max-w-lg mx-4 mb-4 p-5 max-h-[calc(100%-1rem)] overflow-y-auto rounded-2xl border border-white/15"
+        style={{ background: 'rgba(20,20,22,0.97)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', ...NO_SELECT }}
       >
         <p className="text-base font-light text-white">Can&apos;t train this day</p>
         <p className="text-xs text-white/50 mt-1">{fmtDay(date)}</p>
@@ -168,7 +154,6 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
               {days.map((d) => {
                 const on = dayOrder(plan.sessions.filter((s) => s.to === d));
                 const lost = d === plan.lostDate;
-                const over = drag?.over === d;
                 return (
                   <div
                     key={d}
@@ -176,8 +161,9 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                     className="grid gap-2 px-3 py-2 border-b border-white/10 last:border-b-0"
                     style={{
                       gridTemplateColumns: '52px minmax(0,1fr)',
-                      background: over ? 'rgba(255,255,255,0.09)' : lost ? 'rgba(255,255,255,0.02)' : 'transparent',
-                      opacity: lost ? 0.45 : 1,
+                      background: lost ? 'rgba(255,255,255,0.02)' : 'transparent',
+                      opacity: lost && !carry.overStyle(d) ? 0.45 : 1,
+                      ...(carry.overStyle(d) ?? {}),
                     }}
                   >
                     <div className="text-[12px] uppercase" style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15 }}>
@@ -191,8 +177,8 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                         const colour = getDisciplineColor(sportOf(s, tags));
                         const moved = s.to !== s.from;
                         return (
-                          <div key={s.id} style={{ opacity: drag?.id === s.id ? 0.3 : 1 }}>
-                            <div className="grid items-center gap-2.5 text-[15px] min-w-0" style={{ gridTemplateColumns: '10px minmax(0,1fr) 24px' }}>
+                          <div key={s.id} style={{ opacity: carry.carryingId === s.id ? 0.3 : 1 }}>
+                            <div data-lost-session={s.id} className="grid items-center gap-2.5 text-[15px] min-w-0" style={{ gridTemplateColumns: '10px minmax(0,1fr) 24px' }}>
                               <span
                                 className="inline-block rounded-full"
                                 style={{ width: 8, height: 8, background: moved ? 'transparent' : colour, border: `2px solid ${colour}`, boxSizing: 'border-box' }}
@@ -201,10 +187,8 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                               {s.movable ? (
                                 <span
                                   aria-hidden="true"
-                                  onPointerDown={(e) => onGripDown(e, s)}
-                                  onPointerMove={onGripMove}
-                                  onPointerUp={onGripUp}
-                                  onPointerCancel={() => { if (drag) dragHaptics.end(); setDrag(null); }}
+                                  onTouchStart={(e) => { e.stopPropagation(); const t = e.touches[0]; if (t) pickUp(e.currentTarget, t.clientY, s); }}
+                                  onPointerDown={(e) => { if (e.pointerType === 'mouse') { e.preventDefault(); pickUp(e.currentTarget, e.clientY, s); } }}
                                   className="inline-flex items-center justify-center -my-2 py-2"
                                   style={{ color: 'rgba(242,240,236,0.62)', touchAction: 'none', cursor: 'grab' }}
                                 >
@@ -225,6 +209,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
             </div>
           </div>
         ) : null}
+        {carry.card}
 
         <div className="flex gap-3 pt-5">
           <button
