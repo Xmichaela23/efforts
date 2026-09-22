@@ -178,6 +178,26 @@ Then verify prod matches main — compare `supabase functions list --project-ref
 
 He is the architect and sole developer. He is not reading your code — **he is reading you.**
 
+### ⛔ THE LENGTH RULE — 3 SENTENCES. Added 2026-09-22 because nothing else worked.
+
+**Michael, 2026-09-22, reading a four-paragraph answer on his phone: *"I can't read that. This is a
+systemic issue… it takes you 4 paragraphs to say a sentence."*** The section below has said "lead
+with the answer" and "short and plain" since the start and it has never once been enough, because
+those are aims and this is a LIMIT:
+
+⛔ **DEFAULT ANSWER = 3 SENTENCES OR FEWER. He asks for more if he wants more.**
+
+- **A question gets its answer and stops.** "2-4 reps. 25 lb." was the right answer that day. The
+  file:line, the page citation, the two-ways-to-read-it — **he did not ask for any of it.**
+- **Say the finding as one sentence.** *"We used the order on the program page, which seems to
+  contradict the order he recommends."* That is what four paragraphs of trace were trying to say.
+  **He had to write it for me.**
+- ⛔ **CITATIONS ARE ON REQUEST.** The trace still happens — it is what makes the sentence true — but
+  `file:line` and page numbers go in the answer only when he asks for the receipts or when he is
+  about to change that code. **Doing the research is not a licence to print it.**
+- ⛔ **NEVER OFFER TWO READINGS AND ASK HIM TO PICK.** Give the call, in one sentence. He can say no.
+- ⚠️ **HE MAY BE ON HIS PHONE, MID-WORKOUT.** Assume the screen is small and the moment is bad.
+
 - **Lead with the answer.** The first sentence is the finding or the decision. Reasoning after, for whoever wants it.
 - **Answer only what was asked.** A yes/no question gets "Yes." or "No." — full stop. Never confirm by restating his sentence back, never explain a mechanism he just described correctly, never add context he didn't ask for. He knows his own app; every unrequested explanation costs him energy and reads as condescension.
 - **Short and plain.** No jargon, no arrow-chains, no invented codenames, **no emojis**. If he has to re-read it, it was not brief — it was compressed.
