@@ -13,6 +13,8 @@
 // database or a clock.
 // =============================================================================
 
+import { movedOrigin } from '../moved-from.ts';
+
 export type MoveRow = {
   id: string;
   date: string;
@@ -55,6 +57,21 @@ const isLift = (r: MoveRow) => String(r.type ?? '').toLowerCase() === 'strength'
  */
 export const isPlyo = (r: MoveRow): boolean =>
   Array.isArray(r.tags) && (r.tags as unknown[]).some((t) => String(t).toLowerCase() === 'plyo');
+
+/**
+ * ⛔ A "DOWN" DAY IS CLOSED (2026-09-22, Michael): a day whose sessions were all moved off it — rows still carry it as
+ * their original day (`moved_from:`) and nothing is left on it. Like a day off, it is never a destination: not for
+ * "Days that fit" and not for a later lost day. Read off the rows' tags, the same reading get-week's "Down" line makes.
+ */
+export function downDates(rows: MoveRow[]): Set<string> {
+  const origins = new Set<string>();
+  for (const r of rows) {
+    const o = movedOrigin(r);
+    if (o && o !== iso(r.date)) origins.add(o);
+  }
+  for (const r of rows) if (!isSkipped(r) && origins.has(iso(r.date))) origins.delete(iso(r.date));
+  return origins;
+}
 
 // OURS — no three-session days: the book is silent; the smallest choice. docs/STATE-SOURCES.md "Move check".
 export const MAX_SESSIONS_A_DAY = 2;
@@ -149,9 +166,10 @@ export function daysThatFit(args: {
   const from = iso(args.fromDate), to = iso(args.toDate), today = iso(args.today);
   const monday = mondayOf(from);
   const cands: Array<{ date: string; cost: number; near: number }> = [];
+  const down = downDates(args.rows);
   for (let i = 0; i < 7; i++) {
     const d = addDays(monday, i);
-    if (d === from || d === to || d < today) continue;
+    if (d === from || d === to || d < today || down.has(d)) continue;
     const c = checkMove({ session: args.session, toDate: d, rows: args.rows, daysOff: args.daysOff });
     if (c.refused || c.notes.some((n) => n.rule === 'lift_gap')) continue;
     if (!isPlyo(args.session) && sessionsOn(args.rows, d, args.session.id) >= MAX_SESSIONS_A_DAY) continue;

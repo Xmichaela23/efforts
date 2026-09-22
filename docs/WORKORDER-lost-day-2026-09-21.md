@@ -149,3 +149,13 @@ check every result against the Rules list. Include the worked example above. Rep
 ### Approved copy, lost-day sheet subtitle (Michael, 2026-09-21)
 "[Weekday]'s sessions moved to the best days left this week. Nothing is saved until you tap Save."
 Shown under the title and date. [Weekday] is the lost day's full weekday name.
+
+### More than one day lost (Michael, 2026-09-22) — built, held for PM review
+1. A "Down" day (its sessions all moved off) is closed like a day off — never a destination for a later lost day or
+   for "Days that fit". `_shared/move-check/index.ts downDates`.
+2. No room without a three-session day → a session comes off instead of stacking: easy (VT1 or below) first; every
+   lift kept; the week keeps one speed and one subthreshold session (p109). No spill into next week. Order OURS,
+   STATE-SOURCES row beside the p109 citation. `lost-day.ts` rule 6.
+3. Approved copy for a dropped session, under the week: "[Session] comes off this week. There's no day left for it."
+   On Save it is skipped through the existing skip (workout_status 'skipped'), so it stays recorded.
+

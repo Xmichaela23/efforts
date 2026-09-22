@@ -22,7 +22,7 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import WeekStrip from './WeekStrip';
 import { useCarryDrag } from '@/hooks/useCarryDrag';
 
-type Session = { id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; notes: string[] };
+type Session = { id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; dropped?: boolean; notes: string[] };
 type Plan = { lostDate: string; week: string[]; sessions: Session[] };
 
 const WEEKDAY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -116,7 +116,10 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
     setSaving(true);
     try {
       for (const s of plan.sessions) {
-        if (!s.movable || s.to === s.from) continue;
+        if (!s.movable) continue;
+        // ⛔ A SESSION THAT COMES OFF IS SKIPPED, the app's existing skip — recorded, never deleted (2026-09-22).
+        if (s.dropped) { await updatePlannedWorkout(s.id, { workout_status: 'skipped', skip_reason: null } as never); continue; }
+        if (s.to === s.from) continue;
         await updatePlannedWorkout(s.id, await movePatch(s.id, s.to));
       }
       invalidateWorkoutScreens();
@@ -132,7 +135,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   const days = plan ? [...new Set([...plan.week, ...plan.sessions.map((s) => s.to)])].sort() : [];
   const byDay: Record<string, string[]> = {};
   for (const s of plan?.sessions ?? []) {
-    if (!plan!.week.includes(s.to)) continue;
+    if (s.dropped || !plan!.week.includes(s.to)) continue;
     (byDay[weekdayOf(s.to)] ??= []).push(sportOf(s, tags));
   }
 
@@ -195,7 +198,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
         {plan ? (
           <div className={`rounded-xl border border-white/10 overflow-hidden ${busy ? 'opacity-50' : ''} transition-opacity`}>
             {days.map((d) => {
-              const on = dayOrder(plan.sessions.filter((s) => s.to === d));
+              const on = dayOrder(plan.sessions.filter((s) => s.to === d && !s.dropped));
               const lost = d === plan.lostDate;
               const dayNote = on.some((s) => s.notes.some(isDayNote));
               return (
@@ -253,6 +256,16 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                 </div>
               );
             })}
+          </div>
+        ) : null}
+        {/* ⛔ WHAT COMES OFF THIS WEEK (2026-09-22) — approved words, one line per session; skipped on Save. */}
+        {plan && plan.sessions.some((s) => s.dropped) ? (
+          <div className="mt-3 space-y-1.5">
+            {plan.sessions.filter((s) => s.dropped).map((s) => (
+              <p key={s.id} className="text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>
+                {s.name} comes off this week. There&apos;s no day left for it.
+              </p>
+            ))}
           </div>
         ) : null}
         <div className="h-3" />

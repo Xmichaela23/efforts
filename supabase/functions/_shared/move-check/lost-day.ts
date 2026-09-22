@@ -14,16 +14,23 @@
 //      past nine days, p80). The p108 note is shown with the move and does not stop it.
 //   4a. A plyo warm-up goes with the session it warms up — the lost day's first other session — and is never
 //      placed on its own (p274 prints it as that day's warm-up).
-//   5. If no day fits, it goes to the closest open day (still never a third session where a day with fewer exists),
-//      and carries the move check's notes for that day. Nothing is dropped.
-//      OURS — "closest" = fewest days from the lost day, ties to the earlier date; next week only when no day this
-//      week is open. docs/STATE-SOURCES.md "Move check".
+//   5. If no day fits, it goes to the closest open day with fewer than two sessions (a lift's p80 gap may then pass
+//      nine days — the note says so). OURS — "closest" = fewest days from the lost day, ties to the earlier date.
+//   6. If no open day has room, a session COMES OFF rather than making a third on a day (2026-09-22, Michael):
+//      easy sessions (VT1 or below) come off first; every lift is kept; the week keeps its floor of one speed and one
+//      subthreshold session (Viada p109: "one speed, one subthreshold, remainder VT1 or below"). A kept session takes
+//      the place of an easy one — or, failing that, of a hard one the floor does not need — on the closest open day.
+//      OURS — that order, docs/STATE-SOURCES.md "Move check". Nothing spills into next week.
+//   A "Down" day (its sessions all moved off it earlier) is closed, like a day off (`downDates`).
 // =============================================================================
 
-import { checkMove, daysBetween, daysThatFit, isPlyo, MAX_SESSIONS_A_DAY, sessionsOn, weekdayName, type MoveRow } from './index.ts';
+import { planDateOf } from '../moved-from.ts';
+import { checkMove, daysBetween, daysThatFit, downDates, isPlyo, MAX_SESSIONS_A_DAY, sessionsOn, weekdayName, type MoveRow } from './index.ts';
 
 export type LostDaySession = {
   id: string;
+  /** True when it comes off this week (rule 6): shown under the week, skipped on Save — recorded, not deleted. */
+  dropped: boolean;
   name: string | null;
   type: string | null;
   /** The day it is on now. */
@@ -73,9 +80,12 @@ export function placeLostDay(args: {
   const offDays = args.daysOff.map((d) => String(d).trim().toLowerCase());
   const isOff = (d: string) => offDays.includes(weekdayName(d).toLowerCase());
 
-  /** Where every row sits as the placement runs. */
+  /** Where every row sits as the placement runs, and which rows come off this week. */
   const at = new Map<string, string>(args.rows.map((r) => [r.id, iso(r.date)]));
-  const current = (): MoveRow[] => args.rows.map((r) => ({ ...r, date: at.get(r.id) ?? iso(r.date) }));
+  const dropped = new Set<string>();
+  const current = (): MoveRow[] => args.rows.map((r) => ({
+    ...r, date: at.get(r.id) ?? iso(r.date), ...(dropped.has(r.id) ? { workout_status: 'skipped' } : {}),
+  }));
   const countOn = (d: string, except: string) => sessionsOn(current(), d, except);
 
   // 2. The athlete's drags, first and as given.
@@ -85,10 +95,40 @@ export function placeLostDay(args: {
     if (to && isPlanned(r) && inWeek(iso(r.date))) at.set(r.id, iso(to));
   }
 
-  // 4a. The warm-up's session: the lost day's first other planned session, in the day's own order.
+  // 4a. A warm-up's session: the lost day's session that was planned on the warm-up's own day (a session moved in
+  // from another day is not the one it warms up), else the day's first other planned session.
   const lostDay = args.rows.filter((r) => iso(r.date) === lost && isPlanned(r));
-  const warmsUp = lostDay.find((r) => !isPlyo(r)) ?? null;
-  const rideAlong = (r: MoveRow) => isPlyo(r) && warmsUp != null;
+  const partnerOf = (w: MoveRow): MoveRow | null =>
+    lostDay.find((r) => !isPlyo(r) && planDateOf(r) === planDateOf(w)) ?? lostDay.find((r) => !isPlyo(r)) ?? null;
+  const rideAlong = (r: MoveRow) => isPlyo(r) && partnerOf(r) != null;
+
+  // The p109 buckets, read off the composer's `band:` tag (endurance-library/classification.ts).
+  const bandOf = (r: MoveRow): string | null => {
+    for (const t of Array.isArray(r.tags) ? (r.tags as unknown[]) : []) {
+      const v = String(t);
+      if (v.startsWith('band:')) return v.slice(5);
+    }
+    return null;
+  };
+  const isEasy = (r: MoveRow) => !isLift(r) && bandOf(r) === 'vt1_or_easier';
+  const floorClass = (r: MoveRow): 'speed' | 'subthreshold' | null => {
+    const b = bandOf(r);
+    return b === 'above' ? 'speed' : b === 'near' || b === 'below' ? 'subthreshold' : null;
+  };
+  /** True when taking `r` off would leave the week without its p109 speed or subthreshold session. */
+  const floorNeeds = (r: MoveRow): boolean => {
+    const k = floorClass(r);
+    if (!k || isLift(r)) return false;
+    return !current().some((x) => x.id !== r.id && inWeek(iso(x.date)) && status(x) !== 'skipped' && floorClass(x) === k);
+  };
+  const keep = (r: MoveRow) => (isLift(r) && !isPlyo(r)) || floorNeeds(r);
+
+  const downs = downDates(args.rows);
+  const open = (d: string) => d !== lost && d >= today && !isOff(d) && !downs.has(d);
+  const byNearness = (a: string, b: string) => Math.abs(daysBetween(lost, a)) - Math.abs(daysBetween(lost, b)) || a.localeCompare(b);
+  /** The planned sessions on `d` that could give up their place: movable, this week, not the lost day's own. */
+  const givers = (d: string, test: (r: MoveRow) => boolean) => current()
+    .filter((x) => iso(x.date) === d && isPlanned(x) && !isPlyo(x) && iso(args.rows.find((y) => y.id === x.id)!.date) !== lost && test(x));
 
   // 3. The lost day's planned sessions not already dragged: lifts first, then in the day's own order.
   const toPlace = args.rows
@@ -98,24 +138,36 @@ export function placeLostDay(args: {
     .map((x) => x.r);
 
   for (const s of toPlace) {
-    const rows = current();
-    // 4. The first day that fits (`daysThatFit` owns the three-session limit and the p80 gap).
-    let to = daysThatFit({ session: s, fromDate: lost, toDate: lost, rows, daysOff: args.daysOff, today, max: 7 })[0];
+    // 4. The first day that fits (`daysThatFit` owns the three-session limit, the p80 gap and closed "Down" days).
+    let to: string | undefined = daysThatFit({ session: s, fromDate: lost, toDate: lost, rows: current(), daysOff: args.daysOff, today, max: 7 })[0];
+    // 5. The closest open day with room.
+    if (!to) to = week.filter(open).filter((d) => countOn(d, s.id) < MAX_SESSIONS_A_DAY).sort(byNearness)[0];
     if (!to) {
-      // 5. The closest open day: this week first, then the next; fewer than two sessions first.
-      const open = (d: string) => d !== lost && d >= today && !isOff(d);
-      const pool = week.filter(open);
-      const next = pool.length > 0 ? pool : Array.from({ length: 7 }, (_, i) => addDays(week[6], i + 1)).filter(open);
-      next.sort((a, b) =>
-        Number(countOn(a, s.id) >= MAX_SESSIONS_A_DAY) - Number(countOn(b, s.id) >= MAX_SESSIONS_A_DAY)
-        || Math.abs(daysBetween(lost, a)) - Math.abs(daysBetween(lost, b))
-        || a.localeCompare(b));
-      to = next[0] ?? lost;
+      // 6. No room: an easy session comes off first. If this one is easy, it is the one.
+      if (isEasy(s) || !keep(s) && !week.filter(open).some((d) => givers(d, isEasy).length > 0)) {
+        dropped.add(s.id);
+        continue;
+      }
+      // A session worth keeping takes an easy session's place — failing that, a hard one the floor does not need.
+      const tryGive = (test: (r: MoveRow) => boolean): string | undefined => {
+        for (const d of week.filter(open).sort(byNearness)) {
+          const g = givers(d, test)[0];
+          if (g) { dropped.add(g.id); return d; }
+        }
+        return undefined;
+      };
+      to = tryGive(isEasy) ?? (keep(s) ? tryGive((x) => !keep(x)) : undefined);
+      if (!to) { dropped.add(s.id); continue; }
     }
     at.set(s.id, to);
   }
-  // 4a. The warm-up follows its session, wherever that went.
-  for (const r of lostDay) if (rideAlong(r) && !moves[r.id]) at.set(r.id, at.get(warmsUp!.id) ?? lost);
+  // 4a. The warm-up follows its session, wherever that went — and comes off with it.
+  for (const r of lostDay) {
+    if (!rideAlong(r) || moves[r.id]) continue;
+    const partner = partnerOf(r)!;
+    if (dropped.has(partner.id)) dropped.add(r.id);
+    else at.set(r.id, at.get(partner.id) ?? lost);
+  }
 
   // The notes, read against the finished week so a later placement's session counts for an earlier one.
   const final = current();
@@ -124,8 +176,9 @@ export function placeLostDay(args: {
     .map((r) => {
       const from = iso(r.date), to = at.get(r.id) ?? from;
       // A warm-up carries no note of its own (`checkMove` does not count it); its session's note covers the day.
-      const notes = to === from ? [] : checkMove({ session: r, toDate: to, rows: final, daysOff: args.daysOff }).notes.map((n) => n.text);
-      return { id: r.id, name: r.name ?? null, type: r.type ?? null, from, to, movable: isPlanned(r), notes };
+      const off = dropped.has(r.id);
+      const notes = off || to === from ? [] : checkMove({ session: r, toDate: to, rows: final, daysOff: args.daysOff }).notes.map((n) => n.text);
+      return { id: r.id, name: r.name ?? null, type: r.type ?? null, from, to: off ? from : to, movable: isPlanned(r), dropped: off, notes };
     })
     .sort((a, b) => a.to.localeCompare(b.to));
   return { lostDate: lost, week, sessions };

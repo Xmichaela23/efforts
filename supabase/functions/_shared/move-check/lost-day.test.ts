@@ -1,11 +1,12 @@
 // ⛔ "CAN'T TRAIN THIS DAY" (2026-09-21) — the placer, on the move check. Includes the workorder's worked example.
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { placeLostDay } from './lost-day.ts';
+import { placeLostDay, type LostDayPlan } from './lost-day.ts';
+import { tagsAfterMove } from '../moved-from.ts';
 import type { MoveRow } from './index.ts';
 
 const P108 = 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.';
-const S = (id: string, date: string, type: string, name: string, status = 'planned'): MoveRow =>
-  ({ id, date, type, name, workout_status: status, training_plan_id: 'p' });
+const S = (id: string, date: string, type: string, name: string, status = 'planned', band?: string): MoveRow =>
+  ({ id, date, type, name, workout_status: status, training_plan_id: 'p', ...(band ? { tags: ['standing_plan', `band:${band}`] } : {}) });
 
 /**
  * THE WORKED EXAMPLE (workorder): Michael's week Sep 21–27, All Rounder standard, Tuesday lost. Today is Monday 21,
@@ -16,15 +17,15 @@ const S = (id: string, date: string, type: string, name: string, status = 'plann
 const WEEK: MoveRow[] = [
   S('hinge-prev', '2026-09-15', 'strength', 'Lower body: Hinge', 'completed'),
   S('push', '2026-09-21', 'strength', 'Upper body: Push'),
-  S('mlss', '2026-09-21', 'run', 'MLSS+ Repeats'),
+  S('mlss', '2026-09-21', 'run', 'MLSS+ Repeats', 'planned', 'above'),
   S('hinge', '2026-09-22', 'strength', 'Lower body: Hinge'),
-  S('ana', '2026-09-22', 'ride', 'Progressive Repeats'),
+  S('ana', '2026-09-22', 'ride', 'Progressive Repeats', 'planned', 'above'),
   { ...S('plyo', '2026-09-23', 'strength', 'Plyo warm-up'), tags: ['standing_plan', 'plyo'] },
-  S('nt', '2026-09-23', 'run', 'Long Sub-Threshold Repeats'),
+  S('nt', '2026-09-23', 'run', 'Long Sub-Threshold Repeats', 'planned', 'near'),
   S('pull', '2026-09-24', 'strength', 'Upper body: Pull'),
-  S('easy', '2026-09-24', 'ride', 'Endurance Ride'),
+  S('easy', '2026-09-24', 'ride', 'Endurance Ride', 'planned', 'vt1_or_easier'),
   S('lpush', '2026-09-25', 'strength', 'Lower body: Push'),
-  S('long', '2026-09-26', 'ride', 'Long Ride'),
+  S('long', '2026-09-26', 'ride', 'Long Ride', 'planned', 'vt1_or_easier'),
   S('hinge-next', '2026-09-29', 'strength', 'Lower body: Hinge'),
 ];
 const plan = (moves?: Record<string, string>, rows = WEEK, today = '2026-09-21') =>
@@ -96,10 +97,10 @@ Deno.test('⛔ NO THIRD SESSION WHERE A DAY WITH FEWER EXISTS (OURS)', () => {
   assertEquals([...perDay.values()].every((n) => n <= 2), true);
 });
 
-Deno.test('⛔ NOTHING IS DROPPED: with no open day left this week it goes to the closest one next week', () => {
-  const rows = [S('r', '2026-09-27', 'run', 'Long Run')];
+Deno.test('⛔ NO SPILL INTO NEXT WEEK: with no open day left this week the session comes off', () => {
+  const rows = [S('r', '2026-09-27', 'run', 'Long Run', 'planned', 'vt1_or_easier')];
   const p = placeLostDay({ lostDate: '2026-09-27', rows, daysOff: [], today: '2026-09-27' });
-  assertEquals(p.sessions[0].to, '2026-09-28');
+  assertEquals([p.sessions[0].dropped, p.sessions[0].to], [true, '2026-09-27']);
 });
 
 Deno.test('A DONE SESSION ON THE LOST DAY IS SHOWN AND NEVER MOVED', () => {
@@ -108,4 +109,53 @@ Deno.test('A DONE SESSION ON THE LOST DAY IS SHOWN AND NEVER MOVED', () => {
   assertEquals(where(p, 'd').to, '2026-09-22');
   assertEquals(where(p, 'd').movable, false);
   assertEquals(where(p, 'p').to !== '2026-09-22', true);
+});
+
+// ── More than one day lost (2026-09-22) ──────────────────────────────────────────────────────────
+
+/** What Save writes, applied to the rows: moves carry their first day, drops become skipped. */
+function saved(rows: MoveRow[], p: LostDayPlan): MoveRow[] {
+  return rows.map((r) => {
+    const s = p.sessions.find((x) => x.id === r.id);
+    if (!s) return r;
+    if (s.dropped) return { ...r, workout_status: 'skipped' };
+    if (s.to !== s.from) return { ...r, date: s.to, tags: tagsAfterMove(r, s.to) };
+    return r;
+  });
+}
+const lose = (rows: MoveRow[], d: string) => placeLostDay({ lostDate: d, rows, daysOff: ['sunday'], today: '2026-09-21' });
+
+Deno.test('⛔ A "DOWN" DAY IS CLOSED: after Tuesday is lost and saved, losing Friday never puts anything on Tuesday', () => {
+  const afterTue = saved(WEEK, lose(WEEK, '2026-09-22'));
+  const p = lose(afterTue, '2026-09-25');
+  assertEquals(p.sessions.some((s) => s.to === '2026-09-22'), false);
+});
+
+Deno.test('⛔ EASY COMES OFF FIRST; EVERY LIFT AND THE p109 FLOOR STAY — two and three days lost in a row', () => {
+  const tue = lose(WEEK, '2026-09-22');
+  const afterTue = saved(WEEK, tue);
+  const wed = lose(afterTue, '2026-09-23');
+  const afterWed = saved(afterTue, wed);
+  const thu = lose(afterWed, '2026-09-24');
+  for (const p of [tue, wed, thu]) {
+    const off = p.sessions.filter((s) => s.dropped);
+    // Every lift is kept.
+    assertEquals(off.filter((s) => s.type === 'strength' && s.name !== 'Plyo warm-up').map((s) => s.name), []);
+    // No day holds three sessions (the warm-up does not count).
+    const per = new Map<string, number>();
+    for (const s of p.sessions) if (!s.dropped && s.name !== 'Plyo warm-up') per.set(s.to, (per.get(s.to) ?? 0) + 1);
+    assertEquals([...per.values()].every((n) => n <= 2), true);
+    // Nothing into next week.
+    assertEquals(p.sessions.every((s) => s.to <= '2026-09-27'), true);
+  }
+  // The floor: a speed session and a subthreshold session are still in the week after three days lost.
+  const kept = thu.sessions.filter((s) => !s.dropped).map((s) => s.name);
+  assertEquals(kept.some((n) => n === 'MLSS+ Repeats' || n === 'Progressive Repeats'), true);
+  assertEquals(kept.includes('Long Sub-Threshold Repeats'), true);
+});
+
+Deno.test('⛔ THE WARM-UP FOLLOWS ITS OWN DAY\'S SESSION, not one moved onto that day (Tue then Wed lost)', () => {
+  const afterTue = saved(WEEK, lose(WEEK, '2026-09-22'));   // Hinge moved Tue → Wed
+  const wed = lose(afterTue, '2026-09-23');
+  assertEquals(where(wed, 'plyo').to, where(wed, 'nt').to);
 });
