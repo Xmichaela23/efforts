@@ -145,3 +145,7 @@ check every result against the Rules list. Include the worked example above. Rep
 - Never `git commit -a` — add exact files. No push / deploy without Michael's go.
 - Deploy edge functions from a clean worktree of the pushed commit.
 - DB: read-only, and throwaway users only for writes.
+
+### Approved copy, lost-day sheet subtitle (Michael, 2026-09-21)
+"[Weekday]'s sessions moved to the best days left this week. Nothing is saved until you tap Save."
+Shown under the title and date. [Weekday] is the lost day's full weekday name.

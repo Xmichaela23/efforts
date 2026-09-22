@@ -176,6 +176,10 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
       <div className="flex-shrink-0 px-4 pb-3" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
         <p className="text-base font-light text-white">Can&apos;t train this day</p>
         <p className="text-xs text-white/50 mt-1">{fmtDay(date)}</p>
+        {/* Approved copy (Michael, 2026-09-21; docs/WORKORDER-lost-day-2026-09-21.md). [Weekday] = the lost day's full name. */}
+        <p className="text-[13px] font-light mt-2" style={{ color: 'rgba(242,240,236,0.62)' }}>
+          {new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}&apos;s sessions moved to the best days left this week. Nothing is saved until you tap Save.
+        </p>
         {plan ? (
           <div className={`mt-3 ${busy ? 'opacity-50' : ''} transition-opacity`}>
             <WeekStrip byDay={byDay} />
