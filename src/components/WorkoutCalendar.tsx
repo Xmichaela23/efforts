@@ -407,7 +407,7 @@ export default function WorkoutCalendar({
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
-  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string } | null>(null);
+  const [reschedulePending, setReschedulePending] = useState<{ workoutId: string; oldDate: string; newDate: string; workoutName: string; sport?: string } | null>(null);
 
   // Handle drag start
   const handleDragStart = (e: React.DragEvent, workout: any) => {
@@ -474,6 +474,8 @@ export default function WorkoutCalendar({
         newDate: targetDate,
         // A lifting day's title in the book's terms, from get-week (2026-09-18).
         workoutName: workout.intent_title || workout.name || `${workout.type} workout`,
+        // The popup wears the session's calendar-dot colour (2026-09-22).
+        sport: displayDisciplineOf(workout),
       });
       setShowValidationPopup(true);
     } catch (err) {
@@ -1652,6 +1654,7 @@ export default function WorkoutCalendar({
       {showValidationPopup && validationResult && reschedulePending && (
         <RescheduleValidationPopup
           workoutName={reschedulePending.workoutName}
+          sport={reschedulePending.sport}
           oldDate={reschedulePending.oldDate}
           newDate={reschedulePending.newDate}
           validation={validationResult}
