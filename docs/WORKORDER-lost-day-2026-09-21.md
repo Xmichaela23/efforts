@@ -105,6 +105,19 @@ Answer in the stage doc, with file:line:
    ~L449/609). Report only; drag is not in this workorder.
 Stop and report. No design until Michael has read Stage 0.
 
+### Stages 1–4 BUILT 2026-09-21 (decisions from Michael, same day) — commit on branch, not pushed
+- Placement is the MOVE CHECK, not the resolver (Stage 0: the standing plan never used it). Each session of the
+  lost day goes to its first "Days that fit" day; lifts first (OURS); no third session on a day while one with
+  fewer is open (OURS); no day fits → the closest open day, carrying its notes (OURS); next week only when no day
+  this week is open. Nothing dropped. `_shared/move-check/lost-day.ts`, tests `lost-day.test.ts`.
+- Server: `place-lost-day` { date, moves? } → the week + notes. Read-only.
+- Screen: `src/components/LostDaySheet.tsx` — `WeekStrip` (moved out of NonRaceBuilder) + its own day list with a
+  grip on each movable session; every drag re-asks the server. Accept saves through `@/lib/session-move`.
+- Entry: tap the day's name in the calendar week (today and later, with a planned not-done session).
+- Worked example result (differs from the hand answer): Hinge → Fri (with Lower Push; p108 + p80 notes),
+  Progressive Repeats → Sat (with the long ride; no note). Mon and Wed already hold two sessions, so the
+  no-three-a-day rule sends Hinge to Friday; Saturday has no lift, so the ride fits there with no note.
+
 ### Stage 1 — server: place the week (read-only endpoint)
 Input: lost date (+ optional athlete moves). Reads this week's uncompleted rows from today forward,
 closes the lost date for this week only, keeps every other session where it is, places the lost

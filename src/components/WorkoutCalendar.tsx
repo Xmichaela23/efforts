@@ -22,6 +22,7 @@ import { garminDevicesForWeek } from '@/lib/provider-attribution';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LogTypeMenuContent } from '@/components/LogFAB';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
+import LostDaySheet from '@/components/LostDaySheet';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 // ⚠️ `LoadBar` IS NO LONGER IMPORTED HERE — the load card it fed left this screen for Today
@@ -390,6 +391,9 @@ export default function WorkoutCalendar({
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
   /** §3e.3 — which day's add menu is open. One at a time; null is closed. */
   const [addMenuDate, setAddMenuDate] = useState<string | null>(null);
+  /** "Can't train this day" (2026-09-21): the day whose name was tapped, and the day the sheet is open for. */
+  const [lostMenuDate, setLostMenuDate] = useState<string | null>(null);
+  const [lostDay, setLostDay] = useState<string | null>(null);
 
 
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -1487,10 +1491,28 @@ export default function WorkoutCalendar({
                 />
               ) : null}
 
-              {/* The day. Weekday small and dim, the number large. */}
+              {/* The day. Weekday small and dim, the number large.
+                  ⛔ "CAN'T TRAIN THIS DAY" (2026-09-21): a tap on the day's name offers it, on today and later days
+                  that still hold a planned session. Anywhere else on the row still opens the add menu. */}
+              <PopoverPrimitive.Root
+                open={lostMenuDate === key}
+                onOpenChange={(o) => setLostMenuDate(o ? key : null)}
+              >
+              {/* ⚠️ AN ANCHOR, NOT A TRIGGER: the menu opens only on a day that qualifies. Any other tap falls through
+                  to the row, which opens the add menu as before. */}
+              <PopoverPrimitive.Anchor asChild>
               <div
                 className="text-[12px] uppercase"
                 style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
+                onClick={(e) => {
+                  const eligible = key >= todayKey && items.some((it: any) => {
+                    const st = String(it?._src?.workout_status ?? '').toLowerCase();
+                    return st === 'planned' || st === '';
+                  });
+                  if (!eligible) return;
+                  e.stopPropagation();
+                  setLostMenuDate(key);
+                }}
               >
                 {weekdayFmt.format(d)}
                 {/* One weight and one colour on every day, past or future — the date column is a fixed
@@ -1500,6 +1522,27 @@ export default function WorkoutCalendar({
                   {d.getDate()}
                 </b>
               </div>
+              </PopoverPrimitive.Anchor>
+              <PopoverPrimitive.Portal>
+                <PopoverPrimitive.Content
+                  side="bottom"
+                  align="start"
+                  sideOffset={6}
+                  collisionPadding={12}
+                  className="z-50 rounded-2xl border border-white/25 bg-black/80 backdrop-blur-xl p-2 shadow-xl"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setLostMenuDate(null); setLostDay(key); }}
+                    className="flex items-center w-full hover:bg-white/[0.12] text-white font-light tracking-wide rounded-lg"
+                    style={{ padding: '12px 16px', minHeight: 44 }}
+                  >
+                    Can&apos;t train this day
+                  </button>
+                </PopoverPrimitive.Content>
+              </PopoverPrimitive.Portal>
+              </PopoverPrimitive.Root>
 
               <div className="flex flex-col gap-1 min-w-0">
                 {items.length === 0 ? (
@@ -1667,6 +1710,8 @@ export default function WorkoutCalendar({
         </div>,
         document.body,
       ) : null}
+
+      {lostDay ? <LostDaySheet date={lostDay} onClose={() => setLostDay(null)} /> : null}
 
       {/* Validation Popup */}
       {showValidationPopup && validationResult && reschedulePending && (
