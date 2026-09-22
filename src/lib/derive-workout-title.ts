@@ -10,6 +10,8 @@
  *   - `src/components/TodaysEffort.tsx` (chip + drawer-title call sites)
  *
  * Signals consulted, in priority order:
+ *   0. `session_title` — the server's title for a FINISHED session that carries a
+ *      plan. Already the output of this same ladder, run on the planned row.
  *   1. Strength / pilates_yoga / mobility — discipline-specific name handling.
  *   2. Brick tag — preserves "Brick — Bike X hr" / "Brick — Run X mi off the bike".
  *   3. `workout_structure.title` / `workout_title` — explicit structured title.
@@ -43,6 +45,21 @@ export type WorkoutLike = {
   title?: string | null;
   /** The day's title in the book's terms, sent by the server (2026-09-18). */
   intent_title?: string | null;
+  /**
+   * ⛔ THE FINISHED SESSION'S TITLE, DECIDED BY THE SERVER (2026-09-22). A completed endurance row's
+   * `name` is the PROVIDER's ("Santa Cruz Running", from `ingest-activity`'s `generateWorkoutName`),
+   * so a planned "Descending Ladder" lost its name the moment Garmin sent the run back. `get-week`
+   * now runs `_shared/session-title.ts` over the LINKED PLANNED ROW and sends the answer here.
+   *
+   * ⚠️ IT IS THIS FUNCTION'S OWN OUTPUT, not a second vocabulary — `sessionTitle` calls
+   * `deriveWorkoutTitle` on the planned row, so the brick, swap and swim branches below have already
+   * run against the row that knows about them. Reading it first is the same answer, not a shortcut
+   * past one.
+   *
+   * ⚠️ ABSENT ON AN UNATTACHED SESSION, and that is correct: an extra easy spin nobody planned has
+   * no plan name to keep, so the provider's own title stands.
+   */
+  session_title?: string | null;
 };
 
 function stripTrailingDateSuffix(name: string): string {
@@ -98,6 +115,12 @@ function isGenericName(name: string): boolean {
 
 export function deriveWorkoutTitle(workout: WorkoutLike | null | undefined): string {
   if (!workout) return 'Session';
+
+  // ── The server's title for a finished planned session ────────────────────
+  // See `session_title` above. Nothing else in this file can answer for a completed row, because
+  // every signal below it reads the PROVIDER's name.
+  const sent = typeof workout?.session_title === 'string' ? workout.session_title.trim() : '';
+  if (sent) return sent;
 
   const type = String(workout?.type ?? workout?.workout_type ?? '').toLowerCase();
   const nm = stripDeliveryPrefix(stripTrailingDateSuffix(String(workout?.name ?? workout?.title ?? '').trim()));

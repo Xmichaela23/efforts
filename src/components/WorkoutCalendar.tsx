@@ -891,7 +891,6 @@ export default function WorkoutCalendar({
         const plannedLabel = derivePlannedCellLabel(w);
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '', w);
         const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
-        const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
         
         // Determine checkmark based on status
         let checkmark = '';
@@ -937,25 +936,22 @@ export default function WorkoutCalendar({
             }
           }
         }
-        if (isPlannedLinked && !(w as any)?._plannedLabelUsed) {
-          // Try to find the linked planned workout to use its label instead
-          const plannedId = String((w as any)?.planned_id || '');
-          if (plannedId) {
-            const linkedPlanned = allFiltered.find((p: any) => 
-              String(p?.id) === plannedId && p?.workout_status === 'planned'
-            );
-            if (linkedPlanned) {
-              const plannedLabelForCompleted = derivePlannedCellLabel(linkedPlanned);
-              if (plannedLabelForCompleted) {
-                labelBase = plannedLabelForCompleted;
-                (w as any)._plannedLabelUsed = true;
-              }
-            }
-          }
-        }
-        
+        /**
+         * ⛔ THE "USE THE LINKED PLANNED ROW'S CHIP" BLOCK IS DELETED (2026-09-22) — IT COULD NEVER FIRE.
+         * It looked the linked planned row up in `allFiltered` requiring `workout_status === 'planned'`,
+         * and TWO separate things made that impossible: `mappedPlanned` above excludes every planned row
+         * something is linked to (`workoutIdByPlannedId`), so it was not in the array at all; and
+         * `auto-attach-planned` flips the planned row to `completed` on attach
+         * (`auto-attach-planned/index.ts:226`), so the status test would have failed even if it had been.
+         *
+         * ⚠️ THE CHIP IS UNCHANGED, DELIBERATELY. This grid cell prints a coded abbreviation ("RN-VO2
+         * 39:00"), not a name — `derivePlannedCellLabel` also returns null on anything not `planned`. The
+         * session's NAME is the day list's job below, which reads `deriveWorkoutTitle` and now gets the
+         * server's `session_title`.
+         */
+
         // A 1RM/baseline TEST reads as a test on the calendar, not a strength session (Q-097/Q-102).
-        // Covers unlinked completed tests via name; linked ones already resolve via the planned label above.
+        // Covers unlinked completed tests via name.
         if (isBaselineTestWorkout(w)) labelBase = 'TEST';
 
         return {

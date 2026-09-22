@@ -897,6 +897,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             workout_analysis: row?.workout_analysis ?? it?.workout_analysis ?? null,
             name: row?.name ?? it?.name ?? null,
             intent_title: row?.intent_title ?? it?.intent_title ?? null,
+            // ⛔ The plan's name for a finished session (2026-09-22) — see `workout-mappers.ts`. Rides on the
+            // item, like `name` and `workout_analysis` above; the card's title reads it via `deriveWorkoutTitle`.
+            session_title: row?.session_title ?? it?.session_title ?? null,
           };
         }
         return it?.planned_workout ?? null;

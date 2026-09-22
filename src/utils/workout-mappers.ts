@@ -68,6 +68,14 @@ export function mapUnifiedItemToCompleted(item: any): any {
      */
     workout_analysis: item.workout_analysis ?? null,
     name: item.name ?? item.executed?.name ?? null,
+    /**
+     * ⛔ THE PLAN'S NAME FOR A FINISHED SESSION (2026-09-22). `name` above is the PROVIDER's, and
+     * `item.planned.name` has been sitting on the same object all along unread — so a "Descending
+     * Ladder" reached Today's card as "Santa Cruz Running". `get-week` now decides the title once
+     * (`_shared/session-title.ts`) and sends it; `deriveWorkoutTitle` reads it first.
+     * ⚠️ Carried, never computed: null stays null and the provider's name stands.
+     */
+    session_title: item.session_title ?? null,
   };
   
   return mapped;

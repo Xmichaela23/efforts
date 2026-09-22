@@ -229,3 +229,46 @@ Deno.test('a Zwift ride built in Intervals.icu drops the delivering apps from it
   assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Zwift - Intervals icu: Anaerobic Ride' }), 'Anaerobic Ride');
   assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Zwift - Watopia' }), 'Zwift - Watopia');
 });
+
+// ── The finished session keeps its plan's name (2026-09-22) ────────────────
+
+Deno.test("a finished endurance session prints its plan's name, not the provider's", () => {
+  // What the athlete saw: the plan said "Descending Ladder"; Garmin sent the run back named by
+  // `ingest-activity`'s `generateWorkoutName` ("location + sport word"), and every surface but the
+  // session header read that. `get-week` now sends the title off the linked planned row.
+  assertEquals(
+    deriveWorkoutTitle({ type: 'run', name: 'Santa Cruz Running', session_title: 'Descending Ladder' }),
+    'Descending Ladder',
+  );
+});
+
+Deno.test('session_title outranks the regex fallback a generic provider name would hit', () => {
+  // Without it this row is a bare "Run" + `interval_` steps → "Run — Intervals".
+  assertEquals(
+    deriveWorkoutTitle({ type: 'run', name: 'Run', steps_preset: ['interval_8x400m_5kpace_R90s'] }),
+    'Run — Intervals',
+  );
+  assertEquals(
+    deriveWorkoutTitle({
+      type: 'run',
+      name: 'Run',
+      steps_preset: ['interval_8x400m_5kpace_R90s'],
+      session_title: 'Surge and Float',
+    }),
+    'Surge and Float',
+  );
+});
+
+Deno.test('an unattached session has no session_title and keeps the provider name', () => {
+  // An extra easy spin nobody planned has no plan name to keep. Null, empty and whitespace all
+  // mean "nothing was sent" — never a blank title on the card.
+  assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Evening Ride', session_title: null }), 'Evening Ride');
+  assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Evening Ride', session_title: '' }), 'Evening Ride');
+  assertEquals(deriveWorkoutTitle({ type: 'ride', name: 'Evening Ride', session_title: '   ' }), 'Evening Ride');
+});
+
+Deno.test('session_title is absent on every planned row, so nothing else moves', () => {
+  // The field only exists on a COMPLETED item from get-week. A planned row derives as it always did.
+  assertEquals(deriveWorkoutTitle({ type: 'run', name: 'Descending Ladder' }), 'Descending Ladder');
+  assertEquals(deriveWorkoutTitle({ type: 'strength', name: 'ME: Upper', intent_title: 'Maximum Effort: Upper' }), 'Maximum Effort: Upper');
+});

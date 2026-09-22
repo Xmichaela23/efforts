@@ -49,6 +49,10 @@ import { emptyDayLine } from '../_shared/empty-day-line.ts';
 import { planRestDates } from '../_shared/plan-overview.ts';
 import { analysisReadout } from '../_shared/analysis-state.ts';
 import { intentTitle } from '../_shared/intent-title.ts';
+// The one server title for a planned session (`_shared/session-title.ts`) — the same one the calendar sync,
+// the manual Garmin send and plans.csv already print. Stamped on a COMPLETED item so the finished session
+// keeps the name its plan gave it (2026-09-22).
+import { sessionTitle } from '../_shared/session-title.ts';
 import { plyoTitleNote } from '../_shared/standing-plan/plyo.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
@@ -1024,6 +1028,23 @@ Deno.serve(async (req)=>{
         analysis_readout: analysisReadout({ ...w, workout_status: w?.workout_status || status }),
         name: w?.name ?? null,
         intent_title: String(type) === 'strength' ? intentTitle(w?.name ?? null) || null : null,
+        /**
+         * ⛔ THE FINISHED SESSION KEEPS ITS PLAN'S NAME (2026-09-22). `name` above is the PROVIDER's
+         * — `ingest-activity`'s `generateWorkoutName` builds "location + sport word" — so a planned
+         * "Descending Ladder" reached Today and the calendar as "Santa Cruz Running". The detail
+         * header already read the linked planned row itself (`UnifiedWorkoutView.tsx`); every other
+         * surface read `name` and got Garmin's word for it.
+         *
+         * ⚠️ DISPLAY ONLY, and the stored `name` is untouched on BOTH rows. Nothing may match on
+         * this string, and the provider's own title stays readable where a screen wants it.
+         * ⚠️ NULL WHEN NOTHING IS ATTACHED — an unplanned session has no plan name to keep.
+         */
+        session_title: (() => {
+          const src = plannedSourceRow || (planned && planned.name ? planned : null);
+          if (!src) return null;
+          const t = sessionTitle(src);
+          return t && t !== 'Session' ? t : null;
+        })(),
         timestamp: w?.timestamp ?? null,
         // Workload data from database (single source of truth)
         workload_actual: w.workload_actual ?? null,
