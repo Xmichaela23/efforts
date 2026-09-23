@@ -708,6 +708,11 @@ export type ComposeArgs = {
     long?: Weekday | null;
     /** Weekdays for the frame's hard slots, in the frame's own order. */
     hard?: Array<Weekday | null | undefined>;
+    /**
+     * ⛔ WEEKDAYS FOR THE EXTRA EASY RUNS, in order (Michael, 2026-09-22: "we should let people place them").
+     * A tapped day wins over `pickFillDay`, like every other pin; the week's notes say what it costs.
+     */
+    easy?: Array<Weekday | null | undefined>;
   };
   /**
    * ⛔⛔ DAYS THE ATHLETE CANNOT TRAIN — AND NO ENDURANCE SESSION LANDS ON ONE (Michael, 2026-08-25:
@@ -3618,7 +3623,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         });
         builtEndurance.push(built);
         const row = translateEnduranceSession(built);
-        const picked = pickFillDay();
+        // ⛔ THE ATHLETE'S TAP FIRST (extra easy runs only): a pinned day wins, stepped off a day off if it is one.
+        const pinned = sport === 'run' ? titleCaseDay(args.endurancePins?.easy?.[fillsPlaced]) : '';
+        const picked = pinned !== '' && !blockedFill.has(pinned) ? pinned as Weekday : pickFillDay();
         const day = picked ?? relocate(
           dayNameFor(args, frameDay),
           sport === 'run' ? 'the extra easy run' : 'the extra easy ride',

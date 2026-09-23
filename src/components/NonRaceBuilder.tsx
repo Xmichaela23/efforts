@@ -1085,6 +1085,8 @@ export type NonRaceState = {
    * Sent as run days — the frame's runs plus these — so the engine's day fill builds them. Absent = 0.
    */
   extraEasyRuns?: number;
+  /** ⛔ THE DAYS THE ATHLETE TAPPED FOR THE EXTRA EASY RUNS on Your week, in order; '' = the engine's day (2026-09-22). */
+  easyDays?: string[];
   /**
    * ⛔⛔ HOW LONG THIS ATHLETE'S HARD SESSIONS AND LONG SESSION ARE, PER SPORT — their own answer,
    * asked once on the Endurance focus step (Michael, 2026-08-27). It is the SOLE input to the level.
@@ -1462,6 +1464,10 @@ function assemblePayload(
            * writes this session", which is what every block before this field did.
            */
           ...(state.longClub ? { long_session: { ownership: 'club' as const } } : {}),
+          // ⛔ THE EXTRA EASY RUNS' TAPPED DAYS (2026-09-22). Only taps travel; '' = the engine places it.
+          ...((state.easyDays ?? []).slice(0, state.extraEasyRuns ?? 0).some((d) => !!d)
+            ? { easy_days: (state.easyDays ?? []).slice(0, state.extraEasyRuns ?? 0).map((d) => d || null) }
+            : {}),
           ...(state.hardDays.some((h) => h.ownership !== 'club' || !!h.day)
             ? {
                 hard_days: state.hardDays
@@ -3886,7 +3892,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       unavailableDays, state.slotSports, state.swimEasySessions, state.enduranceExperience,
       state.runClubIntensity, state.trainingDays,
       // ⚠️ THE NUMBERS ANSWER DECIDES WHETHER WEEK 1 IS THE TEST WEEK (2026-09-13).
-      state.numbersChoice]);
+      state.numbersChoice,
+      // ⚠️ THE EXTRA EASY RUNS AND THEIR TAPPED DAYS (2026-09-22) change the week too.
+      state.extraEasyRuns, state.easyDays]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -6486,6 +6494,57 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 control is hidden, so the sentence was pointing at something no athlete could see.
                 ⚠️ ON THE SAME BOOLEAN, DELIBERATELY: restoring the club control restores this line
                 with it, rather than leaving a sentence somebody has to remember to bring back. */}
+            {/* ⛔ THE EXTRA EASY RUNS, PLACEABLE (Michael, 2026-09-22: "we should let people place them"). Same card
+                as a hard run: the built week's day, "placed" until tapped, "yours" after. Any day builds; what it
+                costs comes back in the trade-offs below. */}
+            {Array.from({ length: isStrengthFocus ? (state.extraEasyRuns ?? 0) : 0 }).map((_, i) => {
+              const placed = (previewWeek ?? [])
+                .filter((x) => String((x as { type?: string }).type ?? '').toLowerCase() === 'run'
+                  && Array.isArray((x as { tags?: unknown }).tags)
+                  && ((x as { tags: unknown[] }).tags).includes('volume_fill'))
+                .map((x) => String((x as { day?: string }).day ?? '').toLowerCase() as DayName)[i];
+              const mine = (state.easyDays ?? [])[i] as DayName | '' | undefined;
+              const dayVal = (mine || placed || '') as DayName | '';
+              const rgb = getDisciplineColorRgb('run');
+              const label = runStrengthWeek?.extra?.rows?.[i]?.title ?? '';
+              /**
+               * ⛔ A DAY ALREADY HOLDING TWO SESSIONS IS NOT OFFERED (Michael, 2026-09-22) — the calendar move's own limit
+               * (`move-check` `MAX_SESSIONS_A_DAY`; the jump drills do not count). This run's own day is not counted
+               * against itself.
+               */
+              const full = (Object.keys(DAY_SHORT) as DayName[]).filter((d) => {
+                const n = (previewWeek ?? []).filter((x) => String((x as { day?: string }).day ?? '').toLowerCase() === d
+                  && !isPlyoSession(x as { tags?: unknown })).length;
+                return n - (d === dayVal ? 1 : 0) >= 2;
+              });
+              return (
+                <div key={`easy-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-white/85 text-sm">{label}</span>
+                    <span className="text-xs flex items-baseline gap-1 min-w-0" style={{ color: `rgba(${rgb},0.85)` }}>
+                      <span className="shrink-0">{dayVal ? `${DAY_SHORT[dayVal]}${mine ? ' — yours' : ' — placed'}` : ''}</span>
+                      {dayVal && !mine && <span className="truncate text-white/45">· tap to change</span>}
+                    </span>
+                  </div>
+                  <WeekDayRow
+                    selected={dayVal ? [dayVal] : []}
+                    plain
+                    pinned={!!mine}
+                    accentRgb={rgb}
+                    disabled={full}
+                    roles={{}}
+                    stacked={[]}
+                    taken={{}}
+                    onTap={(d) => setState((st) => {
+                      const next = [...(st.easyDays ?? [])];
+                      while (next.length <= i) next.push('');
+                      next[i] = next[i] === d ? '' : d;
+                      return { ...st, easyDays: next };
+                    })}
+                  />
+                </div>
+              );
+            })}
             {CLUB_SESSION_CONTROL_VISIBLE && state.hardDays.length > 0 && (
               <p className="text-white/60 text-xs leading-snug px-1">
                 A club ride or run counts as a high intensity day.

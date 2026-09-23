@@ -727,6 +727,11 @@ Deno.serve(async (req: Request) => {
         hard: (Array.isArray(hard_days) ? hard_days : [])
           .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>).day : null))
           .map(asWeekday),
+        // ⛔ THE EXTRA EASY RUNS' DAYS, as tapped on Your week (2026-09-22). Absent = the engine places them.
+        easy: (() => {
+          const raw = (body as Record<string, unknown>).easy_days;
+          return Array.isArray(raw) ? raw.slice(0, 2).map(asWeekday) : [];
+        })(),
       };
 
       /**
