@@ -25,6 +25,8 @@ Get stronger (Strength Lead = p246, Run Lead = p250) · Build muscle (empty) · 
 
 ## Stage 0 — Run Lead's long run builds only in 7-minute jumps
 
+**✅ DONE 2026-09-23 — `07e63fdff`.** Every minute 105–134 builds within half a minute; chips 105 / 120 / 134 (1h45 / 2h / 2h14; 135 cannot build).
+
 **Symptom:** asking the level-3 long run (`run_lsd`, `long_with_inserts`, 3 sets) for 105 min builds 111; 106 → 117;
 107 → 124; 108 → 131; 109 and up → 134. Level 2 builds to the minute (68…100). So Run Lead's chips are 1h44 / 1h57 /
 2h11 instead of 1h45 / 2h / 2h15.
