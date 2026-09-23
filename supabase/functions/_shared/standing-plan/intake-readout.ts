@@ -164,6 +164,11 @@ export function enduranceIntakeReadout(args: {
   for (const s of frameSlots(frame)) {
     const forced = forcedSportFor(s.key, frame);
     if (forced) slots[s.key] = forced;
+    // ⛔ A RUN-ONLY FRAME'S UNANSWERED ROW IS A RUN (2026-09-23): the long-run chips read the long slot's sport, and
+    // with no answer yet the screen showed none. p246 / p250 print every slot as a run.
+    if (!slots[s.key] && !(FRAMES[frame].enduranceSports ?? []).includes('ride') && s.family.startsWith('run_')) {
+      slots[s.key] = 'run';
+    }
   }
   const dayOrdered = weekIsDayOrdered(frame);
   const hardKeys = hardSlotKeysFor(frame);
