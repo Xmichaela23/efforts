@@ -243,6 +243,37 @@ export function slotSpans(specs: SlotSpec[], anchors: EnduranceAnchors): SlotSpa
 }
 
 /**
+ * ⛔⛔ THE `size` WHERE A BASE RUNG STOPS GROWING — 1 unless the build reaches its top earlier
+ * (2026-09-23, WORKORDER-run-programs Stage 0).
+ *
+ * ⛔ THE DEFECT IT FIXES. `run_lsd` level 3 states 104-300 minutes (p235), but its easy running is
+ * capped at two hours (p107, `boundEasyBout`), so `long_with_inserts` builds 104 at size 0 and its
+ * whole top, 133.5, from size 0.16 up. The rung still said `sizeHi` 1, so `rungAt` spread 29.5
+ * minutes over the whole dial and every minute asked moved the build about 6.6: 105 built 111, 106
+ * built 117, 109 and up built 134. **The session was right; the ladder mapped the ask wrong.**
+ * ⚠️ One probe near the top of the dial; only a rung that is already at its top there is bisected.
+ * A rung that grows to size 1 costs one build and keeps `sizeHi` 1.
+ */
+function sizeWhereBuildTops(spec: SlotSpec, level: Level, anchors: EnduranceAnchors, topMin: number): number {
+  const clockMin = (size: number): number | null => {
+    const built = at({ ...spec, level }, anchors, size);
+    const secs = (built as { totals?: { clockedSeconds?: number } } | null)?.totals?.clockedSeconds;
+    return typeof secs === 'number' && secs > 0 ? secs / SECONDS_PER_MIN : null;
+  };
+  // OURS — solver tolerances: half a second counts as "at the top", probe at 0.99; no page.
+  const HALF_SECOND_MIN = 0.5 / SECONDS_PER_MIN;
+  const atTop = (size: number) => { const m = clockMin(size); return m != null && m >= topMin - HALF_SECOND_MIN; };
+  if (!atTop(0.99)) return 1;
+  let below = 0;
+  let above = 0.99;
+  for (let i = 0; i < 16; i++) {
+    const mid = (below + above) / 2;
+    if (atTop(mid)) above = mid; else below = mid;
+  }
+  return above;
+}
+
+/**
  * ⛔ THE RUNGS ONE SLOT CAN TAKE — its frame level, and for a BASE family every level above it.
  *
  * ⛔⛔ THE DURATION OF EACH RUNG IS `sessionDurationBandSeconds`', NOT THIS FILE'S. That function is
@@ -307,7 +338,7 @@ export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
         out.push({ level: level as Level, lo: minutes, hi: minutes, sizeHi: DEFAULT_SIZE });
         continue;
       }
-      out.push({ level: level as Level, lo, hi: full, sizeHi: 1 });
+      out.push({ level: level as Level, lo, hi: full, sizeHi: sizeWhereBuildTops(spec, level as Level, anchors, full) });
       continue;
     }
     /**

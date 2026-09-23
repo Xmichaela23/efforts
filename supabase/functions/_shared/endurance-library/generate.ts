@@ -750,7 +750,19 @@ function buildPrintedLongRun(ctx: BuildContext, p: PrintedLongRun): Block[] {
   const easyTotal = boundEasyBout(ctx, Math.max(0, ctx.target - insertSeconds - finishSeconds), ctx.archetype.id);
   // OURS — the easy running split evenly around the sets: the page places them "at any point".
   const pieces = count + 1;
-  const piece = Math.round(easyTotal / pieces);
+  /**
+   * ⛔ WHOLE MINUTES THAT ADD UP (2026-09-23, WORKORDER-run-programs Stage 0). Each piece travels as a whole-minute
+   * `longrun_NNmin_easypace` token, so pieces of 26.6 min each became four 27s and a 120-minute run reached the watch
+   * as 121.5. The easy running is now whole minutes before it is split, and the leftover minutes go one each to the
+   * first pieces. ⚠️ The sets can end on a half-minute (p235 level 3: 13.5 min), so such a session is always half a
+   * minute off a whole number; the ladder (`rungForMinutes`) lands an ask of N on N − 0.5, which reads as N. The sets,
+   * their count and their paces are the page's and are untouched.
+   */
+  // OURS — whole-minute easy pieces, nearest minute; no page.
+  const easyWholeMin = Math.max(0, Math.round(easyTotal / 60));
+  const baseMin = Math.floor(easyWholeMin / pieces);
+  const extraMin = easyWholeMin - baseMin * pieces;
+  const pieceSeconds = (i: number) => (baseMin + (i < extraMin ? 1 : 0)) * 60;
   /**
    * ⚠️ THE EASY RUNNING IS ONE RUN CUT BY THE SETS AND THE FINISH, so its pieces are `float` — the easy running that
    * sits between efforts (`StepRole`), as the VT1 riding between p239's sprints is. As `work` each piece would read as
@@ -761,7 +773,7 @@ function buildPrintedLongRun(ctx: BuildContext, p: PrintedLongRun): Block[] {
   const easyBlock = (seconds: number): Block => ({
     repeat: 1, label: 'Steady easy', steps: [step(easyRole, 'Easy', seconds, { kind: 'vt1' }, sport, anchor)], restBetween: null,
   });
-  const blocks: Block[] = [easyBlock(piece)];
+  const blocks: Block[] = [easyBlock(pieceSeconds(0))];
   for (let i = 0; i < count; i += 1) {
     blocks.push({
       repeat: rounds,
@@ -769,8 +781,7 @@ function buildPrintedLongRun(ctx: BuildContext, p: PrintedLongRun): Block[] {
       steps: round.map((seg) => step(seg.role, seg.label ?? (seg.role === 'recovery' ? 'Recovery' : 'Set'), seg.seconds, seg.intensity, sport, anchor)),
       restBetween: null,
     });
-    // The last easy piece takes the rounding, so the session is exactly its target.
-    blocks.push(easyBlock(i === count - 1 ? Math.max(0, easyTotal - piece * count) : piece));
+    blocks.push(easyBlock(pieceSeconds(i + 1)));
   }
   if (p.finish) {
     blocks.push({

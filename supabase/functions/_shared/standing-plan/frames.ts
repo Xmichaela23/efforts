@@ -1361,13 +1361,13 @@ export const FRAMES: Record<FrameId, Frame> = {
     cite: 'Viada pp250-251',
     liftingDays: 4,
     // Viada p235: VT1 level 1 is 25–30 min; LSD level 3 is 1.5h up to 2–2.5h.
-    // Chips (Michael, 2026-09-23: three tiers, the first selected). ⚠️ THE LEVEL-3 LONG RUN BUILDS ONLY AT 104, 111, 117,
-    // 124, 131 and 134 MINUTES — the generator's easy pieces come in whole steps — so the chips are three of those
-    // (1h44 / 1h57 / 2h11) and not rounder numbers; a chip the week cannot build exactly is a promise it breaks.
+    // Chips (Michael, 2026-09-23: three tiers, the first selected). The level-3 long run builds every minute from 104 to
+    // 133 and tops out at 134 (p107's two hours of easy running plus the three sets), so 135 cannot build and the top
+    // chip is 134. ⚠️ It built only 104/111/117/124/131/134 until `sizeWhereBuildTops` (volume-bounds.ts, 2026-09-23).
     // Easy day 4 at 45 / 50 / 60 (p235 level 2, builds to the minute).
     runStrengthWeek: {
-      easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 104,
-      longRunChips: [104, 117, 131], easyRunChipsByLevel: { 2: [45, 50, 60] }, easyRunRangeByLevel: { 2: [45, 60] },
+      easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 105,
+      longRunChips: [105, 120, 134], easyRunChipsByLevel: { 2: [45, 50, 60] }, easyRunRangeByLevel: { 2: [45, 60] },
     },
     columns: { standard: STRENGTH_HALF_STANDARD, taper: STRENGTH_HALF_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_half.perWeek,
