@@ -309,18 +309,16 @@ Deno.test('⛔⛔ THE EASY RUN ON THE HEAVY LEG DAY IS ACTUALLY SHORTER, NOT JUS
    * on it, so shipping the words without the cut would have put a false claim on the row. **The
    * warning is only allowed to exist because the minutes moved.**
    *
-   * ⚠️ THE ALL ROUNDER, BECAUSE ITS EASY RUN CAN LAND ON A LOWER DAY. p246's own layout keeps
-   * endurance off both lower days, so `strength_5k` reaches this only through a pin.
+   * ⚠️ TWO EXTRA EASY RUNS ON `strength_5k` (2026-09-22). The extra runs now take the best day by the week's
+   * rules, so the first goes to the speed leg day uncut; the second has only the heavy leg day left short of a
+   * double or the rest day, and that is where the cut happens.
    */
   const wk = composeWeek({
     ...BASE,
-    frame: 'all_rounder',
     week: 2,
     column: 'standard',
-    sportMix: { runs: 2, rides: 2, swimDays: 0, slots: { '1:0': 'ride', '3:0': 'ride', '4:0': 'run', '6:0': 'run' } },
-    targetRunHours: 3,
-    targetRideHours: 4,
-    enduranceDaysBySport: { run: 3, ride: 2 },
+    sportMix: { runs: 4, rides: 0, swimDays: 0 },
+    enduranceDaysBySport: { run: 6 },
   } as never) as never as {
     sessions: Array<{ day: string; type: string; name: string; duration: number; steps_preset?: string[]; tags: string[] }>;
     conflicts: Array<{ rule: string; days: string[]; text: string }>;

@@ -175,7 +175,7 @@ no-deploy.**
 | `match-goal-for-course.ts` | `course-strategy` · `course-upload` |
 | `middle-half.ts` | `workout-detail` |
 | `mobility-sets.ts` | `materialize-plan` |
-| `moved-from.ts` | `activate-plan` · `coach` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
+| `moved-from.ts` | `activate-plan` · `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
 | `moving-seconds.ts` | `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-workout-summary` · `get-week` · `workout-detail` |
 | `novel-movements.ts` | `coach` |
 | `off-plan-banner.ts` | `coach` |
@@ -426,13 +426,13 @@ no-deploy.**
 |---|---|
 | `index.ts` | `coach` |
 
-### `supabase/functions/_shared/move-check/` — 2 files · anything in it → 5 functions
+### `supabase/functions/_shared/move-check/` — 2 files · anything in it → 9 functions
 
-`endurance-checkpoint` · `generate-strength-plan` · `place-lost-day` · `rematerialize-standing-block` · `validate-reschedule`
+`coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule`
 
 | touch this file | redeploy these |
 |---|---|
-| `index.ts` | `endurance-checkpoint` · `generate-strength-plan` · `place-lost-day` · `rematerialize-standing-block` · `validate-reschedule` |
+| `index.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
 | `lost-day.ts` | `place-lost-day` |
 
 ### `supabase/functions/_shared/narrative-core/adapters/` — 5 files · anything in it → 1 function

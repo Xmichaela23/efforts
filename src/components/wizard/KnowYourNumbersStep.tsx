@@ -32,6 +32,7 @@
  * rides, manual = typed); threshold pace from `resolveCurrentRunThresholdPace`.
  */
 import React from 'react';
+import { Info } from 'lucide-react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
@@ -69,6 +70,9 @@ export type NumbersInclude = { strength: boolean; run: boolean; bike: boolean; s
 function Toggle({ k, value, canUse, onSet, copy }: {
   k: NumbersChoiceKey; value: 'use' | 'test'; canUse: boolean; onSet: (k: NumbersChoiceKey, v: 'use' | 'test') => void; copy: NumbersCopy;
 }) {
+  // ⛔ NOTHING ON FILE → NO BUTTON (Michael, 2026-09-22). A lone "Test in week one" read as a control with one
+  // answer; the row's flagged note says what happens instead.
+  if (!canUse) return null;
   return (
     <div className="flex gap-2 shrink-0" role="group">
       {canUse && (
@@ -85,8 +89,19 @@ function Toggle({ k, value, canUse, onSet, copy }: {
   );
 }
 
+/** A row with nothing on file: the note, flagged, in place of the buttons. */
+function Flag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="flex items-start gap-2 text-white/85">
+      <Info className="h-4 w-4 mt-0.5 shrink-0 text-amber-300/90" aria-hidden />
+      <span>{children}</span>
+    </span>
+  );
+}
+
 export function KnowYourNumbersStep({
   step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue, testedLifts, ftpNote, copy,
+  unit = 'mi', onSaveTyped,
 }: {
   step: number; totalSteps: number;
   row: BaselinesRowLike;
@@ -107,6 +122,13 @@ export function KnowYourNumbersStep({
   ftpNote?: string | null;
   /** The screen's words (`builder.setup.numbers`). Until they arrive the screen shows no rows. */
   copy: NumbersCopy | null;
+  /** The athlete's distance unit: lifts in kg and pace per km on a metric account. */
+  unit?: 'mi' | 'km';
+  /**
+   * ⛔ NUMBERS TYPED HERE (Michael, 2026-09-22: "slots for the 4 lifts and threshold pace"). Saved through
+   * `save-baselines` — the same path Profile uses — before the step moves on. Resolves false on failure.
+   */
+  onSaveTyped?: (typed: { lifts: Record<string, number>; threshold: string | null }) => Promise<boolean>;
 }) {
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
 
@@ -149,6 +171,28 @@ export function KnowYourNumbersStep({
 
   const set = (k: NumbersChoiceKey, v: 'use' | 'test') => onChoice({ ...choice, [k]: v });
 
+  // ── typed numbers (rows with nothing on file) ──
+  const [typedLifts, setTypedLifts] = React.useState<Record<string, string>>({});
+  const [typedPace, setTypedPace] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const liftsToSave = Object.fromEntries(Object.entries(typedLifts)
+    .map(([k, v]) => [k, Number(v)] as const)
+    .filter(([, v]) => Number.isFinite(v) && v > 0));
+  const paceOk = /^\d{1,2}:[0-5]\d$/.test(typedPace.trim());
+  const continueNow = async () => {
+    const anyLift = Object.keys(liftsToSave).length > 0;
+    if (onSaveTyped && (anyLift || paceOk)) {
+      setSaving(true);
+      const ok = await onSaveTyped({ lifts: liftsToSave, threshold: paceOk ? typedPace.trim() : null });
+      setSaving(false);
+      if (!ok) return;
+      // A typed number is a number on file: use it, and week one tests only what is still blank.
+      onChoice({ ...choice, ...(anyLift ? { strength: 'use' as const } : {}), ...(paceOk ? { run: 'use' as const } : {}) });
+    }
+    onContinue();
+  };
+  const boxClass = 'w-full rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-white text-[15px] outline-none focus:border-white/40';
+
   const rowShell = (title: string, body: React.ReactNode, right: React.ReactNode) => (
     // The two buttons sit UNDER the text, not beside it (Michael, 2026-09-11, phone screenshot): side
     // by side, "Use current" + "Retest in week one" took the row's width and the title and numbers
@@ -168,7 +212,7 @@ export function KnowYourNumbersStep({
   const fillIn = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, key) => String(v[key] ?? ''));
   const untested = barbell.filter((l) => !l.onFile).map((l) => copy.lift_labels[l.f.key]);
   return (
-    <StepLayout step={step} totalSteps={totalSteps} title={copy.title} onBack={onBack} onContinue={onContinue} canContinue continueLabel={copy.continue}>
+    <StepLayout step={step} totalSteps={totalSteps} title={copy.title} onBack={onBack} onContinue={() => { void continueNow(); }} canContinue={!saving} saving={saving} continueLabel={copy.continue}>
       <p className="text-white/70 text-sm mb-4">
         {copy.intro}
       </p>
@@ -185,7 +229,23 @@ export function KnowYourNumbersStep({
                 {strengthChoice === 'test' && <div className="text-white/50 mt-1">{copy.strength_test}</div>}
               </>
             )
-            : copy.strength_none,
+            : (
+              <>
+                {copy.strength_none}
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {barbell.map((l) => (
+                    <label key={l.f.key} className="block">
+                      <span className="text-white/70 text-xs">{copy.lift_labels[l.f.key]} ({unit === 'km' ? 'kg' : 'lb'})</span>
+                      <input
+                        type="text" inputMode="numeric" data-testid={`typed-lift-${l.f.key}`}
+                        className={boxClass} value={typedLifts[l.f.key] ?? ''}
+                        onChange={(e) => setTypedLifts((t) => ({ ...t, [l.f.key]: e.target.value.replace(/[^\d.]/g, '') }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
+            ),
           <Toggle k="strength" value={strengthChoice} canUse={strengthAny} onSet={set} copy={copy} />,
         )}
         {include.bike && rowShell(
@@ -194,7 +254,7 @@ export function KnowYourNumbersStep({
             {ftp.value != null
               ? <>{fillIn(copy.watts, { watts: Math.round(ftp.value) })} <span className="text-white/40">· {ftp.source === 'manual' ? copy.source_ftp_manual : ftp.source === 'learned' ? copy.source_ftp_learned : copy.source_ftp_low}</span>
                   {ftpChoice === 'test' && <div className="text-white/50 mt-1">{copy.ftp_test}</div>}</>
-              : <>{copy.ftp_none}</>}
+              : <Flag>{copy.ftp_none}</Flag>}
             {ftpNote ? <div className="text-white/70 mt-1">{ftpNote}</div> : null}
           </>,
           <Toggle k="ftp" value={ftpChoice} canUse={ftp.value != null} onSet={set} copy={copy} />,
@@ -207,7 +267,19 @@ export function KnowYourNumbersStep({
             // (2026-09-16, Stage 7 session 1).
             ? <>{strength?.run_threshold_display} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? copy.source_run_typed : copy.source_run_learned}</span>
                 {runChoice === 'test' && <div className="text-white/50 mt-1">{copy.run_test}</div>}</>
-            : <>{copy.run_none}</>,
+            : (
+              <>
+                {copy.run_none}
+                <label className="block mt-3 max-w-[12rem]">
+                  <span className="text-white/70 text-xs">{unit === 'km' ? 'min:sec per km' : 'min:sec per mile'}</span>
+                  <input
+                    type="text" inputMode="numeric" data-testid="typed-threshold" placeholder={unit === 'km' ? '4:40' : '7:30'}
+                    className={boxClass} value={typedPace}
+                    onChange={(e) => setTypedPace(e.target.value.replace(/[^\d:]/g, ''))}
+                  />
+                </label>
+              </>
+            ),
           <Toggle k="run" value={runChoice} canUse={thr.sec_per_mi != null} onSet={set} copy={copy} />,
         )}
 

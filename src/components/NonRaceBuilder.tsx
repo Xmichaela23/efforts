@@ -165,6 +165,7 @@ import {
 import type { IntakeTier } from '@/lib/run-volume-tables';
 import { parsePaceInput, saveCalibration, type PaceBenchmarkRow } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { localToday } from '@/hooks/useBaselineZones';
 import WeekGrid from '@/components/WeekGrid';
 import { liftingCommitmentLine, liftingDaysForFrame } from '@/lib/lifting-commitment';
 import {
@@ -1887,7 +1888,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const [readout, setReadout] = React.useState<BuilderReadout | null>(null);
   const [intakeKey, setIntakeKey] = React.useState<string | null>(null);
-  const { arc } = useArcSetupContext();
+  const { arc, reload: reloadArc } = useArcSetupContext();
 
   // Don't gate: every athlete is OFFERED all four disciplines (matches the ungated matrix). The seed
   // defaults sensibly per goal; the athlete flips develop/maintain/out. Previously this read the stale
@@ -6527,6 +6528,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d])}
               />
             </div>
+            {/* ⛔ THE REST DAY THE BUILT WEEK KEEPS (Michael, 2026-09-22: "we should show the rest day"). Read off the
+                server's own preview week — a day with nothing on it — so it moves as the picks above move things.
+                Display only. */}
+            {(previewWeek?.length ?? 0) > 0 && (() => {
+              const rest = (Object.keys(DAY_SHORT) as DayName[]).filter((d) => !(placedWeekByDay[d]?.length));
+              return (
+                <div className="rounded-xl border border-white/10 px-3 py-3" data-testid="rest-day-line">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-white/85 text-sm">Rest day</span>
+                    <span className="text-sm text-white/70">
+                      {rest.length === 0 ? 'None' : rest.map((d) => DAY_SHORT[d]).join(' · ')}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
 
             {/* ⛔ THE GATE STATES ITSELF — a disabled Continue that says nothing is indistinguishable
@@ -6850,6 +6867,28 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              endurance is rides only (`Frame.enduranceSports`). */
           ftpNote={isStrengthFocus ? planCopy?.ftp_note ?? null : null}
           copy={setupCopy?.numbers ?? null}
+          unit={unit === 'km' ? 'km' : 'mi'}
+          /* ⛔ NUMBERS TYPED ON THIS STEP go through Profile's own save (`save-baselines`), then the row and the
+             readout are fetched again so Back shows them as on file. */
+          onSaveTyped={async ({ lifts, threshold }) => {
+            const { data, error } = await supabase.functions.invoke('save-baselines', {
+              body: {
+                ...(Object.keys(lifts).length > 0 ? { lifts } : {}),
+                ...(threshold ? { paces: { threshold } } : {}),
+                today: localToday(),
+              },
+            });
+            if (error || !data?.success) return false;
+            const uid = getStoredUserId();
+            if (uid) {
+              const { data: row } = await supabase.from('user_baselines')
+                .select('effort_paces, learned_fitness, performance_numbers, locked_baselines, units')
+                .eq('user_id', uid).maybeSingle();
+              if (row) setPaceRow(row as PaceBenchmarkRow);
+            }
+            reloadArc();
+            return true;
+          }}
           choice={state.numbersChoice ?? {}}
           onChoice={(next) => setState((st) => ({ ...st, numbersChoice: next }))}
           onBack={back}

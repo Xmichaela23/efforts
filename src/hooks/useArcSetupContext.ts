@@ -9,6 +9,8 @@ export function useArcSetupContext(focusDate?: string) {
   const [arc, setArc] = useState<ArcContextPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
+  // Bumped to fetch again after the athlete saves a number mid-flow (Your numbers, 2026-09-22).
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,12 +29,12 @@ export function useArcSetupContext(focusDate?: string) {
     return () => {
       cancelled = true;
     };
-  }, [focusDate]);
+  }, [focusDate, nonce]);
 
   const fiveKSystemSupplement = useMemo(
     () => buildArcSetupFiveKSupplement(arc?.five_k_nudge ?? null),
     [arc?.five_k_nudge]
   );
 
-  return { arc, loading, error, fiveKSystemSupplement };
+  return { arc, loading, error, fiveKSystemSupplement, reload: () => setNonce((n) => n + 1) };
 }

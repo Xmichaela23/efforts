@@ -122,10 +122,13 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
 
 /** The Know your numbers? screen, every line. */
 export const NUMBERS_COPY = {
-  title: 'Know your numbers?',
-  intro: 'Optional. Keep what is on file or test in week one. Numbers are typed on Profile, not here.',
+  // ⛔ REWRITTEN 2026-09-22 (Michael approved the words): not optional; the plan is priced from these.
+  title: 'Your numbers',
+  // Viada p215 — the pretest in week one; p210 / p212 the endurance tests. Profile saves re-price the block.
+  intro: 'The plan sets your weights and paces from these. Anything not on file is tested in week one. You can add '
+    + 'or change them in Profile any time.',
   continue: 'Continue',
-  use_current: 'Use current',
+  use_current: 'Use this',
   retest: 'Retest in week one',
   test: 'Test in week one',
   strength_title: 'Strength',
@@ -140,7 +143,8 @@ export const NUMBERS_COPY = {
   verb_one: 'is',
   verb_many: 'are',
   strength_test: 'Week one is the test week (p215). The number on file stays until the test replaces it.',
-  strength_none: 'Nothing on file. Every lift is tested in week one (p215). Numbers can be typed on Profile.',
+  // Viada p215 — week one is the test week. Profile saves re-price the block (rematerialize-standing-block).
+  strength_none: 'Add your 1-rep maxes if you know them. Any lift left blank is tested in week one.',
   ftp_title: 'FTP',
   watts: '{watts} W',
   source_ftp_manual: 'typed in Baselines',
@@ -150,12 +154,14 @@ export const NUMBERS_COPY = {
   // Viada p212 — the 20-minute test.
   ftp_test: 'The 20-minute FTP test is scheduled into week one.',
   // Viada p212 — the 20-minute test.
-  ftp_none: 'Nothing on file. The 20-minute FTP test is scheduled into week one.',
+  ftp_none: 'Nothing on file. Week one has a 20-minute FTP test. If you know your FTP, add it in Profile and the plan '
+    + 'updates to it.',
   run_title: 'Run threshold',  // not-instruction: a row heading, not an instruction
   source_run_typed: 'typed in Baselines',
   source_run_learned: 'from your runs',
   run_test: 'The threshold time trial is scheduled into week one.',  // p210 — the test is the page's "time trial"; the sentence says what the app scheduled
-  run_none: 'Nothing on file. The threshold time trial is scheduled into week one.',  // p210 — the test is the page's "time trial"; the sentence says what the app scheduled
+  // Viada p210 — the threshold time trial. A Profile save re-prices upcoming sessions (endurance-checkpoint).
+  run_none: 'Add your threshold pace if you know it. Left blank, week one has a threshold time trial.',  // p210 — the test is the page's "time trial"; the sentence says what the app scheduled
   // FIELD — "per 100" is the swim pace unit (time per 100 m or 100 yd), a definition, not a prescription.
   swim_title: 'Swim pace (per 100)',  // not-instruction: a row heading, not an instruction
   source_swim: 'on file',

@@ -200,7 +200,8 @@ import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
 import { archetypesFor } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
-import { easyRunOnHeavyLegDays, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
+import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
+import { MAX_SESSIONS_A_DAY } from '../move-check/index.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
   REST_DAY_RUNG, rungAt, rungForMinutes, sayHours, sizeFor, slotSpans, weekVolumeBounds,
@@ -3553,6 +3554,42 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const room = restFrameDay == null ? clearDays : [...clearDays, restFrameDay];
       let spentRestDay = false;
       let fillsPlaced = 0;
+      /**
+       * ⛔⛔ EACH EXTRA SESSION TAKES THE BEST DAY, BY THE WEEK'S OWN RULES (Michael, 2026-09-22: "we need to be
+       * smarter than that"). Every weekday is tried, ranked in order:
+       *   1. not a day off, and under the calendar's two-session limit (`move-check` `MAX_SESSIONS_A_DAY`);
+       *   2. the fewest new warnings from the week's rules (`conflictsOfTyped`, the builder's and the move check's);
+       *   3. the rest day kept clear (p145 rule 7 allows it, so it is a cost, not a block);
+       *   4. not a second session of the same sport that day (field practice keeps doubles for high-mileage runners);
+       *   5. a run not on a heavy leg day, where p144 cuts it by a third ("the same overall adaptations");
+       *   then the frame's own order of its clear days.
+       * OURS — the order of 3 to 5 (Michael approved it 2026-09-22); the book prints no run on these days.
+       */
+      const blockedFill = new Set((args.unavailableDays ?? []).map((d) => titleCaseDay(d)).filter(Boolean));
+      const preferOrder = room.map((d) => dayNameFor(args, d));
+      const pickFillDay = (): Weekday | null => {
+        const live = sessions.filter((x) => !(x.tags ?? []).includes('plyo'));
+        const before = conflictsOfTyped(typedRowsOf(sessions), null)
+          .filter((c) => c.rule !== 'easy_run_with_heavy_legs').map((c) => c.text);
+        let best: { day: Weekday; key: number[] } | null = null;
+        for (const day of WEEKDAYS) {
+          if (blockedFill.has(day)) continue;
+          const onDay = live.filter((x) => x.day === day);
+          if (onDay.length >= MAX_SESSIONS_A_DAY) continue;
+          const probe = { day, type: sport, name: 'Easy', tags: [`family:${spec.family}`], duration: 30, description: '' };
+          const after = conflictsOfTyped(typedRowsOf([...sessions, probe as PlanSession]), null)
+            .filter((c) => c.rule !== 'easy_run_with_heavy_legs').map((c) => c.text);
+          const warn = after.filter((t) => !before.includes(t)).length;
+          const cut = sport === 'run' && onDay.some((x) => (x.tags ?? []).includes('lower:me') || x.name === 'ME: Lower' || x.name === 'Test: Lower') ? 1 : 0;
+          const rest = onDay.length === 0 && !sessions.some((x) => x.day === day) ? 1 : 0;
+          const dbl = onDay.some((x) => x.type === sport) ? 1 : 0;
+          const order = preferOrder.indexOf(day) >= 0 ? preferOrder.indexOf(day) : preferOrder.length + WEEKDAYS.indexOf(day);
+          const key = [warn, rest, dbl, cut, order];
+          const k = best == null ? -1 : key.findIndex((v, n) => v !== best!.key[n]);
+          if (best == null || (k >= 0 && key[k] < best.key[k])) best = { day, key };
+        }
+        return best?.day ?? null;
+      };
       for (let i = 0; i < want && i < room.length; i++) {
         const frameDay = room[i];
         /**
@@ -3581,7 +3618,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         });
         builtEndurance.push(built);
         const row = translateEnduranceSession(built);
-        const day = relocate(
+        const picked = pickFillDay();
+        const day = picked ?? relocate(
           dayNameFor(args, frameDay),
           sport === 'run' ? 'the extra easy run' : 'the extra easy ride',
         );
