@@ -184,7 +184,6 @@
    "{} (race tempo)"
   ],
   "supabase/functions/_shared/standing-plan/setup-copy.ts": [
-   "Around 4 hours of running a week, with threshold and interval runs, and an emphasis on strength. Intermediate.",
    "If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.",
    "If a powerlifting meet is 4 to 5 weeks away, the recommendation is to switch the running to the deload",
    "to month beyond updating 1RM and threshold as you improve.",
