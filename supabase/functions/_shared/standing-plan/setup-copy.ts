@@ -100,6 +100,7 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
     ftp_note: null,
   },
   strength_5k: {
+    // OURS — "4HR": the built week's running, 3h45–4h15 (see `PROGRAM_COPY.run_strength`).
     name: '4HR + Strength',
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
