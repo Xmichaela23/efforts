@@ -1080,6 +1080,11 @@ export type NonRaceState = {
    */
   slotMinutes?: Partial<Record<SlotKey, number>>;
   /**
+   * ⛔ THE ATHLETE'S EXTRA EASY RUNS ON THE RUNS SCREEN, 0–2 (Viada p247 "one or two VT1 sessions"; 2026-09-22).
+   * Sent as run days — the frame's runs plus these — so the engine's day fill builds them. Absent = 0.
+   */
+  extraEasyRuns?: number;
+  /**
    * ⛔⛔ HOW LONG THIS ATHLETE'S HARD SESSIONS AND LONG SESSION ARE, PER SPORT — their own answer,
    * asked once on the Endurance focus step (Michael, 2026-08-27). It is the SOLE input to the level.
    *
@@ -1557,10 +1562,14 @@ function assemblePayload(
            * a session in the athlete's week they were never able to set. ⚠️ Extra easy days are
            * PARKED, not rejected; they come back with rows of their own or not at all.
            */
-          ...(isStrengthFocusPath && !weekIsDayOrdered(wizardFrame) && (state.runDays > 0 || state.rideDays > 0)
+          ...(isStrengthFocusPath && !weekIsDayOrdered(wizardFrame)
+            && (state.runDays > 0 || state.rideDays > 0 || (state.extraEasyRuns ?? 0) > 0)
             ? {
               endurance_days: {
-                ...(state.runDays > 0 ? { run: state.runDays } : {}),
+                ...(state.runDays > 0
+                  ? { run: state.runDays }
+                  // ⛔ THE EXTRA EASY RUNS (2026-09-22): the frame's own runs plus the athlete's pick.
+                  : (state.extraEasyRuns ?? 0) > 0 ? { run: derivedCounts.runs + (state.extraEasyRuns ?? 0) } : {}),
                 ...(state.rideDays > 0 ? { ride: state.rideDays } : {}),
               },
             }
@@ -5536,7 +5545,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           renders, so the gate is a guard rather than a wall. */}
       {currentStep === 'endurance' && rotateOnlyRunPath(state) && (
         <StepLayout
-          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
+          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Run focus')}
           onBack={back} onContinue={next}
           canContinue={longRunAnswered}
           blockedReason={tintedReason(longRunAnswered ? undefined : 'The long run has no length yet.')}
@@ -5548,6 +5557,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               ...st,
               slotMinutes: { ...(st.slotMinutes ?? {}), [key]: minutes },
             }))}
+            extraEasyRuns={state.extraEasyRuns ?? 0}
+            onExtraEasyRuns={(n) => setState((st) => ({ ...st, extraEasyRuns: n }))}
           />
         </StepLayout>
       )}

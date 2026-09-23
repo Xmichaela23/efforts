@@ -54,7 +54,6 @@ import {
   frameHasArmsSuperset,
 } from './accessory-picks.ts';
 import {
-  advancedTierSessions,
   FRAMES,
   SECONDARY_BY_PATTERN,
   EXPERIENCE_IS_THE_ATHLETES_ANSWER,
@@ -2918,10 +2917,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       for (let i = 0; i < swims; i++) {
         out.push({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, sport: 'swim' });
       }
-      for (let i = 0; i < advancedTierSessions(args.demonstratedWeeklyMiles); i++) {
-        // OURS — the advanced tier's extra VT1 at level 1: p247 says "one or two VT1 sessions" and names no level
-        out.push({ family: 'run_vt1', level: 1, sport: 'run' });
-      }
+      // ⛔ THE ADVANCED TIER'S LOGGED-MILES GATE IS GONE (Michael, 2026-09-22: "we should lose that"). p247's
+      // "one or two VT1 sessions" is now the athlete's own pick on the runs screen, and it arrives as run days
+      // (`enduranceDaysBySport.run`), which the day fill below turns into VT1 level-1 runs (p235: 25–30 min).
       /**
        * ⛔⛔ THE DAYS THE ATHLETE SAID THEY DO EACH SPORT — see `enduranceDaysBySport`. Three runs
        * against two run slots means one more easy run, and it joins the specs HERE, before the
@@ -3526,30 +3524,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     });
   }
 
-  // ── the advanced tier: a PROGRAM tier, gated on demonstrated history ──────────────────────────
-  const extraVt1 = advancedTierSessions(args.demonstratedWeeklyMiles);
-  if (extraVt1 > 0 && args.column === 'standard') {
-    const openDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length === 0);
-    const targets = openDays.length > 0 ? openDays : days.filter((d) => !d.rest && d.endurance.length === 0);
-    for (let i = 0; i < extraVt1 && i < targets.length; i++) {
-      // ⛔ THE TIER'S RUNS TAKE THE RUN DIAL TOO — they are miles in the same week.
-      // OURS — the same level 1 for the advanced tier's extra VT1; p247 names no level
-      const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: dialForSport('run') });
-      builtEndurance.push(built);
-      const row = translateEnduranceSession(built);
-      sessions.push({
-        day: relocate(dayNameFor(args, targets[i].day), 'the extra easy run'),
-        ...row,
-        tags: [...row.tags, 'advanced_tier'],
-      });
-    }
-    notes.push({
-      kind: 'source',
-      text: 'An extra easy run, because the running already on file supports it. The source '
-        + 'recommends one or two for more advanced runners, to test recovery.',
-      cite: 'Viada p247',
-    });
-  }
+  // ⛔ THE ADVANCED TIER'S OWN BLOCK IS DELETED (2026-09-22): extra easy runs are the athlete's pick and are placed by
+  // the day fill below with the other asked-for days.
 
   /**
    * ⛔⛔ THE HOURS PAST THE FIXED SESSIONS, AS EASY SESSIONS (Michael, 2026-08-26). See `easyFillFor`
@@ -3781,7 +3757,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   const dose = dialDose({
     column: args.column,
-    advancedTierSessions: advancedTierSessions(args.demonstratedWeeklyMiles),
+    // ⛔ THE EXTRA EASY RUNS THE ATHLETE PICKED (2026-09-22) — the count the logged-miles tier used to supply.
+    advancedTierSessions: dayFills.run,
   });
   const dialTarget: Partial<Record<MuscleGroup, number>> = {};
   if (dose.targetSets != null) {

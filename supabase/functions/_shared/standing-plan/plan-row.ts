@@ -122,6 +122,8 @@ export type StandingPlanConfig = {
   day_offset: number;
   /** `order[frameDay - 1]` = weekday index, Monday = 0. Null on a block built before 2026-09-22. */
   day_order: number[] | null;
+  /** The days per sport the athlete asked for; carries the extra easy runs. Null when unanswered. */
+  endurance_days_by_sport?: { run?: number | null; ride?: number | null } | null;
   /** Which pins the chosen rotation honoured. Surfacing and provenance. */
   pins_honoured: { longRun: boolean; hardDays: number; unavailableDays?: boolean };
   /**
@@ -363,6 +365,9 @@ export function buildStandingPlanRow(args: {
           }
         : null,
       // OURS — `buildStandingPlanRow` at most 2 easy swims a week (Michael, 2026-08-24), the same clamp as compose.ts; no page.
+      // ⛔ THE DAYS PER SPORT THE ATHLETE ASKED FOR (2026-09-22) — they carry the extra easy runs, and a restate
+      // re-composes the same week only if it reads them back.
+      endurance_days_by_sport: args.compose.enduranceDaysBySport ?? null,
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,
       accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
         ? [...(args.compose.accessoryPicks as string[])]

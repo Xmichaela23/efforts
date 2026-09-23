@@ -42,6 +42,9 @@ type Props = {
   /** The athlete's per-session lengths. Only the long row carries a pick; the easy row is a constant. */
   slotMinutes?: Partial<Record<SlotKey, number>>;
   onSlotMinutes: (key: SlotKey, minutes: number) => void;
+  /** The athlete's extra easy runs, 0–2 (Viada p247). */
+  extraEasyRuns?: number;
+  onExtraEasyRuns?: (n: number) => void;
 };
 
 export default function RunStrengthWeekCard(props: Props) {
@@ -96,7 +99,37 @@ export default function RunStrengthWeekCard(props: Props) {
             </div>
           );
         })}
+        {(week.extra?.rows ?? []).slice(0, props.extraEasyRuns ?? 0).map((row) => (
+          <div
+            key={row.title}
+            data-testid="run-row-extra"
+            className="rounded-xl border border-white/12 bg-white/[0.02] p-3 border-l-2"
+            style={{ borderLeftColor: runColor }}
+          >
+            <p className="text-white text-[15px]">{row.title}</p>
+            <p className="text-white/55 text-xs mt-1 leading-relaxed">{[row.session, row.length].filter(Boolean).join(' · ')}</p>
+          </div>
+        ))}
       </div>
+      {week.extra && props.onExtraEasyRuns ? (
+        <div className="rounded-xl border border-white/12 bg-white/[0.02] p-3">
+          <p className="text-white/80 text-[13px] mb-2">{week.extra.label}</p>
+          <div className="flex gap-1.5">
+            {week.extra.options.map((o) => (
+              <GalaxyButton
+                key={o.count}
+                shape="chip"
+                variant={(props.extraEasyRuns ?? 0) === o.count ? 'primary' : 'secondary'}
+                data-testid={`extra-easy-${o.count}`}
+                onClick={() => props.onExtraEasyRuns?.(o.count)}
+              >
+                {o.label}
+              </GalaxyButton>
+            ))}
+          </div>
+          <p className="text-white/55 text-xs mt-2 leading-relaxed">{week.extra.line}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

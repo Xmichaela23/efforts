@@ -219,6 +219,12 @@ export const RUNS_COPY = {
   length_label: 'Length',
   length_varies: 'length varies week to week',
   row_label: { long: 'Long session', easy: 'Easy session', easy_n: 'Easy session {n}', hard_n: 'Hard session {n}' },  // not-instruction: row labels (names), not instructions
+  // ⛔ THE EXTRA EASY RUNS (2026-09-22). Viada p247: "More advanced runners may see a benefit to additional running
+  // volume, and I recommend adding one or two VT1 sessions initially to test recovery." Length: p235 VT1 level 1.
+  extra_label: 'Extra easy runs',  // not-instruction: a control label
+  extra_chip: { 0: 'None', 1: '1', 2: '2' } as Record<number, string>,  // not-instruction: chip labels
+  extra_line: 'For more advanced runners, to test recovery.',  // Viada p247, reworded
+  extra_row: 'Extra easy run {n}',  // not-instruction: a row label (name)
 } as const;
 
 /** The runs screen's top line, counted off the frame: lifting days and runs, in words. Null on a week that is not all runs. */

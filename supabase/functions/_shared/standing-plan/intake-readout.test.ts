@@ -48,17 +48,18 @@ Deno.test('Run + Strength: the long-run chips stop at the frame\'s ceiling and o
   assertEquals(w.easy_run_minutes, rsw.easyRunMinutes);
 });
 
-Deno.test('the history line counts the frame\'s own slots plus the advanced tier\'s runs', () => {
-  const extra = advancedTierSessions(30);
-  assert(extra > 0);
+Deno.test('⛔ NO HISTORY LINE, AND THE EXTRA EASY RUNS ARE THE ATHLETE\'S PICK (2026-09-22)', () => {
+  // The logged-miles gate is gone ("we should lose that"): miles on file add no line and no runs.
   const r = enduranceIntakeReadout({
-    frame: 'all_rounder', answers: {}, demonstrated: { weeklyMiles: 30, source: 'the last five weeks' },
+    frame: 'strength_5k', answers: {}, demonstrated: { weeklyMiles: 60, source: 'the last five weeks' },
   });
-  assertEquals(
-    r.tier_line,
-    `Your history supports a ${5 + extra}-session endurance week — ${extra} extra easy run${extra === 1 ? '' : 's'} (the last five weeks).`,
-  );
-  assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {}, demonstrated: { weeklyMiles: 10, source: 'x' } }).tier_line, null);
+  assertEquals(r.tier_line, null);
+  const x = r.run_strength_week!.extra;
+  assertEquals(x.label, 'Extra easy runs');
+  assertEquals(x.options.map((o) => o.label), ['None', '1', '2']);
+  assertEquals(x.line, 'For more advanced runners, to test recovery.');
+  assertEquals(x.rows.length, 2);
+  assertEquals(x.rows[0].title, 'Extra easy run 1');
 });
 
 /**

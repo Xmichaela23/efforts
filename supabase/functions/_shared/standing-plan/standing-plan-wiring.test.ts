@@ -511,22 +511,17 @@ Deno.test('no running on file abstains rather than reporting zero miles', () => 
   assert(v.source.length > 5);
 });
 
-Deno.test('the extra easy run appears only for an athlete already running that far', () => {
-  const under = composeBlock({
-    ...ROW_ARGS.compose, weeks: 2, taperWeeks: [],
-    demonstratedWeeklyMiles: ADVANCED_TIER_MIN_WEEKLY_MILES - 1,
-  })[1];
-  const over = composeBlock({
-    ...ROW_ARGS.compose, weeks: 2, taperWeeks: [],
-    demonstratedWeeklyMiles: ADVANCED_TIER_MIN_WEEKLY_MILES + 1,
-  })[1];
-  const runsUnder = under.sessions.filter((s) => s.type === 'run').length;
-  const runsOver = over.sessions.filter((s) => s.type === 'run').length;
-  assertEquals(runsUnder, 4);
-  assertEquals(runsOver, 5);
-  // ⛔ THE ADDED SESSION IS EASY ONLY — the tier exists "to test recovery" (p247).
-  const extra = over.sessions.find((s) => s.tags.includes('advanced_tier'))!;
-  assert(/easy/i.test(extra.steps_preset?.join(' ') ?? ''), `the extra session was not easy: ${extra.name}`);
+Deno.test('⛔ THE EXTRA EASY RUNS COME FROM THE ATHLETE\'S PICK, NOT FROM MILES ON FILE (2026-09-22)', () => {
+  const run = (extra: Record<string, unknown>) => composeBlock({ ...ROW_ARGS.compose, weeks: 2, taperWeeks: [], ...extra })[1]
+    .sessions.filter((s) => s.type === 'run');
+  assertEquals(run({ demonstratedWeeklyMiles: 60 }).length, 4, 'miles on file still add runs');
+  assertEquals(run({ enduranceDaysBySport: { run: 5 } }).length, 5);
+  const two = run({ enduranceDaysBySport: { run: 6 } });
+  assertEquals(two.length, 6);
+  // ⛔ THE ADDED SESSIONS ARE EASY ONLY — p247 adds them "to test recovery".
+  for (const s of two.filter((x) => x.tags.includes('volume_fill'))) {
+    assert(/easy/i.test(s.steps_preset?.join(' ') ?? ''), `the extra session was not easy: ${s.name}`);
+  }
 });
 
 Deno.test('the block records which number gated its tier and where that number came from', () => {

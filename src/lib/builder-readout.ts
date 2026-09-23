@@ -81,6 +81,13 @@ export type EnduranceIntakeReadout = {
     length_label: string;
     long_option_labels: Record<string, string>;
     rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
+    /** The extra easy runs control (2026-09-22). Absent from an older server. */
+    extra?: {
+      label: string;
+      line: string;
+      options: Array<{ count: number; label: string }>;
+      rows: Array<{ title: string; session: string; length: string }>;
+    };
   } | null;
   ride_strength_week: {
     count_label: string;

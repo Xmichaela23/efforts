@@ -35,7 +35,7 @@ import {
   type SlotSport,
 } from '../../../../src/lib/standing-plan-week-copy.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
-import { advancedTierSessions, FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
 import { fill, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
@@ -107,6 +107,12 @@ export type EnduranceIntakeReadout = {
     commitment_line: string | null;
     sub_line: string;
     length_label: string;
+    extra: {
+      label: string;
+      line: string;
+      options: { count: number; label: string }[];
+      rows: { title: string; session: string; length: string }[];
+    };
     long_option_labels: Record<string, string>;
     rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
   } | null;
@@ -229,6 +235,17 @@ export function enduranceIntakeReadout(args: {
       length_label: RUNS_COPY.length_label,
       long_option_labels: Object.fromEntries(options.map((m) => [String(m), lengthWords(m)])),
       rows,
+      // ⛔ THE ATHLETE'S EXTRA EASY RUNS (Viada p247 "one or two VT1 sessions"), built as VT1 level 1 (p235).
+      extra: {
+        label: RUNS_COPY.extra_label,
+        line: RUNS_COPY.extra_line,
+        options: [0, 1, 2].map((n) => ({ count: n, label: RUNS_COPY.extra_chip[n] })),
+        rows: [1, 2].map((n) => ({
+          title: fill(RUNS_COPY.extra_row, { n }),
+          session: sessionName('run_vt1', null),
+          length: lengthWords(rsw.easyRunMinutes),
+        })),
+      },
     };
   })();
 
@@ -259,18 +276,8 @@ export function enduranceIntakeReadout(args: {
     };
   })();
 
-  const tierLine = (() => {
-    const d = args.demonstrated;
-    if (!d) return null;
-    const extra = advancedTierSessions(d.weeklyMiles);
-    if (extra <= 0) return null;
-    // The frame's own endurance slots plus the tier's extra runs — four on Run + Strength, five on
-    // Standard Focus. The phone printed four on both.
-    // Viada p247: "adding one or two VT1 sessions" for more advanced runners; the tier gate is `advancedTierSessions` in frames.ts.
-    const total = frameSlots(frame).length + extra;
-    return `Your history supports a ${total}-session endurance week — ${extra} extra easy `
-      + `run${extra === 1 ? '' : 's'} (${d.source}).`;
-  })();
+  // ⛔ THE HISTORY LINE IS GONE WITH THE LOGGED-MILES GATE (2026-09-22): extra easy runs are the athlete's pick.
+  const tierLine: string | null = null;
 
   return {
     frame,

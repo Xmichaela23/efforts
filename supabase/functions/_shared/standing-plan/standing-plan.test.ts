@@ -643,32 +643,20 @@ Deno.test('an untranslatable family fails loudly rather than emitting a dropped 
 // G — THE ADVANCED TIER: a program tier, never an athlete dial
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('the advanced tier gates on running the athlete already does', () => {
-  // ⛔ RULED 2026-08-23. p247 recommends one or two extra VT1 sessions for more advanced runners;
-  // pivot §2 says convert, never add. Both stand, because the athlete never self-selects into volume
-  // they do not already hold — the engine gates it on DEMONSTRATED history.
-  assertEquals(advancedTierSessions(null), 0);
-  assertEquals(advancedTierSessions(undefined), 0);
-  assertEquals(advancedTierSessions(0), 0);
-  assertEquals(advancedTierSessions(ADVANCED_TIER_MIN_WEEKLY_MILES - 1), 0);
-  assertEquals(advancedTierSessions(ADVANCED_TIER_MIN_WEEKLY_MILES), 1);
-  assertEquals(advancedTierSessions(ADVANCED_TIER_MIN_WEEKLY_MILES * 2), 2);
-
-  const base = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard' });
-  const tiered = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard', demonstratedWeeklyMiles: 60 });
-  const baseRuns = base.sessions.filter((s) => s.type === 'run').length;
-  const tieredRuns = tiered.sessions.filter((s) => s.type === 'run').length;
-  assertEquals(baseRuns, 4);
-  assertEquals(tieredRuns, 6, 'the tier did not add its sessions');
-
-  // ⛔ EASY ONLY. The tier exists to test recovery; a hard session would test something else.
-  for (const s of tiered.sessions.filter((x) => x.tags.includes('advanced_tier'))) {
+Deno.test('⛔ EXTRA EASY RUNS ARE THE ATHLETE\'S PICK — one or two, easy only, never in the taper (2026-09-22)', () => {
+  // ⛔ THE 2026-08-23 LOGGED-MILES GATE IS GONE (Michael, 2026-09-22: "we should lose that"). p247's one or two
+  // extra VT1 sessions are offered to anyone on the runs screen and arrive as run days.
+  const base = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard', demonstratedWeeklyMiles: 60 });
+  assertEquals(base.sessions.filter((s) => s.type === 'run').length, 4, 'miles on file still add runs');
+  const two = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard', enduranceDaysBySport: { run: 6 } });
+  assertEquals(two.sessions.filter((s) => s.type === 'run').length, 6);
+  for (const s of two.sessions.filter((x) => x.tags.includes('volume_fill'))) {
     assertEquals(s.name, 'Easy Run');
     assert((s.steps_preset ?? []).every((t) => /^run_easy_/.test(t)), `${s.name} is not easy`);
   }
   // ⛔ AND NEVER IN THE TAPER. A taper that grows is not a taper.
-  const taper = composeWeek({ ...BASE_ARGS, week: 11, column: 'taper', demonstratedWeeklyMiles: 60 });
-  assertEquals(taper.sessions.filter((s) => s.tags.includes('advanced_tier')).length, 0);
+  const taper = composeWeek({ ...BASE_ARGS, week: 11, column: 'taper', enduranceDaysBySport: { run: 6 } });
+  assertEquals(taper.sessions.filter((s) => s.tags.includes('volume_fill')).length, 0);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

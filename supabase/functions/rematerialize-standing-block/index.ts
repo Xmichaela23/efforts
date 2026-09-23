@@ -411,6 +411,10 @@ Deno.serve(async (req: Request) => {
         ? sp.athlete_equipment
         : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment : null)),
       demonstratedWeeklyMiles: sp.demonstrated_weekly_miles ?? null,
+      // ⛔ THE RUN DAYS THE BLOCK WAS BUILT WITH (2026-09-22) — they carry the athlete's extra easy runs.
+      ...(sp.endurance_days_by_sport && typeof sp.endurance_days_by_sport === 'object'
+        ? { enduranceDaysBySport: sp.endurance_days_by_sport }
+        : {}),
       /**
        * ⛔⛔ THE EXPERIENCE ANSWER THE BLOCK'S LEVELS WERE BUILT FROM, READ BACK (2026-08-27) — and
        * THIS IS THE HOP THAT MATTERS MOST. It is the sole input to the endurance level, and this

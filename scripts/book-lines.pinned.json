@@ -196,7 +196,10 @@
    "Swim pace (per 100)",
    "These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the",
    "Easy session",
-   "Easy session {n}"
+   "Easy session {n}",
+   "Extra easy runs",
+   "For more advanced runners, to test recovery.",
+   "Extra easy run {n}"
   ],
   "supabase/functions/_shared/standing-plan/spacing-line.ts": [],
   "supabase/functions/_shared/standing-plan/sport-slots.ts": [
