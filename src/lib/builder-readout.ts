@@ -80,7 +80,11 @@ export type EnduranceIntakeReadout = {
     sub_line: string;
     length_label: string;
     long_option_labels: Record<string, string>;
-    rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
+    rows: Array<{
+      key: SlotKey; title: string; session: string; length: string | null; is_long: boolean;
+      /** An easy row with chips (2026-09-23): the frame's tiers, the first selected. */
+      options?: number[]; option_labels?: Record<string, string>; default_minutes?: number;
+    }>;
     /** The extra easy runs control (2026-09-22). Absent from an older server. */
     extra?: {
       label: string;

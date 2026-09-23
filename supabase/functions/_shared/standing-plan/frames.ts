@@ -355,6 +355,13 @@ export type RunStrengthWeek = {
    * p247's Strength + 5K). Strength + Half-Marathon's long run is level 3, 1.5h to 2–2.5h (p235).
    */
   longRunCeilingMinutes?: number;
+  /**
+   * ⛔ THE LONG RUN'S THREE CHIPS (Michael, 2026-09-23: three tiers, not five-minute steps; the first is selected).
+   * Each is inside the level's buildable band, so the week builds the minutes on the chip.
+   */
+  longRunChips: number[];
+  /** Chips for an easy run printed above level 1 (Run Lead's day 4, VT1 level 2 = 45–60 min, p235). First selected. */
+  easyRunChipsByLevel?: Partial<Record<number, number[]>>;
   /** An easy run printed above level 1 shows its level's range (Viada p235: VT1 level 2 is 45–60 min). */
   easyRunRangeByLevel?: Partial<Record<number, [number, number]>>;
   /** ⛔ p247's "one or two VT1 sessions" for more advanced runners — Strength + 5K's own advice; other plans do not offer it. */
@@ -1340,7 +1347,8 @@ export const FRAMES: Record<FrameId, Frame> = {
     cite: 'Viada pp246-247',
     liftingDays: 4,
     // 30 min = p246's VT1 level 1 rung top (p235: 25-30 min). OURS — `longRunChipCeilingMinutes` 90 and `longRunDefaultMinutes` 75, see `RunStrengthWeek`
-    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75, offersExtraEasyRuns: true },
+    // Chips (Michael, 2026-09-23): 1h10 / 1h15 / 1h30 inside p235's level-2 band (68–100 min), the first selected.
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 70, longRunChips: [70, 75, 90], offersExtraEasyRuns: true },
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
     testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
@@ -1353,8 +1361,14 @@ export const FRAMES: Record<FrameId, Frame> = {
     cite: 'Viada pp250-251',
     liftingDays: 4,
     // Viada p235: VT1 level 1 is 25–30 min; LSD level 3 is 1.5h up to 2–2.5h.
-    // OURS — the default is the middle chip (120 min), as 4HR's is (Michael, 2026-09-07).
-    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 120, easyRunRangeByLevel: { 2: [45, 60] } },
+    // Chips (Michael, 2026-09-23: three tiers, the first selected). ⚠️ THE LEVEL-3 LONG RUN BUILDS ONLY AT 104, 111, 117,
+    // 124, 131 and 134 MINUTES — the generator's easy pieces come in whole steps — so the chips are three of those
+    // (1h44 / 1h57 / 2h11) and not rounder numbers; a chip the week cannot build exactly is a promise it breaks.
+    // Easy day 4 at 45 / 50 / 60 (p235 level 2, builds to the minute).
+    runStrengthWeek: {
+      easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 104,
+      longRunChips: [104, 117, 131], easyRunChipsByLevel: { 2: [45, 50, 60] }, easyRunRangeByLevel: { 2: [45, 60] },
+    },
     columns: { standard: STRENGTH_HALF_STANDARD, taper: STRENGTH_HALF_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_half.perWeek,
     testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],

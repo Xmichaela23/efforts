@@ -114,7 +114,11 @@ export type EnduranceIntakeReadout = {
       rows: { title: string; session: string; length: string; card: string }[];
     };
     long_option_labels: Record<string, string>;
-    rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
+    rows: Array<{
+      key: SlotKey; title: string; session: string; length: string | null; is_long: boolean;
+      /** An easy row with chips (2026-09-23): the frame's tiers, the first selected. */
+      options?: number[]; option_labels?: Record<string, string>; default_minutes?: number;
+    }>;
   } | null;
   /** ⛔ RIDE + STRENGTH'S RIDES SCREEN (2026-09-13): the question, its answers and the rides each count holds. */
   ride_strength_week: {
@@ -195,17 +199,13 @@ export function enduranceIntakeReadout(args: {
   const rsw = FRAMES[frame]?.runStrengthWeek;
   const runStrengthWeek = (() => {
     if (!rsw) return null;
-    const options = (slotLengthOptions('long', slots, { baselines, frame })?.options ?? [])
-      .filter((m) => m <= rsw.longRunChipCeilingMinutes)
-      // OURS — two chips under 5 minutes apart read as the same choice ("104" / "105"); the shorter one stays.
-      .filter((m, i, all) => i === 0 || m - all[i - 1] >= 5);
+    // ⛔ THE FRAME'S THREE CHIPS (2026-09-23), kept only where the ladder can build them (its min–max band).
+    const band = slotLengthOptions('long', slots, { baselines, frame });
+    const options = rsw.longRunChips.filter((m) => band != null && m >= Math.floor(band.min) && m <= Math.ceil(band.max));
     // The ruled default where the ladder offers it, else the middle of what it offers.
     // OURS — `enduranceIntakeReadout` falls back to the middle long-run option when the frame's default is not offered.
-    const def = options.length === 0
-      ? null
-      : options.includes(rsw.longRunDefaultMinutes)
-        ? rsw.longRunDefaultMinutes
-        : options[Math.floor((options.length - 1) / 2)];
+    // The first chip is selected (Michael, 2026-09-23).
+    const def = options.length > 0 ? options[0] : null;
     const sessionName = (family: string, archetype: string | null | undefined): string => {
       const fam = (FAMILIES as Record<string, { label?: string; archetypes?: { id: string; label?: string }[] }>)[family];
       if (!fam) return '';
@@ -232,6 +232,14 @@ export function enduranceIntakeReadout(args: {
             : lengthWords(rsw.easyRunMinutes))
           : RUNS_COPY.length_varies,
         is_long: row.role === 'long',
+        // ⛔ AN EASY RUN WITH CHIPS (Run Lead's day 4): the frame's tiers, the first selected (2026-09-23).
+        ...(row.role === 'easy' && rsw.easyRunChipsByLevel?.[row.level]
+          ? {
+            options: rsw.easyRunChipsByLevel[row.level]!,
+            option_labels: Object.fromEntries(rsw.easyRunChipsByLevel[row.level]!.map((m) => [String(m), lengthWords(m)])),
+            default_minutes: rsw.easyRunChipsByLevel[row.level]![0],
+          }
+          : {}),
       };
     });
     return {

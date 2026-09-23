@@ -76,10 +76,11 @@ Deno.test('⛔⛔ EVERY LONG-RUN CHIP BUILDS EXACTLY ITS OWN LENGTH, AND NONE EX
   }
 });
 
-Deno.test('⛔ THE DEFAULT IS THE RULED 75, AND IT IS ONE THE LADDER OFFERS', () => {
+Deno.test('⛔ THE DEFAULT IS THE FIRST CHIP (Michael, 2026-09-23: start at the lowest), AND IT IS ONE THE CHIPS OFFER', () => {
   const options = longRunLengthOptions(SLOTS, { baselines: BASELINES, frame: 'strength_5k' });
   const seed = longRunDefaultMinutes(options);
-  assertEquals(seed, 75, `the long run opens at ${seed} rather than the ruled 75`);
+  assertEquals(options, [70, 75, 90], 'the three chips are 1h10 / 1h15 / 1h30');
+  assertEquals(seed, 70, `the long run opens at ${seed} rather than the first chip`);
   assert(options.includes(seed!), 'the default is not a length the chips offer');
 });
 

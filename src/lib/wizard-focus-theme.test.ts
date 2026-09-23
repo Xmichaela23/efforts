@@ -86,7 +86,9 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
   // screen is titled by the grouping's discipline word, under the same eye as Train.
   // ⚠️ REBASED 2026-09-13: the title reads the section's word from one table (Multisport / Run / Ride).
   // ⚠️ REBASED 2026-09-13: the section word is the server's (`setup-copy.ts`, `SECTION_COPY.list_title`).
-  assert(WIZARD.includes("title={eyeTitle(setupCopy?.sections[state.trainCard].list_title ?? '')}"),
+  // ⚠️ REBASED 2026-09-23: inside an open Run section the title is the section's own; the list still reads the
+  // section word under the eye.
+  assert(WIZARD.includes(": setupCopy?.sections[state.trainCard].list_title ?? '',") && WIZARD.includes("title={eyeTitle(\n"),
     'the program list lost the eye, or its title stopped being the section word');
 });
 

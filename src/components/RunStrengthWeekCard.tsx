@@ -63,10 +63,13 @@ export default function RunStrengthWeekCard(props: Props) {
       </div>
       <div className="space-y-2">
         {week.rows.map((row) => {
-          // ⚠️ The long row's length is the athlete's chip; the others come from the server as written.
+          // ⚠️ A row with chips shows the athlete's chip; the others come from the server as written.
+          const pickedHere = props.slotMinutes?.[row.key];
           const lengthNow = row.is_long
             ? (pickedLong != null && week.long_run_options.includes(pickedLong) ? week.long_option_labels[String(pickedLong)] : null)
-            : row.length;
+            : row.options?.length
+              ? (pickedHere != null && row.options.includes(pickedHere) ? row.option_labels?.[String(pickedHere)] ?? null : null)
+              : row.length;
           return (
             <div
               key={row.key}
@@ -78,6 +81,24 @@ export default function RunStrengthWeekCard(props: Props) {
               <p className="text-white/55 text-xs mt-1 leading-relaxed">
                 {[row.session, lengthNow].filter(Boolean).join(' · ')}
               </p>
+              {!row.is_long && row.options?.length ? (
+                <div className="mt-2.5">
+                  <p className="text-white/80 text-[13px] mb-2">{week.length_label}</p>
+                  <div className="flex gap-1.5">
+                    {row.options.map((m) => (
+                      <GalaxyButton
+                        key={m}
+                        shape="chip"
+                        variant={pickedHere === m ? 'primary' : 'secondary'}
+                        data-testid={`${row.key}-run-${m}`}
+                        onClick={() => props.onSlotMinutes(row.key, m)}
+                      >
+                        {row.option_labels?.[String(m)] ?? String(m)}
+                      </GalaxyButton>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {row.is_long && week.long_run_options.length > 0 ? (
                 <div className="mt-2.5">
                   <p className="text-white/80 text-[13px] mb-2">{week.length_label}</p>

@@ -3630,8 +3630,13 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * four-hour ask.
          */
         const askedDay = i < dayFills[sport];
+        // ⛔ AN EXTRA EASY RUN IS THE FRAME'S EASY-RUN LENGTH (Michael, 2026-09-23: "nobody wants a 28 minute run").
+        // ⚠️ Only when no weekly hours were asked; a stated hours target is divided across the days as before.
+        const easyAsk = sport === 'run' && volume.run.verdict === 'no_target'
+          ? FRAMES[args.frame]?.runStrengthWeek?.easyRunMinutes ?? null
+          : null;
         const rung = askedDay
-          ? rungForSlot(spec.family, spec.level, spec.archetype, sport, null, spec.role)
+          ? rungForSlot(spec.family, spec.level, spec.archetype, sport, easyAsk, spec.role)
           : { level: spec.level, size: 1 };
         const built = buildEnduranceSession({
           family: spec.family, level: rung.level, archetype: spec.archetype, anchors, size: rung.size,

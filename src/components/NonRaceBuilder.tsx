@@ -3569,22 +3569,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (!runStrengthWeek) return;
     const seedLong = runStrengthWeek.long_run_default;
     const easy = runStrengthWeek.easy_run_minutes;
+    // ⛔ AN EASY ROW WITH CHIPS SEEDS ITS FIRST CHIP (2026-09-23); the plain easy row keeps the frame's minutes.
+    const chipped = runStrengthWeek.rows.filter((r) => !r.is_long && r.options?.length && r.default_minutes != null);
     setState((st) => {
       const now = st.slotMinutes ?? {};
-      const needEasy = Number(now.easy) !== easy;
+      const needEasy = !chipped.some((r) => r.key === 'easy') && Number(now.easy) !== easy;
       const needLong = seedLong != null && !(Number(now.long) > 0);
-      if (!needEasy && !needLong) return st;
+      const seedChips = Object.fromEntries(chipped.filter((r) => !(Number(now[r.key]) > 0)).map((r) => [r.key, r.default_minutes!]));
+      if (!needEasy && !needLong && Object.keys(seedChips).length === 0) return st;
       return {
         ...st,
         slotMinutes: {
           ...now,
           ...(needEasy ? { easy } : {}),
           ...(needLong ? { long: seedLong } : {}),
+          ...seedChips,
         },
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runStrengthWeek?.easy_run_minutes, runStrengthWeek?.long_run_default]);
+  }, [runStrengthWeek?.easy_run_minutes, runStrengthWeek?.long_run_default, runStrengthWeek?.rows]);
   /** ⛔ THE ONE GATE ON THAT SCREEN — a length the chips actually offer, so a stale value cannot pass. */
   const longRunAnswered = !rotateOnlyRun
     || (state.slotMinutes?.long != null
