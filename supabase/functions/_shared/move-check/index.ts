@@ -141,9 +141,17 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   // ⚠️ A plyo warm-up is not a session and not a lift here — it rides with its day's session (see `isPlyo`).
   const realLift = (r: MoveRow) => isLift(r) && !isPlyo(r);
   const others = args.rows.filter((r) => r.id !== args.session.id && iso(r.date) === to && !isSkipped(r) && !isPlyo(r));
-  if (!isPlyo(args.session) && others.length > 0 && (realLift(args.session) || others.some(realLift))) {
+  // ⛔ THE WEEK'S OWN RULES FIRST, so a same-day heavy-legs line (which states the order itself) is not doubled by this one.
+  const weekNotes = weekRuleNotes(args.session, to, args.rows);
+  if (!isPlyo(args.session) && others.length > 0 && (realLift(args.session) || others.some(realLift))
+    && !weekNotes.some((t) => t.startsWith(`${day}: `) && /heavy legs\./.test(t) && /6 to 8 hours after/.test(t))) {
+    // Viada p108 / p145 rule 6: the lift in the first session, 6-8 h before the next. Michael approved the words 2026-09-23.
+    const other = realLift(args.session) ? others.find((r) => !isLift(r)) : args.session;
+    const word = other ? (String(other.type ?? '').toLowerCase() === 'ride' ? 'ride' : String(other.type ?? '').toLowerCase() === 'swim' ? 'swim' : 'run') : null;
     notes.push({ rule: 'two_sessions', page: 'p108',
-      text: 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.' });
+      text: word
+        ? `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`
+        : `Two sessions on ${day}. Leave 6 to 8 hours between them.` });
   }
   // Viada p80: at least one session every 8 to 9 days per movement. Only past nine; the 3–4 day ideal gets no note.
   if (realLift(args.session)) {
@@ -159,7 +167,7 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   // adds: a clash the week already had is not the move's.
   // ⚠️ The two-sessions note above already covers a second session on the day; the builder's same-day lines
   // say something different (what tired legs do), so both can show.
-  for (const text of weekRuleNotes(args.session, to, args.rows)) {
+  for (const text of weekNotes) {
     notes.push({ rule: 'week_rule', page: null, text });
   }
   return { refused: false, notes };

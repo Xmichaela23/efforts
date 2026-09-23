@@ -2,7 +2,8 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { checkMove, daysThatFit, type MoveRow } from './index.ts';
 
-const P108 = 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.';
+// Michael approved the words 2026-09-23 (Viada p108 / p145 rule 6: the lift first, 6-8 h before the next session).
+const P108 = (day: string, word = 'run') => `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`;
 
 // Week of Mon 2026-09-21 … Sun 2026-09-27. Hinge every Tuesday; other sessions as listed.
 const hinge = (id: string, date: string, extra: Partial<MoveRow> = {}): MoveRow =>
@@ -36,7 +37,7 @@ Deno.test('DAY OFF: a day that is not off is never refused, whatever is on it', 
 
 Deno.test('⛔ p108: a day that already holds a session earns the two-sessions note, in the approved words', () => {
   const c = checkMove({ session: HINGE, toDate: '2026-09-23', rows, daysOff: [] });
-  assertEquals(c.notes.map((n) => [n.page, n.text]), [['p108', P108]]);
+  assertEquals(c.notes.map((n) => [n.page, n.text]), [['p108', P108('Wednesday')]]);
 });
 
 Deno.test('p108: a skipped session on the day does not count, and neither does the moved session itself', () => {
@@ -141,7 +142,7 @@ Deno.test('⛔ p108: a run moved onto a ride day gets no note, and that day stil
 
 Deno.test('p108: a run moved onto a lifting day still gets the note', () => {
   const r = run('rr', '2026-09-23');
-  assertEquals(checkMove({ session: r, toDate: '2026-09-22', rows: [r, HINGE], daysOff: [] }).notes.map((n) => n.text), [P108]);
+  assertEquals(checkMove({ session: r, toDate: '2026-09-22', rows: [r, HINGE], daysOff: [] }).notes.map((n) => n.text), [P108('Tuesday')]);
 });
 
 // ── 4. The builder's week rules, on the week the move makes (2026-09-22, one source of logic) ─────
@@ -159,17 +160,19 @@ const WK: MoveRow[] = [
   { id: 'vt1', date: '2026-10-03', type: 'run', name: 'Easy Run', tags: ['family:run_vt1'] },
   { id: 'del', date: '2026-10-04', type: 'strength', name: 'DE: Lower', tags: ['lower:de'] },
 ].map((r) => ({ workout_status: 'planned', training_plan_id: 'p', ...r }));
-const HEAVY_AFTER_HARD = 'Thursday: heavy legs after hard run. Tired legs cause you to lift slowly and establish improper coordination patterns.';
+const HEAVY_AFTER_HARD = 'Thursday: hard run and heavy legs. Lift first, run 6 to 8 hours after.';
 
 Deno.test('⛔ WEEK RULE: heavy legs moved onto the hard run day earns the builder\'s own sentence', () => {
   const mel = WK.find((r) => r.id === 'mel')!;
   const c = checkMove({ session: mel, toDate: '2026-10-01', rows: WK, daysOff: [] });
-  assertEquals(c.notes.map((n) => n.text), [P108, HEAVY_AFTER_HARD]);
+  // ⛔ ONE LINE, NOT TWO: the same-day heavy-legs line states the order itself, so the two-sessions note is not doubled.
+  assertEquals(c.notes.map((n) => n.text), [HEAVY_AFTER_HARD]);
 });
 
 Deno.test('WEEK RULE: a move that adds no clash says nothing new, and a clash the week already had is not the move\'s', () => {
   const vt1 = WK.find((r) => r.id === 'vt1')!;
-  assertEquals(checkMove({ session: vt1, toDate: '2026-09-29', rows: WK, daysOff: [] }).notes, []);
+  // ⛔ Tuesday was the week's only clear day, so the move earns the shared rest-day line (2026-09-23) and nothing else.
+  assertEquals(checkMove({ session: vt1, toDate: '2026-09-29', rows: WK, daysOff: [] }).notes.map((n) => n.text), ['No day this week is clear.']);
   // The week already has heavy legs on the threshold day; moving the easy run adds nothing to it.
   const clashed = WK.map((r) => (r.id === 'mel' ? { ...r, date: '2026-10-01' } : r));
   assertEquals(checkMove({ session: vt1, toDate: '2026-09-29', rows: clashed, daysOff: [] }).notes, []);

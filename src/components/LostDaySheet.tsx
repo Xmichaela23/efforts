@@ -40,7 +40,8 @@ const sportOf = (s: Session, tags: Record<string, string[]>) => displayDisciplin
  * The move check's p108 note, word for word (`_shared/move-check/index.ts`). ⚠️ The server sends notes as words, so the
  * sheet recognises this one by its exact text to show it once per day; if the approved words change, change both.
  */
-const P108_NOTE = 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.';
+// ⛔ THE SERVER'S WORDS, recognised by how the line opens (2026-09-23) — the sheet prints what it was sent, once per day.
+const isTwoSessionsNote = (n: string) => n.startsWith('Two sessions on ');
 const NO_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
 
 export default function LostDaySheet({ date, onClose }: { date: string; onClose: () => void }) {
@@ -180,7 +181,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   }, []);
 
   /** The two-sessions note (p108) is about a DAY: shown once, under the day, not under each session on it. */
-  const isDayNote = (n: string) => n === P108_NOTE;
+  const isDayNote = isTwoSessionsNote;
 
   return createPortal(
     <div
@@ -213,7 +214,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
             {days.map((d) => {
               const on = dayOrder(plan.sessions.filter((s) => s.to === d && !s.dropped));
               const lost = d === plan.lostDate;
-              const dayNote = on.some((s) => s.notes.some(isDayNote));
+              const dayNote = on.flatMap((s) => s.notes).find(isDayNote) ?? null;
               return (
                 <div
                   key={d}
@@ -263,7 +264,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
                       );
                     })}
                     {dayNote ? (
-                      <p className="mt-0.5 ml-[20px] text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>{P108_NOTE}</p>
+                      <p className="mt-0.5 ml-[20px] text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>{dayNote}</p>
                     ) : null}
                   </div>
                 </div>

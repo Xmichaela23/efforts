@@ -442,6 +442,9 @@ export function typedRowsOf(rows: Array<{ day: string; type?: string | null; nam
   return out;
 }
 
+/** The one word for the session in "run 6 to 8 hours after". */
+const sportWordOf = (t: TypedSession): string => (t.s.type === 'ride' ? 'ride' : t.s.type === 'swim' ? 'swim' : 'run');
+
 /**
  * ⛔ THE RULES THEMSELVES, ON SESSIONS ALREADY TYPED (2026-09-22, one source of logic). The builder
  * reaches them through `weekConflicts` with its frame; the calendar move reaches them with rows off the
@@ -505,16 +508,17 @@ export function conflictsOfTyped(
       if (apart === 'same' && ctx != null && framePrintsHardOnHeavyDay(ctx.frame, ctx.column, sDay, ctx.dayOffset)) {
         continue;
       }
-      if (apart === 'same' && blocker.s.type === 'ride') {
+      if (apart === 'same' && isEnduranceBlocker(blocker)) {
+        // ⛔ ONE SENTENCE FOR THE SAME DAY, RUN OR RIDE (Michael approved the words 2026-09-23): the order to run the day
+        // in. Viada p145 (rule 6): skill movements in the first session, at least 6-8 hours before the next; p108 the same.
         push({
           kind: 'cost',
           rule: 'hard_with_heavy_legs',
           days,
           sessions,
           shortBy: u.shortBy,
-          // Viada p145 (rule 6): skill movements in the first session, at least 6-8 hours before the next; p108 the same 6-8 h.
-          text: `${sDay}: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before `
-            + 'the ride.',
+          // Viada p145 (rule 6) / p108: the lift in the first session, 6-8 hours before the next.
+          text: `${sDay}: ${bareFor(blocker)} and heavy legs. Lift first, ${sportWordOf(blocker)} 6 to 8 hours after.`,
         });
       } else if (isEnduranceBlocker(blocker)) {
         push({
@@ -719,6 +723,10 @@ export function conflictsOfTyped(
     const restFrameDay = ctx == null
       ? null
       : FRAMES[ctx.frame].columns[ctx.column].find((d) => d.rest)?.day ?? null;
+    // ⛔ WITHOUT A FRAME (a calendar move), the same rule with the day left out (2026-09-23): the week has no clear day.
+    if (used.size >= 7 && ctx == null) {
+      push({ kind: 'cost', rule: 'no_rest_day', days: [], sessions: [], text: 'No day this week is clear.' });
+    }
     if (used.size >= 7 && restFrameDay != null) {
       // ⚠️ THE DAY NAMED IS THE FRAME'S OWN REST DAY under this rotation, and the sessions are
       // whatever took it — that is the tap the athlete can undo.

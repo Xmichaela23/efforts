@@ -4,7 +4,7 @@ import { placeLostDay, type LostDayPlan } from './lost-day.ts';
 import { tagsAfterMove } from '../moved-from.ts';
 import type { MoveRow } from './index.ts';
 
-const P108 = 'Two sessions this day: 6 to 8 hours before the lift, or 4 to 6 if the first is an easy session under an hour, with a full meal in between.';
+const P108 = (day: string, word = 'run') => `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`;
 const S = (id: string, date: string, type: string, name: string, status = 'planned', band?: string): MoveRow =>
   ({ id, date, type, name, workout_status: status, training_plan_id: 'p', ...(band ? { tags: ['standing_plan', `band:${band}`] } : {}) });
 
@@ -37,11 +37,11 @@ Deno.test('⛔ WORKED EXAMPLE: Tuesday lost — Hinge to Wednesday, Progressive 
   // Hinge (a lift, placed first): Mon and Thu already hold two; Wednesday holds one — the plyo warm-up does not count
   // (2026-09-21) — and its gap (8 days after Sep 15) is inside p80. Fri/Sat would pass nine days.
   assertEquals(where(p, 'hinge').to, '2026-09-23');
-  assertEquals(where(p, 'hinge').notes, [P108]);
+  assertEquals(where(p, 'hinge').notes, [P108('Wednesday', 'run')]);
   // Progressive Repeats: Wednesday is now full, Mon and Thu hold two; Friday (one day nearer than Saturday) fits.
   // The p108 note shows (Lower Push is there) and no longer stops the day.
   assertEquals(where(p, 'ana').to, '2026-09-25');
-  assertEquals(where(p, 'ana').notes, [P108]);
+  assertEquals(where(p, 'ana').notes, [P108('Friday', 'ride')]);
   // Nothing else moves, nothing lands on Tuesday or Sunday.
   assertEquals(p.sessions.filter((s) => s.to !== s.from).map((s) => s.id).sort(), ['ana', 'hinge']);
   assertEquals(p.sessions.some((s) => s.to === '2026-09-22' || s.to === '2026-09-27'), false);
@@ -50,7 +50,7 @@ Deno.test('⛔ WORKED EXAMPLE: Tuesday lost — Hinge to Wednesday, Progressive 
 Deno.test('⛔ MICHAEL\'S CASE: Wednesday lost — the plyo warm-up goes with Long Sub-Threshold Repeats to Friday; Sunday stays empty', () => {
   const p = placeLostDay({ lostDate: '2026-09-23', rows: WEEK, daysOff: ['sunday'], today: '2026-09-21' });
   assertEquals(where(p, 'nt').to, '2026-09-25');
-  assertEquals(where(p, 'nt').notes, [P108]);
+  assertEquals(where(p, 'nt').notes, [P108('Friday', 'run')]);
   assertEquals(where(p, 'plyo').to, '2026-09-25');
   assertEquals(where(p, 'plyo').notes, []);
   assertEquals(p.sessions.filter((s) => s.to === '2026-09-27'), []);
@@ -59,7 +59,7 @@ Deno.test('⛔ MICHAEL\'S CASE: Wednesday lost — the plyo warm-up goes with Lo
 Deno.test('WORKED EXAMPLE, the athlete drags Hinge to Saturday: it stays there; the ride is placed around it', () => {
   const p = plan({ hinge: '2026-09-26' });
   assertEquals(where(p, 'hinge').to, '2026-09-26');
-  assertEquals(where(p, 'hinge').notes, [P108, 'Hinge: 11 days until the next one. Consistent improvement needs one every 8 to 9 days.']);
+  assertEquals(where(p, 'hinge').notes, [P108('Saturday', 'ride'), 'Hinge: 11 days until the next one. Consistent improvement needs one every 8 to 9 days.']);
   // Wednesday holds one session (the warm-up does not count) and no lift, so the ride goes there with no note.
   assertEquals(where(p, 'ana').to, '2026-09-23');
   assertEquals(where(p, 'ana').notes, []);
