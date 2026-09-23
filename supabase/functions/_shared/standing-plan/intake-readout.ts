@@ -196,7 +196,9 @@ export function enduranceIntakeReadout(args: {
   const runStrengthWeek = (() => {
     if (!rsw) return null;
     const options = (slotLengthOptions('long', slots, { baselines, frame })?.options ?? [])
-      .filter((m) => m <= rsw.longRunChipCeilingMinutes);
+      .filter((m) => m <= rsw.longRunChipCeilingMinutes)
+      // OURS — two chips under 5 minutes apart read as the same choice ("104" / "105"); the shorter one stays.
+      .filter((m, i, all) => i === 0 || m - all[i - 1] >= 5);
     // The ruled default where the ladder offers it, else the middle of what it offers.
     // OURS — `enduranceIntakeReadout` falls back to the middle long-run option when the frame's default is not offered.
     const def = options.length === 0

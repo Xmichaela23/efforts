@@ -252,7 +252,9 @@ const GOAL_ORDER: NonRaceGoalId[] = ['get_stronger', 'marathon'];
  * screen behind each card shows only what is live. Never a card that opens nothing.
  */
 type EntryCardId = 'train' | 'race' | 'build';
-const ENTRY_ORDER: EntryCardId[] = ['train', 'race', 'build'];
+// ⛔ RACE IS A SECTION INSIDE RUN NOW (Michael, 2026-09-23), not an entry card. The `race` entry stays as a state the
+// marathon flow sets; nothing offers it here.
+const ENTRY_ORDER: EntryCardId[] = ['train', 'build'];
 const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string | null }> = {
   // Colours mirror the Goals door exactly (`GoalsScreen`) — same three cards, so the same palette.
   // Build carries none: it has no discipline until the athlete writes one.
@@ -371,7 +373,7 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength' | 'marathon';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
   standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength'],
@@ -403,6 +405,12 @@ const PROGRAM_COPY: Record<ProgramId, {
   run_half_strength: {
     Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
     goal: 'get_stronger', focus: 'run_half',
+  },
+  // ⛔ THE RACE CARD, INSIDE RUN (Michael, 2026-09-23). Tapping it opens the race flow the Goals screen's race entry used
+  // to open; `goal: 'marathon'` is what `reseed` reads.
+  marathon: {
+    Icon: Flag, color: FOCUS_RACE_COLOR,
+    goal: 'marathon', focus: 'run',
   },
   ride_strength: {
     Icon: Bike, color: getDisciplineColor('ride'),
@@ -4177,7 +4185,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           hideContinue hideProgress
         >
           <div className="space-y-2">
-            {PROGRAMS_BY_CARD[state.trainCard].map((p) => {
+            {/* ⛔ THE RUN SCREEN IS SECTIONS (Michael, 2026-09-23): the server's `run_sections`, each a title and its
+                cards; a section with no card yet is shown closed. The other screens keep their flat list. */}
+            {(state.trainCard === 'run' && setupCopy?.run_sections?.length
+              ? setupCopy.run_sections.map((sec) => ({ title: sec.title, programs: sec.programs as ProgramId[] }))
+              : [{ title: null, programs: PROGRAMS_BY_CARD[state.trainCard] }]
+            ).map((sec) => (
+              <div key={sec.title ?? 'all'} className={sec.title ? 'pt-2' : ''}>
+                {sec.title ? (
+                  <p className={`text-[15px] mb-2 ${sec.programs.length > 0 ? 'text-white' : 'text-white/40'}`}>{sec.title}</p>
+                ) : null}
+                {sec.title && sec.programs.length === 0 ? (
+                  <p className="text-sm text-white/35 mb-1">{setupCopy?.section_closed_line ?? ''}</p>
+                ) : null}
+                <div className="space-y-2">
+            {sec.programs.map((p) => {
               const { Icon, color, goal, focus, held } = PROGRAM_COPY[p];
               const words = setupCopy?.programs[p];
               const label = words?.label;
@@ -4191,6 +4213,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   disabled={!live}
                   onClick={() => {
                     if (!goal || !live) return;
+                    if (p === 'marathon') {
+                      // The race flow, exactly as the old race entry opened it.
+                      setState((st) => ({ ...st, entry: 'race', program: p }));
+                      reseed('marathon', undefined);
+                      next();
+                      return;
+                    }
                     reseed(goal, undefined);
                     // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`). Set AFTER
                     // `reseed`, which does not touch it.
@@ -4207,7 +4236,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — the same line the Standard Focus card
                           carries; this block refuses at the gate without it. */}
-                      {live ? (
+                      {live && requirement ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
                           {requirement}
                         </span>
@@ -4217,6 +4246,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </button>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
         </StepLayout>
       )}

@@ -24,7 +24,7 @@ import {
   type ViadaPickKey,
 } from './accessory-picks.ts';
 import { FRAMES, type FrameId } from './frames.ts';
-import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, SECTION_COPY } from './setup-copy.ts';
+import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
 
 export type BuildFocusOption = { name: string; label: string; display: string };
 export type BuildFocusRow = {
@@ -60,6 +60,9 @@ export type BuildFocusBlock = {
 export type SetupBlock = {
   sections: typeof SECTION_COPY;
   programs: typeof PROGRAM_COPY;
+  /** The Run screen's sections, in order (2026-09-23). */
+  run_sections: typeof RUN_SECTIONS;
+  section_closed_line: string;
   plans: typeof PLAN_COPY;
   numbers: typeof NUMBERS_COPY;
   build_focus: Record<FrameId, BuildFocusBlock>;
@@ -134,6 +137,8 @@ export function setupBlock(equipment: string[] | null): SetupBlock {
   return {
     sections: SECTION_COPY,
     programs: PROGRAM_COPY,
+    run_sections: RUN_SECTIONS,
+    section_closed_line: SECTION_CLOSED_LINE,
     plans: PLAN_COPY,
     numbers: NUMBERS_COPY,
     build_focus: {

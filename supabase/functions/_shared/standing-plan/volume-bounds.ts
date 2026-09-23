@@ -32,6 +32,12 @@ import {
 export type SlotSpec = {
   family: FamilyId;
   level: Level;
+  /**
+   * ⛔ THE PLAN'S OWN CEILING FOR THIS SESSION, when the plan states one (2026-09-22). The family ceilings below are
+   * one plan's words — `run_lsd: 100` is p247's Strength + 5K long run — and p250's long run (level 3, p235: 1.5h to
+   * 2–2.5h) is another plan's. A frame's `runStrengthWeek.longRunChipCeilingMinutes` arrives here for the long slot.
+   */
+  ceilingMin?: number;
   archetype?: string;
   sport: 'run' | 'ride' | 'swim';
   /**
@@ -129,7 +135,8 @@ export const LADDER_CEILING_MIN: Record<string, number> = {
 export const RIDE_EASY_CEILING_MIN = 120;
 
 /** The ceiling this one slot's ladder is clipped to. */
-export function ladderCeilingFor(spec: Pick<SlotSpec, 'family' | 'role'>): number {
+export function ladderCeilingFor(spec: Pick<SlotSpec, 'family' | 'role' | 'ceilingMin'>): number {
+  if (typeof spec.ceilingMin === 'number' && spec.ceilingMin > 0) return spec.ceilingMin;
   if (spec.family === 'ride_endurance' && spec.role === 'easy') return RIDE_EASY_CEILING_MIN;
   return LADDER_CEILING_MIN[spec.family] ?? Infinity;
 }

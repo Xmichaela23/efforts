@@ -350,6 +350,11 @@ export type RunStrengthWeek = {
   longRunChipCeilingMinutes: number;
   /** OURS — Michael, 2026-09-07: the middle chip opens selected. */
   longRunDefaultMinutes: number;
+  /**
+   * ⛔ THE LONG RUN'S LENGTH CAP WHEN THIS PLAN STATES ITS OWN (2026-09-22). Absent = the family cap (`run_lsd: 100`,
+   * p247's Strength + 5K). Strength + Half-Marathon's long run is level 3, 1.5h to 2–2.5h (p235).
+   */
+  longRunCeilingMinutes?: number;
   /** An easy run printed above level 1 shows its level's range (Viada p235: VT1 level 2 is 45–60 min). */
   easyRunRangeByLevel?: Partial<Record<number, [number, number]>>;
   /** ⛔ p247's "one or two VT1 sessions" for more advanced runners — Strength + 5K's own advice; other plans do not offer it. */
@@ -1347,8 +1352,9 @@ export const FRAMES: Record<FrameId, Frame> = {
     sourceName: 'Strength + Half-Marathon',
     cite: 'Viada pp250-251',
     liftingDays: 4,
-    // Viada p235: VT1 level 1 is 25–30 min; LSD level 3 is 1.5h up to 2–2.5h. OURS — the default chip is the page's floor.
-    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunDefaultMinutes: 90, easyRunRangeByLevel: { 2: [45, 60] } },
+    // Viada p235: VT1 level 1 is 25–30 min; LSD level 3 is 1.5h up to 2–2.5h.
+    // OURS — the default is the middle chip (120 min), as 4HR's is (Michael, 2026-09-07).
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 120, easyRunRangeByLevel: { 2: [45, 60] } },
     columns: { standard: STRENGTH_HALF_STANDARD, taper: STRENGTH_HALF_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_half.perWeek,
     testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],

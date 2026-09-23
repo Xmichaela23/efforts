@@ -41,7 +41,8 @@ export const PROGRAM_COPY = {
   // p247 NT 5–8 min work intervals; interval runs: p246 MLSS+. Emphasis on strength: p247 (the lifting days lead).
   // Intermediate: p247 "useful for athletes of most skill levels… even advanced intermediate runners".
   run_strength: {
-    label: '4HR + Strength',
+    // ⛔ RENAMED 2026-09-23 (Michael): named by which side leads the week.
+    label: 'Strength Lead',
     blurb: 'Around 4 hours of running a week, with threshold and interval runs, and an emphasis on strength. Intermediate.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
@@ -49,12 +50,18 @@ export const PROGRAM_COPY = {
   // OURS — "5 hours": the built week's running (five runs, p250) as composed; see the ledger. "Advanced": p251 "more
   // advanced hybrid athletes", "not recommended as a first program", "not for novices". Half marathon: p250's name.
   run_half_strength: {
-    label: '5HR + Strength',
+    label: 'Run Lead',
     // p251: "can be run indefinitely … maintain the ability to pivot toward longer distance events".
     // p251: 1RM "1% every four weeks" (4HR: every three, p247).
-    blurb: 'Around 5 hours of running a week and four lifting days. The weights go up more slowly than on 4HR. It can run '
-      + 'all year and keeps you ready for longer races. Advanced.',
+    blurb: 'Around 5 hours of running a week and four lifting days. The weights go up more slowly than on Strength Lead. '
+      + 'It can run all year and keeps you ready for longer races. Advanced.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
+  // ⛔ THE RACE CARD INSIDE RUN (Michael, 2026-09-23): opens the marathon flow, built back from the race date.
+  marathon: {
+    label: 'Marathon',  // not-instruction: a card name
+    blurb: 'Built back from your race date.',
+    requirement: '',
   },
   // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
   // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
@@ -72,6 +79,22 @@ export const PROGRAM_COPY = {
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
   },
 } as const;
+
+// ── The Run screen's sections (Michael, 2026-09-23: "sections … based on what they do") ──────────────────────
+
+/**
+ * ⛔ ONE TAP TO A SECTION, THEN TWO OR THREE CARDS. Sections with no programs yet are shown closed. Race lives here,
+ * not on the Goals screen. Titles approved by Michael 2026-09-23.
+ */
+export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
+  { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
+  { id: 'muscle', title: 'Build muscle', programs: [] },       // Viada pp244, 252 — not built
+  { id: 'race', title: 'Race', programs: ['marathon'] },
+  { id: 'offroad', title: 'Off road / trails', programs: [] },       // Viada p254 — not built
+  { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
+];
+/** Under a closed section. */
+export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
 
 // ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────
 
@@ -116,7 +139,7 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   },
   strength_5k: {
     // OURS — "4HR": the built week's running, 3h45–4h15 (see `PROGRAM_COPY.run_strength`).
-    name: '4HR + Strength',
+    name: 'Strength Lead',
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
     // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
@@ -125,7 +148,7 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   },
   strength_half: {
     // OURS — "5HR": the built week's running, about 5 hours (five runs, Viada p250).
-    name: '5HR + Strength',
+    name: 'Run Lead',
     confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,

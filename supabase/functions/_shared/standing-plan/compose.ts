@@ -3079,7 +3079,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
      */
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
-    const rungs = ladderOf({ family: family as never, level, archetype, sport, role }, anchors);
+    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`.
+    const planLongCeiling = role === 'long' && family === 'run_lsd'
+      ? FRAMES[args.frame]?.runStrengthWeek?.longRunCeilingMinutes
+      : undefined;
+    const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
     /**
      * ⛔⛔ THE ATHLETE'S OWN ANSWER FIRST, AND BEFORE THE `no_target` BRANCH. A screen that asks per
      * session sends no weekly hours at all, so the verdict there is always `no_target` — reading it

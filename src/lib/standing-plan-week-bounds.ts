@@ -239,6 +239,10 @@ export function slotLengthOptions(
     sport,
     // ⛔ THE ROW'S ROLE — the easy ride's ceiling is not the long ride's (`ladderCeilingFor`).
     role: row.role,
+    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — the same one the composer builds to (`SlotSpec.ceilingMin`).
+    ...(row.role === 'long' && eq.family === 'run_lsd' && FRAMES[frame]?.runStrengthWeek?.longRunCeilingMinutes
+      ? { ceilingMin: FRAMES[frame].runStrengthWeek!.longRunCeilingMinutes }
+      : {}),
   } as SlotSpec, anchors);
   if (rungs.length === 0) return null;
   const band = slotMinutesBand(rungs);
