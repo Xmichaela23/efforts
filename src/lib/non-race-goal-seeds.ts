@@ -48,7 +48,7 @@ export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
   // is for every reader that only has the goal id. Keep the two identical.
   // ⚠️ THE ID STAYS `get_stronger` — routing, specs and every stored goal key off it. Standard
   // Focus seeds the same id and takes its name from its own frame.
-  get_stronger: 'Run + Strength',
+  get_stronger: '4HR + Strength',
   build_muscle: 'Build muscle + train',
   maintain: 'Maintain',
   starting_over: 'Starting over',

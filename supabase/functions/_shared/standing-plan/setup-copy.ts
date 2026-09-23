@@ -36,9 +36,13 @@ export const PROGRAM_COPY = {
   // hour" and "about three hours of running and seven to nine hours of training in all" — on no page.
   // ⛔ OFF 2026-09-18 (round 3): "You get stronger." (no page) and "The long run stays under 100 minutes." (a rewording
   // of p247's "runs up to 90 to 100 minutes").
+  // ⛔ RENAMED 2026-09-22 (Michael approved the words): named by weekly running, not by race. OURS — "4 hours": the built
+  // week's running, 3h45–4h15 across 12 weeks (p246's four runs; p247's long run up to 90–100 min). Threshold intervals:
+  // p247 NT 5–8 min work intervals; interval runs: p246 MLSS+. Emphasis on strength: p247 (the lifting days lead).
+  // Intermediate: p247 "useful for athletes of most skill levels… even advanced intermediate runners".
   run_strength: {
-    label: 'Run + Strength',
-    blurb: 'Four lifting days, four runs. Mileage depends on experience level, and more proficient runners may run up to 90 to 100 minutes.',
+    label: '4HR + Strength',
+    blurb: 'Around 4 hours of running a week, with threshold and interval runs, and an emphasis on strength. Intermediate.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
@@ -96,7 +100,7 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
     ftp_note: null,
   },
   strength_5k: {
-    name: 'Run + Strength',
+    name: '4HR + Strength',
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
     // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
