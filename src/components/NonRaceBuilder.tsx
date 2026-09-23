@@ -919,6 +919,8 @@ export type NonRaceState = {
   trainCard: TrainCardId | null;
   /** Which programme card was tapped on the program screen, so it reads as chosen on Back. */
   program: ProgramId | null;
+  /** The Run screen's open section (2026-09-23); null = the section list. */
+  runSection?: string | null;
   /** Easy-swim add-on count (Michael, 2026-08-24): 0 = none, 1–2 = easy/technique swims appended
    *  outside the four endurance slots. Cap 2 — past that the athlete wants a tri plan. */
   swimEasySessions?: 0 | 1 | 2;
@@ -4179,25 +4181,51 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <StepLayout
           step={stepNo('program')} totalSteps={steps.length}
           // ⛔ THE SECTION'S OWN WORD, from the table above (it was a Run/Ride ternary until Multisport joined).
-          title={eyeTitle(setupCopy?.sections[state.trainCard].list_title ?? '')}
+          title={eyeTitle(
+            state.trainCard === 'run' && state.runSection
+              ? setupCopy?.run_sections?.find((x) => x.id === state.runSection)?.title ?? ''
+              : setupCopy?.sections[state.trainCard].list_title ?? '',
+          )}
           subtitle="Pick a program."
-          onBack={back} onContinue={next} canContinue={state.program != null}
+          onBack={state.trainCard === 'run' && state.runSection
+            ? () => setState((st) => ({ ...st, runSection: null }))
+            : back}
+          onContinue={next} canContinue={state.program != null}
           hideContinue hideProgress
         >
           <div className="space-y-2">
-            {/* ⛔ THE RUN SCREEN IS SECTIONS (Michael, 2026-09-23): the server's `run_sections`, each a title and its
-                cards; a section with no card yet is shown closed. The other screens keep their flat list. */}
+            {/* ⛔ THE RUN SCREEN IS SECTIONS (Michael, 2026-09-23): the server's `run_sections` as rows; a tap opens the
+                section's cards, Back returns to the rows. A section with no card yet is shown closed. The other
+                screens keep their flat list. */}
+            {state.trainCard === 'run' && setupCopy?.run_sections?.length && !state.runSection
+              ? setupCopy.run_sections.map((sec) => {
+                const open = sec.programs.length > 0;
+                const names = sec.programs.map((p) => setupCopy?.programs[p as ProgramId]?.label).filter(Boolean).join(' · ');
+                return (
+                  <button
+                    key={sec.id} type="button"
+                    className={optBtn(false, !open)}
+                    disabled={!open}
+                    onClick={() => setState((st) => ({ ...st, runSection: sec.id }))}
+                  >
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 block">
+                        <span className="block text-base">{sec.title}</span>
+                        <span className={`block text-sm mt-1 ${open ? 'text-white/70' : 'text-white/40'}`}>
+                          {open ? names : setupCopy?.section_closed_line ?? ''}
+                        </span>
+                      </span>
+                      {open ? <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-white/40" /> : null}
+                    </span>
+                  </button>
+                );
+              })
+              : null}
             {(state.trainCard === 'run' && setupCopy?.run_sections?.length
-              ? setupCopy.run_sections.map((sec) => ({ title: sec.title, programs: sec.programs as ProgramId[] }))
+              ? setupCopy.run_sections.filter((sec) => sec.id === state.runSection).map((sec) => ({ title: null, programs: sec.programs as ProgramId[] }))
               : [{ title: null, programs: PROGRAMS_BY_CARD[state.trainCard] }]
             ).map((sec) => (
-              <div key={sec.title ?? 'all'} className={sec.title ? 'pt-2' : ''}>
-                {sec.title ? (
-                  <p className={`text-[15px] mb-2 ${sec.programs.length > 0 ? 'text-white' : 'text-white/40'}`}>{sec.title}</p>
-                ) : null}
-                {sec.title && sec.programs.length === 0 ? (
-                  <p className="text-sm text-white/35 mb-1">{setupCopy?.section_closed_line ?? ''}</p>
-                ) : null}
+              <div key={sec.title ?? 'all'}>
                 <div className="space-y-2">
             {sec.programs.map((p) => {
               const { Icon, color, goal, focus, held } = PROGRAM_COPY[p];
