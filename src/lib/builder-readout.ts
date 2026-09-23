@@ -86,7 +86,7 @@ export type EnduranceIntakeReadout = {
       label: string;
       line: string;
       options: Array<{ count: number; label: string }>;
-      rows: Array<{ title: string; session: string; length: string }>;
+      rows: Array<{ title: string; session: string; length: string; card?: string }>;
     };
   } | null;
   ride_strength_week: {

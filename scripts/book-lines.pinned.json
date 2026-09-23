@@ -203,7 +203,8 @@
    "{n} long and easy",
    "Add up to two {minutes}-minute easy runs to your week.",
    "For more advanced runners, to test recovery.",
-   "Extra easy run {n}"
+   "Extra easy run {n}",
+   "Easy run · {length}"
   ],
   "supabase/functions/_shared/standing-plan/spacing-line.ts": [],
   "supabase/functions/_shared/standing-plan/sport-slots.ts": [

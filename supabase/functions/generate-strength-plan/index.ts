@@ -673,6 +673,25 @@ Deno.serve(async (req: Request) => {
         return out;
       })();
 
+      /**
+       * ⛔ WHAT THE ATHLETE DRAGGED ON YOUR WEEK (2026-09-22). `lift_days` = frame day label → weekday; `slot_days` =
+       * endurance slot key (`${frameDay}:${i}`, the row's `slot:` tag) → weekday. Validated here; a bad value is no pick.
+       */
+      const dragPicks = (() => {
+        const read = (raw: unknown, keyOk: (k: string) => boolean): Record<string, Weekday> => {
+          const out: Record<string, Weekday> = {};
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            const d = titleCaseDay(v);
+            if (keyOk(k) && isWeekday(d)) out[k] = d as Weekday;
+          }
+          return out;
+        };
+        return {
+          lifts: read((body as Record<string, unknown>).lift_days, (k) => k.length > 0 && k.length < 40),
+          slots: read((body as Record<string, unknown>).slot_days, (k) => /^\d:\d$/.test(k)),
+        };
+      })();
       const dayMap = chooseDayMap(frameId, {
         longRunDay: typeof long_run_day === 'string' ? long_run_day : null,
         longRideDay: bike && typeof bike === 'object'
@@ -687,6 +706,9 @@ Deno.serve(async (req: Request) => {
           .map((d) => (typeof d === 'string' ? d : null)),
         // ⛔ THE ROTATION IS SCORED TO KEEP THE LIFTS OFF THESE DAYS — see `DayPins.unavailableDays`.
         unavailableDays,
+        // ⛔ SESSIONS DRAGGED ON YOUR WEEK (2026-09-22) — lifting days by label, endurance slots by key.
+        liftDays: dragPicks.lifts,
+        slotDays: dragPicks.slots,
         startDateIso: typeof start_date === 'string' ? start_date : null,
       });
 
@@ -727,6 +749,7 @@ Deno.serve(async (req: Request) => {
         hard: (Array.isArray(hard_days) ? hard_days : [])
           .map((h) => (h && typeof h === 'object' ? (h as Record<string, unknown>).day : null))
           .map(asWeekday),
+        slots: dragPicks.slots,
         // ⛔ THE EXTRA EASY RUNS' DAYS, as tapped on Your week (2026-09-22). Absent = the engine places them.
         easy: (() => {
           const raw = (body as Record<string, unknown>).easy_days;

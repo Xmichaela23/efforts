@@ -111,7 +111,7 @@ export type EnduranceIntakeReadout = {
       label: string;
       line: string;
       options: { count: number; label: string }[];
-      rows: { title: string; session: string; length: string }[];
+      rows: { title: string; session: string; length: string; card: string }[];
     };
     long_option_labels: Record<string, string>;
     rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
@@ -253,6 +253,7 @@ export function enduranceIntakeReadout(args: {
           title: fill(RUNS_COPY.extra_row, { n }),
           session: sessionName('run_vt1', null),
           length: lengthWords(rsw.easyRunMinutes),
+          card: fill(RUNS_COPY.extra_card, { length: lengthWords(rsw.easyRunMinutes) }),
         })),
       },
     };

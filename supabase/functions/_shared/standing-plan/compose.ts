@@ -201,7 +201,7 @@ import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts'
 import { archetypesFor } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
-import { MAX_SESSIONS_A_DAY } from '../move-check/index.ts';
+import { MAX_SESSIONS_A_DAY } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
   REST_DAY_RUNG, rungAt, rungForMinutes, sayHours, sizeFor, slotSpans, weekVolumeBounds,
@@ -422,9 +422,12 @@ function enduranceDayFor(
    */
   role: 'long' | 'hard' | null,
   hardIndex: number,
+  slotKey?: string,
 ): Weekday {
   const pins = args.endurancePins;
   if (pins) {
+    const bySlot = slotKey ? titleCaseDay(pins.slots?.[slotKey]) : '';
+    if (bySlot !== '') return bySlot as Weekday;
     if (role === 'long' && pins.long) return pins.long;
     if (role === 'hard') {
       const pinned = pins.hard?.[hardIndex];
@@ -577,11 +580,11 @@ export function placeEnduranceDays(
         // ⛔ THE FRAME'S OWN ANSWER, matching `hardSlotIndex` above — see `anchorRoleOf`. The slot's
         // stated role wins where it has one; the family decides where it does not.
         const role = anchorRoleOf(slot.family, slot.role);
-        const pinned = role === 'long'
+        const pinned = !!titleCaseDay(args.endurancePins?.slots?.[key]) || (role === 'long'
           ? !!args.endurancePins?.long
-          : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false;
+          : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false);
         if (pinned !== wantPinned) return;
-        const proposed = enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex);
+        const proposed = enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex, key);
         enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
       });
     }
@@ -713,6 +716,11 @@ export type ComposeArgs = {
      * A tapped day wins over `pickFillDay`, like every other pin; the week's notes say what it costs.
      */
     easy?: Array<Weekday | null | undefined>;
+    /**
+     * ⛔ ANY FRAME ENDURANCE SLOT BY ITS KEY, `${frameDay}:${index}` (the row's `slot:` tag) — a session dragged on Your
+     * week (2026-09-22). Wins over `long` and `hard` for that slot.
+     */
+    slots?: Record<string, Weekday | null | undefined>;
   };
   /**
    * ⛔⛔ DAYS THE ATHLETE CANNOT TRAIN — AND NO ENDURANCE SESSION LANDS ON ONE (Michael, 2026-08-25:
@@ -3466,7 +3474,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * is renamed and no existing reader changes behaviour.
          */
         ...(() => {
-          const extra: string[] = [];
+          // ⛔ WHICH FRAME SLOT THIS ROW IS (2026-09-22): Your week drags a session by it and sends the drop back as
+          // `endurancePins.slots[key]`. Additive — no reader of the other tags changes.
+          const extra: string[] = [`slot:${day.day}:${i}`];
           if (isLongSlot(slot)) {
             const w = row.type === 'ride' ? 'long_ride' : row.type === 'run' ? 'long_run' : null;
             if (w && !row.tags.includes(w)) extra.push(w);

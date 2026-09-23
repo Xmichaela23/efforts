@@ -39,7 +39,13 @@ const P86_SET_COST = 'A very hard session of 14+ work sets may cut performance i
  * ⛔ WHICH BREAK IT IS. Three come from `COST` and one from the frame — and the fourth is not a
  * clearance at all, which is why it needs its own id rather than being folded into the others.
  */
+// OURS — no three-session days: the book is silent; the smallest choice. docs/STATE-SOURCES.md "Move check".
+// ⛔ ONE OWNER (2026-09-22): `move-check` re-exports it, the week chooser and the extra-run placement read it.
+export const MAX_SESSIONS_A_DAY = 2;
+
 export type ConflictRule =
+  /** More sessions on one day than the two the app plans (jump drills not counted). */
+  | 'crowded_day'
   /** A hard session and the heavy leg session on ONE day. `heavy_lower` short of `heavy_legs`. */
   | 'hard_with_heavy_legs'
   /** The long RUN inside the shadow of heavy leg work. `long_run` short of `heavy_legs`. */
@@ -676,6 +682,31 @@ export function conflictsOfTyped(
         // Viada p108 / p145: at least 6-8 hours between two sessions in one day.
         text: `${day} has ${list} on it. Six to eight hours between them, and the second one starts `
           + 'on legs that have already worked.',
+      });
+    }
+  }
+
+  // ⛔ MORE THAN TWO SESSIONS ON A DAY (Michael, 2026-09-22: "flag crazy shit"). Only a drag or a tap can make one —
+  //    the app never plans it — so it is the athlete's week, stated. The jump drills ride with their day and do not count.
+  {
+    const perDay = new Map<Weekday, number>();
+    for (const t of typed) {
+      if ((t.s.tags ?? []).includes('plyo')) continue;
+      const d = t.s.day as Weekday;
+      if (!WEEKDAYS.includes(d)) continue;
+      perDay.set(d, (perDay.get(d) ?? 0) + 1);
+    }
+    const WORDS: Record<number, string> = { 3: 'three', 4: 'four', 5: 'five' };
+    for (const [day, n] of perDay) {
+      if (n <= MAX_SESSIONS_A_DAY) continue;
+      push({
+        kind: 'cost',
+        rule: 'crowded_day',
+        days: [day],
+        sessions: typed.filter((t) => t.s.day === day && !(t.s.tags ?? []).includes('plyo')).map((t) => t.s.name),
+        // Viada p108 / p145: at least 6-8 hours between two sessions in one day — the two_hard_one_day line's own cost.
+        text: `${day} has ${WORDS[n] ?? String(n)} sessions on it. Six to eight hours between each, and the later ones `
+          + 'start on legs that have already worked.',
       });
     }
   }

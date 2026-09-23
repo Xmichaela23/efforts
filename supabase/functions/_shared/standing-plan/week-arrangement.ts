@@ -13,6 +13,7 @@
 // every tie.
 //
 // THE ORDER OF THE TERMS, each a tie-break for the one before:
+//   0. a lifting day the athlete dragged sits where it was dropped (2026-09-22);
 //   1. nothing the book fixes (lifts, jump drills) on a day the athlete cannot train — unchanged;
 //   2. the long session on the athlete's long day — unchanged;
 //   3. ⛔ the fewest warnings from `weekConflicts` on the week this arrangement builds, not counting
@@ -35,7 +36,7 @@ import {
 } from './day-map.ts';
 import { weekConflicts, type ConflictRule } from './week-conflicts.ts';
 import { placeEnduranceDays, type PlanSession } from './compose.ts';
-import { MAX_SESSIONS_A_DAY, offIdeal } from '../move-check/index.ts';
+import { offIdeal } from '../move-check/index.ts';
 
 /** Monday = 0 … Sunday = 6. Null when there is no usable date. */
 function startWeekdayIndex(iso: string | null | undefined): number | null {
@@ -85,6 +86,7 @@ function distanceFromBook(order: number[]): { moved: number; offset: number } {
 function skeletonWeek(args: {
   frame: FrameId; column: ColumnKind; order: number[];
   longPin: string; hardPins: string[]; longSlotSport: 'run' | 'ride' | 'swim'; blocked: string[];
+  slotPins?: Record<string, string>;
 }): PlanSession[] {
   const out: PlanSession[] = [];
   const S = (day: string, type: string, name: string, tags: string[]): PlanSession =>
@@ -95,6 +97,7 @@ function skeletonWeek(args: {
     endurancePins: {
       long: (args.longPin || null) as Weekday | null,
       hard: args.hardPins.map((d) => (d || null) as Weekday | null),
+      slots: (args.slotPins ?? {}) as Record<string, Weekday>,
     },
     unavailableDays: args.blocked,
   } as never).days;
@@ -185,7 +188,17 @@ export function chooseDayMap(
   const testDays = [1, 2];
   const spokenFor = new Set<string>([longPin, ...hardPins].filter((d) => d !== ''));
 
+  /** ⛔ LIFTING DAYS THE ATHLETE DRAGGED: frame day → weekday, read off the frame's own labels. */
+  const liftPins: Array<[number, string]> = [];
+  for (const d of FRAMES[frame].columns[column]) {
+    const want = d.label ? titleCaseDay(pins.liftDays?.[d.label]) : '';
+    if (want !== '') liftPins.push([d.day, want]);
+  }
+  const slotPins: Record<string, string> = {};
+  for (const [k, v] of Object.entries(pins.slotDays ?? {})) { const d = titleCaseDay(v); if (d !== '') slotPins[k] = d; }
+
   type Cand = {
+    liftsPinned: number;
     order: number[]; offset: number; long: boolean; blockedLifts: number; blockedFixed: number;
     hard: number; stacked: number; testSafe: boolean;
     warnings: number; moved: number; spacing: number;
@@ -196,6 +209,7 @@ export function chooseDayMap(
   const candidates: Cand[] = (opts.rotationsOnly ? ORDERS.slice(0, 7) : ORDERS).map((order) => {
     const { moved, offset } = distanceFromBook(order);
     return {
+      liftsPinned: liftPins.filter(([fd, wd]) => weekdayForFrameDay(fd, order) === wd).length,
       order,
       offset,
       long: longPin !== '' && anchors.long != null && weekdayForFrameDay(anchors.long, order) === longPin,
@@ -215,7 +229,8 @@ export function chooseDayMap(
    * ⚠️ THE WARNINGS ARE COUNTED ONLY WHERE THEY CAN DECIDE. Terms 1–2 come first, so only the candidates
    * that tie best on those are judged — the same answer as judging all of them, for less work.
    */
-  const head = (c: Cand) => [c.blockedFixed, c.blockedLifts, c.long ? 0 : 1];
+  // ⛔ A LIFTING DAY THE ATHLETE DRAGGED COMES FIRST — it is their own answer, like a day off.
+  const head = (c: Cand) => [-c.liftsPinned, c.blockedFixed, c.blockedLifts, c.long ? 0 : 1];
   const cmpHead = (a: Cand, b: Cand) => {
     const x = head(a), y = head(b);
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
@@ -247,16 +262,11 @@ export function chooseDayMap(
       // steps it off that day, and the judged week has to be that week.
       longPin: titleCaseDay(longSlotSport === 'ride' ? pins.longRideDay : pins.longRunDay),
       hardPins: (pins.hardDays ?? []).map(titleCaseDay),
-      longSlotSport, blocked: [...blockedDays],
+      longSlotSport, blocked: [...blockedDays], slotPins,
     });
-    /**
-     * ⛔ THE CALENDAR MOVE'S DAY LIMIT, COUNTED THE SAME WAY (`move-check` `sessionsOn`: the jump drills
-     * ride with their day and do not count). A day over it is one more warning.
-     */
-    const perDay = new Map<string, number>();
-    for (const x of sessions) if (!x.tags.includes('plyo')) perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
-    const crowded = [...perDay.values()].filter((n) => n > MAX_SESSIONS_A_DAY).length;
-    c.warnings = crowded + weekConflicts({ sessions, frame, column, dayOffset: c.order })
+    // ⛔ A DAY OVER THE TWO-SESSION LIMIT IS ONE OF THE WEEK'S OWN WARNINGS NOW (`crowded_day`, 2026-09-22), so it is
+    // counted here with the rest rather than a second time on its own.
+    c.warnings = weekConflicts({ sessions, frame, column, dayOffset: c.order })
       .filter((w) => !NOT_A_COST.includes(w.rule) && !printed.has(keyOf(w, c.order))).length;
   }
 

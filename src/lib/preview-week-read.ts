@@ -75,7 +75,7 @@ export function placedHardDays(
  */
 export const CONFLICT_RULES: ReadonlySet<string> = new Set([
   'hard_with_heavy_legs', 'long_after_heavy_legs', 'heavy_legs_after_long',
-  'hard_on_speed_leg_day', 'two_hard_one_day', 'no_rest_day',
+  'hard_on_speed_leg_day', 'two_hard_one_day', 'no_rest_day', 'crowded_day',
 ]);
 
 export type PreviewCompromise = { kind?: string; text: string; rule?: string; days?: string[] };

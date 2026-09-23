@@ -235,6 +235,7 @@ export const RUNS_COPY = {
   extra_chip: { 0: 'None', 1: '1', 2: '2' } as Record<number, string>,  // not-instruction: chip labels
   extra_line: 'For more advanced runners, to test recovery.',  // Viada p247, reworded
   extra_row: 'Extra easy run {n}',  // not-instruction: a row label (name)
+  extra_card: 'Easy run · {length}',  // not-instruction: a card label (name and length) on Your week
 } as const;
 
 /** The runs screen's top line, counted off the frame: lifting days and runs, in words. Null on a week that is not all runs. */

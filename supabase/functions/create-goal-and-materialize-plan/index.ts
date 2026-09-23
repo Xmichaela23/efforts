@@ -3102,6 +3102,21 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_days: out } : {};
               })(),
+              // ⛔ SESSIONS DRAGGED ON YOUR WEEK (2026-09-22) — forwarded as sent; `generate-strength-plan` validates them.
+              ...(() => {
+                const ld = (gsTp as Record<string, unknown>).lift_days;
+                const sd = (gsTp as Record<string, unknown>).slot_days;
+                const obj = (x: unknown) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x as object).length > 0;
+                return { ...(obj(ld) ? { lift_days: ld } : {}), ...(obj(sd) ? { slot_days: sd } : {}) };
+              })(),
+              // ⛔ THE EXTRA EASY RUNS' TAPPED DAYS (2026-09-22) — forwarded as sent; `generate-strength-plan` validates
+              // each against the weekday list and takes at most two. Without this hop the tap never reached the week.
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).easy_days;
+                return Array.isArray(raw) && raw.some((d) => typeof d === 'string' && d !== '')
+                  ? { easy_days: raw.slice(0, 2).map((d) => (typeof d === 'string' ? d : null)) }
+                  : {};
+              })(),
               /**
                * ⛔⛔ THE EXPERIENCE ANSWER, PER SPORT — AND THIS HOP IS THE ONE THAT DROPS THINGS
                * (2026-08-27, the same defect `endurance_days` above was just fixed for).
@@ -3193,7 +3208,8 @@ Deno.serve(async (req: Request) => {
                 readout: {
                   intake: gsGen?.intake ?? null,
                   week_one: weekOneSummary(
-                    gsGen?.plan?.sessions_by_week?.['1'] ?? null,
+                    // ⛔ A TYPICAL WEEK (2026-09-22): week two, which carries no test sessions; week one on a one-week block.
+                    gsGen?.plan?.sessions_by_week?.['2'] ?? gsGen?.plan?.sessions_by_week?.['1'] ?? null,
                     Array.isArray(gsGen?.plan?.placement_compromises) ? gsGen.plan.placement_compromises.length : 0,
                   ),
                 },

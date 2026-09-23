@@ -85,8 +85,9 @@ export function downDates(rows: MoveRow[]): Set<string> {
   return origins;
 }
 
-// OURS — no three-session days: the book is silent; the smallest choice. docs/STATE-SOURCES.md "Move check".
-export const MAX_SESSIONS_A_DAY = 2;
+// OURS — no three-session days; owned by `week-conflicts.ts` so the builder's note and this limit are one number.
+export { MAX_SESSIONS_A_DAY } from '../standing-plan/week-conflicts.ts';
+import { MAX_SESSIONS_A_DAY } from '../standing-plan/week-conflicts.ts';
 /** Sessions on `date` other than `exceptId` — skipped rows and plyo warm-ups do not count. */
 export const sessionsOn = (rows: MoveRow[], date: string, exceptId: string): number =>
   rows.filter((r) => r.id !== exceptId && iso(r.date) === iso(date) && !isSkipped(r) && !isPlyo(r)).length;

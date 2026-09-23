@@ -157,6 +157,13 @@ export type DayPins = {
   /** Days they pinned a hard session to. */
   hardDays?: (string | null | undefined)[];
   /**
+   * ⛔ LIFTING DAYS DRAGGED ON YOUR WEEK (2026-09-22): the frame day's label (`ME: Upper`, `Lower body: Hinge`) →
+   * the weekday it was dropped on. The chooser puts that lifting day there before anything else it weighs.
+   */
+  liftDays?: Record<string, string | null | undefined>;
+  /** Any frame endurance slot dragged on Your week, by its `slot:` key → weekday (see `compose.ts` `endurancePins.slots`). */
+  slotDays?: Record<string, string | null | undefined>;
+  /**
    * ⛔⛔ DAYS THE ATHLETE CANNOT TRAIN — A PIN LIKE ANY OTHER (Michael, 2026-08-25).
    *
    * The rule: *"an unavailable day is a hard pin like any other, and the solver must JUGGLE before

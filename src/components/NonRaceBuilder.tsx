@@ -70,6 +70,7 @@ import {
 import { useArcSetupContext } from '@/hooks/useArcSetupContext';
 import { getDisciplineColor, getDisciplineColorRgb, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 import WeekStrip from './WeekStrip';
+import WeekPlanList, { type PlanSessionLite } from './WeekPlanList';
 // ⛔ ONE READER FOR "is this the plyo day" — shared with the calendar chip. The tag, never the name.
 import { isPlyoSession } from '@/lib/utils';
 // ONE source for the block's own words — the composer writes the same sentences onto the plan.
@@ -1087,6 +1088,10 @@ export type NonRaceState = {
   extraEasyRuns?: number;
   /** ⛔ THE DAYS THE ATHLETE TAPPED FOR THE EXTRA EASY RUNS on Your week, in order; '' = the engine's day (2026-09-22). */
   easyDays?: string[];
+  /** ⛔ LIFTING DAYS DRAGGED ON YOUR WEEK: frame day label (`ME: Upper`) → day (2026-09-22). */
+  liftDays?: Record<string, string>;
+  /** ⛔ ENDURANCE SESSIONS DRAGGED ON YOUR WEEK: the row's `slot:` key → day (2026-09-22). */
+  slotDays?: Record<string, string>;
   /**
    * ⛔⛔ HOW LONG THIS ATHLETE'S HARD SESSIONS AND LONG SESSION ARE, PER SPORT — their own answer,
    * asked once on the Endurance focus step (Michael, 2026-08-27). It is the SOLE input to the level.
@@ -1464,6 +1469,9 @@ function assemblePayload(
            * writes this session", which is what every block before this field did.
            */
           ...(state.longClub ? { long_session: { ownership: 'club' as const } } : {}),
+          // ⛔ SESSIONS DRAGGED ON YOUR WEEK (2026-09-22) — lifting days by label, endurance slots by key.
+          ...(Object.keys(state.liftDays ?? {}).length > 0 ? { lift_days: state.liftDays } : {}),
+          ...(Object.keys(state.slotDays ?? {}).length > 0 ? { slot_days: state.slotDays } : {}),
           // ⛔ THE EXTRA EASY RUNS' TAPPED DAYS (2026-09-22). Only taps travel; '' = the engine places it.
           ...((state.easyDays ?? []).slice(0, state.extraEasyRuns ?? 0).some((d) => !!d)
             ? { easy_days: (state.easyDays ?? []).slice(0, state.extraEasyRuns ?? 0).map((d) => d || null) }
@@ -1877,6 +1885,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // ⛔ THE WEEK, BEFORE IT IS ACCEPTED. Nothing here writes: `preview()` calls the composer with the
   // goal inline and persists neither a goal nor a plan.
   const [previewWeek, setPreviewWeek] = React.useState<PreviewSession[] | null>(null);
+  /**
+   * ⛔ A TYPICAL WEEK — week two (Michael, 2026-09-22: "it should be a true example of the week"). Week one carries the
+   * test sessions; Your week and the Build this plan? sample show the week the block repeats. Falls back to week one on
+   * a block too short to have a second.
+   */
+  const [previewWeekTypical, setPreviewWeekTypical] = React.useState<PreviewSession[] | null>(null);
   /** ⛔ Distinguishes "the preview could not be built" from "the week is empty". They are not the same. */
   const [previewFailed, setPreviewFailed] = React.useState(false);
   const [previewNotes, setPreviewNotes] = React.useState<string[]>([]);
@@ -2614,6 +2628,46 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
   const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
+
+  /**
+   * ⛔ A SESSION DROPPED ON YOUR WEEK BECOMES A PICK (2026-09-22). Read off the row's own tags, never its name:
+   *   · the long session → the long day (the pick every other screen already reads);
+   *   · an extra easy run (`volume_fill`) → its place among the extra runs;
+   *   · any other run or ride → its frame slot (`slot:` tag);
+   *   · a lifting day → its label (the frame's own, `ME: Upper`).
+   * The server rebuilds the week from the picks; nothing is placed here.
+   */
+  const dropSession = (x: PlanSessionLite, to: DayName) => {
+    const tags = Array.isArray(x.tags) ? (x.tags as unknown[]).map(String) : [];
+    const type = String(x.type ?? '').toLowerCase();
+    if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('family:run_lsd')) {
+      if (type === 'ride') { touch('longRide'); setState((st) => ({ ...st, longRideDay: to })); }
+      else { touch('longRun'); setState((st) => ({ ...st, longRunDay: to })); }
+      return;
+    }
+    if (tags.includes('volume_fill') && type === 'run') {
+      const fills = (previewWeekTypical ?? []).filter((y) => String((y as { type?: string }).type ?? '').toLowerCase() === 'run'
+        && Array.isArray((y as { tags?: unknown }).tags) && ((y as { tags: unknown[] }).tags).includes('volume_fill'));
+      const i = fills.indexOf(x as never);
+      if (i < 0) return;
+      setState((st) => {
+        const next = [...(st.easyDays ?? [])];
+        while (next.length <= i) next.push('');
+        next[i] = to;
+        return { ...st, easyDays: next };
+      });
+      return;
+    }
+    const slot = tags.find((t) => t.startsWith('slot:'))?.slice('slot:'.length);
+    if (slot && (type === 'run' || type === 'ride')) {
+      setState((st) => ({ ...st, slotDays: { ...(st.slotDays ?? {}), [slot]: to } }));
+      return;
+    }
+    if (type === 'strength' && x.name) {
+      const label = String(x.name);
+      setState((st) => ({ ...st, liftDays: { ...(st.liftDays ?? {}), [label]: to } }));
+    }
+  };
 
   /**
    * ⛔ THE PHONE'S WEEK SOLVE IS GONE (2026-09-10, audit item 20). `solveWizardWeek` pre-filled the
@@ -3501,6 +3555,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * long-run default, and the long-run chips the `run_lsd` ladder builds up to the frame's ceiling.
    */
   const runStrengthWeek = rotateOnlyRun ? intakeFresh?.run_strength_week ?? null : null;
+  // ⚠️ KEPT PAST ITS STEP: Your week labels the extra easy runs with the runs screen's own words, and the intake
+  // readout is only fresh on the step that asked it.
+  const lastRunStrengthWeek = React.useRef(runStrengthWeek);
+  if (runStrengthWeek) lastRunStrengthWeek.current = runStrengthWeek;
   React.useEffect(() => {
     if (!runStrengthWeek) return;
     const seedLong = runStrengthWeek.long_run_default;
@@ -3796,6 +3854,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // result, and the athlete cannot tell the difference.
     setPreviewFailed(!Array.isArray(wk1) || wk1.length === 0);
     setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
+    const wk2 = plan?.sessions_by_week?.['2'];
+    setPreviewWeekTypical(Array.isArray(wk2) && wk2.length > 0 ? wk2 : Array.isArray(wk1) ? wk1 : []);
     // ⛔ THE TEST-WEEK OFFER IS GONE (2026-08-30) — the server stopped sending it and week one is
     // the test week for every block. Nothing to read, nothing to show.
     setPreviewSkip(null);
@@ -3894,7 +3954,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       // ⚠️ THE NUMBERS ANSWER DECIDES WHETHER WEEK 1 IS THE TEST WEEK (2026-09-13).
       state.numbersChoice,
       // ⚠️ THE EXTRA EASY RUNS AND THEIR TAPPED DAYS (2026-09-22) change the week too.
-      state.extraEasyRuns, state.easyDays]);
+      state.extraEasyRuns, state.easyDays, state.liftDays, state.slotDays]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -6286,7 +6346,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              * ⚠️ IT ALSO NAMES THE SPLIT the card now has: the days are the question, the rest of
              * the week is the answer under it.
              */
-            : 'The week below is the program’s. Any day can move. What a move costs shows up in the notes. A run club or ride club can take a hard session or the long day.'}
+            // ⛔ Michael approved the words 2026-09-22.
+            : 'This is a typical week. Drag a session to move it. You can always adjust days later.'}
           onBack={back} onContinue={next}
           // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
           // and `scheduleCanContinue` is about the per-week COUNTS, which live on the other step.
@@ -6321,363 +6382,29 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               three are open at once, and the master strip above them shows the week they produce.
               ⛔ Do not reintroduce one-open-at-a-time without a fourth row to justify it. */}
           <div className="space-y-3">
-            {/* ⛔⛔ THE MASTER STRIP LEADS THE SCREEN (Michael, round 3, 2026-08-25). The week the
-                athlete is editing is the first thing on it, and it redraws on every pin — so a tap
-                and its consequence are one glance apart instead of one scroll. The worded list at
-                the bottom is unchanged and is still the detail view; this is the shape.
-                ⚠️ IT IS NOT A CONTROL. Nothing here is tappable — the pickers below own every
-                decision. A strip that both reported and edited is the fusion this screen was
-                rebuilt to end. */}
-            {(previewWeek?.length ?? 0) > 0 && (
-              <div className={previewing ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
-                <WeekStrip byDay={placedWeekByDay} />
-              </div>
-            )}
-
-            {/* ⛔⛔ THE `hardday` DISCLOSURE BLOCK STOOD HERE AND IS DELETED (Michael, 2026-08-25).
-                ~830 lines: the one-open-question row list, its collapsed answer lines, a second copy
-                of the day pickers, and a second copy of the club toggle and archetype menus.
-
-                ⛔ IT WAS UNREACHABLE. `hardday` is a `StepKey` that `scheduleSteps()` never pushes —
-                the What-question moved onto the `endurance` step, where `HardSlotChoices` owns the
-                session choice and the club toggle. So `currentStep` could not equal `'hardday'` on
-                any path, and every control in here was a duplicate of one the athlete actually uses.
-                ⚠️ THE CLUB CONTROL IS NOT LOST WITH IT — it is `HardSlotChoices` on the endurance
-                step, writing the same `ownership` field, and it was confirmed working before this
-                deletion. The copy in here had drifted: no "Replaces this hard session." sub-label.
-
-                ⛔ AND THE DISCLOSURE PATTERN ITSELF IS GONE FROM THIS SCREEN, deliberately — see the
-                note on the always-open pickers above for why three rows do not earn it. The
-                three-failed-layouts history that argued for it is preserved there. */}
-            {/* ⛔⛔ EVERY PICKER IS OPEN, ALWAYS (Michael, round 3, 2026-08-25). THE DISCLOSURE LIST
-                IS GONE FROM THIS STEP — read the three-failed-layouts note above before restoring it.
-
-                Its argument was that five questions stacked in a column all compete for the fold.
-                That was true of FIVE. This step is down to three, the counts moved to the volume
-                card and the hard sessions' own What-question moved to the `hardday` step, so what is
-                left is three day rows — and a disclosure list over three rows costs a tap to see
-                each answer's control while hiding the other two. ⚠️ The `hardday` step KEEPS the
-                list: it still carries the archetype menus, the club toggle and the add/remove
-                buttons, which is the shape the list was built for.
-
-                ⛔ ONE ROW PER SESSION, NOT ONE ROW PER QUESTION. The long day, the hard run and the
-                hard ride are three separate answers and each gets its own card, so no card's border
-                ever contains another card's controls. */}
-            {longRowShown && (
-              <div className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-white/85 text-sm">
-                    {scheduleRunShown ? 'Long run' : 'Long ride'}
-                    {/* ⚠️ THE SAME GATE, and it was a one-line change so the three stay consistent.
-                        `state.longClub` cannot become true while the control is hidden, so this was
-                        unreachable rather than wrong — but a reader finding one club reference gated
-                        and another not would have to work out which was deliberate. */}
-                    {CLUB_SESSION_CONTROL_VISIBLE && state.longClub
-                      && <span className="text-white/45"> — club ride</span>}
-                  </span>
-                  {/* ⛔ A CLUB SESSION IS NOT ASKED WHERE IT SHOULD GO (slice 2b). Only the athlete
-                      knows when the club meets, so the question changes from a choice to a fact. */}
-                  <span className="text-xs" style={{ color: `rgba(${longRowRgb},0.85)` }}>
-                    {longRowDay
-                      ? `${DAY_SHORT[longRowDay as DayName]}${
-                        !longRowIsOwn ? ' — placed' : state.longClub ? ' — club' : ' — yours'}`
-                      : (state.longClub ? 'Which day does it meet?' : 'Tap a day')}
-                  </span>
-                </div>
-                <WeekDayRow
-                  selected={longRowDay ? [longRowDay as DayName] : []}
-                  plain
-                  pinned={(state.longClub || !!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide'])
-                    && longRowIsOwn}
-                  accentRgb={longRowRgb}
-                  roles={{}}
-                  stacked={[]}
-                  taken={anchorDaysTaken(state, scheduleRunShown ? 'long run' : 'long ride')}
-                  disabled={[]}
-                  onTap={(d) => {
-                    touch(scheduleRunShown ? 'longRun' : 'longRide');
-                    if (scheduleRunShown) {
-                      setState((st) => ({ ...st, longRunDay: st.longRunDay === d ? '' : d }));
-                    } else {
-                      setState((st) => ({ ...st, longRideDay: st.longRideDay === d ? '' : d }));
-                    }
-                  }}
-                />
-              </div>
-            )}
-
-            {state.hardDays.map((h, i) => {
-              const dayVal = dayForSlot(i);
-              const rgb = getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run');
-              /**
-               * ⛔ THE LABEL IS WHAT THE PLAN BUILT (Michael, 2026-09-03). It said "sustained
-               * threshold" over an anaerobic ride because the phone decided the role itself; the
-               * server never read it. Once the preview is back the family tag decides; before that
-               * the phone's guess stands in.
-               */
-              // server-word: `hardCardLabel` owns every word on this card (2026-09-17, WORKORDER Stage C).
-              const label = hardCardLabel(h.discipline, h.ownership, placedFamilies[i], hardRoleOf(i) === 'threshold' ? 'threshold' : 'top-end');
-              return (
-                <div key={`hard-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-white/85 text-sm">{label}</span>
-                    {/* ⚠️ THE CUE NAMES WHOSE ANSWER IT IS, not just which day. "Yours" is the
-                        word that makes the filled chip mean something. */}
-                    <span className="text-xs flex items-baseline gap-1 min-w-0" style={{ color: `rgba(${rgb},0.85)` }}>
-                      <span className="shrink-0">
-                        {dayVal
-                          ? `${DAY_SHORT[dayVal as DayName]}${
-                            h.ownership === 'club' ? ' — club' : isPinned(i) ? ' — yours' : ' — placed'}`
-                          : (h.ownership === 'club' ? 'Which day does it meet?' : 'Tap a day')}
-                      </span>
-                      {/* ⛔ THE TAP CUE, ON THE ENGINE'S DAYS ONLY (Michael, 2026-08-25). A placed
-                          chip looks answered, so nothing said the athlete could take it — the pinned
-                          and club states already read as theirs and need no invitation.
-
-                          ⛔ IT DROPS FIRST WHEN THE LINE IS TIGHT, and that is what `truncate` on
-                          THIS span and `shrink-0` on the status above it buy: the day and who owns
-                          it are the load-bearing half and survive every width; the cue is the half
-                          that can go. ⚠️ No breakpoint — a hardcoded width would guess at a device.
-                          ⚠️ ZERO NEW VERTICAL SPACE: same line, same row, no new element box. */}
-                      {dayVal && h.ownership !== 'club' && !isPinned(i) && (
-                        <span className="truncate text-white/45">· tap to change</span>
-                      )}
-                    </span>
-                  </div>
-                  <WeekDayRow
-                    selected={dayVal ? [dayVal as DayName] : []}
-                    plain
-                    pinned={isPinned(i)}
-                    accentRgb={rgb}
-                    /* ⛔ A DAY THE ATHLETE CANNOT TRAIN IS DIMMED, NOT REMOVED, and it is NOT
-                       locked: pinning a hard session onto a blocked day is a contradiction the
-                       athlete is allowed to enter — it comes back as a note, per the ruling. */
-                    disabled={[]}
-                    roles={{}}
-                    stacked={[]}
-                    /* ⛔ NOTHING IS DISABLED. The other slot's day is NOT locked: two hard sessions
-                       on one day still builds as one, and the PLAN says so — a lock made it look
-                       like a broken button. */
-                    taken={{}}
-                    onTap={(d) => {
-                      // ⛔ THE TAP MARKS THIS UNIT DIRTY WHATEVER IT DOES — set, move or CLEAR.
-                      // Clearing is the case that matters: it is an answer, and the engine used to
-                      // read it as an empty field and refill it.
-                      touch(`hard:${i}`);
-                      setState((st) => {
-                        const next = [...st.hardDays];
-                        const cur = next[i];
-                        if (!cur) return st;
-                        next[i] = { ...cur, day: cur.day === d ? '' : d };
-                        return { ...st, hardDays: next };
-                      });
-                    }}
-                  />
-                  {/* ⛔ THE "picked X, placed Y" LINE IS GONE (pins-win, 2026-08-25) — the two are
-                      the same day now, so there was nothing left for it to reconcile. What the
-                      pinned week costs is stated once, in the tiered notes below, because a
-                      clearance breach is a fact about a PAIR of sessions and belongs beside neither
-                      one of them on its own. */}
-                </div>
-              );
-            })}
-            {/* ⛔ ONE LINE, UNDER BOTH PICKERS (Michael, round 4, 2026-08-25). It was a bullet inside
-                the disclosure row's lead copy and went with that structure; it is a fact about what
-                counts as a hard day, so it belongs under the two cards it describes rather than
-                inside either one.
-                ⚠️ THE CONTROL IT REFERS TO IS ON THE ENDURANCE STEP, not here — `HardSlotChoices`
-                carries the club toggle beside the session choice, which is where the athlete says
-                WHAT the session is. This step only asks WHEN. The sentence is here because this is
-                where the count matters. */}
-            {/* ⛔ GATED WITH THE CONTROL IT REFERS TO (Michael, 2026-08-26: "remove the line").
-                Its own comment two lines up says the control is on the endurance step — and that
-                control is hidden, so the sentence was pointing at something no athlete could see.
-                ⚠️ ON THE SAME BOOLEAN, DELIBERATELY: restoring the club control restores this line
-                with it, rather than leaving a sentence somebody has to remember to bring back. */}
-            {/* ⛔ THE EXTRA EASY RUNS, PLACEABLE (Michael, 2026-09-22: "we should let people place them"). Same card
-                as a hard run: the built week's day, "placed" until tapped, "yours" after. Any day builds; what it
-                costs comes back in the trade-offs below. */}
-            {Array.from({ length: isStrengthFocus ? (state.extraEasyRuns ?? 0) : 0 }).map((_, i) => {
-              const placed = (previewWeek ?? [])
-                .filter((x) => String((x as { type?: string }).type ?? '').toLowerCase() === 'run'
-                  && Array.isArray((x as { tags?: unknown }).tags)
-                  && ((x as { tags: unknown[] }).tags).includes('volume_fill'))
-                .map((x) => String((x as { day?: string }).day ?? '').toLowerCase() as DayName)[i];
-              const mine = (state.easyDays ?? [])[i] as DayName | '' | undefined;
-              const dayVal = (mine || placed || '') as DayName | '';
-              const rgb = getDisciplineColorRgb('run');
-              const label = runStrengthWeek?.extra?.rows?.[i]?.title ?? '';
-              /**
-               * ⛔ A DAY ALREADY HOLDING TWO SESSIONS IS NOT OFFERED (Michael, 2026-09-22) — the calendar move's own limit
-               * (`move-check` `MAX_SESSIONS_A_DAY`; the jump drills do not count). This run's own day is not counted
-               * against itself.
-               */
-              const full = (Object.keys(DAY_SHORT) as DayName[]).filter((d) => {
-                const n = (previewWeek ?? []).filter((x) => String((x as { day?: string }).day ?? '').toLowerCase() === d
-                  && !isPlyoSession(x as { tags?: unknown })).length;
-                return n - (d === dayVal ? 1 : 0) >= 2;
-              });
-              return (
-                <div key={`easy-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-white/85 text-sm">{label}</span>
-                    <span className="text-xs flex items-baseline gap-1 min-w-0" style={{ color: `rgba(${rgb},0.85)` }}>
-                      <span className="shrink-0">{dayVal ? `${DAY_SHORT[dayVal]}${mine ? ' — yours' : ' — placed'}` : ''}</span>
-                      {dayVal && !mine && <span className="truncate text-white/45">· tap to change</span>}
-                    </span>
-                  </div>
-                  <WeekDayRow
-                    selected={dayVal ? [dayVal] : []}
-                    plain
-                    pinned={!!mine}
-                    accentRgb={rgb}
-                    disabled={full}
-                    roles={{}}
-                    stacked={[]}
-                    taken={{}}
-                    onTap={(d) => setState((st) => {
-                      const next = [...(st.easyDays ?? [])];
-                      while (next.length <= i) next.push('');
-                      next[i] = next[i] === d ? '' : d;
-                      return { ...st, easyDays: next };
-                    })}
-                  />
-                </div>
-              );
-            })}
-            {CLUB_SESSION_CONTROL_VISIBLE && state.hardDays.length > 0 && (
-              <p className="text-white/60 text-xs leading-snug px-1">
-                A club ride or run counts as a high intensity day.
-              </p>
-            )}
-            {state.hardDays.length === 0 && (
-              <p className="text-white/45 text-xs leading-snug px-1">
-                No high intensity sessions in this block. Nothing to place.
-              </p>
-            )}
-
-            {/* ⛔ DAYS YOU CANNOT TRAIN — the third kind of pin (handoff §3, 2026-08-25). Same chip
-                row, same absoluteness: the endurance sessions arrange around it.
-
-                ⛔ AND THE ENGINE JUGGLES BEFORE IT WARNS (Michael, 2026-08-25). Blocking a day
-                moves the ENDURANCE off it outright — it is movable by definition — and the lifting
-                frame is ROTATED to try to land its empty day there, all seven rotations scored. A
-                lifting day sits on a blocked day only when no rotation honours every pin at once,
-                and the note then names the pins that collided.
-                ⚠️ NO SPORT COLOUR — this is the absence of training, not a discipline. */}
-            <div className="rounded-xl border border-white/10 px-3 py-3 space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-white/85 text-sm">Days you can&rsquo;t train</span>
-                <span className="text-xs text-white/45">
-                  {unavailableDays.length === 0
-                    ? 'None'
-                    : unavailableDays.map((d) => DAY_SHORT[d]).join(' · ')}
-                </span>
-              </div>
-              <WeekDayRow
-                selected={unavailableDays}
-                plain
-                pinned
-                accentRgb="255,255,255"
-                roles={{}}
-                stacked={[]}
-                taken={{}}
-                disabled={[]}
-                onTap={(d) => setUnavailableDays((cur) =>
-                  cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d])}
+            {/* ⛔⛔ YOUR WEEK IS THE HOME WEEK LIST (Michael, 2026-09-22: "use our weekly schedule that's already built…
+                lose the scheduler in the wizard, it's a headache"). A typical week — week two, no test sessions, days not
+                dates — with the calendar's own drag. A drop is a pick sent to the server, which rebuilds the week; what
+                the move costs comes back in the notes below. The chip rows (long day, hard days, extra runs, days off)
+                and the rest-day line are gone: the list shows every session and every rest day itself. */}
+            {(previewWeekTypical?.length ?? 0) > 0 ? (
+              <WeekPlanList
+                sessions={previewWeekTypical ?? []}
+                dimmed={previewing}
+                movable={(x) => {
+                  const t = String(x.type ?? '').toLowerCase();
+                  return t === 'strength' || t === 'run' || t === 'ride';
+                }}
+                onDrop={(x, to) => dropSession(x, to as DayName)}
               />
-            </div>
-            {/* ⛔ THE REST DAY THE BUILT WEEK KEEPS (Michael, 2026-09-22: "we should show the rest day"). Read off the
-                server's own preview week — a day with nothing on it — so it moves as the picks above move things.
-                Display only. */}
-            {(previewWeek?.length ?? 0) > 0 && (() => {
-              const rest = (Object.keys(DAY_SHORT) as DayName[]).filter((d) => !(placedWeekByDay[d]?.length));
-              return (
-                <div className="rounded-xl border border-white/10 px-3 py-3" data-testid="rest-day-line">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-white/85 text-sm">Rest day</span>
-                    <span className="text-sm text-white/70">
-                      {rest.length === 0 ? 'None' : rest.map((d) => DAY_SHORT[d]).join(' · ')}
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
+            ) : previewing ? (
+              <p className="text-white/50 text-sm">Building your week…</p>
+            ) : previewFailed ? (
+              <p className="text-white/60 text-sm leading-relaxed">
+                The week could not be built — that is a fault on our side, not your answers.
+              </p>
+            ) : null}
 
-
-            {/* ⛔ THE GATE STATES ITSELF — a disabled Continue that says nothing is indistinguishable
-                from a broken one (the race card learned that 2026-08-06). The reason NOW renders in
-                the footer right above the Continue key (StepLayout `blockedReason`), not here below
-                the rows where it scrolled off-screen while the dead button stayed visible — the exact
-                disconnect that let an athlete miss the "Runs a week" count. One sentence, one place,
-                at the button. */}
-
-            {/* ── SCHEDULE HEALTH ──────────────────────────────────────────────────────────────
-                ⛔ PINNED DIRECTLY ABOVE THE WEEK (Michael, 2026-08-18), so it answers the tap that
-                caused it. It reads the SAME model that will build the block — one solve, run as they
-                move a chip — so the badge and the plan agree by construction rather than by luck.
-
-                ⛔ ONLY CLEARANCE COLLISIONS LIGHT IT. A ride the week had no room for, a crowded
-                day, the interleaving preference: real costs, none of them biological collisions.
-                Folding those in would light the badge on weeks where nothing is breached and the
-                warning would stop meaning anything. A week with no rest day is excluded for the same
-                reason.
-
-                ⛔ NEUTRAL SURFACE, NOT A COLOUR. This app already spends amber on STRENGTH and green
-                on RIDE — a coloured badge here would read as a discipline, which is the wayfinding
-                language the rest of the wizard is built in. The state is carried by an ICON and the
-                WORDS; the surface stays the card's own.
-
-                ⚠️ A COUNT, NEVER A PERCENTAGE. A week either breaches a clearance or it does not,
-                so a score would be a number with no scale behind it — the "score that lies" this
-                codebase keeps deleting. It says how many, and tapping shows exactly which. */}
-            {/* ⛔⛔ THE LEGEND IS GONE, AND SO ARE THE LETTERS IT DECODED (2026-08-25).
-                It read `H hard · LR/LB long · E/B easy run/ride · S lifting only · ×2 = two
-                sessions` — written 2026-08-24 because the chips were not "clearly telling you where
-                the hard days are, easy days, stacks". That reading was right and the legend was the
-                wrong answer to it: **a legend is the screen admitting its own notation failed.**
-                Nothing decodes now because nothing is encoded — the week is stated once, in words,
-                in the answer zone below, where "Hard Run 41m" needs no key.
-                ⚠️ THE ×2 BADGE IS NOT REDESIGNED, it simply has no chip left to sit on
-                (Michael's call, 2026-08-24 — the wording stands wherever coded chips still render,
-                which is the race path's accumulating week row). */}
-            {/* ⛔⛔ THE ENGINE SAID WHAT IT COULD NOT HONOUR AND THIS SCREEN THREW IT AWAY
-                (traced on the dev preview, 2026-08-25 — task 0 of the handoff).
-
-                **What is actually happening.** The Standing Plan week is a FIXED-ORDER FRAME: which
-                frame day carries a hard session is fixed, and the only freedom `chooseDayMap`
-                (`_shared/standing-plan/day-map.ts`) has is which weekday frame-day-1 lands on. It
-                scores the seven rotations with the long day weighted above everything —
-                `LONG_RUN_WINS`, and its own copy says why — so a long ride pinned to Saturday fixes
-                the rotation, and at that rotation the frame's hard days are Monday and Wednesday.
-                A hard day pinned to Friday is then unreachable.
-
-                ⛔ AND THAT IS NOT A SILENT OVERRIDE — THE ENGINE WRITES THE SENTENCE. Measured on
-                the wire: `plan.placement_compromises` came back with *"The hard session is on Monday
-                and Wednesday rather than Thursday. The week's order is fixed and the long day is
-                placed first, so Thursday could not also be reached."* The screen rendered
-                `<WeekGrid notes={[]} />` and printed none of it. So the athlete saw their day in the
-                row, a different day in the week, and a green tick between them.
-
-                ⚠️ NOT THE SAME QUESTION AS THE HEALTH BADGE, WHICH IS WHY IT IS ITS OWN ROW. That
-                badge is the CLIENT clearance model — biological collisions between sessions. This is
-                the SERVER saying a pin was not reachable. Both can be true, neither implies the
-                other, and folding them into one count would be a number with two meanings.
-
-                ⛔ IT SITS WITH THE SELECTORS, NOT UNDER THE WEEK. Feedback lands where the choice
-                was made — the day chips above are what caused it.
-                ⛔ AND IT IS THE ENGINE'S OWN WORDS, printed verbatim. Re-wording them client-side is
-                how the screen and the plan come to describe the same week differently. */}
-            {/* ⛔⛔ THE "N days the week could not honour" BANNER IS DELETED (pins-win, 2026-08-25).
-                Nothing is unhonoured any more: `compose.ts` puts the endurance session on the day
-                that was tapped. Its slot carries the tiered notes instead — what the week the
-                athlete asked for COSTS, never what the engine refused them.
-
-                ⛔ TWO TIERS, ONE SURFACE, AND NEITHER IS A BLOCK. A breach is a clearance in the
-                law (`week-model` Layer 1 — injury risk, named plainly). A trade-off is a legal week
-                that is thinner than it could be (Layer 2). Continue is not gated on either.
-                ⚠️ AMBER, NOT RED, AND NO ICON ESCALATION — the handoff is explicit that this is
-                information, not an error state. The count leads so the row is legible closed. */}
             {weekNotes.length > 0 && (
               <button
                 type="button"
@@ -6758,96 +6485,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   </span>
                 )}
               </button>
-            )}
-
-            {/* ⛔ HOW THE WEEK IS PUT TOGETHER — UNDER THE CONFLICT LINE, ABOVE THE WEEK (round 3).
-                Its position is the argument: the line above says THIS week has an outstanding pin,
-                and this says what the rules were that produced it. Reference, so it opens closed.
-
-                ⛔ STATIC, AND SOURCED. Every sentence is traced to `week-model/model.ts` or
-                `standing-plan/day-map.ts` at the `PLACEMENT_RULES` declaration — no LLM, no
-                per-athlete phrasing, nothing computed. It says the same thing on every week because
-                the rules are the same on every week. */}
-            <button
-              type="button"
-              onClick={() => setRulesOpen((v) => !v)}
-              aria-expanded={rulesOpen}
-              className="w-full text-left rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5"
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-white/85 text-sm">Use these tips to put your own week together</span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 ml-auto transition-transform ${rulesOpen ? 'rotate-180' : ''}`} />
-              </span>
-              {rulesOpen && (
-                <span className="block mt-2 space-y-1.5">
-                  {PLACEMENT_RULES.map((r, i) => (
-                    <span key={i} className="block text-white/70 text-sm leading-relaxed">{r}</span>
-                  ))}
-                </span>
-              )}
-            </button>
-
-            {/* ══ THE ANSWER ZONE ════════════════════════════════════════════════════════════
-                ⛔ ONE REPRESENTATION OF THE WEEK, AND IT IS THIS ONE (2026-08-25). Above this line
-                everything is a QUESTION — seven plain day chips per anchor, nothing else riding on
-                them. Below it is the week those answers produce, stated in words. The screen used
-                to do both jobs in one object: the chips were the picker AND a coded report, so
-                every chip meant two things and a legend was needed to say which.
-
-                ⛔ THE WEEK, BELOW THE CONTROLS AND NOT COSTING THE FOLD WHEN IT IS EMPTY (kept).
-                It led this card once, and reserved nine rems for a sentence that showed no
-                selection at all — which put the controls it was meant to accompany off screen.
-
-                ⛔ NEVER A SILENT EMPTY SPACE (kept). Running, failed, and never-asked-for are three
-                different states that once all rendered as nothing. Each still says which it is —
-                and the box only reserves height once there is something in it. */}
-            {(previewWeek?.length || previewing || previewFailed) ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
-                {/* ⛔ THE ZONE IS NAMED, because an unlabelled block under a picker reads as more
-                    controls. It says whose answer it is: the same solve that will build the block. */}
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-white/85 text-sm">The week this builds</p>
-                  {/* ⛔⛔ IT SAID NOTHING WHILE IT WAS OUT OF DATE, AND THAT IS THE CONTRADICTION
-                      MICHAEL PHOTOGRAPHED (traced 2026-08-25 — task 0 of the handoff).
-
-                      The high-intensity row reads `state.hardDays`, which fills the instant a chip
-                      is tapped or the client pre-fill writes a suggestion. This grid reads
-                      `previewWeek`, which is the SERVER's composed week and arrives 400 ms of
-                      debounce plus a round trip later. Between the two, the old week kept rendering
-                      at full confidence beside the new answer — the `previewWeek?.length` arm wins
-                      over `previewing`, so "Building your week…" only ever showed on the FIRST
-                      build, never on a refresh.
-
-                      ⛔ THE ENGINE IS NOT MOVING ANYTHING, AND THAT WAS THE OTHER HALF OF THE TRACE.
-                      A pinned hard day becomes a solver ANCHOR (`strength-primary-plan.ts:3258`),
-                      and `week-model/resolve.ts:483` splits units into `fixed` (pinned, kept
-                      verbatim) and `free` (searched) — the local-improvement sweep starts at
-                      `firstFree`, so a pinned day cannot move. `strength-primary-plan.ts:3617`
-                      pushes a pinned entry straight through. The athlete's day is honoured
-                      absolutely; the grid was simply showing the previous answer.
-
-                      ⚠️ SO THE FIX IS A STALENESS CUE, NOT A RECONCILIATION. Nothing here is
-                      re-derived and no placement happens on the client — the grid dims and says it
-                      is catching up, then the real answer lands. */}
-                  {previewing && previewWeek && previewWeek.length > 0 && (
-                    <span className="text-white/45 text-xs shrink-0">Updating</span>
-                  )}
-                </div>
-                {previewWeek && previewWeek.length > 0 ? (
-                  <div className={previewing ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
-                    <WeekGrid sessions={previewWeek} notes={[]} title="Sample week — week 1" summary={readout?.week_one ?? null} />
-                  </div>
-                ) : previewing ? (
-                  <p className="text-white/50 text-sm">Building your week…</p>
-                ) : (
-                  <p className="text-white/60 text-sm leading-relaxed">
-                    The week could not be built — that is a fault on our side, not your answers.
-                    {previewError ? <span className="block text-white/35 text-xs mt-1 font-mono break-words">{previewError}</span> : null}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-white/35 text-xs">The week appears once your days are in.</p>
             )}
 
             {/* ⛔ THE LAST ROW IS NOT THE LAST PIXEL (punch item 4, 2026-08-25). Saturday and Sunday
@@ -7105,7 +6742,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // line, same compromise sentences, so the athlete learns it once. It also owns
                     // the endurance budget, which is DERIVED from the lifting frequency rather than
                     // hardcoded, so it stays true if the block ever runs 3 lifting days.
-                    return <WeekGrid sessions={previewWeek} notes={previewNotes} title="Sample week — week 1" summary={readout?.week_one ?? null} />;
+                    // ⛔ A TYPICAL WEEK (2026-09-22), the same one Your week shows — week two on a standing plan.
+                    return <WeekGrid sessions={isStrengthFocus ? (previewWeekTypical ?? previewWeek) : previewWeek} notes={previewNotes} title={isStrengthFocus ? 'Sample week' : 'Sample week — week 1'} summary={readout?.week_one ?? null} />;
                   })()}
                 </div>
               )}
