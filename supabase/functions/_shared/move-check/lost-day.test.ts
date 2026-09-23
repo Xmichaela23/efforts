@@ -4,7 +4,7 @@ import { placeLostDay, type LostDayPlan } from './lost-day.ts';
 import { tagsAfterMove } from '../moved-from.ts';
 import type { MoveRow } from './index.ts';
 
-const P108 = (day: string, word = 'run') => `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`;
+const P108 = (day: string, word = 'run') => `Two sessions on ${day}. ${word.charAt(0).toUpperCase() + word.slice(1)} in the morning and lift 6 to 8 hours later.`;
 const S = (id: string, date: string, type: string, name: string, status = 'planned', band?: string): MoveRow =>
   ({ id, date, type, name, workout_status: status, training_plan_id: 'p', ...(band ? { tags: ['standing_plan', `band:${band}`] } : {}) });
 

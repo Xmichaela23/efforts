@@ -3,7 +3,7 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { checkMove, daysThatFit, type MoveRow } from './index.ts';
 
 // Michael approved the words 2026-09-23 (Viada p108 / p145 rule 6: the lift first, 6-8 h before the next session).
-const P108 = (day: string, word = 'run') => `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`;
+const P108 = (day: string, word = 'run') => `Two sessions on ${day}. ${word.charAt(0).toUpperCase() + word.slice(1)} in the morning and lift 6 to 8 hours later.`;
 
 // Week of Mon 2026-09-21 … Sun 2026-09-27. Hinge every Tuesday; other sessions as listed.
 const hinge = (id: string, date: string, extra: Partial<MoveRow> = {}): MoveRow =>
@@ -160,7 +160,7 @@ const WK: MoveRow[] = [
   { id: 'vt1', date: '2026-10-03', type: 'run', name: 'Easy Run', tags: ['family:run_vt1'] },
   { id: 'del', date: '2026-10-04', type: 'strength', name: 'DE: Lower', tags: ['lower:de'] },
 ].map((r) => ({ workout_status: 'planned', training_plan_id: 'p', ...r }));
-const HEAVY_AFTER_HARD = 'Thursday: hard run and heavy legs. Lift first, run 6 to 8 hours after.';
+const HEAVY_AFTER_HARD = 'Thursday: hard run and heavy legs. Run in the morning and cut it short to reduce fatigue. Lift 6 to 8 hours later.';
 
 Deno.test('⛔ WEEK RULE: heavy legs moved onto the hard run day earns the builder\'s own sentence', () => {
   const mel = WK.find((r) => r.id === 'mel')!;

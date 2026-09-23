@@ -144,13 +144,13 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   // ⛔ THE WEEK'S OWN RULES FIRST, so a same-day heavy-legs line (which states the order itself) is not doubled by this one.
   const weekNotes = weekRuleNotes(args.session, to, args.rows);
   if (!isPlyo(args.session) && others.length > 0 && (realLift(args.session) || others.some(realLift))
-    && !weekNotes.some((t) => t.startsWith(`${day}: `) && /heavy legs\./.test(t) && /6 to 8 hours after/.test(t))) {
-    // Viada p108 / p145 rule 6: the lift in the first session, 6-8 h before the next. Michael approved the words 2026-09-23.
+    && !weekNotes.some((t) => t.startsWith(`${day}: `) && /heavy legs\./.test(t) && /Lift 6 to 8 hours later/.test(t))) {
+    // Viada p143 rule 6: the run in the morning, at least 6-8 h before the resistance session. Michael's words, 2026-09-23.
     const other = realLift(args.session) ? others.find((r) => !isLift(r)) : args.session;
     const word = other ? (String(other.type ?? '').toLowerCase() === 'ride' ? 'ride' : String(other.type ?? '').toLowerCase() === 'swim' ? 'swim' : 'run') : null;
     notes.push({ rule: 'two_sessions', page: 'p108',
       text: word
-        ? `Two sessions on ${day}. Lift first, ${word} 6 to 8 hours after.`
+        ? `Two sessions on ${day}. ${word.charAt(0).toUpperCase() + word.slice(1)} in the morning and lift 6 to 8 hours later.`
         : `Two sessions on ${day}. Leave 6 to 8 hours between them.` });
   }
   // Viada p80: at least one session every 8 to 9 days per movement. Only past nine; the 3–4 day ideal gets no note.

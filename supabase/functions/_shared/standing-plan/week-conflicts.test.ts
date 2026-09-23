@@ -117,14 +117,14 @@ Deno.test('a hard session on the heavy leg day is named — the ride gets an ord
   const rideC = ride.week.conflicts.find((c) => c.rule === 'hard_with_heavy_legs');
   assert(rideC, 'a hard ride on the heavy leg day raised nothing');
   assert(rideC!.days.includes('Tuesday'), rideC!.days.join(','));
-  assertEquals(rideC!.text, 'Tuesday: hard ride and heavy legs. Lift first, ride 6 to 8 hours after.');
+  assertEquals(rideC!.text, 'Tuesday: hard ride and heavy legs. Ride in the morning and cut it short to reduce fatigue. Lift 6 to 8 hours later.');
 
   const run = build({ runs: 4, rides: 0 }, 'Saturday', ['Tuesday', null]);
   const runC = run.week.conflicts.find((c) => c.rule === 'hard_with_heavy_legs');
   assert(runC, 'a hard run on the heavy leg day raised nothing');
   // ⛔ SAME DAY, RUN OR RIDE: the order to run the day in (Michael approved the words 2026-09-23). The p77 "tired legs"
   // line keeps the day-after case (see the long-session test below).
-  assertEquals(runC!.text, 'Tuesday: hard run and heavy legs. Lift first, run 6 to 8 hours after.');
+  assertEquals(runC!.text, 'Tuesday: hard run and heavy legs. Run in the morning and cut it short to reduce fatigue. Lift 6 to 8 hours later.');
   // ⛔ THE ARTICLE IS DROPPED ON PURPOSE — his own lines name sessions bare ("Tuesday: hard ride and
   // heavy legs", "Friday heavy legs, Saturday long run"). A "the" here would be a word he did not write.
   assert(!/after the /.test(runC!.text), runC!.text);

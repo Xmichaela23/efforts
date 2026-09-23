@@ -442,8 +442,9 @@ export function typedRowsOf(rows: Array<{ day: string; type?: string | null; nam
   return out;
 }
 
-/** The one word for the session in "run 6 to 8 hours after". */
+/** The one word for the session: run / ride / swim. */
 const sportWordOf = (t: TypedSession): string => (t.s.type === 'ride' ? 'ride' : t.s.type === 'swim' ? 'swim' : 'run');
+const capitalize = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
 
 /**
  * ⛔ THE RULES THEMSELVES, ON SESSIONS ALREADY TYPED (2026-09-22, one source of logic). The builder
@@ -509,16 +510,18 @@ export function conflictsOfTyped(
         continue;
       }
       if (apart === 'same' && isEnduranceBlocker(blocker)) {
-        // ⛔ ONE SENTENCE FOR THE SAME DAY, RUN OR RIDE (Michael approved the words 2026-09-23): the order to run the day
-        // in. Viada p145 (rule 6): skill movements in the first session, at least 6-8 hours before the next; p108 the same.
+        // ⛔ ONE SENTENCE FOR THE SAME DAY, RUN OR RIDE (Michael's words, 2026-09-23): the book's own order for the day.
         push({
           kind: 'cost',
           rule: 'hard_with_heavy_legs',
           days,
           sessions,
           shortBy: u.shortBy,
-          // Viada p145 (rule 6) / p108: the lift in the first session, 6-8 hours before the next.
-          text: `${sDay}: ${bareFor(blocker)} and heavy legs. Lift first, ${sportWordOf(blocker)} 6 to 8 hours after.`,
+          // Viada p143 (rule 6): a morning run, "shorter-than-normal … to reduce fatigue", then "at least 6 to 8 hours" before
+          // the resistance session. Michael's words, 2026-09-23.
+          // ⚠️ "Try" is on the banned-word list (`voiceViolation`), so the line states it plainly.
+          text: `${sDay}: ${bareFor(blocker)} and heavy legs. ${capitalize(sportWordOf(blocker))} in the morning and cut it short to `
+            + 'reduce fatigue. Lift 6 to 8 hours later.',
         });
       } else if (isEnduranceBlocker(blocker)) {
         push({
