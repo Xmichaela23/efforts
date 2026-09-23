@@ -168,6 +168,8 @@ export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
  */
 export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
   strength_5k: VIADA_PICK_KEYS,
+  // p250 prints p246's HYP accessory cells (focused pull/push, accessory lower, secondary push lower), so it takes p246's keys.
+  strength_half: VIADA_PICK_KEYS,
   all_rounder: ALL_ROUNDER_PICK_KEYS,
   /**
    * ⛔ p278 PRINTS THE SAME THREE HYP ACCESSORY CELLS AS p246's DAYS 1 AND 2 (focused pull, focused

@@ -11,11 +11,15 @@
 import React from 'react';
 import { GripVertical } from 'lucide-react';
 import { useCarryDrag, type CarryItem } from '@/hooks/useCarryDrag';
-import { displayDisciplineOf, isPlyoSession } from '@/lib/utils';
+import { displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 export type PlanSessionLite = {
   day?: string; type?: string; name?: string; intent_title?: string; duration?: number; tags?: unknown;
+  /** The server's length words — the ones the Home calendar prints (`planned-duration-label.ts`). */
+  planned_duration_label?: string | null;
+  /** What a drop of this session is, decided by the server (`preview-session.ts`). Absent = does not move. */
+  pick?: { kind: 'long' | 'easy' | 'slot' | 'lift'; key: string };
 };
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
@@ -24,17 +28,11 @@ const SHORT: Record<string, string> = {
 };
 const NO_SELECT = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties;
 
-/** The planned length in the calendar's register: runs and rides as minutes:00, lifts as minutes. */
-function lengthOf(s: PlanSessionLite): string {
-  const m = Math.round(Number(s.duration) || 0);
-  if (m <= 0) return '';
-  return String(s.type ?? '').toLowerCase() === 'strength' ? `${m} min` : `${m}:00`;
-}
+/** The server's words for the length; nothing is worked out here. */
+const lengthOf = (s: PlanSessionLite): string => s.planned_duration_label ?? '';
 
-export default function WeekPlanList({ sessions, movable, onDrop, dimmed }: {
+export default function WeekPlanList({ sessions, onDrop, dimmed }: {
   sessions: PlanSessionLite[];
-  /** Whether this session may be carried. The jump drills ride with their day and are not. */
-  movable: (s: PlanSessionLite) => boolean;
   onDrop: (s: PlanSessionLite, toDay: string) => void;
   /** True while the server is rebuilding the week after a drop. */
   dimmed?: boolean;
@@ -76,7 +74,8 @@ export default function WeekPlanList({ sessions, movable, onDrop, dimmed }: {
               ) : items.map((s, i) => {
                 const id = idOf(s, i, d);
                 const colour = getDisciplineColor(displayDisciplineOf(s as never));
-                const canMove = movable(s) && !isPlyoSession(s as never);
+                // ⛔ A SESSION MOVES WHEN THE SERVER SAYS WHAT A DROP OF IT IS.
+                const canMove = s.pick != null;
                 return (
                   <div
                     key={id}

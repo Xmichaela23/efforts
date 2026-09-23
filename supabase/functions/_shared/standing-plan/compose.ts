@@ -3171,7 +3171,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     // ⚠️ IT IS ITS OWN SESSION RATHER THAN ROWS APPENDED TO A LIFT, which matters if a future frame
     // ever marks a lifting day: the drills must not enter `dosing`, and p247's *"all first lifts of
     // the day should be a competition movement"* would not survive a skip at the top of the list.
-    const drills = day.plyo ? plyoRows(args, notes) : [];
+    // ⛔ "Plyo x N" (p250) — the first N of the day's drills, in the book's family order.
+    const drills = day.plyo ? plyoRows(args, notes).slice(0, day.plyoCount ?? undefined) : [];
 
     // ── strength ──────────────────────────────────────────────────────────────────────────────
     if (day.strength.length > 0) {

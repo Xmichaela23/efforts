@@ -123,9 +123,10 @@ const corsHeaders = {
  * Cycling: Base, anything else (including absent) → Strength + 5K, which is what every caller before
  * the focus cards existed already gets.
  */
-function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' {
+function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' | 'run_half' {
   const raw = (body as Record<string, unknown> | null)?.focus;
-  return raw === 'standard' ? 'standard' : raw === 'ride' ? 'ride' : 'run';
+  // ⛔ 'run_half' → 5HR + Strength (p250), 2026-09-22.
+  return raw === 'standard' ? 'standard' : raw === 'ride' ? 'ride' : raw === 'run_half' ? 'run_half' : 'run';
 }
 
 function json(obj: unknown, status: number): Response {
@@ -136,10 +137,10 @@ function json(obj: unknown, status: number): Response {
  * The endurance screen's per-row sport answers (`endurance_slot_answers`, keyed `hard1`…`long`).
  * Validated, not trusted: an unknown row or a value other than run/ride drops the whole map.
  */
-function slotAnswersFromBody(body: unknown): Partial<Record<'hard1' | 'hard2' | 'hard3' | 'easy' | 'long', 'run' | 'ride'>> | null {
+function slotAnswersFromBody(body: unknown): Partial<Record<'hard1' | 'hard2' | 'hard3' | 'easy' | 'easy2' | 'long', 'run' | 'ride'>> | null {
   const raw = (body as Record<string, unknown> | null)?.endurance_slot_answers;
   if (!raw || typeof raw !== 'object') return null;
-  const rows = new Set(['hard1', 'hard2', 'hard3', 'easy', 'long']);
+  const rows = new Set(['hard1', 'hard2', 'hard3', 'easy', 'easy2', 'long']);
   const out: Record<string, 'run' | 'ride'> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (!rows.has(k) || (v !== 'run' && v !== 'ride')) return null;

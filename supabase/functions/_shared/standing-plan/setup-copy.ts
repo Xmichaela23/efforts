@@ -45,6 +45,17 @@ export const PROGRAM_COPY = {
     blurb: 'Around 4 hours of running a week, with threshold and interval runs, and an emphasis on strength. Intermediate.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
+  // ⛔ 5HR + STRENGTH (Strength + Half-Marathon, Viada pp250-251), 2026-09-22 — Michael approved the words.
+  // OURS — "5 hours": the built week's running (five runs, p250) as composed; see the ledger. "Advanced": p251 "more
+  // advanced hybrid athletes", "not recommended as a first program", "not for novices". Half marathon: p250's name.
+  run_half_strength: {
+    label: '5HR + Strength',
+    // p251: "can be run indefinitely … maintain the ability to pivot toward longer distance events".
+    // p251: 1RM "1% every four weeks" (4HR: every three, p247).
+    blurb: 'Around 5 hours of running a week and four lifting days. The weights go up more slowly than on 4HR. It can run '
+      + 'all year and keeps you ready for longer races. Advanced.',
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
   // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
   // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
   // advanced cyclists".
@@ -78,6 +89,10 @@ export const DELOAD_LINE: Record<FrameId, string | null> = {
   // Viada p247, reworded (Michael approved the words 2026-09-19); the page: "If a powerlifting meet or 5K approaches, I recommend that, 2 weeks
   // out, you switch the program to the deload version."
   strength_5k: 'If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.',
+  // Viada p251, reworded (Michael approved the words 2026-09-22); the page: "4 to 5 weeks out from a meet, consider running the deload
+  // running portion (unless a race is within 6 weeks)."
+  strength_half: 'If a powerlifting meet is 4 to 5 weeks away, the recommendation is to switch the running to the deload '
+    + 'version, unless a race is within 6 weeks.',
   all_rounder: null,
   cycling_base: null,
 };
@@ -105,6 +120,13 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
     // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
+    confirm_line: 'A {weeks}-week block.',
+    ftp_note: null,
+  },
+  strength_half: {
+    // OURS — "5HR": the built week's running, about 5 hours (five runs, Viada p250).
+    name: '5HR + Strength',
+    confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
   },

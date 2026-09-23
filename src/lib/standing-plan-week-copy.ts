@@ -23,7 +23,7 @@ import { isHardSlot, isLongSlot } from '../../supabase/functions/_shared/standin
  * CONTROL. p274 prescribes MLSS+, Cyc AnA and NT; p246 prescribes two. **The row count is the
  * frame's, and `frameSlots` is what reads it** — see below.
  */
-export type SlotKey = 'hard1' | 'hard2' | 'hard3' | 'easy' | 'long';
+export type SlotKey = 'hard1' | 'hard2' | 'hard3' | 'easy' | 'easy2' | 'long';
 export type SlotSport = 'run' | 'ride';
 /** What a slot is FOR, which is what decides its label, its default sport and its row order. */
 export type SlotRole = 'hard' | 'easy' | 'long';

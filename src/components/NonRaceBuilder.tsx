@@ -371,9 +371,10 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-type ProgramId = 'run_ride_strength' | 'run_strength' | 'ride_strength';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
-  standard: ['run_ride_strength'], run: ['run_strength'], ride: ['ride_strength'],
+  // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
+  standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength'],
 };
 // ⛔ THE CARDS' WORDS ARE THE SERVER'S (2026-09-13) — `builder.setup.programs`: name, description, requirements line.
 const PROGRAM_COPY: Record<ProgramId, {
@@ -381,7 +382,7 @@ const PROGRAM_COPY: Record<ProgramId, {
   /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
   goal: NonRaceGoalId | null;
   /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
-  focus: 'standard' | 'run' | 'ride';
+  focus: 'standard' | 'run' | 'ride' | 'run_half';
   /**
    * ⛔ A BUILT PROGRAMME WHOSE SCREENS' WORDS ARE NOT ALL APPROVED YET STAYS DIMMED (Ride + Strength,
    * 2026-09-13: every athlete-facing line goes through Michael before the card is switched on).
@@ -399,6 +400,10 @@ const PROGRAM_COPY: Record<ProgramId, {
     Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
     goal: 'get_stronger', focus: 'run',
   },
+  run_half_strength: {
+    Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
+    goal: 'get_stronger', focus: 'run_half',
+  },
   ride_strength: {
     Icon: Bike, color: getDisciplineColor('ride'),
     goal: 'get_stronger', focus: 'ride',
@@ -408,11 +413,13 @@ const PROGRAM_COPY: Record<ProgramId, {
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 /** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
-const FOCUS_FRAME: Record<'standard' | 'run' | 'ride', FrameId> = {
+const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half', FrameId> = {
   standard: 'all_rounder',
   run: 'strength_5k',
   // ⛔ Ride Focus → Ride + Strength → Cycling: Base (p278). `resolveFrame` takes the same word.
   ride: 'cycling_base',
+  // ⛔ 5HR + Strength → Strength + Half-Marathon (p250), 2026-09-22.
+  run_half: 'strength_half',
 };
 
 /**
@@ -421,14 +428,14 @@ const FOCUS_FRAME: Record<'standard' | 'run' | 'ride', FrameId> = {
  * is the whole class of defect the per-slot answer exists to prevent.
  * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
-const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'run_half' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
 
 /**
  * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4). The page
  * fixes every ride at level 1 and the athlete's one answer is four rides or five. Keyed on what the
  * frame DECLARES (`printedWeekOnly` and a `fewerRidesDropsSlot`), never on its id.
  */
-const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): boolean =>
+const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' }): boolean =>
   st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.fewerRidesDropsSlot != null;
 
 /**
@@ -445,8 +452,8 @@ const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standar
  * ⚠️ ONE OWNER, READ IN BOTH SCOPES — the payload assembler and the component. Two copies of this
  * test is how the screen and the payload come to disagree about what was asked.
  */
-const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): boolean =>
-  st.goal === 'get_stronger' && frameOf(st) === 'strength_5k';
+const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' }): boolean =>
+  st.goal === 'get_stronger' && (frameOf(st) === 'strength_5k' || frameOf(st) === 'strength_half');
 
 // ⛔ THE STRONG / HEAVY TIER SCREEN IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a
 // no-op routing into `get_stronger`; Heavy was dark; nothing in the payload read the tier. The
@@ -889,7 +896,7 @@ export type NonRaceState = {
    * card existed. It never changes what that path builds.
    * ⚠️ `'ride'` = Ride + Strength (Cycling: Base, p278), 2026-09-13.
    */
-  focus?: 'standard' | 'run' | 'ride';
+  focus?: 'standard' | 'run' | 'ride' | 'run_half';
   /**
    * ⛔ RIDE + STRENGTH'S ONE ENDURANCE ANSWER — four rides or five (p278; the 4-ride week leaves out
    * the Day 2 easy ride). Absent = the page's five.
@@ -1619,6 +1626,8 @@ function assemblePayload(
           // ⛔ RIDE + STRENGTH (2026-09-13): the focus, and the ride count on a printed ride week. Both
           // omitted on every other path, so those payloads are byte-identical.
           ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
+          // ⛔ 5HR + Strength (p250), 2026-09-22 — without this the build falls back to the 5K frame.
+          ...(isStrengthFocusPath && state.focus === 'run_half' ? { focus: 'run_half' } : {}),
           // ⚠️ ONLY WHEN THE ATHLETE PICKED (2026-09-13): the build keeps the page's own count otherwise.
           ...(printedRideWeekPath(state) && state.rideCount != null ? { ride_count: state.rideCount } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
@@ -2630,42 +2639,29 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
 
   /**
-   * ⛔ A SESSION DROPPED ON YOUR WEEK BECOMES A PICK (2026-09-22). Read off the row's own tags, never its name:
-   *   · the long session → the long day (the pick every other screen already reads);
-   *   · an extra easy run (`volume_fill`) → its place among the extra runs;
-   *   · any other run or ride → its frame slot (`slot:` tag);
-   *   · a lifting day → its label (the frame's own, `ME: Upper`).
-   * The server rebuilds the week from the picks; nothing is placed here.
+   * ⛔ A SESSION DROPPED ON YOUR WEEK BECOMES A PICK (2026-09-22). The server stamps each preview session with what a
+   * drop of it is (`pick`, `_shared/standing-plan/preview-session.ts`); this files the day under that key and the server
+   * rebuilds the week from the picks. Nothing is decided or placed here.
    */
   const dropSession = (x: PlanSessionLite, to: DayName) => {
-    const tags = Array.isArray(x.tags) ? (x.tags as unknown[]).map(String) : [];
-    const type = String(x.type ?? '').toLowerCase();
-    if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('family:run_lsd')) {
-      if (type === 'ride') { touch('longRide'); setState((st) => ({ ...st, longRideDay: to })); }
+    // ⛔ THE SERVER SAID WHAT THIS DROP IS (`pick`, `preview-session.ts`); the phone files it under that key.
+    const pick = x.pick;
+    if (!pick) return;
+    if (pick.kind === 'long') {
+      if (pick.key === 'ride') { touch('longRide'); setState((st) => ({ ...st, longRideDay: to })); }
       else { touch('longRun'); setState((st) => ({ ...st, longRunDay: to })); }
-      return;
-    }
-    if (tags.includes('volume_fill') && type === 'run') {
-      const fills = (previewWeekTypical ?? []).filter((y) => String((y as { type?: string }).type ?? '').toLowerCase() === 'run'
-        && Array.isArray((y as { tags?: unknown }).tags) && ((y as { tags: unknown[] }).tags).includes('volume_fill'));
-      const i = fills.indexOf(x as never);
-      if (i < 0) return;
+    } else if (pick.kind === 'easy') {
+      const i = Number(pick.key);
       setState((st) => {
         const next = [...(st.easyDays ?? [])];
         while (next.length <= i) next.push('');
         next[i] = to;
         return { ...st, easyDays: next };
       });
-      return;
-    }
-    const slot = tags.find((t) => t.startsWith('slot:'))?.slice('slot:'.length);
-    if (slot && (type === 'run' || type === 'ride')) {
-      setState((st) => ({ ...st, slotDays: { ...(st.slotDays ?? {}), [slot]: to } }));
-      return;
-    }
-    if (type === 'strength' && x.name) {
-      const label = String(x.name);
-      setState((st) => ({ ...st, liftDays: { ...(st.liftDays ?? {}), [label]: to } }));
+    } else if (pick.kind === 'slot') {
+      setState((st) => ({ ...st, slotDays: { ...(st.slotDays ?? {}), [pick.key]: to } }));
+    } else if (pick.kind === 'lift') {
+      setState((st) => ({ ...st, liftDays: { ...(st.liftDays ?? {}), [pick.key]: to } }));
     }
   };
 
@@ -6391,10 +6387,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               <WeekPlanList
                 sessions={previewWeekTypical ?? []}
                 dimmed={previewing}
-                movable={(x) => {
-                  const t = String(x.type ?? '').toLowerCase();
-                  return t === 'strength' || t === 'run' || t === 'ride';
-                }}
                 onDrop={(x, to) => dropSession(x, to as DayName)}
               />
             ) : previewing ? (

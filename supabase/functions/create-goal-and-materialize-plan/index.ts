@@ -36,6 +36,7 @@ import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-pro
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxesResolved, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
 import { FRAMES } from '../_shared/standing-plan/frames.ts';
 import { resolveFrame } from '../_shared/standing-plan/frame-resolver.ts';
+import { withPreviewFields } from '../_shared/standing-plan/preview-session.ts';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 // ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
@@ -2592,7 +2593,7 @@ Deno.serve(async (req: Request) => {
             // same rule `generate-strength-plan` applies; keep the two together. No frame → all four.
             const gsEntryFrame = resolveFrame({
               enduranceSport: gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null,
-              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' ? gsTp.focus : 'run',
+              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' || gsTp.focus === 'run_half' ? gsTp.focus : 'run',
             }).frame;
             const gsEntryLifts: string[] = gsEntryFrame ? FRAMES[gsEntryFrame].testedLifts : ['squat', 'bench', 'deadlift', 'overheadPress'];
             const gsLow = liftsBelowEntryMinimum(gsMaxes)
@@ -3145,7 +3146,7 @@ Deno.serve(async (req: Request) => {
                * through, so a stale or malformed client cannot name a frame that does not exist.
                */
               // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
-              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' ? { focus: gsTp.focus } : {}),
+              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half' ? { focus: gsTp.focus } : {}),
               /**
                * ⛔ THE RIDE COUNT (Ride + Strength, p278's 4 or 5, 2026-09-13). Same allowlist, same
                * failure: `generate-strength-plan` reads `ride_count` off its own body, so a hop that drops
@@ -3200,7 +3201,10 @@ Deno.serve(async (req: Request) => {
             if (bodyPreview) {
               return new Response(JSON.stringify({
                 success: true, mode, goal_id: createdGoalId, preview: true, sport: 'strength', combined: false,
-                plan: gsGen?.plan ?? null,
+                // ⛔ EACH SESSION CARRIES ITS LENGTH WORDS AND WHAT A DROP OF IT IS (2026-09-22) — `withPreviewFields`.
+                plan: gsGen?.plan
+                  ? { ...gsGen.plan, sessions_by_week: withPreviewFields(gsGen.plan.sessions_by_week) }
+                  : null,
                 /**
                  * ⛔ WHAT THE BUILDER PRINTS ABOUT THIS PREVIEW (2026-09-10, audit H-W05, H-P05): the
                  * endurance step's numbers, and the sample week's counts and sentences.

@@ -1465,6 +1465,40 @@ What these two bullets settle, read off the page:
 
 ✅ Images filed: `book-sources/p210.jpg`–`p214.jpg` (from `~/Downloads/IMG_4322–4326`). Read directly.
 
+# PART E3 — STRENGTH + HALF-MARATHON (Chapter 10, pp.250–251) — "5HR + Strength" in the app
+
+**Transcribed 2026-09-22 from `p250.jpg` and `p251.jpg`, both read directly.** Built as frame `strength_half`.
+
+## E3a. The week (p250)
+
+| Day | STANDARD strength | STANDARD endurance | TAPER/DELOAD strength | TAPER/DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **ME: Upper** — 1 × ME: Primary push · 1 × SKILL: Accessory: primary pull · 1 × DE: Accessory: braced push · 1 × HYP: Accessory: focused pull, focused push · Plyo × 1 | MLSS+ (level 2) | **ME: Upper** — 1 × ME: Primary push · 1 × SKILL: Accessory: primary pull · 1 × HYP: Accessory: focused pull, focused push | 1 × NT (level 1–2) |
+| **2** | **ME: Lower** — 1 × ME: Primary hinge lower *(rotate with primary push)* · 1 × SKILL: Accessory: primary push lower *(rotate with primary hinge)* · 1 × DE: Accessory: braced hinge lower · 1 × HYP: Accessory lower | — | **ME: Lower** — 1 × ME: Primary hinge lower *(rotate)* · 1 × SKILL: Accessory: primary push lower · 1 × HYP: Accessory: accessory lower | — |
+| **3** | Plyo × 2 | NT (level 2) | Plyo × 2 | VT1 (level 1–2) |
+| **4** | **DE: Upper** — 1 × DE: Primary push · 1 × DE: Accessory: braced pull · 1 × HYP: Accessory: secondary push · 1 × HYP: Accessory: focused pull, focused push | VT1 (level 2) | **DE: Upper** — 1 × DE: Primary push · 1 × SKILL: Accessory: primary pull · 1 × HYP: Accessory: focused pull, focused push | — |
+| **5** | **DE: Lower** — 1 × DE: Primary push lower *(rotate with primary hinge)* · 1 × SKILL: Accessory: braced hinge lower *(rotate with braced push lower)* · 1 × HYP: Accessory: secondary push lower · 1 × HYP: Accessory: focused push | — | **DE: Lower** — 1 × DE: Primary push lower *(rotate)* · 1 × SKILL: Accessory: primary hinge lower · 1 × HYP: Accessory: accessory lower | — |
+| **6** | Plyo × 1 | LSD (level 3) | Plyo × 1 | VT1 (level 2) |
+| **7** | — | VT1 (level 1) | **REST** | |
+
+⚠️ **Reading of the page.** "LSD (level 3)" sits between the day 6 and day 7 rows. p251's *"the occasional longer LSD
+run on Saturday"* and *"fatigue is inevitable after the weekend"* put the LSD on day 6 and the VT1 (level 1) on day 7,
+so **the standard week has no rest day**; the taper's day 7 is REST.
+
+## E3b. Notes (p251), key lines
+
+- Not a first program: it *"assumes an athlete has already done sufficient training to steadily improve their 5K/10K
+  time"*; *"The running program here is not for novices."*
+- Strength *"similar in structure to the Strength + 5K"*, with *"skill"-focused lifts* using full recovery and a less
+  ballistic eccentric. *"1% every four weeks or so as a solid starting point."*
+- *"Can be run indefinitely … a good option for more advanced hybrid athletes"*; usable for marathon preparation (a longer
+  midweek NT segment, the occasional longer Saturday LSD).
+- *"Consider switching the ME upper and lower days on occasion if the lower day is suffering heavily from the fast run the
+  day before."* *"4 to 5 weeks out from a meet, consider running the deload running portion (unless a race is within 6
+  weeks)."*
+- Running: volume *"dependent on runner proficiency and tolerance"*; quality matters as much as duration. Half-marathoners
+  may choose NT at 92–97%; marathoners 89–94% and a weekend LSD up to 3 hours.
+
 ## H0.1 "Establishing your VO2 max pace and threshold pace" (p210)
 1. Easy 6–8 min jog. 2. 2 × 100 m strides (slow → near full tilt). 3. 3 rounds of 30 s at a "fast run"
 (mile PR) pace, 1 min easy walk/jog between. 4. 1 min additional rest. 5. **Time trial: 9.5/10 to

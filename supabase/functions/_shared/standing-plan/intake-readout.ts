@@ -107,7 +107,7 @@ export type EnduranceIntakeReadout = {
     commitment_line: string | null;
     sub_line: string;
     length_label: string;
-    extra: {
+    extra?: {
       label: string;
       line: string;
       options: { count: number; label: string }[];
@@ -224,7 +224,11 @@ export function enduranceIntakeReadout(args: {
         key: row.key,
         title: fill(RUNS_COPY.row, { day: row.frameDay, label }),
         session: sessionName(row.family, row.archetype ?? null),
-        length: row.role === 'long' ? null : row.role === 'easy' ? lengthWords(rsw.easyRunMinutes) : RUNS_COPY.length_varies,
+        length: row.role === 'long' ? null : row.role === 'easy'
+          ? (rsw.easyRunRangeByLevel?.[row.level]
+            ? `${rsw.easyRunRangeByLevel[row.level]![0]}–${rsw.easyRunRangeByLevel[row.level]![1]} min`  // Viada p235
+            : lengthWords(rsw.easyRunMinutes))
+          : RUNS_COPY.length_varies,
         is_long: row.role === 'long',
       };
     });
@@ -245,7 +249,7 @@ export function enduranceIntakeReadout(args: {
       long_option_labels: Object.fromEntries(options.map((m) => [String(m), lengthWords(m)])),
       rows,
       // ⛔ THE ATHLETE'S EXTRA EASY RUNS (Viada p247 "one or two VT1 sessions"), built as VT1 level 1 (p235).
-      extra: {
+      extra: !rsw.offersExtraEasyRuns ? undefined : {
         label: fill(RUNS_COPY.extra_label, { minutes: rsw.easyRunMinutes }),
         line: RUNS_COPY.extra_line,
         options: [0, 1, 2].map((n) => ({ count: n, label: RUNS_COPY.extra_chip[n] })),

@@ -51,7 +51,7 @@ Deno.test('⛔ HOP 3 — the builder reads it and hands it to the resolver', () 
     'generate-strength-plan no longer reads the focus off its body');
   assert(/enduranceSport: sport, focus/.test(GENERATE),
     'the focus never reaches resolveFrame — every athlete gets the 5K frame');
-  assert(/raw === 'ride' \? 'ride' : 'run'/.test(GENERATE),
+  assert(/raw === 'ride' \? 'ride' : raw === 'run_half' \? 'run_half' : 'run'/.test(GENERATE),
     'an unrecognised focus no longer falls back to the 5K frame');
 });
 
@@ -62,9 +62,9 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
    * `all_rounder` would move every one of them onto a different programme mid-flight.
    */
   // ⚠️ `'ride'` JOINED 2026-09-13 (Ride Focus → Cycling: Base, p278). Absent still means the 5K frame.
-  assert(/focus\?: 'standard' \| 'run' \| 'ride';/.test(RESOLVER),
+  assert(/focus\?: 'standard' \| 'run' \| 'ride' \| 'run_half';/.test(RESOLVER),
     'the resolver no longer takes an optional focus');
-  assert(/position\.focus === 'ride' \? 'cycling_base' : 'strength_5k'/.test(RESOLVER),
+  assert(/position\.focus === 'run_half' \? 'strength_half' : 'strength_5k'/.test(RESOLVER),
     'the resolver default is no longer the 5K frame');
 });
 
@@ -84,7 +84,7 @@ Deno.test('⛔ MULTISPORT FOCUS — the Run + Ride + Strength card opens today\'
   // The same goal and focus the Standard Focus Train card set, so the setup and the payload are unchanged.
   assert(/run_ride_strength: \{[\s\S]*?goal: 'get_stronger', focus: 'standard',/.test(WIZARD),
     'the Run + Ride + Strength card no longer seeds the Standard Focus goal and focus');
-  assert(/standard: \['run_ride_strength'\], run: \['run_strength'\], ride: \['ride_strength'\]/.test(WIZARD),
+  assert(/standard: \['run_ride_strength'\], run: \['run_strength', 'run_half_strength'\], ride: \['ride_strength'\]/.test(WIZARD),
     'the program lists changed');
   assert(/standard: 'programs', run: 'programs', ride: 'programs'/.test(WIZARD), 'a section no longer opens its list');
 });
@@ -93,6 +93,6 @@ Deno.test('⛔ THE SAMPLE WEEK FOLLOWS THE NUMBERS ANSWER (Michael, off his phon
   // Build this plan? rebuilds a sample week built from older answers; Your week rebuilds on the numbers answer.
   assert(/previewBuiltFrom\.current !== JSON\.stringify\(payloadNow\(\)\)/.test(WIZARD),
     'Build this plan? can show a sample week built before the numbers were answered');
-  assert(/state\.runClubIntensity, state\.trainingDays,[\s\S]{0,120}state\.numbersChoice\]/.test(WIZARD),
+  assert(/state\.runClubIntensity, state\.trainingDays,[\s\S]{0,120}state\.numbersChoice,/.test(WIZARD),
     'Your week no longer rebuilds when the numbers answer changes');
 });

@@ -42,7 +42,7 @@ export type FramePosition = {
    * mid-block. **The frame is reachable; which one is the default is Michael's call and needs the
    * screen that asks.** §11 still has it open.
    */
-  focus?: 'standard' | 'run' | 'ride';
+  focus?: 'standard' | 'run' | 'ride' | 'run_half';
 };
 
 export type FrameResolution =
@@ -92,7 +92,9 @@ export function resolveFrame(position: FramePosition): FrameResolution {
     // ⛔ `'ride'` → Ride Focus, which houses Cycling: Base (p278, 2026-09-13).
     const frame: FrameId = position.focus === 'standard'
       ? 'all_rounder'
-      : position.focus === 'ride' ? 'cycling_base' : 'strength_5k';
+      : position.focus === 'ride' ? 'cycling_base'
+        // ⛔ 5HR + Strength (p250), 2026-09-22.
+        : position.focus === 'run_half' ? 'strength_half' : 'strength_5k';
     return { frame, cite: FRAMES[frame].cite };
   }
   return { frame: null, reason: 'no endurance sport is being held, and every frame is a hybrid week' };

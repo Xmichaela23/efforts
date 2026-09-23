@@ -22,7 +22,7 @@ export type StepRouterState = {
    * carries (`skipsSportScope`, `fixedSportScope`). Absent is `run`, which is every build that
    * predates the Standard card.
    */
-  focus?: 'standard' | 'run' | 'ride';
+  focus?: 'standard' | 'run' | 'ride' | 'run_half';
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07) — `standard`, `run` or `ride`. Run and Ride are
    * groupings that open a program list (`program`) before any goal exists; Standard opens the

@@ -20,7 +20,7 @@ import type { TestedLift } from './working-number.ts';
  * `strength_5k` is FROZEN AS A DESIGN — stop shaping new work around its quirks — and still fully
  * guarded by its tests, because both frames share the composer, the materializer and the progression.
  */
-export type FrameId = 'strength_5k' | 'all_rounder' | 'cycling_base';
+export type FrameId = 'strength_5k' | 'strength_half' | 'all_rounder' | 'cycling_base';
 
 /**
  * ⛔⛔⛔ WHETHER THIS FRAME ASKS FOR A WEEKLY HOURS TOTAL AT ALL — Michael, 2026-08-31:
@@ -288,6 +288,8 @@ export type FrameDay = {
   endurance: EnduranceSlot[];
   /** Day 3 only. p227 governs the dose; see `PLYO_DOSE`. */
   plyo?: boolean;
+  /** ⛔ HOW MANY PLYO DRILLS THE PAGE PRINTS FOR THE DAY ("Plyo x 2", p250). Absent = the full day's drills. */
+  plyoCount?: number;
   rest?: boolean;
   /**
    * ⛔⛔ WHAT A LOWER-BODY DAY IS FOR, STATED BY THE FRAME (2026-08-30) — the SAME fix as
@@ -348,6 +350,10 @@ export type RunStrengthWeek = {
   longRunChipCeilingMinutes: number;
   /** OURS — Michael, 2026-09-07: the middle chip opens selected. */
   longRunDefaultMinutes: number;
+  /** An easy run printed above level 1 shows its level's range (Viada p235: VT1 level 2 is 45–60 min). */
+  easyRunRangeByLevel?: Partial<Record<number, [number, number]>>;
+  /** ⛔ p247's "one or two VT1 sessions" for more advanced runners — Strength + 5K's own advice; other plans do not offer it. */
+  offersExtraEasyRuns?: boolean;
 };
 
 export type Frame = {
@@ -610,6 +616,150 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     endurance: [],
   },
   { day: 6, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔⛔ STRENGTH + HALF-MARATHON (p250), "5HR + Strength" — transcribed from `p250.jpg` 2026-09-22 (Michael: "let's build
+ * it … more running, slower weight progression, geared for 1/2 marathon performance"). Notes: p251.
+ *
+ * The lifting is p246's four days with the page's own substitutions: a SKILL accessory where p246 has DE, BRACED
+ * accessories (p221–222), and plyo on days 1, 3 and 6. The running is five runs: MLSS+ (2), NT (2), VT1 (2), LSD (3) and
+ * a VT1 (1) on day 7 — so the STANDARD WEEK HAS NO REST DAY (the taper column's day 7 is REST). p251: "more advanced
+ * hybrid athletes", "not recommended as a first program", "not for novices"; 1RM "1% every four weeks or so".
+ * ⚠️ READING OF THE PAGE: "LSD (level 3)" is set between the day 6 and day 7 rows; p251's "the occasional longer LSD run on
+ * Saturday" and "fatigue … after the weekend" put it on day 6 (Saturday) and the VT1 (level 1) on day 7.
+ * ⚠️ "Plyo x N" is read as N plyometric drills (`plyoCount`); the page gives no other meaning for the count.
+ */
+const STRENGTH_HALF_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME: Upper',
+    strength: [
+      // p250 day 1, standard column: row text verbatim
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'pull_upper', '1 x SKILL: Accessory: primary pull'),  // Viada p250
+      S('DE', 'accessory', 'braced', 'push_upper', '1 x DE: Accessory: braced push'),  // Viada p250
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
+    ],
+    endurance: [E('run_mlss', 2, 'MLSS+ (level 2)')],
+    plyo: true,
+    plyoCount: 1,
+  },
+  {
+    day: 2,
+    label: 'ME: Lower',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'press_lower', '1 x SKILL: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),  // Viada p250
+      S('DE', 'accessory', 'braced', 'hinge_lower', '1 x DE: Accessory: braced hinge lower'),  // Viada p250
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory lower', {  // Viada p250
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  // p250 day 3: Plyo x 2, NT (level 2). p251: half-marathoners may choose NT workouts at 92 to 97 percent.
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 2, 'NT (level 2)')], plyo: true, plyoCount: 2 },
+  {
+    day: 4,
+    label: 'DE: Upper',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),  // Viada p250
+      S('DE', 'accessory', 'braced', 'pull_upper', '1 x DE: Accessory: braced pull'),  // Viada p250
+      /**
+       * ⛔ THE WEEK'S OVERHEAD PRESS, THE SAME WAY 4HR GETS ONE (frame-rules RULE 1 / RULE 4). p220's secondary push list
+       * holds two overhead presses (seated DB press, Arnold press); the muscle is ours, the list is his, and the barbell
+       * presses are admitted behind them for a kit that reaches nothing else — see STRENGTH_5K_STANDARD day 1.
+       */
+      S('HYP', 'accessory', 'secondary', 'push_upper', '1 x HYP: Accessory: secondary push', {  // Viada p250
+        muscle: 'deltoids',
+        alsoAdmits: [
+          'seated db press', 'arnold press',
+          'overhead press', 'military press', 'standing barbell overhead press', 'push press',
+        ],
+      }),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
+    ],
+    // p250 day 4 endurance cell: VT1 (level 2)
+    endurance: [E('run_vt1', 2, 'VT1 (level 2)', { carriesStrides: true })],
+  },
+  {
+    day: 5,
+    label: 'DE: Lower',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),  // Viada p250
+      S('SKILL', 'accessory', 'braced', 'hinge_lower', '1 x SKILL: Accessory: braced hinge lower (rotate with braced push lower)', { rotatesWith: 'press_lower' }),  // Viada p250
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: secondary push lower'),  // Viada p250
+      // ⚠️ p250 prints "focused push" on the lower day; read as the lower-body focused push, as p246 day 5 prints it.
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Accessory: focused push'),  // Viada p250
+    ],
+    endurance: [],
+  },
+  // p250 day 6: Plyo x 1, LSD (level 3) — see the reading note above.
+  { day: 6, label: null, strength: [], endurance: [E('run_lsd', 3, 'LSD (level 3)', { archetype: 'long_with_inserts' })], plyo: true, plyoCount: 1 },
+  // p250 day 7: VT1 (level 1). No rest day in the standard column.
+  { day: 7, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+];
+
+const STRENGTH_HALF_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME: Upper',
+    strength: [
+      // p250 day 1, taper column: row text verbatim
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'pull_upper', '1 x SKILL: Accessory: primary pull'),  // Viada p250
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
+    ],
+    // p250 prints "1 x NT (level 1–2)"; OURS — the lower of the page's two levels.
+    endurance: [E('run_near_threshold', 1, '1 x NT (level 1-2)')],
+  },
+  {
+    day: 2,
+    label: 'ME: Lower',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate)', { rotatesWith: 'press_lower' }),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'press_lower', '1 x SKILL: Accessory: primary push lower'),  // Viada p250
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {  // Viada p250
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  // p250 day 3, taper: Plyo x 2, VT1 (level 1–2); OURS — the lower of the page's two levels.
+  { day: 3, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1-2)')], plyo: true, plyoCount: 2 },
+  {
+    day: 4,
+    label: 'DE: Upper',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'pull_upper', '1 x SKILL: Accessory: primary pull'),  // Viada p250
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
+    ],
+    endurance: [],
+  },
+  {
+    day: 5,
+    label: 'DE: Lower',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate)', { rotatesWith: 'hinge_lower' }),  // Viada p250
+      S('SKILL', 'accessory', 'primary', 'hinge_lower', '1 x SKILL: Accessory: primary hinge lower'),  // Viada p250
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {  // Viada p250
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [],
+  },
+  // p250 day 6, taper: Plyo x 1, VT1 (level 2).
+  { day: 6, label: null, strength: [], endurance: [E('run_vt1', 2, 'VT1 (level 2)')], plyo: true, plyoCount: 1 },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
@@ -1122,6 +1272,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
  */
 export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
   strength_5k: { perWeek: 0.01 / 3, cite: 'Viada p247 — 1% every 3 weeks' },
+  strength_half: { perWeek: 0.01 / 4, cite: 'Viada p251 — "1% every four weeks or so as a solid starting point"' },
   /**
    * ⛔⛔ ZERO, AND ZERO IS A RULING RATHER THAN A MISSING NUMBER (Michael, 2026-08-30).
    * **Progression is EARNED or it does not happen.** Read the whole chain before restoring a rate
@@ -1184,9 +1335,22 @@ export const FRAMES: Record<FrameId, Frame> = {
     cite: 'Viada pp246-247',
     liftingDays: 4,
     // 30 min = p246's VT1 level 1 rung top (p235: 25-30 min). OURS — `longRunChipCeilingMinutes` 90 and `longRunDefaultMinutes` 75, see `RunStrengthWeek`
-    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75 },
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75, offersExtraEasyRuns: true },
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
+    testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
+    laysOutWeekByDay: false,
+    enduranceSports: ['run', 'swim'],
+  },
+  strength_half: {
+    id: 'strength_half',
+    sourceName: 'Strength + Half-Marathon',
+    cite: 'Viada pp250-251',
+    liftingDays: 4,
+    // Viada p235: VT1 level 1 is 25–30 min; LSD level 3 is 1.5h up to 2–2.5h. OURS — the default chip is the page's floor.
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunDefaultMinutes: 90, easyRunRangeByLevel: { 2: [45, 60] } },
+    columns: { standard: STRENGTH_HALF_STANDARD, taper: STRENGTH_HALF_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.strength_half.perWeek,
     testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
     laysOutWeekByDay: false,
     enduranceSports: ['run', 'swim'],

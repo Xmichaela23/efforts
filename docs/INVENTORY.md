@@ -189,8 +189,8 @@ no-deploy.**
 | `plan-phase.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
 | `plan-refresh.ts` | `endurance-checkpoint` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
 | `plan-week.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `analyze-swim-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `rematerialize-strength-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
-| `planned-duration-label.ts` | `get-week` · `workout-detail` |
-| `planned-duration.ts` | `analyze-cycling-workout` · `auto-attach-planned` · `coach` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `mark-planned-complete` · `materialize-plan` · `plan-overview` · `rematerialize-standing-block` · `swap-session` · `workout-detail` |
+| `planned-duration-label.ts` | `create-goal-and-materialize-plan` · `get-week` · `workout-detail` |
+| `planned-duration.ts` | `analyze-cycling-workout` · `auto-attach-planned` · `coach` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `mark-planned-complete` · `materialize-plan` · `plan-overview` · `rematerialize-standing-block` · `swap-session` · `workout-detail` |
 | `planned-narrative.ts` | `materialize-plan` |
 | `planned-step-lines.ts` | `materialize-plan` |
 | `planning-context.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
@@ -225,7 +225,7 @@ no-deploy.**
 | `strava-access-token.ts` | `fetch-strava-route` · `share-strength-to-strava` |
 | `strength-equipment-tier.ts` | `create-goal-and-materialize-plan` · `generate-combined-plan` · `get-arc-context` · `materialize-plan` |
 | `strength-profiles.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
-| `strength-session-minutes.ts` | `get-week` · `workout-detail` |
+| `strength-session-minutes.ts` | `create-goal-and-materialize-plan` · `get-week` · `workout-detail` |
 | `strength-session-types.ts` | `coach` |
 | `strength-test-key.ts` | `analyze-strength-workout` · `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `save-baseline-test` · `strength-test-session` · `swap-session` · `validate-reschedule` |
 | `swim-cutoff-pressure.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
@@ -554,7 +554,7 @@ no-deploy.**
 | `swap.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
 | `workout-choice.ts` | `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
 
-### `supabase/functions/_shared/standing-plan/` — 31 files · anything in it → 36 functions
+### `supabase/functions/_shared/standing-plan/` — 32 files · anything in it → 36 functions
 
 `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `calendar-sync` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `plan-overview` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `save-baseline-test` · `send-workout-to-garmin` · `strava-webhook` · `strength-test-session` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail`
 
@@ -575,6 +575,7 @@ no-deploy.**
 | `me-history.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `plan-row.ts` | `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `plyo.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
+| `preview-session.ts` | `create-goal-and-materialize-plan` |
 | `progression.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
 | `protocol-id.ts` | `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` |
 | `restate.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `rematerialize-standing-block` |
@@ -654,7 +655,7 @@ no-deploy.**
 | `all-out-set.ts` | `coach` · `compute-snapshot` · `workout-detail` |
 | `match-exercises.ts` | `analyze-strength-workout` · `auto-attach-planned` · `workout-detail` |
 | `performed-set.ts` | `analyze-strength-workout` · `share-strength-to-strava` |
-| `rest-seconds.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` · `workout-detail` |
+| `rest-seconds.ts` | `coach` · `compute-session-boom` · `create-goal-and-materialize-plan` · `endurance-checkpoint` · `generate-strength-plan` · `get-week` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `swap-session` · `validate-reschedule` · `workout-detail` |
 | `session-volume.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `export-data` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `rematerialize-strength-block` · `resolve-exercise-weight` · `save-baseline-test` · `save-baselines` · `share-strength-to-strava` · `strava-webhook` · `strength-test-session` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
 | `shown-name.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `coach` · `compute-session-boom` · `compute-snapshot` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `ingest-phone-workout` · `learn-fitness-profile` · `materialize-plan` · `place-lost-day` · `planning-context` · `post-import-athlete-pipeline` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `swap-list` · `swap-session` · `validate-reschedule` · `workout-detail` |
 | `strength-display-lines.ts` | `coach` · `compute-session-boom` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `place-lost-day` · `rematerialize-standing-block` · `strength-test-session` · `swap-session` · `validate-reschedule` |
@@ -845,6 +846,42 @@ Source: Viada pp246-247 · 4 lifting days · weekly rate anchor: **0.00333333333
   day 7   (rest)               —
 ```
 
+### `strength_half` — Strength + Half-Marathon
+
+Source: Viada pp250-251 · 4 lifting days · weekly rate anchor: **0.0025**
+
+**standard column**
+
+```
+  day 1   ME: Upper            ME:primary · SKILL:primary · DE:braced · HYP:focused · HYP:focused
+                               endurance: run_mlss
+  day 2   ME: Lower            ME:primary · SKILL:primary · DE:braced · HYP:secondary
+  day 3   (plyometrics)        —
+                               endurance: run_near_threshold
+  day 4   DE: Upper            DE:primary · DE:braced · HYP:secondary · HYP:focused
+                               endurance: run_vt1
+  day 5   DE: Lower            DE:primary · SKILL:braced · HYP:secondary · HYP:focused
+  day 6   (plyometrics)        —
+                               endurance: run_lsd
+  day 7   —                    —
+                               endurance: run_vt1
+```
+
+**taper column**
+
+```
+  day 1   ME: Upper            ME:primary · SKILL:primary · HYP:focused
+                               endurance: run_near_threshold
+  day 2   ME: Lower            ME:primary · SKILL:primary · HYP:secondary
+  day 3   (plyometrics)        —
+                               endurance: run_vt1
+  day 4   DE: Upper            DE:primary · SKILL:primary · HYP:focused
+  day 5   DE: Lower            DE:primary · SKILL:primary · HYP:secondary
+  day 6   (plyometrics)        —
+                               endurance: run_vt1
+  day 7   (rest)               —
+```
+
 ### `all_rounder` — The All Rounder
 
 Source: Viada pp274-275 · 4 lifting days · weekly rate anchor: **ZERO — progression is earned, never scheduled**
@@ -934,6 +971,18 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `iso_pull_a` — Pull isolation
 - `iso_pull_b` — Pull isolation
 - `hinge_lower` — Hinge variation
+- `single_leg_a` — Leg variation
+- `single_leg_b` — Leg variation
+- `quad_iso` — Leg isolation
+- `core` — Core  ⚠️ names no printed cell (opt-in addition)
+
+**`strength_half`** — 9 cells
+
+- `db_press` — Press variation
+- `iso_push` — Push isolation
+- `iso_pull_a` — Pull isolation
+- `iso_pull_b` — Pull isolation
+- `hinge_lower` — Hinge variation  ⚠️ names no printed cell (opt-in addition)
 - `single_leg_a` — Leg variation
 - `single_leg_b` — Leg variation
 - `quad_iso` — Leg isolation

@@ -17,45 +17,9 @@ const SRC = await Deno.readTextFile(
   new URL('../components/NonRaceBuilder.tsx', import.meta.url),
 );
 
-Deno.test('⛔ THE LONG-DAY ROWS LOCK AGAINST THE OTHER ANCHOR — the long run and long ride cannot both read Sunday', () => {
-  // ⛔ THE DEFECT (trace report, unresolved until stage 3 2026-08-21). The comment above this row
-  // said `anchor-days.ts` answers the lock "for all three" — and the code passed `taken={{}}`. The
-  // comment and the code disagreed, and the code was the one that was wrong: nothing was locked and
-  // nothing was named, so both long days could be answered onto the same date.
-  //
-  // ⚠️ `strength-primary-plan.ts` keeps a BACKSTOP for that collision and its own comment says where
-  // the real fix belongs: *"the day picker greys out and locks a day another anchor already holds,
-  // so the collision is never entered."* This is that picker.
-  // ⚠️ THE EXPRESSION MOVED, THE RULE DID NOT (2026-08-25). The disclosure list is gone, so the row
-  // no longer branches on `row.key`; the long picker is its own always-open card and reads the same
-  // helper off `scheduleRunShown`. The test matches the CALL, not the old row plumbing around it.
-  assert(
-    /taken=\{anchorDaysTaken\(state, scheduleRunShown \? 'long run' : 'long ride'\)\}/.test(SRC),
-    'the long-day WeekDayRow no longer passes anchorDaysTaken — the two long days can collide again',
-  );
-});
-
-Deno.test('⛔ THE HARD-DAY ROW STILL PASSES {} — this is a RULING, not an inconsistency', () => {
-  // ⚠️ THE TWO ROWS DISAGREE ON PURPOSE AND MUST NOT BE "MADE CONSISTENT". The hard-day row is
-  // deliberately unlocked — *"two hard sessions on one day still builds as one, and the PLAN says
-  // so; a lock made it look like a broken button."* Two hard days sharing a date is a legal week the
-  // composer reports on. Two LONG days sharing one is the pin collision above.
-  //
-  // ⛔ THIS TEST EXISTS BECAUSE FIXING THE ROW ABOVE MAKES THIS ONE LOOK LIKE THE SAME BUG. It is
-  // not. If a future session "tidies" it, this fails and points at the ruling.
-  // ⚠️ ANCHORED ON THE RULING'S OWN WORDS, so the test names the reason rather than a line number.
-  const marker = '⛔ NOTHING IS DISABLED. The other slot';
-  const at = SRC.indexOf(marker);
-  assert(at > 0, `the hard-day ruling comment is gone — it read: "${marker}..."`);
-  // ⚠️ THE PROP MOVED BELOW THE RULING (2026-08-25). It used to sit immediately before the comment;
-  // in the always-open card the comment introduces the pair and `taken` follows it. Both sides are
-  // searched so the assertion survives the next reshuffle of one element's attribute order.
-  const around = SRC.slice(Math.max(0, at - 300), at + 300);
-  assert(
-    /taken=\{\{\}\}/.test(around),
-    `the hard-day WeekDayRow stopped passing an empty \`taken\`: ...${around.slice(-200)}`,
-  );
-});
+// ⛔ THE LONG-DAY AND HARD-DAY ROW LINTS ARE DELETED (2026-09-22): Your week is the Home week list now and those
+// chip rows are gone (Michael: "lose the scheduler in the wizard"). Dropping one session on another's day is a
+// drag the server rebuilds from, and the week's own notes say what it costs.
 
 Deno.test('⛔ THE EXHAUSTIVE SOLVE IS GATED TO THE STEP THAT READS IT', () => {
   // ⛔ THE LATENCY DEFECT. The memo was ungated and its deps include `runDays`, `rideDays` and
