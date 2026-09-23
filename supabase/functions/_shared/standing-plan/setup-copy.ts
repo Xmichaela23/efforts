@@ -43,7 +43,8 @@ export const PROGRAM_COPY = {
   run_strength: {
     // ⛔ RENAMED 2026-09-23 (Michael): named by which side leads the week.
     label: 'Strength Lead',
-    blurb: 'Around 4 hours of running a week, with threshold and interval runs, and an emphasis on strength. Intermediate.',
+    // Michael's words, 2026-09-23. Hours: the built week's running (p246, four runs); p247: "most skill levels… advanced intermediate runners".
+    blurb: 'Less running, strength focused. About 4 hours of running a week, four lifting days. Ideal for intermediate or advanced.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // ⛔ 5HR + STRENGTH (Strength + Half-Marathon, Viada pp250-251), 2026-09-22 — Michael approved the words.
@@ -53,8 +54,8 @@ export const PROGRAM_COPY = {
     label: 'Run Lead',
     // p251: "can be run indefinitely … maintain the ability to pivot toward longer distance events".
     // p251: 1RM "1% every four weeks" (4HR: every three, p247).
-    blurb: 'Around 5 hours of running a week and four lifting days. The weights go up more slowly than on Strength Lead. '
-      + 'It can run all year and keeps you ready for longer races. Advanced.',
+    // Michael's words, 2026-09-23. p251: "more advanced hybrid athletes", 1RM "1% every four weeks"; hours: the built week's five runs (p250).
+    blurb: 'For high-mile advanced runners. 5 hours or more of running a week, four lifting days. Strength progresses more slowly.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // ⛔ THE RACE CARD INSIDE RUN (Michael, 2026-09-23): opens the marathon flow, built back from the race date.
@@ -90,7 +91,7 @@ export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: 
   { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
   { id: 'muscle', title: 'Build muscle', programs: [] },       // Viada pp244, 252 — not built
   { id: 'race', title: 'Race', programs: ['marathon'] },
-  { id: 'offroad', title: 'Off road / trails', programs: [] },       // Viada p254 — not built
+  { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
 ];
 /** Under a closed section. */
