@@ -57,7 +57,7 @@ export default function RunStrengthWeekCard(props: Props) {
     <div className="space-y-3">
       <div>
         {week.commitment_line ? (
-          <p className="text-white/85 text-sm leading-relaxed">{week.commitment_line}</p>
+          <p className="text-white text-[16px] leading-snug">{week.commitment_line}</p>
         ) : null}
         <p className="text-white/55 text-sm leading-relaxed mt-1">{week.sub_line}</p>
       </div>
@@ -112,9 +112,10 @@ export default function RunStrengthWeekCard(props: Props) {
         ))}
       </div>
       {week.extra && props.onExtraEasyRuns ? (
-        <div className="rounded-xl border border-white/12 bg-white/[0.02] p-3">
-          <p className="text-white/80 text-[13px] mb-2">{week.extra.label}</p>
-          <div className="flex gap-1.5">
+        <div className="rounded-xl border border-white/12 bg-white/[0.02] p-4">
+          <p className="text-white text-[15px] leading-snug">{week.extra.label}</p>
+          <p className="text-white/55 text-xs mt-1 leading-relaxed">{week.extra.line}</p>
+          <div className="flex gap-2 mt-3">
             {week.extra.options.map((o) => (
               <GalaxyButton
                 key={o.count}
@@ -123,11 +124,10 @@ export default function RunStrengthWeekCard(props: Props) {
                 data-testid={`extra-easy-${o.count}`}
                 onClick={() => props.onExtraEasyRuns?.(o.count)}
               >
-                {o.label}
+                <span className="px-2">{o.label}</span>
               </GalaxyButton>
             ))}
           </div>
-          <p className="text-white/55 text-xs mt-2 leading-relaxed">{week.extra.line}</p>
         </div>
       ) : null}
     </div>

@@ -5545,7 +5545,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           renders, so the gate is a guard rather than a wall. */}
       {currentStep === 'endurance' && rotateOnlyRunPath(state) && (
         <StepLayout
-          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Run focus')}
+          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Run focus')} accent="run"
           onBack={back} onContinue={next}
           canContinue={longRunAnswered}
           blockedReason={tintedReason(longRunAnswered ? undefined : 'The long run has no length yet.')}

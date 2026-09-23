@@ -230,14 +230,23 @@ export function enduranceIntakeReadout(args: {
     });
     return {
       easy_run_minutes: rsw.easyRunMinutes, long_run_options: options, long_run_default: def,
-      commitment_line: runsCommitmentLine(frame),
+      // ⛔ THE TOP LINE COUNTS THE RUNS BY WHAT THEY ARE (Michael, 2026-09-22): "4 runs a week: 2 hard, 1 short and
+      // easy, 1 long and easy." Counted off the frame's own slots; null on a week that is not all runs.
+      commitment_line: (() => {
+        const all = frameSlots(frame);
+        if (runsCommitmentLine(frame) == null || all.length === 0) return null;
+        const n = (role: string) => all.filter((r) => r.role === role).length;
+        const parts = (['hard', 'easy', 'long'] as const).filter((r) => n(r) > 0)
+          .map((r) => fill(RUNS_COPY.runs_part[r], { n: n(r) }));
+        return fill(RUNS_COPY.runs_line, { runs: all.length, parts: parts.join(', ') });
+      })(),
       sub_line: fill(RUNS_COPY.sub, { minutes: rsw.easyRunMinutes }),
       length_label: RUNS_COPY.length_label,
       long_option_labels: Object.fromEntries(options.map((m) => [String(m), lengthWords(m)])),
       rows,
       // ⛔ THE ATHLETE'S EXTRA EASY RUNS (Viada p247 "one or two VT1 sessions"), built as VT1 level 1 (p235).
       extra: {
-        label: RUNS_COPY.extra_label,
+        label: fill(RUNS_COPY.extra_label, { minutes: rsw.easyRunMinutes }),
         line: RUNS_COPY.extra_line,
         options: [0, 1, 2].map((n) => ({ count: n, label: RUNS_COPY.extra_chip[n] })),
         rows: [1, 2].map((n) => ({

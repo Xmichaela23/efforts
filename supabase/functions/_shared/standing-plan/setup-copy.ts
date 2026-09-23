@@ -221,7 +221,11 @@ export const RUNS_COPY = {
   row_label: { long: 'Long session', easy: 'Easy session', easy_n: 'Easy session {n}', hard_n: 'Hard session {n}' },  // not-instruction: row labels (names), not instructions
   // ⛔ THE EXTRA EASY RUNS (2026-09-22). Viada p247: "More advanced runners may see a benefit to additional running
   // volume, and I recommend adding one or two VT1 sessions initially to test recovery." Length: p235 VT1 level 1.
-  extra_label: 'Extra easy runs',  // not-instruction: a control label
+  // Viada p246: the week table's runs by role (two hard, one VT1, one LSD); p235: VT1 short, LSD long, both easy.
+  runs_line: '{runs} runs a week: {parts}.',
+  runs_part: { hard: '{n} hard', easy: '{n} short and easy', long: '{n} long and easy' },  // not-instruction: parts of runs_line
+  // Viada p247 "adding one or two VT1 sessions"; the length is p235's VT1 level 1 (25–30 min) as the week builds it.
+  extra_label: 'Add up to two {minutes}-minute easy runs to your week.',
   extra_chip: { 0: 'None', 1: '1', 2: '2' } as Record<number, string>,  // not-instruction: chip labels
   extra_line: 'For more advanced runners, to test recovery.',  // Viada p247, reworded
   extra_row: 'Extra easy run {n}',  // not-instruction: a row label (name)

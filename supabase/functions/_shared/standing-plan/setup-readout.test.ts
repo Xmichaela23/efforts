@@ -91,7 +91,7 @@ Deno.test('⛔ Rides screen and runs screen — rows and words from the server',
   }
   assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).ride_strength_week, null);
   const run = enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).run_strength_week!;
-  assertEquals(run.commitment_line, 'Four lifting days, four runs.');
+  assertEquals(run.commitment_line, '4 runs a week: 2 hard, 1 short and easy, 1 long and easy.');
   assertEquals(run.sub_line, 'Pick how long the long run is.');
   assertEquals(run.rows.map((r) => r.title), ['Day 1 · Hard session 1', 'Day 3 · Hard session 2', 'Day 4 · Easy session', 'Day 6 · Long session']);
   assertEquals(run.rows.map((r) => r.length), ['length varies week to week', 'length varies week to week', '30 min', null]);

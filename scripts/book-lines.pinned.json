@@ -197,7 +197,9 @@
    "These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the",
    "Easy session",
    "Easy session {n}",
-   "Extra easy runs",
+   "{n} short and easy",
+   "{n} long and easy",
+   "Add up to two {minutes}-minute easy runs to your week.",
    "For more advanced runners, to test recovery.",
    "Extra easy run {n}"
   ],

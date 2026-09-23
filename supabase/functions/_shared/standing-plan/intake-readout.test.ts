@@ -55,7 +55,8 @@ Deno.test('⛔ NO HISTORY LINE, AND THE EXTRA EASY RUNS ARE THE ATHLETE\'S PICK 
   });
   assertEquals(r.tier_line, null);
   const x = r.run_strength_week!.extra;
-  assertEquals(x.label, 'Extra easy runs');
+  assertEquals(x.label, `Add up to two ${r.run_strength_week!.easy_run_minutes}-minute easy runs to your week.`);
+  assertEquals(r.run_strength_week!.commitment_line, '4 runs a week: 2 hard, 1 short and easy, 1 long and easy.');
   assertEquals(x.options.map((o) => o.label), ['None', '1', '2']);
   assertEquals(x.line, 'For more advanced runners, to test recovery.');
   assertEquals(x.rows.length, 2);
