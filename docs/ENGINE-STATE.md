@@ -153,7 +153,7 @@
 > Baselines buttons on efforts.work, the equipment rebuild and a retest on HIS plan · Q-303 Ladder Drills has no how-to ·
 > Q-304 the sandwich ride's rest prints no "easy spin" in the list (task chip spawned).
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-23, PM chat — everything below PUSHED to main through `e52329b3f`, every importer DEPLOYED, phone build from `0f2faf532`; the chip work after that is on the site and server but NOT yet installed on the phone)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-23, PM chat — everything below PUSHED to main through `d72f762e3`, every importer DEPLOYED, phone build from `d72f762e3`)
 
 > **How to talk to Michael (read first):** `~/.claude/CLAUDE.md`, the voice example at the top. He listens to replies
 > read aloud. Numbers without page citations after each one; three tiers, not five-minute steps; say "I inferred" when
@@ -189,9 +189,18 @@
 >   easy run has chips 45/50/60 (`easyRunChipsByLevel`). A plan may state its own long-run cap (`SlotSpec.ceilingMin`,
 >   `longRunCeilingMinutes`); Strength Lead keeps the family's 100 (p247). Unanswered rows on a run-only frame read as run.
 >
-> **UNVERIFIED:** the whole flow on Michael's phone with the LAST build (chips on the easy row; the phone was unreachable
-> at install) · a 5HR/Run Lead plan built end to end on a device · a drag on a real touch screen on Your week (a mouse
-> drag was checked) · the Marathon card from the Run screen. Sweeps: fuzz + builder-answers-sweep 23/23 on `c998b4f4b`
+> - **The two-a-day lines follow p143** (after the handoff was first written): same-day hard run/ride + heavy legs →
+>   "{Day}: hard run and heavy legs. Run in the morning and cut it short to reduce fatigue. Lift 6 to 8 hours later."
+>   (one line for run and ride; the p77 "tired legs" line keeps the day-after case); the move check's p108 line →
+>   "Two sessions on {Day}. Run in the morning and lift 6 to 8 hours later." (no meal clause, not doubled where the
+>   heavy-legs line shows). `no_rest_day` fires without a frame ("No day this week is clear."), so a move onto the last
+>   clear day is noted and "Days that fit" ranks the rest day last. The lost-day sheet prints the server's line.
+>   ⚠️ "lift first" was a wrong reading of rule 6 — p143 puts the run in the morning; read the page, not the transcript.
+> - **Chips show before any row is answered** on a run-only plan (`intake-readout.ts` reads an unanswered row as run).
+>
+> **UNVERIFIED:** a Run Lead plan built end to end on a device · a drag on a real touch screen on Your week (a mouse
+> drag was checked) · the Marathon card from the Run screen · the new two-a-day line on a real move (the words are
+> deployed; Michael's move on 2026-09-23 showed the old ones). Sweeps: fuzz + builder-answers-sweep 23/23 on `c998b4f4b`
 > and again after the crowded-day rule; a 6,216-week combo sweep (3 plans) and a 3,192-week Run Lead sweep, 0 problems.
 >
 > **Rules that bind you:** commit exact files, never `-a` · commit, push and deploy wait for his word · the build check
