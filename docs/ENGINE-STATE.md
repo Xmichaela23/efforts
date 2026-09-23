@@ -153,48 +153,51 @@
 > Baselines buttons on efforts.work, the equipment rebuild and a retest on HIS plan · Q-303 Ladder Drills has no how-to ·
 > Q-304 the sandwich ride's rest prints no "easy spin" in the list (task chip spawned).
 
-## 🧭 NEXT SESSION — START HERE (updated 2026-09-20 night, PM chat — menu fix + Strava "removed the app" PUSHED (`b229a30e4`, `b05ddc85f`); `strava-webhook` DEPLOYED; iOS synced; **NOT checked signed in or on a device**)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-23, PM chat — everything below PUSHED to main through `e52329b3f`, every importer DEPLOYED, phone build from `0f2faf532`; the chip work after that is on the site and server but NOT yet installed on the phone)
 
-> **How to talk to Michael (read first):** the voice example at the top of `~/.claude/CLAUDE.md`. This chat lost him
-> three times with long answers and once with "you said…" — answer from the page or the code, in a few spoken sentences.
+> **How to talk to Michael (read first):** `~/.claude/CLAUDE.md`, the voice example at the top. He listens to replies
+> read aloud. Numbers without page citations after each one; three tiers, not five-minute steps; say "I inferred" when
+> you did. A "go" is the word go; he approves every athlete-facing line before it ships.
 >
-> **Your job:** none was named. The three priorities picked in this chat are closed or waiting on him: (1) the menu —
-> built, he checks it on the phone; (2) Strava "athlete removed the app" — deployed, he resubmits the Developer Program
-> form; (3) the test day in the logger — WITHDRAWN, nothing to build. The Record banner below is still the map of the
-> last big piece of work, and its one live thread still stands: `spacing-line.ts` is modified in the tree and NOT
-> committed (another terminal's). ⚠️ `get-week` IS deployed now (from `e96ec0193`, 2026-09-20 night, the two-a-day
-> fix); the uncommitted `spacing-line.ts` was not in that deploy and is still not live.
+> **Your job:** `docs/WORKORDER-run-programs-2026-09-23.md`, one stage per terminal session, in its order. Stage 0 is
+> small (the Run Lead long-run rounding). Stage 1 is the Build muscle pair. The PM chat reviews each stage before push.
 >
-> **What shipped — do not redo.**
-> - **The menu, four causes** (punch list "THE MENU IS UNRELIABLE" has the full note). Gear and Import are paths now
->   (`/gear`, `/import`: `App.tsx`, one effect in `AppLayout.tsx` after the `/help` effect; `handleGearClick` /
->   `handleImportClick` navigate there; `handleBackToDashboard` leaves them). Opened by a flag alone they lost the
->   render chain to any path-driven screen and to the + screen. `Gear.tsx` no longer draws its own `MobileHeader`.
->   Import is drawn inside the layout (the early `return <FitFileImporter/>` is gone). `MobileHeader`'s Import has a
->   default. The toast list (`ui/toast.tsx`) sits below the header and is click-through: at `top-0` it covered the
->   whole header while a toast was up — checked in the browser on `/support`, before and after.
-> - **Strava:** `strava-webhook` `handleAthleteDeauthorized` — `object_type: athlete` + `updates.authorized: "false"`
->   deletes the Strava rows in both connection tables and writes `connection_events` `deauthorized`. No call to Strava;
->   logged workouts stay, as on a disconnect inside Efforts.
-> - **The test day stays p215's three sets (D-480).** p214 and p215 were read off the photos (`book-sources/`). The app
->   matches the page: `_shared/standing-plan/working-number.ts` (0.75 → ×1.10 → ×1.15, Epley and Brzycki averaged,
->   × 0.96). With no number on file the first set is the page's own guess and the logger fills sets 2 and 3 from it
->   (`compose.ts:2060`, built 2026-09-09). The 2026-09-01 ladder item is withdrawn on the punch list.
+> **What shipped 2026-09-22/23 — do not redo.**
+> - **The week is arranged, not slid** (`_shared/standing-plan/week-arrangement.ts`, `chooseDayMap`): every order of the
+>   book's days is tried; scored by days off · a dragged lifting day · the long day · fewest `weekConflicts` warnings on
+>   the week it builds (a warning the plan's own page prints is not counted; `crowded_day` counts) · fewest days moved
+>   from the book · p80 lift spacing · hard picks · stacked · test days. The judged week is the built week:
+>   `placeEnduranceDays` (compose.ts) is the one placement, `day_order` is stored and restated.
+> - **One rule set** for building, calendar moves and "Can't train this day": `week-conflicts.ts` `conflictsOfTyped` +
+>   `typedRowsOf`; `move-check` `checkMove` adds the builder's own sentences (`week_rule`); `MAX_SESSIONS_A_DAY` lives
+>   in week-conflicts and is re-exported. New note `crowded_day` ("{Day} has three sessions on it. Six to eight hours…").
+> - **Extra easy runs are the athlete's pick** (Strength Lead only, p247): None/1/2 on the runs screen; each is placed
+>   on the best day by the same rules (compose.ts `pickFillDay`: no day off, two-session limit, no new warning, rest day
+>   kept, no same-sport double, then not a heavy leg day); built at the frame's 30 min. The logged-miles tier is gone.
+> - **Your week = the Home week list** (`src/components/WeekPlanList.tsx`): week two, no dates, the calendar's drag.
+>   The server stamps each preview session with `planned_duration_label` and `pick` (`preview-session.ts`); a drop
+>   becomes `long_run_day` / `easy_days[i]` / `slot_days[key]` / `lift_days[label]`, forwarded by create-goal.
+>   The chip rows, days-off row, rest-day line, tips and second picture are gone. Sample week = week two.
+> - **Your numbers** (was "Know your numbers?"): not optional; boxes for the plan's lifts and threshold pace when
+>   nothing is on file, saved through `save-baselines` (`lifts`, `paces.threshold`), then "Use this"; blanks are tested.
+> - **Plans:** `strength_5k` = **Strength Lead**, new `strength_half` = **Run Lead** (p250/251, SOURCE Part E3; five
+>   runs, no rest day in the standard week; `plyoCount`; 1%/4wk; `focus: 'run_half'`; SlotKey `easy2`). The Run screen is
+>   five tappable sections from the server (`RUN_SECTIONS`): Get stronger · Build muscle · Race (Marathon card opens the
+>   race flow; the Goals screen's race entry is gone) · Trails · Get faster. Cards' words are Michael's (setup-copy.ts).
+> - **Lengths:** long-run chips are the frame's three tiers, first selected (`runStrengthWeek.longRunChips`; Run Lead
+>   1h44/1h57/2h11 because the level-3 long run only builds at 104/111/117/124/131/134 min — Stage 0). Run Lead's day-4
+>   easy run has chips 45/50/60 (`easyRunChipsByLevel`). A plan may state its own long-run cap (`SlotSpec.ceilingMin`,
+>   `longRunCeilingMinutes`); Strength Lead keeps the family's 100 (p247). Unanswered rows on a run-only frame read as run.
 >
-> **UNVERIFIED, and what settles it:** the menu signed in, on web and phone (he walks it: every item from every other
-> item's screen and from +, Import with the header, the menu straight after a save) · that the toast was the cause of
-> "the menu does not always open" — it is a proven mechanism, not a proven cause · the `connection_events` row for the
-> fake event sent after the deploy (athlete `999999999999`, should read `matched: false`; the call returned 200, the
-> row was not read back — a prod read needs his go) · whether Strava's API agreement requires deleting the athlete's
-> Strava workouts on removal — not read; Garmin's does and `garmin-webhook-user` deletes them.
+> **UNVERIFIED:** the whole flow on Michael's phone with the LAST build (chips on the easy row; the phone was unreachable
+> at install) · a 5HR/Run Lead plan built end to end on a device · a drag on a real touch screen on Your week (a mouse
+> drag was checked) · the Marathon card from the Run screen. Sweeps: fuzz + builder-answers-sweep 23/23 on `c998b4f4b`
+> and again after the crowded-day rule; a 6,216-week combo sweep (3 plans) and a 3,192-week Run Lead sweep, 0 problems.
 >
-> **One wrong claim from this chat, because it is the usual shape:** "with no number on file the test shows no
-> weights" — read off `pretestSession` returning null, without reading the branch ten lines below it that handles
-> exactly that case. Read around it before saying what the athlete sees.
->
-> **Rules that bind you:** commit exact files, never `-a` (terminals share this tree; HEAD is `stage/one-truth-drift`
-> and is pushed with `git push origin HEAD:main`) · commit, push and deploy wait for his word · prod reads need his
-> go-ahead per session.
+> **Rules that bind you:** commit exact files, never `-a` · commit, push and deploy wait for his word · the build check
+> (`node scripts/check-estimate-provenance.mjs --fail-only`) needs `node_modules` linked and must exit 0 before a push
+> (one push this session went out with it silently failing) · `--write-book-pins` only after he approves the words ·
+> deploy every importer (`docs/INVENTORY.md`) from a clean worktree · a phone install needs the phone reachable.
 
 ## (older banner) THE RECORD TAB (written 2026-09-20 evening — main = `7326c1135`, PUSHED; 8 functions DEPLOYED; both migrations RUN; **VERIFIED on Michael's phone** — "it works")
 
