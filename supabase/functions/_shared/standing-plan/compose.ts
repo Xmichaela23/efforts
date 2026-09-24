@@ -143,20 +143,28 @@ import { FAMILIES } from '../endurance-library/index.ts';
  * that row, the list no longer applies and the ordinary rules take over.
  * ⚠️ THE LIBRARY IS ASKED, never a literal — `archetypesFor` owns which shapes a level offers, and
  * a second copy of that answer here is the D-457 disease with a new face.
+ *
+ * ⛔ AND FILTERED TO WHERE THE ROW WILL BE RIDDEN (2026-09-24, SPEC-outdoor-rides §3C) — the same
+ * `archetypesForVenue` the rotation below asks. A named list the road empties falls through to the
+ * family's road rotation, the level-mismatch lesson above applied once more, rather than throwing.
  */
 export function frameRotatedArchetype(
   slot: { archetypes?: string[] },
   assigned: { substituted?: boolean; family: string },
   level: number,
   week: number,
+  venue: RideVenue = 'road',
 ): string | undefined {
   const list = slot.archetypes;
   if (assigned.substituted || !Array.isArray(list) || list.length === 0) return undefined;
-  const offered = new Set(archetypesFor(assigned.family as never, level as never).map((a) => a.id));
+  const offered = new Set(archetypesForVenue(assigned.family as never, level as never, venue).map((a) => a.id));
   const usable = list.filter((id) => offered.has(id));
   if (usable.length === 0) return undefined;
   return usable[(Math.max(1, week) - 1) % usable.length];
 }
+
+/** Where a row will be ridden: the road unless the athlete put that slot on the trainer. See `ComposeArgs.trainerSlotsByWeek`. */
+export type RideVenue = 'road' | 'trainer';
 
 /**
  * ⛔⛔ A PICKED LENGTH BUILDS THE SESSION THE CHIPS WERE MEASURED ON, EVERY WEEK (2026-09-20, found
@@ -175,6 +183,10 @@ export function frameRotatedArchetype(
  * ours too); this only stops the rotation overriding an answer the athlete gave.
  * ⚠️ NO PICK, NO CHANGE. A row with no length answer rotates exactly as it did, so Ride + Strength
  * and every hard row are untouched. ⚠️ READ AT BOTH SITES, like the two resolvers below it.
+ *
+ * ⛔ AND EVERY BRANCH WALKS THE SHAPES THE ROW'S VENUE ALLOWS (2026-09-24, SPEC-outdoor-rides §3A):
+ * the road's shapes unless the athlete put this slot on the trainer (`slotVenue`). An explicit pick
+ * (`assigned.archetype` — the athlete's own, or the frame's pin) still wins, as it always did.
  */
 function archetypeForSlot(
   slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
@@ -182,26 +194,39 @@ function archetypeForSlot(
   level: number,
   week: number,
   lengthPicked: boolean,
+  venue: RideVenue,
 ): string | undefined {
-  const pinned = frameRotatedArchetype(slot, assigned, level, week) ?? assigned.archetype;
+  const pinned = frameRotatedArchetype(slot, assigned, level, week, venue) ?? assigned.archetype;
   if (pinned) return pinned;
   if (lengthPicked && !isHardSlot(slot)) {
-    const first = archetypesFor(assigned.family as never, level as never)[0]?.id;
+    const first = archetypesForVenue(assigned.family as never, level as never, venue)[0]?.id;
     if (first) return first;
   }
-  return rotatedArchetype(assigned.family, level, week);
+  return rotatedArchetype(assigned.family, level, week, venue);
 }
 
-function rotatedArchetype(family: string, level: number, week: number): string | undefined {
-  const rules = (FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>)[family];
-  if (!rules) return undefined;
-  const offered = rules.archetypes.filter((a) => !a.levels || a.levels.includes(level));
-  if (offered.length < 2) return undefined;
+/** The venue of one frame slot this week — see `ComposeArgs.trainerSlotsByWeek`. */
+function slotVenue(args: Pick<ComposeArgs, 'trainerSlotsByWeek' | 'week'>, key: string): RideVenue {
+  return (args.trainerSlotsByWeek?.[args.week] ?? []).includes(key) ? 'trainer' : 'road';
+}
+
+/**
+ * ⛔ THE ROAD'S SHAPES UNLESS THE ROW IS ON THE TRAINER (2026-09-24, SPEC-outdoor-rides §3A) — the
+ * library's own filter (`archetypesForVenue`), never a level test or a road list written out here.
+ * ⛔ ONE SHAPE ROTATES AS ITSELF. VO2 has one road shape (p238's long repeats), and `undefined` here
+ * would hand `buildEnduranceSession` its default — the family's FIRST shape, which is the same shape
+ * today only by the order of the list. The single shape is returned by name so that order can never
+ * decide it. ⚠️ A family the library does not know still returns nothing.
+ */
+function rotatedArchetype(family: string, level: number, week: number, venue: RideVenue = 'road'): string | undefined {
+  if (!(FAMILIES as Record<string, unknown>)[family]) return undefined;
+  const offered = archetypesForVenue(family as never, level as never, venue);
+  if (offered.length === 0) return undefined;
   return offered[(Math.max(1, week) - 1) % offered.length].id;
 }
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
-import { archetypesFor } from '../endurance-library/index.ts';
+import { archetypesFor, archetypesForVenue } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import { MAX_SESSIONS_A_DAY } from './week-conflicts.ts';
@@ -870,6 +895,17 @@ export type ComposeArgs = {
    * to render as nothing rather than as a prescription for one rep.
    */
   meLastRepsByPattern?: Partial<Record<ViadaPattern, number[]>> | null;
+  /**
+   * ⛔ THE RIDE SLOTS THE ATHLETE HAS PUT ON THE TRAINER, BY BLOCK WEEK (2026-09-24,
+   * `docs/SPEC-outdoor-rides-2026-09-24.md` §3B). Keyed by week, each entry the frame slot's own key
+   * (`${frameDay}:${index}` — the `slot:` tag on the row, the `sportMix.minutes` key). A slot listed
+   * for a week walks every shape the family offers there; every other ride walks the road shapes
+   * (`archetypesForVenue`). Absent — every fresh build — means the road everywhere.
+   * ⚠️ DERIVED, NEVER ASKED: `rematerialize-standing-block` reads it off the athlete's `venue:trainer`
+   * "Rest of plan" rows (`plan-adjustments.ts trainerSlotsByWeek`) for the weeks AFTER the one the tag
+   * landed on. The tagged week keeps its shape — p275's "same session, tagged".
+   */
+  trainerSlotsByWeek?: Record<number, string[]> | null;
 };
 
 export type ComposeNote = { kind: 'source' | 'ours' | 'inferred' | 'gap' | 'warning'; text: string; cite?: string };
@@ -2938,9 +2974,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           family: a.family,
           level: levelForFamily(a.family, a.level),
           // ⛔ A picked length holds the shape it was offered on — see `archetypeForSlot`.
+          // ⛔ The road's shapes unless this slot is on the trainer — see `slotVenue`.
           archetype: archetypeForSlot(
             slot, a, levelForFamily(a.family, a.level), args.week,
             Number.isFinite(Number(args.sportMix?.minutes?.[`${d.day}:${i}`] ?? NaN)),
+            slotVenue(args, `${d.day}:${i}`),
           ),
           sport: a.sport,
           // ⛔ THE FRAME'S ROLE, so the easy ride and the long ride get their own ceilings (`ladderCeilingFor`).
@@ -3412,9 +3450,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * falls through to the rules below exactly as it did before.
        */
       // ⛔ A picked length holds the shape it was offered on — see `archetypeForSlot`.
+      // ⛔ The road's shapes unless this slot is on the trainer — see `slotVenue`. Same key as the specs above.
       const slotArchetype = archetypeForSlot(
         slot, assigned, levelForFamily(assigned.family, assigned.level), args.week,
         Number.isFinite(Number(args.sportMix?.minutes?.[`${day.day}:${i}`] ?? NaN)),
+        slotVenue(args, `${day.day}:${i}`),
       );
       /**
        * ⛔ THE ATHLETE'S OWN LENGTH FOR THIS SESSION, WHERE A SCREEN ASKED — see `SportMix.minutes`.

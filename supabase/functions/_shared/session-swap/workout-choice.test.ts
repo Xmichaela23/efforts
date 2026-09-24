@@ -247,3 +247,33 @@ Deno.test('Back to the plan on a chosen workout restores the row the plan author
   assertEquals(write.patch.steps_preset, row.steps_preset);
   assertEquals(write.patch.type, 'run');
 });
+
+/**
+ * ⛔ THE SHEET LISTS WHAT THE ROW'S VENUE ALLOWS (2026-09-24, `docs/SPEC-outdoor-rides-2026-09-24.md` §3C, §6.4):
+ * an untagged VO2 ride has one road shape (p238's long repeats) and so offers nothing else; the same row on the
+ * trainer (`venue:trainer`) offers the page's other two. The filter is the composer's own (`archetypesForVenue`).
+ */
+Deno.test('an untagged VO2 ride offers one workout (Long VO2 Repeats); on the trainer, three', () => {
+  const row = rowOf({ ...home, frame: 'cycling_base', sportMix: { rideCount: 7 } }, 'ride_vo2', 1);
+  assertEquals(archetypeOf(row), 'long_vo2');
+  const road = hardSlotOf(row)!;
+  assertEquals(road.venue, 'road');
+  assertEquals(workoutsForSlot(road).map((w) => w.id), ['long_vo2']);
+  assertEquals(workoutChoiceOptions(row, [row], NO_THRESHOLD as never).length, 0);
+
+  const onTrainer = { ...row, tags: [...row.tags, 'venue:trainer'] };
+  const trainer = hardSlotOf(onTrainer)!;
+  assertEquals(trainer.venue, 'trainer');
+  assertEquals(workoutsForSlot(trainer).map((w) => w.id), ['long_vo2', 'short_vo2', 'micro']);
+  assertEquals(workoutChoiceOptions(onTrainer, [onTrainer], NO_THRESHOLD as never).map((o) => o.archetype), ['short_vo2', 'micro']);
+
+  // A sweet-spot ride: the road offers the page's three two-minute-plus shapes, the trainer all four.
+  const ss = rowOf({ ...home, frame: 'cycling_base', sportMix: { rideCount: 7 } }, 'ride_sweet_spot', 1);
+  assertEquals(workoutsForSlot(hardSlotOf(ss)!).map((w) => w.id), ['medium', 'long', 'tempo']);
+  assertEquals(workoutsForSlot(hardSlotOf({ ...ss, tags: [...ss.tags, 'venue:trainer'] })!).map((w) => w.id), ['minute_surge', 'medium', 'long', 'tempo']);
+
+  // A row holding a trainer shape with no tag (built before the road rule, or picked in the builder) still gets its sheet.
+  const legacy = { ...row, tags: row.tags.map((t) => (t === 'archetype:long_vo2' ? 'archetype:short_vo2' : t)) };
+  assertEquals(hardSlotOf(legacy)?.archetype, 'short_vo2');
+  assertEquals(workoutChoiceOptions(legacy, [legacy], NO_THRESHOLD as never).map((o) => o.archetype), ['long_vo2']);
+});

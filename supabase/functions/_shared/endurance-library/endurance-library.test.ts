@@ -22,6 +22,7 @@ import {
   applyEasyBoutBounds,
   applyTempoCrossover,
   archetypesFor,
+  archetypesForVenue,
   buildEnduranceSession,
   sessionDurationBandSeconds,
 } from './generate.ts';
@@ -878,4 +879,53 @@ Deno.test('⛔⛔ A REPEAT COUNT COMES FROM THE WORK BAND, NOT FROM A SECOND DIA
   // `totalsFor` counts it on every repeat but the last.
   assert(race.rest != null && race.rest > 0, 'the race repeat lost its stated recovery');
   assert(below.rest != null && below.rest > 0, 'the 8:30 round lost its VT1 recovery');
+});
+
+/**
+ * ⛔ RIDES BUILD FOR THE ROAD; THE TRAINER IS THE EXCEPTION (2026-09-24, `docs/SPEC-outdoor-rides-2026-09-24.md` §1,
+ * §6.1). The sort is OURS (ledger row in `docs/STATE-SOURCES.md`); this holds it against a future shape: every ride
+ * shape carries the mark, the trainer set is exactly the three sub-two-minute controlled switches, and every ride
+ * family keeps at least one road shape at every level it is offered at — so `archetypesForVenue(…, 'road')` can never
+ * empty a slot and make the composer fall back to the family's first shape by accident.
+ */
+Deno.test('⛔ every ride shape carries the road/trainer mark, and the trainer set is exactly short_vo2 / micro / minute_surge', () => {
+  const trainer: string[] = [];
+  let rideShapes = 0;
+  for (const [family, rules] of Object.entries(FAMILIES)) {
+    for (const a of (rules as { sport: string; archetypes: Array<{ id: string; venue?: string }> }).archetypes) {
+      if ((rules as { sport: string }).sport !== 'ride') {
+        assertEquals(a.venue, undefined, `${family}.${a.id} is not a ride and carries a venue mark`);
+        continue;
+      }
+      rideShapes += 1;
+      assert(a.venue === 'road' || a.venue === 'trainer', `${family}.${a.id} carries no road/trainer mark`);
+      if (a.venue === 'trainer') trainer.push(a.id);
+    }
+  }
+  assertEquals(rideShapes, 15, 'the spec sorts 15 ride shapes');
+  assertEquals(trainer.sort(), ['micro', 'minute_surge', 'short_vo2']);
+});
+
+Deno.test('⛔ every ride family keeps a road shape at every level — the spec\'s 3/3/3 · 3/3/3 · 1/1/1 · 3/3/2 · 2/2/2', () => {
+  const want: Record<string, number[]> = {
+    ride_sprints: [3, 3, 3], ride_anaerobic: [3, 3, 3], ride_vo2: [1, 1, 1], ride_sweet_spot: [3, 3, 2], ride_endurance: [2, 2, 2],
+  };
+  for (const family of ALL_FAMILIES) {
+    if ((FAMILIES[family] as { sport: string }).sport !== 'ride') {
+      // A run or swim family is untouched by the filter: road and trainer are the same list.
+      for (const level of ALL_LEVELS) {
+        assertEquals(archetypesForVenue(family, level, 'road').map((a) => a.id), archetypesFor(family, level).map((a) => a.id), `${family} L${level}`);
+      }
+      continue;
+    }
+    for (const level of ALL_LEVELS) {
+      const road = archetypesForVenue(family, level, 'road');
+      assert(road.length >= 1, `${family} L${level} has no road shape`);
+      assertEquals(road.length, want[family][level - 1], `${family} L${level} road shapes`);
+      // The trainer walks everything the level offers — today's rotation, unchanged.
+      assertEquals(archetypesForVenue(family, level, 'trainer').map((a) => a.id), archetypesFor(family, level).map((a) => a.id), `${family} L${level} trainer`);
+      for (const a of road) assert(a.venue === 'road', `${family} L${level} road list holds ${a.id} (${a.venue})`);
+    }
+  }
+  assertEquals(archetypesForVenue('ride_vo2', 1, 'road').map((a) => a.id), ['long_vo2']);
 });

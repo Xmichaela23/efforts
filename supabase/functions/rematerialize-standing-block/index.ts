@@ -66,6 +66,7 @@ import {
   enduranceSlotName,
   optionsFromSwapTags,
   swapClassOf,
+  trainerSlotsByWeek,
   weekdayOfDate,
   type SwapAdjustment,
 } from '../_shared/session-swap/plan-adjustments.ts';
@@ -507,56 +508,11 @@ Deno.serve(async (req: Request) => {
      * ⚠️ AND ONLY THE WEEKS THAT HAVE NOT STARTED. History is not editable and the live week keeps
      * the prescription it is being judged against — the boundary `afterWeek` draws below.
      */
-    const composed = composeBlock({
-      ...composeBase,
-      ...(Object.keys(ladder.sets).length > 0 ? { meSetsByPattern: ladder.sets } : {}),
-      ...(Object.keys(ladder.bar).length > 0 ? { barOffsetsByPattern: ladder.bar } : {}),
-      // ⛔ AND WHAT THEY GOT LAST TIME, ON THE SAME PATH (stage 2, items 5 and 6). The row prints it
-      // so a working block stops looking frozen, and the logger's rep cell opens on it instead of on
-      // the top of the band — the phantom five-rep session that used to move the bar.
-      ...(Object.keys(ladder.lastReps).length > 0 ? { meLastRepsByPattern: ladder.lastReps } : {}),
-    });
-
     /**
-     * ⛔⛔ THE LAST TEST DAY, AS A DATE — the cut the restatement uses inside the test week.
-     *
-     * ⛔ WHY A DATE AND NOT A WEEK (Michael, 2026-08-27: *"its a dumb rule should just fill
-     * everything after test"*). The old cut was `max(TEST_WEEK_INDEX, currentWeek)` under the
-     * comment *"history and the live week stand"* — and the test sits INSIDE the live week, so
-     * protecting the live week protected exactly the sessions the test had just enabled. He tested
-     * Monday and Tuesday and Thursday still read "No weight is prescribed".
-     *
-     * ⚠️ TAKEN FROM THE COMPOSED WEEK'S OWN `test_week` TAG, not from a weekday named here — the
-     * frame's rotation decides which days the tests land on, and a second answer to that question is
-     * how the two drift.
-     */
-    const testCutoff = testDayCutoff(composed, plannedRows ?? [], TEST_WEEK_INDEX);
-
-    const restated = restateFromTest({
-      composed,
-      planned: plannedRows ?? [],
-      /**
-       * ⛔ AFTER THE TEST, MINUS ANYTHING ALREADY DONE. The week index is the TEST week now rather
-       * than the live one; `testDayCutoff` carries the day-level half, and `restateFromTest` skips
-       * any session already completed or skipped in any week. History still stands — per session,
-       * which is what it always meant.
-       */
-      afterWeek: TEST_WEEK_INDEX,
-      testDayCutoff: testCutoff,
-      // ⛔ TODAY ON (2026-09-18): the rest of the live week too; before today stays as it is.
-      fromDate: today,
-    });
-
-    /**
-     * ⛔ THE RUNS AND RIDES TAKE TODAY'S SHAPE TOO (2026-09-05). Until now only the lift rows were
-     * restated; a library correction or a deload column never reached an existing calendar. Same
-     * laws: unstarted sessions only, the diff comes back on the dry run, applying is the tap.
-     */
-    /**
-     * ⛔ THE ATHLETE'S ENDURANCE SWAPS ARE PART OF WHAT THE PLAN BUILDS (2026-09-19). Each is a `plan_adjustments` row —
-     * the list the logger's lift swap already writes — and `applyEnduranceAdjustments` makes the composed session what
-     * the athlete chose, on the dates the row covers. The lift restate above reads `composed` as it always did;
-     * materialize-plan applies a lift swap when it expands the row.
+     * ⛔ THE SWAPS ARE READ BEFORE THE WEEKS ARE COMPOSED (2026-09-24, SPEC-outdoor-rides §3B): a ride slot the
+     * athlete put on the trainer for the rest of the plan composes with every shape its family offers from the
+     * next unstarted week (`trainerSlotsByWeek`, off the probe's slot names — same days, same sports, same keys),
+     * so the read happens here and the apply (`applyEnduranceAdjustments`, below) reads the same list.
      */
     const tapRow = swapTap ? (plannedRows ?? []).find((r: Record<string, unknown>) => String(r.id) === String(swapTap.planned_id)) : null;
     const tapDate = tapRow ? String(tapRow.date ?? '').slice(0, 10) : null;
@@ -613,7 +569,63 @@ Deno.serve(async (req: Request) => {
       // ⛔ The plan's date, not a moved row's (`_shared/moved-from.ts`) — this maps the plan's slots.
       if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(planDateOf(r))}`, planDateOf(r));
     }
-    const planned = applyEnduranceAdjustments(composed, swaps, (week, day) => dateByWeekDay.get(`${week}|${day}`) ?? null);
+    const dateOfSlot = (week: number, day: string) => dateByWeekDay.get(`${week}|${day}`) ?? null;
+    const trainerSlots = trainerSlotsByWeek(probe, swaps, dateOfSlot);
+
+    const composed = composeBlock({
+      ...composeBase,
+      // ⛔ The trainer slots, by week — see `ComposeArgs.trainerSlotsByWeek`. Empty on a plan with no such swap.
+      ...(Object.keys(trainerSlots).length > 0 ? { trainerSlotsByWeek: trainerSlots } : {}),
+      ...(Object.keys(ladder.sets).length > 0 ? { meSetsByPattern: ladder.sets } : {}),
+      ...(Object.keys(ladder.bar).length > 0 ? { barOffsetsByPattern: ladder.bar } : {}),
+      // ⛔ AND WHAT THEY GOT LAST TIME, ON THE SAME PATH (stage 2, items 5 and 6). The row prints it
+      // so a working block stops looking frozen, and the logger's rep cell opens on it instead of on
+      // the top of the band — the phantom five-rep session that used to move the bar.
+      ...(Object.keys(ladder.lastReps).length > 0 ? { meLastRepsByPattern: ladder.lastReps } : {}),
+    });
+
+    /**
+     * ⛔⛔ THE LAST TEST DAY, AS A DATE — the cut the restatement uses inside the test week.
+     *
+     * ⛔ WHY A DATE AND NOT A WEEK (Michael, 2026-08-27: *"its a dumb rule should just fill
+     * everything after test"*). The old cut was `max(TEST_WEEK_INDEX, currentWeek)` under the
+     * comment *"history and the live week stand"* — and the test sits INSIDE the live week, so
+     * protecting the live week protected exactly the sessions the test had just enabled. He tested
+     * Monday and Tuesday and Thursday still read "No weight is prescribed".
+     *
+     * ⚠️ TAKEN FROM THE COMPOSED WEEK'S OWN `test_week` TAG, not from a weekday named here — the
+     * frame's rotation decides which days the tests land on, and a second answer to that question is
+     * how the two drift.
+     */
+    const testCutoff = testDayCutoff(composed, plannedRows ?? [], TEST_WEEK_INDEX);
+
+    const restated = restateFromTest({
+      composed,
+      planned: plannedRows ?? [],
+      /**
+       * ⛔ AFTER THE TEST, MINUS ANYTHING ALREADY DONE. The week index is the TEST week now rather
+       * than the live one; `testDayCutoff` carries the day-level half, and `restateFromTest` skips
+       * any session already completed or skipped in any week. History still stands — per session,
+       * which is what it always meant.
+       */
+      afterWeek: TEST_WEEK_INDEX,
+      testDayCutoff: testCutoff,
+      // ⛔ TODAY ON (2026-09-18): the rest of the live week too; before today stays as it is.
+      fromDate: today,
+    });
+
+    /**
+     * ⛔ THE RUNS AND RIDES TAKE TODAY'S SHAPE TOO (2026-09-05). Until now only the lift rows were
+     * restated; a library correction or a deload column never reached an existing calendar. Same
+     * laws: unstarted sessions only, the diff comes back on the dry run, applying is the tap.
+     */
+    /**
+     * ⛔ THE ATHLETE'S ENDURANCE SWAPS ARE PART OF WHAT THE PLAN BUILDS (2026-09-19). Each is a `plan_adjustments` row —
+     * the list the logger's lift swap already writes — and `applyEnduranceAdjustments` makes the composed session what
+     * the athlete chose, on the dates the row covers. The lift restate above reads `composed` as it always did;
+     * materialize-plan applies a lift swap when it expands the row.
+     */
+    const planned = applyEnduranceAdjustments(composed, swaps, dateOfSlot);
 
     const endurance = restateEndurance({ composed: planned, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX, fromDate: writeFrom });
 

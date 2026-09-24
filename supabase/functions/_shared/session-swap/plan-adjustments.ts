@@ -239,31 +239,75 @@ export function applyEnduranceAdjustments(
     return null;
   };
   return composed.map((wk) => {
-    // The session's place among its day's sessions of the plan's sport, in the order the week lists them — what
-    // activate-plan writes as `day_seq`.
-    const seen = new Map<string, number>();
-    const placeIn = (s: PlanSession): number => {
-      const k = `${s.day}|${originOf(s as SwappableSession) ?? disciplineOf(s.type)}`;
-      const n = seen.get(k) ?? 0;
-      seen.set(k, n + 1);
-      return n;
-    };
+    const named = slotsOfWeek(wk, dateOf);
     return {
     ...wk,
-    sessions: wk.sessions.map((s) => {
-      const date = dateOf(wk.week, String(s.day));
-      const place = placeIn(s);
-      const slot = date ? enduranceSlotName(date, { ...(s as SwappableSession), day_seq: place }) : null;
-      if (!date || !slot) return s;
+    sessions: wk.sessions.map((s, i) => {
+      const at = named[i];
+      if (!at) return s;
       let cur = s;
       for (const a of live) {
-        if (a.exercise_name !== slot || !covers(a, date)) continue;
+        if (a.exercise_name !== at.slot || !covers(a, at.date)) continue;
         cur = sessionForOption(cur, String(a.substitute_exercise_name), template) ?? cur;
       }
       return cur;
     }),
     };
   });
+}
+
+/**
+ * Each session's slot name and date, by its index in the week — null where it is not an endurance session or the
+ * week has no date for its day. ⛔ ONE NAMING, read by the swap apply above and the trainer read below: the place
+ * is the session's order among its day's sessions of the plan's sport, in the order the week lists them — what
+ * activate-plan writes as `day_seq`.
+ */
+function slotsOfWeek(wk: ComposedWeek, dateOf: (week: number, day: string) => string | null): Array<{ slot: string; date: string } | null> {
+  const seen = new Map<string, number>();
+  return wk.sessions.map((s) => {
+    const k = `${s.day}|${originOf(s as SwappableSession) ?? disciplineOf(s.type)}`;
+    const place = seen.get(k) ?? 0;
+    seen.set(k, place + 1);
+    const date = dateOf(wk.week, String(s.day));
+    const slot = date ? enduranceSlotName(date, { ...(s as SwappableSession), day_seq: place }) : null;
+    return date && slot ? { slot, date } : null;
+  });
+}
+
+/**
+ * ⛔ THE RIDE SLOTS ON THE TRAINER FOR THE REST OF THE PLAN, BY BLOCK WEEK (2026-09-24,
+ * `docs/SPEC-outdoor-rides-2026-09-24.md` §3B) — what `composeBlock` takes as `trainerSlotsByWeek`, so those slots
+ * walk every shape the family offers while every other ride walks the road's.
+ *
+ * ⛔ THE WEEK THE TAG LANDED ON KEEPS ITS SHAPE (p275: the same session, tagged): a slot is listed for a week only
+ * when an active `venue:trainer` row covers its date AND the date is after the row's own `applies_from`. A "just
+ * today" row (`applies_until = applies_from`) therefore lists nothing, and the tapped week of a "Rest of plan" row
+ * lists nothing; the weeks after it list that one slot. ⛔ THAT SLOT ONLY — the row names the weekday, the sport and
+ * the place, so the Tuesday VO2 ride on the trainer says nothing about the Saturday long ride. A reverted or stopped
+ * row (`writeSwapAdjustment`) covers nothing, and the slot returns to the road.
+ * ⚠️ THE KEY IS THE FRAME SLOT'S OWN (`slot:` tag), read off the composed session — never a second naming.
+ */
+export function trainerSlotsByWeek(
+  composed: ComposedWeek[],
+  adjustments: SwapAdjustment[],
+  dateOf: (week: number, day: string) => string | null,
+): Record<number, string[]> {
+  const live = adjustments.filter((a) =>
+    isEnduranceAdjustment(a) && (a.status ?? 'active') === 'active' && a.substitute_exercise_name === `venue:${RIDE_VENUES[0]}`);
+  const out: Record<number, string[]> = {};
+  if (!live.length) return out;
+  for (const wk of composed) {
+    const named = slotsOfWeek(wk, dateOf);
+    wk.sessions.forEach((s, i) => {
+      const at = named[i];
+      if (!at || disciplineOf(s.type) !== 'ride') return;
+      const key = (s.tags ?? []).map(String).find((t) => t.startsWith('slot:'))?.slice('slot:'.length);
+      if (!key) return;
+      if (!live.some((a) => a.exercise_name === at.slot && covers(a, at.date) && at.date > a.applies_from)) return;
+      (out[wk.week] ??= []).push(key);
+    });
+  }
+  return out;
 }
 
 /** The option a swapped row's own tags say it carries, per class — what a row swapped before this shipped holds. */

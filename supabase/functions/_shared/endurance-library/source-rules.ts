@@ -127,9 +127,14 @@ export const VT1_IS_TOP_OF_ZONE_2 = true;
 // listed by NAME and carry no duration, because the page gives none — they are steps with a null
 // clock rather than steps with an invented one.
 
+/**
+ * `lapButton` (2026-09-24, rides): the line keeps its seconds for the card, the pop-up, the minutes and the step walk,
+ * and reaches the watch as the lap-button step (`materialize-plan expandBikeToken` → `lap_button: true` →
+ * `garmin/convert-workout.ts` durationType `OPEN`), so the Edge shows the warm-up until the athlete presses lap.
+ */
 export type WrapperSpec = {
-  warmup: { label: string; seconds: number | null; intensity: Intensity }[];
-  cooldown: { label: string; seconds: number | null; intensity: Intensity }[];
+  warmup: { label: string; seconds: number | null; intensity: Intensity; lapButton?: true }[];
+  cooldown: { label: string; seconds: number | null; intensity: Intensity; lapButton?: true }[];
   cite: string;
 };
 
@@ -190,9 +195,19 @@ const NO_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada p235 �
  * p236 — cycling sprints. ⚠️ No cooldown box is printed for ANY cycling family. The cadence sprints are one step of
  * the four sprints and the three 3-minute rests between them (600 s), carrying the page's whole line.
  */
+/**
+ * ⛔ A RIDE'S EASY-SPIN WARM-UP ENDS ON THE LAP PRESS (2026-09-24, Michael on a road ride with a 20-minute roll-out
+ * before the drills). Sent as a timed step, the Edge ended the warm-up at the line's seconds and started interval 1
+ * wherever the rider was. Every easy-spin warm-up line of a ride box below carries `lapButton`: the seconds stay
+ * (the card, the pop-up and the minutes print them; the step walk reads them), the watch step is open.
+ * FIELD — TrainingPeaks, "Open-ended steps for Structured Workouts" (help.trainingpeaks.com/hc/en-us/articles/
+ * 115003385172): an open-ended step ends on the lap button. ⚠️ OURS — choosing the open step over the page's
+ * stated range ("10- to 15-minute"); ledger row in docs/STATE-SOURCES.md. A timed effort inside a box (p238's
+ * "5 minutes @ 95%") and p236's cadence sprints stay timed. Runs and swims are untouched.
+ */
 const RIDE_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy },  // p236 — the box, as printed
+    { label: '10-minute easy spin', seconds: 10 * 60, intensity: easy, lapButton: true },  // p236 — the box, as printed; open on the watch (above)
     { label: '4 cadence only 15-second sprints to build up the leg speed and focus on timing and technique with 3-minute rest between',  // p236 — the box, as printed
       seconds: 4 * 15 + 3 * 3 * 60, intensity: drill },
   ],
@@ -205,7 +220,7 @@ const RIDE_SPRINT_WRAPPER: WrapperSpec = {
  * 12:30 is the middle of the page's range — OURS, the pick inside it (the label prints the page's range).
  */
 const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
-  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy }],  // p237, p238 — the box, as printed
+  warmup: [{ label: '10- to 15-minute easy spin', seconds: 12 * 60 + 30, intensity: easy, lapButton: true }],  // p237, p238 — the box, as printed; open on the watch (above)
   cooldown: [],
   cite: 'Viada p237, p238 — "10- to 15-minute easy spin"; the midpoint of his own range',
 };
@@ -213,9 +228,9 @@ const RIDE_EASY_SPIN_WRAPPER: WrapperSpec = {
 /** p238 — the VO2 box, the only cycling warm-up with an effort in it. */
 const RIDE_VO2_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy },  // p238 — the box, as printed
+    { label: '15-minute easy spin', seconds: 15 * 60, intensity: easy, lapButton: true },  // p238 — the box, as printed; open on the watch (above)
     { label: '5 minutes @ 95%', seconds: 5 * 60, intensity: { kind: 'pct_threshold', lo: 0.95, hi: 0.95 } },  // p238 — the box, as printed
-    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy },  // p238 — the box, as printed
+    { label: '5-minute easy spin', seconds: 5 * 60, intensity: easy, lapButton: true },  // p238 — the box, as printed; open on the watch (above)
   ],
   cooldown: [],
   cite: 'Viada p238',
@@ -257,14 +272,14 @@ export function wrapperToken(family: FamilyId, part: 'warmup' | 'cooldown', inde
   return `wrap_${family}_${part === 'warmup' ? 'warm' : 'cool'}${index}`;
 }
 export function wrapperStepForToken(token: string): {
-  kind: 'warmup' | 'cooldown'; seconds: number | null; label: string; intensity: Intensity;
+  kind: 'warmup' | 'cooldown'; seconds: number | null; label: string; intensity: Intensity; lapButton?: true;
 } | null {
   const m = String(token ?? '').toLowerCase().match(WRAPPER_TOKEN);
   if (!m) return null;
   const spec = (WRAPPERS as Record<string, WrapperSpec>)[m[1]];
   const kind = m[2] === 'warm' ? 'warmup' : 'cooldown';
   const line = spec?.[kind]?.[Number(m[3])];
-  return line ? { kind, seconds: line.seconds, label: line.label, intensity: line.intensity } : null;
+  return line ? { kind, seconds: line.seconds, label: line.label, intensity: line.intensity, ...(line.lapButton ? { lapButton: true as const } : {}) } : null;
 }
 
 // ── THE WORK-VOLUME BAND, PER FAMILY x LEVEL ────────────────────────────────────────────────────
@@ -480,10 +495,28 @@ export type ArchetypeShape =
   /** Reps stepping down from the top of `repBand` to the bottom, recovery falling with them. */
   | 'descending';
 
+/**
+ * ⛔ WHERE A RIDE SHAPE CAN BE RIDDEN — the road by default, the trainer as the exception
+ * (`docs/SPEC-outdoor-rides-2026-09-24.md` §1; Michael, 2026-09-24: "not everyone has a trainer").
+ *
+ * ⛔ THE SORT IS **OURS** (ledger row in `docs/STATE-SOURCES.md`, "Rides build for the road"). No page
+ * asks for a trainer: p275 asks for *"any modality with a power meter"*. The rule: a shape is `road`
+ * when every work interval is two minutes or longer, or its family is prescribed by feel (sprints
+ * p236 "max effort", anaerobic p237 "by feel with a power FLOOR", endurance p239 "use judgment"); a
+ * shape is `trainer` when the work switches inside two minutes on a controlled family (VO2 p238
+ * "more carefully controlled", sweet spot pp238-239). Recovery length and terrain never decide it.
+ * ⚠️ RIDE SHAPES ONLY. Run and swim shapes carry no mark and are offered everywhere.
+ * ⚠️ NEVER ON SCREEN. No note says road or trainer; the mark only decides which shapes the rotation
+ * and the workout sheet walk (`archetypesForVenue`).
+ */
+export type RideVenueMark = 'road' | 'trainer';
+
 export type Archetype = {
   id: string;
   label: string;
   shape: ArchetypeShape;
+  /** See `RideVenueMark`. Set on every ride shape (`endurance-library.test.ts` holds it); absent elsewhere. */
+  venue?: RideVenueMark;
   /** Work rep length, seconds — or metres where the family prescribes distance. */
   repBand: Range;
   /** The work interval's intensity. */
@@ -1341,6 +1374,7 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'max_effort',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Maximal sprints',
         repBand: { lo: 120, hi: 180 },
@@ -1353,6 +1387,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'flying_surge',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Flying surges',
         repBand: { lo: 15, hi: 30 },
@@ -1387,6 +1422,7 @@ export const FAMILIES: Record<FamilyId, {
          * by what the page differs by rather than by nothing.
          */
         id: 'standing_start',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Standing starts',
         repBand: { lo: 0, hi: 0 },
@@ -1420,6 +1456,7 @@ export const FAMILIES: Record<FamilyId, {
          * inside the band. What is new is that the COUNT is now per-level too.
          */
         id: 'progressive_repeats',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Progressive Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 45, hi: 90 },
@@ -1435,6 +1472,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'one_to_one',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         /**
          * ⛔ p237 AS PRINTED (read off the photo 2026-09-11):
@@ -1457,6 +1495,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'sandwich',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         /**
          * ⛔ p237 AS PRINTED (read off the photo 2026-09-11) — the surge is on BOTH sides:
@@ -1493,6 +1532,7 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'long_vo2',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Long VO2 Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 180, hi: 300 },
@@ -1503,6 +1543,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'short_vo2',
+        venue: 'trainer',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Short VO2 Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 90, hi: 90 },
@@ -1523,6 +1564,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'micro',
+        venue: 'trainer',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Micro-Intervals',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 30, hi: 40 },
@@ -1557,6 +1599,7 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'minute_surge',
+        venue: 'trainer',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         /**
          * ⛔ p238-239 AS PRINTED (read off the photos 2026-09-11) — "6 minutes @ 90% with 10 seconds
@@ -1581,6 +1624,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'medium',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         /**
          * ⛔ p238-239 AS PRINTED (2026-09-11): L1 6 rounds of 4 min @ 95% / 2-minute easy spin;
@@ -1600,6 +1644,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'long',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         /**
          * ⛔ p238-239 AS PRINTED (2026-09-11): L1 3 rounds of 8 min @ 90% / 4-minute easy spin;
@@ -1619,6 +1664,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'tempo',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Tempo Blocks',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 900, hi: 1200 },
@@ -1652,6 +1698,7 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'steady',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'continuous',
         label: 'Steady endurance ride',
         repBand: { lo: 60 * 60, hi: 300 * 60 },
@@ -1661,6 +1708,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'mixed',
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'continuous_with_inserts',
         label: 'Endurance ride with tempo blocks and sprints',  // not-instruction: session name, not an instruction; no page names it; Michael's call
         repBand: { lo: 120, hi: 120 },

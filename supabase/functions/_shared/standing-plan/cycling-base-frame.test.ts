@@ -166,9 +166,12 @@ Deno.test('⛔ p238 VO2 and p236 sprints at level 1 build the page and reach the
 });
 
 Deno.test('⛔ the one-fewer-ride week leaves out the Day 2 easy ride and nothing else, in both columns', () => {
+  // ⚠️ The hard rides' names are the ROAD rotation's for weeks 2 and 3 (2026-09-24, SPEC-outdoor-rides §3A): sweet
+  // spot walks medium / long / tempo, VO2 is p238's long repeats every week; the trainer shapes need a `venue:trainer`
+  // slot (`outdoor-rides.test.ts`). This test is about the six-ride drop, not the rotation.
   const expectAll = {
-    standard: ['Monday|Medium Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Short VO2 Repeats', 'Wednesday|Medium Sweet Spot Repeats', 'Friday|Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
-    taper: ['Monday|Long Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Micro-Intervals', 'Friday|Sprint Ride', 'Saturday|Ride'],
+    standard: ['Monday|Long Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Long VO2 Repeats', 'Wednesday|Long Sweet Spot Repeats', 'Friday|Ride', 'Friday|Sprint Ride', 'Saturday|Ride'],
+    taper: ['Monday|Tempo Blocks', 'Tuesday|Ride', 'Wednesday|Long VO2 Repeats', 'Friday|Sprint Ride', 'Saturday|Ride'],
   };
   for (const [week, column] of [[2, 'standard'], [3, 'taper']] as const) {
     const all = composeWeek(baseArgs(week, column) as never);

@@ -26,6 +26,7 @@
  */
 import {
   archetypesFor,
+  archetypesForVenue,
   buildEnduranceSession,
   FAMILIES,
   resolveEnduranceAnchors,
@@ -49,6 +50,7 @@ import {
   disciplineOf,
   intensityOf,
   isDisciplineSwapped,
+  venueOf,
   WORKOUT_FROM_PREFIX,
   workoutFromOf,
   type SwapOption,
@@ -66,7 +68,18 @@ const tagValue = (s: SwappableSession | null | undefined, prefix: string): strin
 /** The composer's bands for a hard slot — `ENDURANCE_CLASS`. Sweet spot is `below`, and it is a hard slot. */
 const HARD_BANDS = new Set(['near', 'above', 'below']);
 
-export type HardSlot = { family: FamilyId; level: Level; archetype: string; sport: 'run' | 'ride' };
+export type HardSlot = {
+  family: FamilyId;
+  level: Level;
+  archetype: string;
+  sport: 'run' | 'ride';
+  /**
+   * ⛔ WHERE THE ROW WILL BE RIDDEN (2026-09-24, SPEC-outdoor-rides §3C): the trainer when the row carries
+   * `venue:trainer`, the road otherwise — which shapes `workoutsForSlot` may offer. A run is always `road`
+   * (no run shape carries a mark, so the filter passes them all).
+   */
+  venue: 'road' | 'trainer';
+};
 
 /** The row's family, level and workout, when it is a planned hard session whose workout can be chosen. */
 export function hardSlotOf(session: SwappableSession | null | undefined): HardSlot | null {
@@ -85,8 +98,10 @@ export function hardSlotOf(session: SwappableSession | null | undefined): HardSl
   if (!archetype) return null;
   const sport = FAMILIES[family].sport;
   if ((sport !== 'run' && sport !== 'ride') || disciplineOf(session.type) !== sport) return null;
+  // ⚠️ THE ROW'S OWN SHAPE IS CHECKED AGAINST THE WHOLE LIST, not the venue's: a row built before the road
+  // rule, or a trainer shape the athlete picked in the builder, still gets its sheet.
   if (!archetypesFor(family, level as Level).some((a) => a.id === archetype)) return null;
-  return { family, level: level as Level, archetype, sport };
+  return { family, level: level as Level, archetype, sport, venue: venueOf(session) === 'trainer' ? 'trainer' : 'road' };
 }
 
 /**
@@ -94,9 +109,12 @@ export function hardSlotOf(session: SwappableSession | null | undefined): HardSl
  * this family holding this workout, the library's list for the family at this level otherwise.
  * ⚠️ FILTERED TO THE LEVEL either way — the low-volume tier builds p247's Wednesday at level 1, where
  * its three shapes do not exist, and the composer falls back to the family's rotation there too.
+ * ⛔ AND TO THE ROW'S VENUE (2026-09-24, SPEC-outdoor-rides §3C) — `archetypesForVenue`, the filter the
+ * composer's rotation walks, so the sheet offers what a rebuild would build. A frame list the road empties
+ * falls through to the family's road list rather than to nothing.
  */
 export function workoutsForSlot(slot: HardSlot): { id: string; label: string }[] {
-  const offered = archetypesFor(slot.family, slot.level).map((a) => ({ id: a.id, label: a.label }));
+  const offered = archetypesForVenue(slot.family, slot.level, slot.venue).map((a) => ({ id: a.id, label: a.label }));
   for (const frame of Object.values(FRAMES)) {
     for (const column of Object.values(frame.columns)) {
       for (const day of column) {
