@@ -27,6 +27,7 @@ import { weekLedgersFor, type WeekLedgersByWeek } from './week-ledger.ts';
 import type { MeLadderReading } from './me-history.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
 import type { ViadaPickKey } from './accessory-picks.ts';
+import type { StandingRace } from './race-week.ts';
 
 /** The app's existing phase shape — `strength-primary-plan.ts` writes the same one. */
 export type ArcPhase = { name: string; start_week: number; end_week: number; weeks_in_phase: number };
@@ -254,6 +255,10 @@ export type StandingPlanConfig = {
   /** ⛔ The weight those reps were performed at, per pattern (`barState.atWeight`). Stored beside
    *  `me_last_reps` because the two are ONE reading; a surface must never source them apart. */
   me_at_weight: Partial<Record<ViadaPattern, number>> | null;
+  /** ⛔ Half marathon (2026-09-24): the taper weeks the race set, read back by the restate. Absent on a block with no race. */
+  taper_weeks?: number[];
+  /** ⛔ The race the block ends on (`race-week.ts`), read back by the restate. Absent on a block with no race. */
+  race?: StandingRace;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -277,6 +282,8 @@ export function buildStandingPlanRow(args: {
   skipEvidence?: Record<string, unknown> | null;
   /** Surfacing only. */
   extraNotes?: ComposedWeek['notes'];
+  /** ⛔ The race the block ends on (Half marathon, 2026-09-24). Absent = no race, the block exactly as before. */
+  race?: StandingRace | null;
 }): StandingPlanRow {
   const weeks = Math.max(1, Math.round(args.weeks));
   const blocks = composeBlock({
@@ -286,6 +293,7 @@ export function buildStandingPlanRow(args: {
     ...(args.dayMap ? { dayOffset: args.dayMap.order } : {}),
     weeks,
     taperWeeks: args.taperWeeks ?? [],
+    ...(args.race ? { race: args.race } : {}),
   });
 
   const sessions_by_week: Record<string, PlanSession[]> = {};
@@ -400,6 +408,8 @@ export function buildStandingPlanRow(args: {
       me_history: null,
       me_last_reps: null,
       me_at_weight: null,
+      // ⛔ Only on a block with a race, so every other block's config is unchanged.
+      ...(args.race ? { taper_weeks: [...(args.taperWeeks ?? [])], race: { ...args.race } } : {}),
     },
     notes,
     /**

@@ -373,7 +373,7 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength' | 'marathon';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength' | 'marathon' | 'half_marathon';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
   standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength'],
@@ -411,6 +411,12 @@ const PROGRAM_COPY: Record<ProgramId, {
   marathon: {
     Icon: Flag, color: FOCUS_RACE_COLOR,
     goal: 'marathon', focus: 'run',
+  },
+  // ⛔ HALF MARATHON (2026-09-24): the Run Lead week (p250) built back from a race date — `get_stronger` on the
+  // `run_half` frame, with the race-date screen first (`getSteps`). Not the marathon generator.
+  half_marathon: {
+    Icon: Flag, color: FOCUS_RACE_COLOR,
+    goal: 'get_stronger', focus: 'run_half',
   },
   ride_strength: {
     Icon: Bike, color: getDisciplineColor('ride'),
@@ -1123,6 +1129,10 @@ export type NonRaceState = {
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
+  /** ⛔ THE HALF MARATHON'S RACE DAY (YYYY-MM-DD, 2026-09-24). Separate from `raceDate` on purpose: that field turns the
+   *  goal into an `event` for the marathon generator; this one travels as `training_prefs.race_date` to the Run Lead
+   *  build. Empty = not the Half marathon card. */
+  halfRaceDate?: string;
   /** Race distance as the SERVER's label vocabulary expects it (`DISTANCE_TO_API`, `create-goal…:195`
    *  — 'Marathon' → 'marathon'). Sending the lowercase api key here would not resolve. */
   raceDistance: string;
@@ -1172,6 +1182,7 @@ export type NonRaceState = {
 // test on the path passed. ⚠️ Re-exported so every `StepKey` reference here is unchanged.
 export type { StepKey } from '@/lib/wizard-steps';
 import { getSteps, skipsSportScope, fixedSportScope, type StepKey } from '@/lib/wizard-steps';
+import { raceBlockWeeks, RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS } from '@/lib/race-weeks';
 
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -1243,6 +1254,9 @@ function assemblePayload(
    * already does. This slice deliberately does not change that routing.
    */
   const isRace = !!state.raceDate;
+  // ⛔ HALF MARATHON (2026-09-24): the block's length is the race's week, counted the way the server counts it.
+  const halfRaceWeeks = state.goal === 'get_stronger' && state.program === 'half_marathon'
+    ? raceBlockWeeks(state.startDate, state.halfRaceDate) : null;
   /**
    * ⛔ THE COUNTS, DERIVED FROM THE SLOTS ON THE STRENGTH PATH (2026-08-24). The program owns the
    * count (8-21 §3c), so "how many runs" is "how many of the four endurance slots are runs" — one
@@ -1283,7 +1297,7 @@ function assemblePayload(
         name: isRace && state.raceName.trim() ? state.raceName.trim() : (planName ?? GOAL_LABELS[goal]),
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
-        ...(isRace ? {} : { target_weeks: state.targetWeeks }),
+        ...(isRace ? {} : { target_weeks: halfRaceWeeks ?? state.targetWeeks }),
         sport: shape.sport,
         distance: isRace ? state.raceDistance : null,
         /**
@@ -1638,6 +1652,8 @@ function assemblePayload(
           ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
           // ⛔ 5HR + Strength (p250), 2026-09-22 — without this the build falls back to the 5K frame.
           ...(isStrengthFocusPath && state.focus === 'run_half' ? { focus: 'run_half' } : {}),
+          // ⛔ HALF MARATHON (2026-09-24): race day travels to the Run Lead build (`generate-strength-plan` → `race-week.ts`).
+          ...(halfRaceWeeks != null && state.halfRaceDate ? { race_date: state.halfRaceDate } : {}),
           // ⚠️ ONLY WHEN THE ATHLETE PICKED (2026-09-13): the build keeps the page's own count otherwise.
           ...(printedRideWeekPath(state) && state.rideCount != null ? { ride_count: state.rideCount } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
@@ -2142,6 +2158,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     if (initialEntry === 'race') reseed('marathon', undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ⛔ HALF MARATHON (2026-09-24): the block is as long as the weeks to race day, so the confirm screen's week count
+  // follows the race date and the start week (both can change after the date screen).
+  const halfRaceWeeks = state.goal === 'get_stronger' && state.program === 'half_marathon'
+    ? raceBlockWeeks(state.startDate, state.halfRaceDate) : null;
+  const halfRaceWeeksOk = halfRaceWeeks != null && halfRaceWeeks >= RACE_BLOCK_MIN_WEEKS && halfRaceWeeks <= RACE_BLOCK_MAX_WEEKS;
+  React.useEffect(() => {
+    if (halfRaceWeeks != null && halfRaceWeeks !== state.targetWeeks) setState((s) => ({ ...s, targetWeeks: halfRaceWeeks }));
+  }, [halfRaceWeeks, state.targetWeeks]);
 
   // Modal-lock: hide the app tab bar while the builder is open (see index.css `body.wizard-active`).
   React.useEffect(() => {
@@ -4282,6 +4307,49 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </div>
             ))}
           </div>
+        </StepLayout>
+      )}
+
+      {/* ── THE HALF MARATHON'S RACE DAY (2026-09-24) ──────────────────────────────────────────────
+          The Half marathon card on Run › Race: the Run Lead week built back from this date. The same date fields the
+          marathon's race screen uses; the words are the server's (`RACE_DATE_COPY`). */}
+      {currentStep === 'race_date' && (
+        <StepLayout
+          step={stepNo('race_date')} totalSteps={steps.length} title={setupCopy?.race_date?.title ?? ''}
+          subtitle={setupCopy?.race_date?.subtitle ?? ''}
+          onBack={back} onContinue={next} canContinue={halfRaceWeeksOk}
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-white/85 text-sm mb-2">{setupCopy?.race_date?.race_day_label ?? ''}</p>
+              <input
+                type="date"
+                value={state.halfRaceDate ?? ''}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setState((s) => ({ ...s, halfRaceDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-[rgba(var(--wiz-accent-rgb,236,233,227),0.50)]"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+            <div>
+              <p className="text-white/85 text-sm mb-2">{setupCopy?.race_date?.start_label ?? ''}</p>
+              <input
+                type="date"
+                value={state.startDate}
+                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-[rgba(var(--wiz-accent-rgb,236,233,227),0.50)]"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+          </div>
+          {halfRaceWeeksOk && (
+            <p className="text-white/70 text-sm mt-1.5">
+              {(setupCopy?.race_date?.weeks_line ?? '').replace('{weeks}', String(halfRaceWeeks))}
+            </p>
+          )}
+          {state.halfRaceDate && !halfRaceWeeksOk && (
+            <p className="text-amber-400/70 text-sm mt-1.5">{setupCopy?.race_date?.out_of_range_line ?? ''}</p>
+          )}
         </StepLayout>
       )}
 

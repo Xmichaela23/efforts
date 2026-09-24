@@ -229,3 +229,16 @@ Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN TAKES THE SAME ROU
   assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }),
     getSteps(strengthPath('standard')).filter((k) => k !== 'train' && k !== 'program'));
 });
+
+Deno.test('⛔ HALF MARATHON (2026-09-24): the card opens race day first, and no other card sees that screen', () => {
+  const base: StepRouterState = {
+    goal: 'get_stronger', entry: 'train', focus: 'run_half', trainCard: 'run',
+    posture: { strength: 'develop', run: 'maintain', bike: 'out', swim: 'out' },
+  };
+  const half = getSteps({ ...base, program: 'half_marathon' });
+  assertEquals(half[half.indexOf('program') + 1], 'race_date');
+  assert(half.includes('schedule') && half.includes('confirm'), 'the Run Lead screens follow the race date');
+  const runLead = getSteps({ ...base, program: 'run_half_strength' });
+  assert(!runLead.includes('race_date'), 'Run Lead from Get stronger asks no race date');
+  assertEquals(half.filter((s) => s !== 'race_date'), runLead);
+});

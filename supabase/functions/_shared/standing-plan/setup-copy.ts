@@ -64,6 +64,13 @@ export const PROGRAM_COPY = {
     blurb: 'Built back from your race date.',
     requirement: '',
   },
+  // ⛔ HALF MARATHON (Stage 2, 2026-09-24) — NOT YET APPROVED. The Run Lead week (Viada p250) built back from a race date;
+  // the last two weeks are p250's TAPER/DELOAD column (OURS, p247's "2 weeks out"; SOURCE Part E3c).
+  half_marathon: {
+    label: 'Half marathon',  // not-instruction: a card name
+    blurb: 'The Run Lead week, built back from your race date. The last two weeks are the lighter version of the week.',
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
   // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
   // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
   // advanced cyclists".
@@ -90,12 +97,27 @@ export const PROGRAM_COPY = {
 export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
   { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
   { id: 'muscle', title: 'Build muscle', programs: [] },       // Viada pp244, 252 — not built
-  { id: 'race', title: 'Race', programs: ['marathon'] },
+  { id: 'race', title: 'Race', programs: ['marathon', 'half_marathon'] },
   { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
 ];
 /** Under a closed section. */
 export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
+
+/**
+ * ⛔ THE HALF MARATHON'S DATE SCREEN (Stage 2, 2026-09-24) — NOT YET APPROVED. {weeks} is the count from the start week to
+ * race week, inclusive. 4 to 52 is the goal row's own range (create-goal `target_weeks`).
+ */
+export const RACE_DATE_COPY = {
+  title: 'Race day',  // not-instruction: a screen title
+  subtitle: 'The plan runs from the week you start to race day.',
+  race_day_label: 'Race day',  // not-instruction: a field label
+  start_label: 'Start the week of',  // not-instruction: a field label
+  // OURS — "the last two": `RACE_TAPER_WEEKS` (race-week.ts), p247's "2 weeks out".
+  weeks_line: '{weeks} weeks of training. The last two are the lighter version of the week.',
+  // OURS — 4 to 52: the goal row's own range (create-goal `target_weeks`), not a book number.
+  out_of_range_line: 'This plan needs 4 to 52 weeks between the start and race day.',
+} as const;
 
 // ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────
 

@@ -29,6 +29,8 @@ export type StepRouterState = {
    * wizard directly. Absent or null = not reached through a Train card.
    */
   trainCard?: string | null;
+  /** ⛔ Which programme card was tapped (2026-09-24): `half_marathon` puts the race-date screen in the flow. */
+  program?: string | null;
   posture: Partial<Record<string, string | null | undefined>>;
 };
 
@@ -103,6 +105,8 @@ export type StepKey =
   // the engine (`StrengthPrimaryArgs` has no `liftingDays`), so a card offering it would be a screen
   // asking a question nothing downstream can answer.
   | 'numbers'
+  // ⛔ THE HALF MARATHON'S RACE DAY (2026-09-24) — one date, after the program card; the date sets the block's length.
+  | 'race_date'
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -365,8 +369,10 @@ export function getSteps(state: StepRouterState): StepKey[] {
    * on the frame rather than on the step. A value nobody was asked for still has to reach the
    * payload, and dropping the screen must not drop the write.
    */
+  // ⛔ THE HALF MARATHON CARD ASKS RACE DAY FIRST (2026-09-24): the Run Lead block is built back from it.
+  const raceDate: StepKey[] = isStrengthFocus && state.program === 'half_marathon' ? ['race_date'] : [];
   const head: StepKey[] = isStrengthFocus
-    ? [...door, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
+    ? [...door, ...raceDate, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
   const sched = scheduleSteps(state, isStrengthFocus, isRaceGoal);
   /**

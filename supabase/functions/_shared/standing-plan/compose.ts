@@ -218,6 +218,8 @@ import {
 } from './working-number.ts';
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
 import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
+// ⛔ Half marathon (Stage 2, 2026-09-24): race week at the end of a Run Lead block — `race-week.ts`.
+import { applyRaceWeek, type StandingRace } from './race-week.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -4387,12 +4389,13 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
 /** Every week of a block. ⛔ Week one is the test week; the taper column is the hold variant. */
 export function composeBlock(
-  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[] },
+  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[]; race?: StandingRace | null },
 ): ComposedWeek[] {
   const out: ComposedWeek[] = [];
   const taper = new Set(args.taperWeeks ?? []);
   for (let week = 1; week <= args.weeks; week++) {
     out.push(composeWeek({ ...args, week, column: taper.has(week) ? 'taper' : 'standard' }));
   }
-  return out;
+  // ⛔ A block with a race ends on race day (`race-week.ts`). Absent race → the weeks exactly as composed.
+  return args.race ? applyRaceWeek(out, args.race, args.dayOffset ?? 0) : out;
 }

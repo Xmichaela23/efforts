@@ -3147,6 +3147,9 @@ Deno.serve(async (req: Request) => {
                */
               // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
               ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half' ? { focus: gsTp.focus } : {}),
+              // ⛔ HALF MARATHON (2026-09-24): the race date travels to `generate-strength-plan`, which builds the Run Lead
+              // block back from it (`race-week.ts`). A date only; the builder checks it.
+              ...(typeof gsTp.race_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(gsTp.race_date) ? { race_date: gsTp.race_date } : {}),
               /**
                * ⛔ THE RIDE COUNT (Ride + Strength, p278's 4 or 5, 2026-09-13). Same allowlist, same
                * failure: `generate-strength-plan` reads `ride_count` off its own body, so a hop that drops

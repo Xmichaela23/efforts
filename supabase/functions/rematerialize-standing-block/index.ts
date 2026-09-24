@@ -390,6 +390,8 @@ Deno.serve(async (req: Request) => {
       frame: sp.frame,
       weeks,
       taperWeeks,
+      // ⛔ Half marathon (2026-09-24): the race the block was built to, read back so race week is rebuilt the same way.
+      ...(sp.race && typeof sp.race === 'object' ? { race: sp.race } : {}),
       competitionLifts: sp.competition_lifts ?? {},
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},

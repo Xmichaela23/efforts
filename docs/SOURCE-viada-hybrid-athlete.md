@@ -1499,6 +1499,30 @@ so **the standard week has no rest day**; the taper's day 7 is REST.
 - Running: volume *"dependent on runner proficiency and tolerance"*; quality matters as much as duration. Half-marathoners
   may choose NT at 92–97%; marathoners 89–94% and a weekend LSD up to 3 hours.
 
+## E3c. Reading note — the taper before a race (p251 re-read off `p251.jpg`, 2026-09-24, Stage 2 of the run-programs workorder)
+
+- **The one deload sentence on p251 is about a MEET.** Strength Notes, third bullet, whole: *"Consider switching the ME
+  upper and lower days on occasion if the lower day is suffering heavily from the fast run the day before. Some fatigue is
+  inevitable after the weekend, however, and 4 to 5 weeks out from a meet, consider running the deload running portion
+  (unless a race is within 6 weeks)."* Read: a lifter with a powerlifting meet 4–5 weeks away swaps the running to the
+  taper column's running; the parenthesis turns that off when a race is within 6 weeks, so the running keeps training
+  toward the race. **It gives no timing for a race taper.**
+- **p250's table prints the column** — "TAPER/DELOAD", strength and endurance — but neither page says when a race puts
+  the athlete in it, or for how many weeks.
+- **p251 prints nothing about race day or race week**: no race-week session, no race pace, no DE cut. The NT line
+  (*"Half-marathoners may choose NT workouts that focus on the 92 to 97 percent intensity"*) is a choice of NT band for the
+  standard week, not a taper rule.
+- **The nearest printed rule is the sister program's**, p247 (Strength + 5K, whose structure p251 says this strength
+  portion is *"similar in structure to"*): *"If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you
+  switch the program to the deload version."* p269 (another program) says the same number for a cycle under 8 weeks: *"only
+  a single week of deload 2 weeks out"*.
+- **Not carried over from p247**, because p251 does not print them for this program: the NT at race pace with 25 percent
+  longer recoveries *"if within six weeks of a race"* (p247 Running Notes), and *"eliminate the DE lifting sessions on race
+  week"* (p247, for a 5K).
+- **What the build does (OURS, ledger rows in `STATE-SOURCES.md`):** the last two weeks (the week before race week, and
+  race week) are p250's TAPER/DELOAD column, whole; race day carries the race and nothing else; nothing is built after
+  race day.
+
 ## H0.1 "Establishing your VO2 max pace and threshold pace" (p210)
 1. Easy 6–8 min jog. 2. 2 × 100 m strides (slow → near full tilt). 3. 3 rounds of 30 s at a "fast run"
 (mile PR) pace, 1 min easy walk/jog between. 4. 1 min additional rest. 5. **Time trial: 9.5/10 to
