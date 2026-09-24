@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info } from 'lucide-react';
+import { ChevronDown, Info } from 'lucide-react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
@@ -21,6 +21,7 @@ import {
   isStrengthRow,
   isEnduranceRow,
   isFromPlan,
+  hasTag,
   type TodayRow,
 } from '@/lib/today-lines';
 
@@ -277,6 +278,12 @@ export const LiftSessionCard: React.FC<{
   const cards = liftCardRowsFor(session, useImperial);
   const rawTitleNote = (session as { title_note?: unknown }).title_note;
   const titleNote = typeof rawTitleNote === 'string' && rawTitleNote.trim() ? rawTitleNote : null;
+  /**
+   * ⛔ THE PLYO WARM-UP FOLDS TO ITS DRILL NAMES (Michael, 2026-09-23: "takes too much space"). Closed: the title, the
+   * arrow, and every drill's name with its (i). Open: the sentence under the title and each drill's how-to. Nothing
+   * about the words changes — only whether they are drawn.
+   */
+  const plyo = hasTag(session, 'plyo');
 
   const [open, setOpen] = React.useState(false);
   // Which rows' (i) is open, by row key. ⛔ CLOSED BY DEFAULT, like the day's own (i) (`TodaySpacingLine`, §2.1).
@@ -310,18 +317,20 @@ export const LiftSessionCard: React.FC<{
   }, [cards.length, openInfo]);
 
   if (cards.length === 0) return null;
-  // `N more` counts EXERCISES (§3h), so a superset line past the fold counts both of its rows.
-  const more = cards.slice(2).reduce((n, c) => n + c.rows, 0);
+  // `N more` counts EXERCISES (§3h), so a superset line past the fold counts both of its rows. The plyo card shows every name, so it has none.
+  const more = plyo ? 0 : cards.slice(2).reduce((n, c) => n + c.rows, 0);
+  const canToggle = plyo || more > 0;
+  const showWords = !plyo || open;
 
   return (
     <div
       role="button"
       tabIndex={0}
       aria-expanded={open}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (more > 0) setOpen((o) => !o); }}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && more > 0) { e.preventDefault(); setOpen((o) => !o); } }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (canToggle) setOpen((o) => !o); }}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && canToggle) { e.preventDefault(); setOpen((o) => !o); } }}
       className="w-full text-left galaxy-card readout-texture readout-texture--spectral"
-      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: more > 0 ? 'pointer' : 'default' }}
+      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: canToggle ? 'pointer' : 'default' }}
     >
       <div className="flex items-baseline justify-between gap-3">
         {/* ⛔ THE ONE DOOR TO THE DRAWER. It stops the card's toggle so the two taps stay separate. */}
@@ -335,12 +344,20 @@ export const LiftSessionCard: React.FC<{
         >
           {title}
         </span>
-        {meta ? (
-          <span className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>{meta}</span>
+        {meta || plyo ? (
+          <span className="flex items-center gap-1 flex-shrink-0 self-center">
+            {meta ? (
+              <span className="text-footnote tabular-nums" style={{ color: 'var(--label-secondary)' }}>{meta}</span>
+            ) : null}
+            {/* The app's own drop arrow (`NonRaceBuilder`, `EnduranceWeekCard`): turns over when the card is open. */}
+            {plyo ? (
+              <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+            ) : null}
+          </span>
         ) : null}
       </div>
       {/* server-word: get-week's `title_note` (2026-09-19) — p275's sentence under the plyo warm-up's title. */}
-      {titleNote ? (
+      {titleNote && showWords ? (
         <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 4, color: 'var(--label-secondary)' }}>{titleNote}</div>
       ) : null}
 
@@ -352,7 +369,7 @@ export const LiftSessionCard: React.FC<{
              a third exercise's name line showed under the second (caught in the 390×844 screenshot). */
           position: 'relative',
           overflow: 'hidden',
-          height: heights ? (open ? heights.full : heights.closed) : undefined,
+          height: heights && !plyo ? (open ? heights.full : heights.closed) : undefined,
           transition: reduced ? 'none' : 'height 320ms cubic-bezier(.2,.8,.2,1)',
         }}
       >
@@ -399,7 +416,7 @@ export const LiftSessionCard: React.FC<{
               <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label)' }}>{c.info}</div>
             ) : null}
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
-            {c.cues.map((cue) => (
+            {showWords && c.cues.map((cue) => (
               <div key={cue} className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{cue}</div>
             ))}
           </div>
