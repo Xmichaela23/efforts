@@ -28,7 +28,7 @@
 // week is exactly the one the rotation chooser built.
 // ============================================================================
 
-import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
+import { FRAMES, isJoinedSlot, type ColumnKind, type FrameId } from './frames.ts';
 import { isLongSlot } from './sport-slots.ts';
 import {
   WEEKDAYS, frameDayOn, frameFixedDaysFor, anchorDaysFor, titleCaseDay, weekdayForFrameDay,
@@ -108,6 +108,7 @@ function skeletonWeek(args: {
     }
     if (d.plyo === true) out.push(S(wd, 'strength', 'Plyo warm-up', ['plyo']));
     d.endurance.forEach((slot, i) => {
+      if (isJoinedSlot(slot)) return; // ⛔ the second half of one run (p245 / p253) is not a session of its own
       const long = isLongSlot(slot);
       const family = String(slot.family);
       const sport = long

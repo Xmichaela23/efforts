@@ -53,6 +53,9 @@ Deno.test('⛔ HOP 3 — the builder reads it and hands it to the resolver', () 
     'the focus never reaches resolveFrame — every athlete gets the 5K frame');
   assert(/raw === 'ride' \? 'ride' : raw === 'run_half' \? 'run_half' : 'run'/.test(GENERATE),
     'an unrecognised focus no longer falls back to the 5K frame');
+  // ⛔ Build muscle (p244, p252), 2026-09-23: the two focus words pass through by name, nothing else does.
+  assert(/if \(raw === 'run_hyp' \|\| raw === 'run_half_hyp'\) return raw;/.test(GENERATE),
+    'the Build muscle focus words no longer reach the resolver');
 });
 
 Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
@@ -62,7 +65,7 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
    * `all_rounder` would move every one of them onto a different programme mid-flight.
    */
   // ⚠️ `'ride'` JOINED 2026-09-13 (Ride Focus → Cycling: Base, p278). Absent still means the 5K frame.
-  assert(/focus\?: 'standard' \| 'run' \| 'ride' \| 'run_half';/.test(RESOLVER),
+  assert(/focus\?: 'standard' \| 'run' \| 'ride' \| 'run_half' \| 'run_hyp' \| 'run_half_hyp';/.test(RESOLVER),
     'the resolver no longer takes an optional focus');
   assert(/position\.focus === 'run_half' \? 'strength_half' : 'strength_5k'/.test(RESOLVER),
     'the resolver default is no longer the 5K frame');

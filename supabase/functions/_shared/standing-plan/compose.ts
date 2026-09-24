@@ -55,6 +55,9 @@ import {
 } from './accessory-picks.ts';
 import {
   FRAMES,
+  JOINED_PART_TAG,
+  JOINED_TAG,
+  isJoinedSlot,
   SECONDARY_BY_PATTERN,
   EXPERIENCE_IS_THE_ATHLETES_ANSWER,
   frameAsksWeeklyHours,
@@ -141,7 +144,7 @@ import { FAMILIES } from '../endurance-library/index.ts';
  * ⚠️ THE LIBRARY IS ASKED, never a literal — `archetypesFor` owns which shapes a level offers, and
  * a second copy of that answer here is the D-457 disease with a new face.
  */
-function frameRotatedArchetype(
+export function frameRotatedArchetype(
   slot: { archetypes?: string[] },
   assigned: { substituted?: boolean; family: string },
   level: number,
@@ -548,6 +551,8 @@ export function placeEnduranceDays(
     let n = 0;
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
+        // ⛔ The second half of a joined run takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
+        if (isJoinedSlot(slot)) return;
         if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
       });
     }
@@ -584,10 +589,19 @@ export function placeEnduranceDays(
           ? !!args.endurancePins?.long
           : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false);
         if (pinned !== wantPinned) return;
+        if (isJoinedSlot(slot)) return; // ⛔ placed below, on the day of the half before it
         const proposed = enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex, key);
         enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
       });
     }
+  }
+  // ⛔ ONE RUN, ONE DAY (p245 / p253): the second half of a joined run lands where the first half did.
+  for (const d of days) {
+    d.endurance.forEach((slot, i) => {
+      if (!isJoinedSlot(slot) || i === 0) return;
+      const head = enduranceDays.get(`${d.day}:${i - 1}`);
+      if (head) enduranceDays.set(`${d.day}:${i}`, head);
+    });
   }
 
   return { days: enduranceDays, moves, place: relocate };
@@ -2680,6 +2694,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     let n = 0;
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
+        // ⛔ The second half of a joined run takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
+        if (isJoinedSlot(slot)) return;
         if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
       });
     }
@@ -2808,6 +2824,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const mine: { key: string; rank: number }[] = [];
       for (const dd of days) {
         dd.endurance.forEach((slot, i) => {
+          if (isJoinedSlot(slot)) return; // ⛔ the second half of one run is not a day of its own
           const a = assignedSlot(sportAssignment, dd.day, i, slot);
           if (a.sport !== sport) return;
           const role = anchorRoleOf(slot.family, slot.role);
@@ -2819,6 +2836,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       // ⚠️ TIES BROKEN BY KEY so the same ask never yields two different weeks.
       mine.sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key));
       for (let i = 0; i < surplus; i++) drop.add(mine[i].key);
+    }
+    // ⛔ A dropped head takes its joined second half with it — one run.
+    for (const dd of days) {
+      dd.endurance.forEach((slot, i) => {
+        if (isJoinedSlot(slot) && i > 0 && drop.has(`${dd.day}:${i - 1}`)) drop.add(`${dd.day}:${i}`);
+      });
     }
     return drop;
   })();
@@ -3439,7 +3462,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * runs are appended elsewhere in this file and carry none — one stride block a week.
        */
       const carriesStrides = slot.carriesStrides === true && assigned.sport === 'run';
+      // ⛔ ONE RUN OF TWO PARTS (p245 / p253, `EnduranceSlot.joinsPrevious`): the first half loses its cooldown, the
+      // second its warm-up. A half whose partner was dropped is built whole.
+      const joinsNext = isJoinedSlot(day.endurance[i + 1]) && !droppedSlots.has(`${day.day}:${i + 1}`);
+      const joinedPart = isJoinedSlot(slot) && i > 0 && !droppedSlots.has(`${day.day}:${i - 1}`);
       const built = buildEnduranceSession({
+        ...(joinsNext || joinedPart ? { omit: { cooldown: joinsNext, warmup: joinedPart } } : {}),
         family: assigned.family,
         level,
         // ⚠️ THE SAME SHAPE THE LADDER ABOVE WAS MEASURED ON — see `slotArchetype`.
@@ -3482,6 +3510,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // ⛔ WHICH FRAME SLOT THIS ROW IS (2026-09-22): Your week drags a session by it and sends the drop back as
           // `endurancePins.slots[key]`. Additive — no reader of the other tags changes.
           const extra: string[] = [`slot:${day.day}:${i}`];
+          if (joinsNext || joinedPart) extra.push(JOINED_TAG);
+          if (joinedPart) extra.push(JOINED_PART_TAG);
           if (isLongSlot(slot)) {
             const w = row.type === 'ride' ? 'long_ride' : row.type === 'run' ? 'long_run' : null;
             if (w && !row.tags.includes(w)) extra.push(w);
@@ -4355,7 +4385,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
   for (const sport of ['run', 'ride'] as const) {
     const perDay = new Map<string, number>();
-    for (const x of sessions.filter((y) => y.type === sport)) {
+    // ⛔ One run of two parts (p245 / p253) is one run — its second half is not counted.
+    // ⛔ AND RUNS THE PAGE ITSELF PRINTS TOGETHER ON ONE DAY, STILL ON THAT DAY, ARE NOT COUNTED AGAINST IT (2026-09-23) —
+    // the same rule as a warning the page's own week carries. p252's deload day 3 prints NT (level 1) and VT1 (level 1).
+    // ⚠️ RUNS ONLY: p278 prints two rides on days 3 and 5 and Ride + Strength's week keeps its line; that is the PM's call.
+    const printedTogether = (x: PlanSession): boolean => {
+      if (sport !== 'run') return false;
+      const m = (x.tags ?? []).find((t) => t.startsWith('slot:'))?.match(/^slot:(\d+):\d+$/);
+      if (!m) return false;
+      const fd = days.find((d) => d.day === Number(m[1]));
+      const runsPrinted = (fd?.endurance ?? []).filter((e) => !isJoinedSlot(e) && String(e.family).startsWith('run_')).length;
+      return runsPrinted >= 2 && x.day === dayNameFor(args, Number(m[1]));
+    };
+    const pagePairDays = new Set<string>();
+    for (const x of sessions.filter((y) => y.type === sport && !(y.tags ?? []).includes(JOINED_PART_TAG))) {
+      if (printedTogether(x)) {
+        if (pagePairDays.has(x.day)) continue; // the page's pair counts once on its own day
+        pagePairDays.add(x.day);
+      }
       perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
     }
     // ⚠️ A DAY THE CONFLICT ENGINE ALREADY NAMES (two hard sessions, or hard beside long) gets its

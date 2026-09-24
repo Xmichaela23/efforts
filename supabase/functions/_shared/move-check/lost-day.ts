@@ -27,7 +27,7 @@
 // =============================================================================
 
 import { planDateOf } from '../moved-from.ts';
-import { checkMove, daysBetween, daysThatFit, downDates, isPlyo, liftGaps, MAX_SESSIONS_A_DAY, sessionsOn, weekdayName, type MoveRow } from './index.ts';
+import { checkMove, daysBetween, daysThatFit, downDates, isJoinedPart, isPlyo, liftGaps, MAX_SESSIONS_A_DAY, movesWith, sessionsOn, weekdayName, type MoveRow } from './index.ts';
 
 export type LostDaySession = {
   id: string;
@@ -134,13 +134,18 @@ export function placeLostDay(args: {
     if (!(isPlanned(r) || lostOf.has(r.id))) continue;
     at.set(r.id, iso(to));
     pending.delete(r.id);
+    // ⛔ A joined run's other part goes with the drag (p245 / p253) unless it was dragged too.
+    for (const w of movesWith(r, args.rows)) if (!moves[w.id]) { at.set(w.id, iso(to)); pending.delete(w.id); }
   }
 
   // 4a. A warm-up's session: the pool session planned on the warm-up's own day, else the first on that lost day.
   const partnerOf = (w: MoveRow): MoveRow | null =>
     pool.find((r) => !isPlyo(r) && planDateOf(r) === planDateOf(w))
     ?? pool.find((r) => !isPlyo(r) && lostOf.get(r.id) === lostOf.get(w.id)) ?? null;
-  const rideAlong = (r: MoveRow) => isPlyo(r) && partnerOf(r) != null;
+  // ⛔ AND THE SECOND PART OF A JOINED RUN (p245 / p253) rides with its first part, the same way (`movesWith`).
+  const headOf = (r: MoveRow): MoveRow | null =>
+    (isJoinedPart(r) ? movesWith(r, pool)[0] ?? null : null);
+  const rideAlong = (r: MoveRow) => (isPlyo(r) && partnerOf(r) != null) || headOf(r) != null;
 
   // The p109 buckets, read off the composer's `band:` tag (endurance-library/classification.ts).
   const bandOf = (r: MoveRow): string | null => {
@@ -209,7 +214,7 @@ export function placeLostDay(args: {
   // 4a. The warm-up follows its session, wherever that went — and comes off with it.
   for (const r of pool) {
     if (!rideAlong(r) || moves[r.id]) continue;
-    const partner = partnerOf(r)!;
+    const partner = headOf(r) ?? partnerOf(r)!;
     pending.delete(r.id);
     if (dropped.has(partner.id)) dropped.add(r.id);
     else at.set(r.id, at.get(partner.id) ?? lostOf.get(r.id)!);

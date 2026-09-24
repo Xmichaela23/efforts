@@ -20,7 +20,7 @@ import RescheduleDatePicker from './RescheduleDatePicker';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 import { displayDisciplineOf } from '@/lib/utils';
-import { movePatch } from '@/lib/session-move';
+import { moveWithPartners } from '@/lib/session-move';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
@@ -1760,9 +1760,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               // to delete it before the move.
               // ⛔ THE SESSION STAYS THE PLAN'S (2026-09-21, `@/lib/session-move`): it keeps its week and day and records
               // the plan date it left, so the calendar does not re-add it there and a rebuild keeps it where it was moved.
-              const result = await updatePlannedWorkout(
-                reschedulePending.workoutId,
-                await movePatch(reschedulePending.workoutId, reschedulePending.newDate),
+              const result = await moveWithPartners(
+                updatePlannedWorkout, reschedulePending.workoutId, reschedulePending.newDate, rescheduleValidation?.moves_with,
               );
               
               console.log('[Reschedule] Update result:', result);
@@ -1792,7 +1791,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             // "Days that fit" (2026-09-21): tapping a day moves the session there, the same write as Move.
             if (!reschedulePending || !updatePlannedWorkout) return;
             try {
-              await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, date));
+              await moveWithPartners(updatePlannedWorkout, reschedulePending.workoutId, date, rescheduleValidation?.moves_with);
               invalidateWorkoutScreens();
               setShowReschedulePopup(false);
               setReschedulePending(null);

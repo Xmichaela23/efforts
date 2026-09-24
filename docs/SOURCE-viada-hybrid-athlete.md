@@ -1529,6 +1529,114 @@ Test": simple option — start ~50% of FTP, +25 W (recreational male) / +20 W (h
 0.78**; complex option — +6/+5/+4 W every 15 s, **FTP = average of the four final power numbers ×
 0.74**. p214 = the 1RM (Part H).
 
+# PART E4 — HYPERTROPHY + 5K (Chapter 10, pp.244–245) — "Strength Lead + Muscle" (proposed) in the app
+
+**Transcribed 2026-09-23 from `p244.jpg` and `p245.jpg`, both read directly.** Built as frame `hyp_5k`.
+
+## E4a. The week (p244)
+
+| Day | STANDARD strength | STANDARD endurance | TAPER/DELOAD strength | TAPER/DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **Upper body hypertrophy: Push primary** — 1 × ME: Secondary push · 1 × HYP: Braced push · 1 × HYP: Braced pull · 2 × HYP: Focused push/pull (arms) superset · 1 × HYP: Focused push | 1 × Sprint/power (level 1) · 1 × MLSS+ (level 1) | **Upper body hypertrophy: Push primary** — 1 × DE: Secondary push · 1 × HYP: Braced push · 1 × HYP: Braced pull · 2 × HYP: Focused push/pull (arms) superset | 1 × Sprint/power (level 1) |
+| **2** | **Lower body hypertrophy: Hinge primary** — 1 × DE: Secondary hinge · 1 × HYP: Secondary hinge · 2 × HYP: Braced hinge/braced lower push superset · 1 × HYP: Focused hamstring · 1 × DE: Braced push (asymmetrical) | — | **Lower body hypertrophy: Hinge primary** — 1 × DE: Secondary hinge · 1 × HYP: Secondary hinge · 1 × HYP: Focused hamstring · 1 × DE: Braced push (asymmetrical) | — |
+| **3** | Plyo warmup | NT (level 3) | Plyo warmup | NT (race tempo) (level 1) |
+| **4** | **Upper body hypertrophy: Pull primary** — 1 × ME: Secondary pull · 1 × HYP: Braced pull · 1 × HYP: Braced push · 2 × HYP: Focused push/pull (arms) superset · 1 × HYP: Focused pull | VT1 (level 1) | **Upper body hypertrophy: Pull primary** — 1 × ME: Secondary pull · 1 × HYP: Braced pull · 1 × HYP: Braced push · 2 × HYP: Focused push/pull (arms) superset | — |
+| **5** | **Lower body hypertrophy: Push primary** — 1 × DE: Secondary push · 1 × HYP: Secondary hinge · 2 × HYP: Braced hinge/braced lower push superset · 1 × HYP: Focused quadriceps · 1 × SKILL: Braced push (asymmetrical) | — | **Lower body hypertrophy: Push primary** — 1 × SKILL: Secondary push · 1 × HYP: Secondary hinge · 1 × HYP: Focused quadriceps · 1 × SKILL: Braced push (asymmetrical) | — |
+| **6** | — | LSD (level 2) | — | VT1 (level 1) |
+| **7** | **REST** | | **REST** | |
+
+⚠️ **Reading of the page.** Day 5's "Secondary push" is the LOWER push (the day is "Lower body hypertrophy: Push
+primary"). No row names an overhead press; the only printed row whose list (p220) holds one is day 1's "Secondary push".
+"2 × HYP: X/Y superset" is read as one X movement and one Y movement, paired (as p274, Part E1).
+
+## E4b. Notes (p245), key lines
+
+- *"This program is hybrid training at its most basic: a combination of hypertrophy-focused strength training and a
+  running program focused primarily on improving performance in the 30- to 45-minute time domain, or near threshold."*
+- *"This program can be used by athletes of most levels but would not be recommended for extremely high-level physique
+  athletes or very advanced runners. (Those running a sub-16:30 5K will require a good deal more volume in their running
+  to advance.)"*
+- *"Motivated trainees may notice that there's some recovery left on the table and can add one or two short VT1 sessions
+  (running or cross-training), or a small amount of an additional recreational sport activity."*
+- *"If performance begins to suffer, particularly if the ME lifts underperform 2 weeks in a row, consider running a single
+  deload week."*
+- *"If a 5K event is approaching, the Wednesday session should convert to race pace tempo workouts, and Monday's MLSS+
+  component should be of the 3- to 4-minute interval sort (ensuring adequate time spent specifically above threshold)."*
+- *"If you're interested in a first program to start with in this book, this is the one."*
+- Strength notes: *"The lifting days usually begin with a max effort or dynamic effort lift. These are lifter preference
+  but will typically be a compound barbell movement that will activate the majority of muscle groups to be trained on that
+  day."* · *"Each lower body day finishes with a braced DE or skill asymmetrical push movement. I recommend single-legged
+  leg press, belt squat/pendulum squat split squats, and other similar movements. Note the Smith machine can also be used
+  here, as can landmine split squat/lunge variants in a pinch."* · *"Progress should be through the circle of reps, with
+  slow gradual increases in the calculated 1RM taking place every 3 to 4 weeks (assume 1 percent every 3 weeks as a
+  starting point)."*
+- Running notes: *"Monday's session is a single run with two components. A sprint workout should be chosen (level 1), and
+  the cooldown removed. The second section of the run should be chosen from the MLSS+ workouts, with the warm-up removed.
+  Note that removing a handful of intervals here is acceptable, with the goal being around 45 to 50 minutes of total
+  training time."* · *"Wednesday's near-threshold workout is the most challenging of the week. I recommend NT workouts
+  with 5- to 8-minute work intervals. If within six weeks of a race, increase the pace here to race pace, but extend
+  recovery periods by 25 percent."* · *"Saturday's LSD workout should be mixed terrain. Mileage will be dictated by
+  experience level, with more proficient runners looking at runs up to 90 to 100 minutes here with an emphasis on LT
+  intervals, and less experienced runners opting for shorter fartlek variations."*
+
+⚠️ Several of p245's sentences are p247's word for word (the 1RM rate, the NT work intervals, the LSD mileage).
+
+# PART E5 — HYPERTROPHY + HALF-MARATHON (Chapter 10, pp.252–253) — "Run Lead + Muscle" (proposed) in the app
+
+**Transcribed 2026-09-23 from `p252.jpg` and `p253.jpg`, both read directly.** Built as frame `hyp_half`.
+
+## E5a. The week (p252)
+
+| Day | STANDARD strength | STANDARD endurance | TAPER/DELOAD strength | TAPER/DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **Lower body hypertrophy: Hinge** — 1 × DE: Secondary hinge · 2 × HYP: Secondary hinge · 2 × HYP: Braced hinge/braced lower push superset · 1 × SKILL: Braced push (asymmetrical) | MLSS+ (level 1) · VT1 (level 2) | **Lower body hypertrophy: Hinge primary** — the same four rows | 1 × Sprint/power (level 1) |
+| **2** | **Upper body hypertrophy: Push** — 1 × ME: Secondary push · 1 × HYP: Braced push · 1 × HYP: Braced pull · 2 × HYP: Focused push/pull (arms) superset · 1 × HYP: Focused push | — | **Upper body hypertrophy: Push primary** — the same five rows | — |
+| **3** | Plyo × 2 | NT (level 2) | Plyo × 1 | NT (level 1) · VT1 (level 1) |
+| **4** | **Upper body hypertrophy: Pull** — 1 × ME: Secondary pull · 1 × HYP: Braced pull · 1 × HYP: Braced push · 2 × HYP: Focused push/pull (arms) superset · 1 × HYP: Focused pull | VT1 (level 2) | **Upper body hypertrophy: Pull primary** — the same five rows | VT1 (level 1) |
+| **5** | **Lower body hypertrophy: Push** — 1 × DE: Secondary push · 1 × HYP: Secondary push · 1 × SKILL: Secondary hinge · 2 × HYP: Braced hinge/braced lower push superset · 2 × HYP: Focused quadriceps/focused hamstring superset | — | **Lower body hypertrophy: Push primary** — the same five rows | — |
+| **6** | — | LSD (level 3) | — | LSD (level 1) |
+| **7** | — | VT1 (level 1) | **REST** | |
+
+⚠️ **Reading of the page.** (1) The standard "LSD (level 3)" is set between the day 6 and day 7 rows, as on p250;
+read the same way as Part E3 — LSD on day 6, VT1 (level 1) on day 7, **no rest day in the standard week**. The taper's
+"LSD (level 1)" sits above REST: day 6. (2) The taper endurance column is printed lower than its strength column; NT
+(level 1) and the first VT1 (level 1) fall in day 3's band, the second VT1 (level 1) in day 4's. (3) The taper lifting is
+the standard lifting row for row; only the day headers add "primary". (4) Day 5's "Secondary push" is the lower push.
+
+## E5b. Notes (p253), key lines
+
+- *"This program is intended for athletes with a solid strength background who are looking to build muscle size or improve
+  body composition while training for a half-marathon or full marathon. Note that nutrition will be a major factor here,
+  with peri-workout fueling critically important for positive outcomes."*
+- *"It is worth noting the slight change in order, with the two upper body days only having one day between them, and the
+  more intense running sessions falling after the first leg day and between the two upper lifts. While training lower
+  body heavily before a high-intensity running session may seem counterintuitive, the majority of movements in the weight
+  room on Monday should be hinge movements. Because only one of these is a braced hinge, the likely choice of more free
+  weight/compound movements will distribute the work from the lower back down through the hamstrings; thus, no single
+  muscle group will be so fatigued as to make quality speed work impossible. While following this program, it's worth
+  considering the use of lifting aids (lifting belts, straps, and so on) to reduce unneeded fatigue."*
+- *"This program can, like many others, be run almost indefinitely. It's an excellent program for all-around health if
+  run intelligently because it combines dynamic effort/speed movements, plyometrics, sprints, and base conditioning. Those
+  who want to run it as a lifestyle program may want to consider developing two conditioning modalities to build ideal
+  fitness, such as running and cycling or running and air bike."*
+- Strength notes: *"The dynamic effort movements chosen should be well practiced in this routine… the dynamic effort first
+  lift should be more about 'priming' you for the day."* · *"In most cases, it's far preferable to do an extra set with a
+  few reps in reserve versus one fewer set to failure."* · *"Excessively long eccentrics are not indicated here. Lifting
+  tempo should, in almost all cases, be steady and controlled (except in the case of DE work)."*
+- Running notes: *"Monday's speed work should be relatively brief and of the 'surge and sustain' variety when possible.
+  The objective is to incorporate some fast movement/strides over vVO2 pace for running economy improvement and then
+  finish the session with some easy miles. The MLSS+ session should flow directly into the VT1 work, with the latter
+  serving as an extended 'cooldown' for the former."* · *"Similar to the strength + half-marathon plan, marathon runners
+  can extend the weekend LSD up to 3 hours as blended 'strategy sessions,' with fast finishes and food/drink tolerance as
+  major learning points. Advanced marathon runners can also change Monday's VT1 level 2 to a level 3 and add an extended
+  VT1 cooldown to Wednesday's session."* · *"The choice of NT intervals should depend on the race. Half-marathoners may
+  choose NT workouts that focus on the 92 to 97 percent intensity, whereas marathon runners may want to incorporate more
+  NT intervals in the 89 to 94 percent range."*
+
+⚠️ **No rate.** p253 gives no 1RM rate and no sentence on when to deload (both pages read off the photos for one; the only
+numbers on p253 are the NT percentages and the 3-hour LSD). The frame uses the All Rounder's ruling (no
+scheduled rise, OURS).
+
 # PART H — THE WORKING NUMBER AND THE PRETEST (p215)
 
 ✅ **IMAGE FILED 2026-09-02: `book-sources/p215.png`** (Michael's photo, pasted in chat and read again

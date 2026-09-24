@@ -42,7 +42,7 @@ export type FramePosition = {
    * mid-block. **The frame is reachable; which one is the default is Michael's call and needs the
    * screen that asks.** §11 still has it open.
    */
-  focus?: 'standard' | 'run' | 'ride' | 'run_half';
+  focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
 };
 
 export type FrameResolution =
@@ -93,8 +93,11 @@ export function resolveFrame(position: FramePosition): FrameResolution {
     const frame: FrameId = position.focus === 'standard'
       ? 'all_rounder'
       : position.focus === 'ride' ? 'cycling_base'
-        // ⛔ 5HR + Strength (p250), 2026-09-22.
-        : position.focus === 'run_half' ? 'strength_half' : 'strength_5k';
+        // ⛔ Hypertrophy + 5K (p244) and Hypertrophy + Half-Marathon (p252), 2026-09-23.
+        : position.focus === 'run_hyp' ? 'hyp_5k'
+          : position.focus === 'run_half_hyp' ? 'hyp_half'
+            // ⛔ 5HR + Strength (p250), 2026-09-22.
+            : position.focus === 'run_half' ? 'strength_half' : 'strength_5k';
     return { frame, cite: FRAMES[frame].cite };
   }
   return { frame: null, reason: 'no endurance sport is being held, and every frame is a hybrid week' };

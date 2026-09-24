@@ -12,6 +12,7 @@
  *     Absent on a session that does not move (the plyo warm-up rides with its day; swim add-ons).
  */
 import { plannedDurationFields } from '../planned-duration-label.ts';
+import { JOINED_PART_TAG } from './frames.ts';
 
 export type PreviewPick = { kind: 'long' | 'easy' | 'slot' | 'lift'; key: string };
 
@@ -23,6 +24,8 @@ function pickOf(r: Row, fillIndex: () => number): PreviewPick | null {
   const tags = tagsOf(r);
   const type = String(r.type ?? '').toLowerCase();
   if (tags.includes('plyo')) return null;
+  // ⛔ The second half of one run (p245 / p253) moves with the first; it is not dragged on its own.
+  if (tags.includes(JOINED_PART_TAG)) return null;
   if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('family:run_lsd')) {
     return { kind: 'long', key: type === 'ride' ? 'ride' : 'run' };
   }

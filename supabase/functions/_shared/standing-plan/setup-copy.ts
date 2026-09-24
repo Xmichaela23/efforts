@@ -58,6 +58,21 @@ export const PROGRAM_COPY = {
     blurb: 'For high-mile advanced runners. 5 hours or more of running a week, four lifting days. Strength progresses more slowly.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
+  // ⛔ BUILD MUSCLE (WORKORDER-run-programs Stage 1) — Michael approved the words 2026-09-24. Hypertrophy + 5K (Viada
+  // pp244-245): p245 "can be used by athletes of most levels", "If you're interested in a first program to start with in
+  // this book, this is the one." Hours: the built week's running (p244, four runs), measured at 3.1-3.5 h.
+  run_muscle: {
+    label: 'Strength Lead + Muscle',
+    blurb: 'Built for muscle. About 3 hours of running a week and four lifting days. A first program that suits most levels.',
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
+  // Hypertrophy + Half-Marathon (Viada pp252-253): p253 "intended for athletes with a solid strength background", "can,
+  // like many others, be run almost indefinitely". Hours: the built week's running (p252, five runs), measured at 4.9-5.7 h.
+  run_half_muscle: {
+    label: 'Run Lead + Muscle',
+    blurb: 'For runners with a solid strength background. About 5 hours of running a week and four lifting days. You can stay on it almost indefinitely.',
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
   // ⛔ THE RACE CARD INSIDE RUN (Michael, 2026-09-23): opens the marathon flow, built back from the race date.
   marathon: {
     label: 'Marathon',  // not-instruction: a card name
@@ -89,7 +104,7 @@ export const PROGRAM_COPY = {
  */
 export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
   { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
-  { id: 'muscle', title: 'Build muscle', programs: [] },       // Viada pp244, 252 — not built
+  { id: 'muscle', title: 'Build muscle', programs: ['run_muscle', 'run_half_muscle'] },  // Viada pp244, 252
   { id: 'race', title: 'Race', programs: ['marathon'] },
   { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
@@ -117,6 +132,12 @@ export const DELOAD_LINE: Record<FrameId, string | null> = {
   // running portion (unless a race is within 6 weeks)."
   strength_half: 'If a powerlifting meet is 4 to 5 weeks away, the recommendation is to switch the running to the deload '
     + 'version, unless a race is within 6 weeks.',
+  // Viada p245, reworded (Michael approved the words 2026-09-24); the page: "If performance begins to suffer, particularly
+  // if the ME lifts underperform 2 weeks in a row, consider running a single deload week."
+  hyp_5k: 'If performance drops, especially if the heavy lifts fall short 2 weeks in a row, the recommendation is a single '
+    + 'deload week.',
+  // p252/p253 print no sentence on when to deload.
+  hyp_half: null,
   all_rounder: null,
   cycling_base: null,
 };
@@ -150,6 +171,19 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   strength_half: {
     // OURS — "5HR": the built week's running, about 5 hours (five runs, Viada p250).
     name: 'Run Lead',
+    confirm_title: '{name} — {weeks} weeks.',
+    confirm_line: 'A {weeks}-week block.',
+    ftp_note: null,
+  },
+  // Michael approved the words 2026-09-24 — the card names; the second line is Run Lead's.
+  hyp_5k: {
+    name: 'Strength Lead + Muscle',
+    confirm_title: '{name} — {weeks} weeks.',
+    confirm_line: 'A {weeks}-week block.',
+    ftp_note: null,
+  },
+  hyp_half: {
+    name: 'Run Lead + Muscle',
     confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
@@ -280,6 +314,15 @@ export const RUNS_COPY = {
   extra_label: 'Add up to two {minutes}-minute easy runs to your week.',
   extra_chip: { 0: 'None', 1: '1', 2: '2' } as Record<number, string>,  // not-instruction: chip labels
   extra_line: 'For more advanced runners, to test recovery.',  // Viada p247, reworded
+  // Viada p245, reworded (Michael approved the words 2026-09-24); the page: "Motivated trainees may notice that there's
+  // some recovery left on the table and can add one or two short VT1 sessions (running or cross-training)".
+  extra_line_by_frame: {
+    hyp_5k: 'One or two short easy sessions, running or cross-training, when the week leaves room for more recovery.',  // Viada p245
+  } as Partial<Record<FrameId, string>>,
+  // ⛔ ONE RUN OF TWO PARTS ON ITS ROW (Viada p245 / p253; Michael approved the words 2026-09-24). {first} is the row's own
+  // session name (the sample week's sprint where the frame rotates it), {second} the second part's.
+  joined_row: '{first}, then {second}',  // not-instruction: a session name joined from two names
+  joined_easy: 'easy running',  // not-instruction: the name of the second part when it is the easy run (p253 VT1)
   extra_row: 'Extra easy run {n}',  // not-instruction: a row label (name)
   extra_card: 'Easy run · {length}',  // not-instruction: a card label (name and length) on Your week
 } as const;

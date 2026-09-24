@@ -442,6 +442,8 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
   run_mlss: FAMILIES.run_mlss.label,
   run_near_threshold: FAMILIES.run_near_threshold.label,
   run_vt1: 'Easy Run',  // not-instruction: session name, not an instruction; no page names it; Michael's call
+  // p244's "Sprint/power" row, named by the library's own label (Michael approved the words 2026-09-24).
+  run_sprint_power: FAMILIES.run_sprint_power.label,
   run_lsd: 'Long Run',
   // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
   // says "sweet spot" or "MLSS" at an athlete, and the description carries the intensity.
@@ -745,6 +747,34 @@ export function translateEnduranceSession(
      * frame. Both travel as round tokens: VO2 at the page's own percentage (a printed range stays a
      * range), sprints as all-out work with no power target (p236 "max effort", unresolved per p229).
      */
+    /**
+     * ⛔ p244's SPRINT/POWER RUN (2026-09-23, Hypertrophy + 5K day 1) — reachable on purpose now. Every p230-231 shape is
+     * DISTANCE reps, and the frame rotates all four (p229: "try each type of workout… alternate"). They travel as the
+     * materializer's existing `strides_{n}x{m}m`: a distance step with NO pace target and an untimed lap-button recovery.
+     * ⚠️ WHAT THE WATCH DOES NOT GET, AND THE SESSION'S STEPS SAY SO BY OMISSION: the speed-endurance repeats' 130-140%
+     * and the flying repeats' "faster than vVO2" (no distance token carries a percentage or a pace region), the flying
+     * repeats' stated 60-180 s recoveries and set rests (the lap button stands in), and the 150 m reps' three speeds
+     * (each 150 m goes as one untargeted rep). The all-out accelerations lose
+     * nothing — p229's "all-out" has no target and p230's recovery is "full recovery".
+     */
+    case 'run_sprint_power': {
+      work = session.blocks.map((b) => {
+        // ⚠️ A REP IS THE WORK STEPS RUN STRAIGHT THROUGH: p230-231's "150m as 50m / 50m all-out / 50m" is three
+        // segments and one 150 m rep. Any other step (a recovery, the full recovery) ends the rep.
+        const reps: number[] = [];
+        let run = 0;
+        for (const x of b.steps) {
+          if (x.role === 'work' && x.meters && x.meters > 0) { run += x.meters; continue; }
+          if (run > 0) { reps.push(run); run = 0; }
+        }
+        if (run > 0) reps.push(run);
+        if (reps.length === 0 || reps.some((m) => m !== reps[0])) {
+          throw new Error(`no token for a run_sprint_power block (${session.archetype})`);
+        }
+        return `strides_${Math.max(1, b.repeat) * reps.length}x${Math.round(reps[0])}m`;
+      });
+      break;
+    }
     case 'ride_vo2':
     case 'ride_sprints': {
       rangeTokens = true;

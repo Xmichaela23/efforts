@@ -188,3 +188,49 @@ Deno.test('WEEK RULE: "Days that fit" puts the days with no new clash first', ()
   assertEquals(clashes('2026-10-01'), 1);
   assertEquals(days.indexOf('2026-10-01') > days.indexOf(days[0]), true);
 });
+
+// ── One run of two parts moves as one (Viada p245 / p253, Build muscle day 1, 2026-09-23) ─────────────────────────
+
+import { movesWith, sessionsOn } from './index.ts';
+import { placeLostDay } from './lost-day.ts';
+
+const joinedRows = (): MoveRow[] => [
+  { id: 'lift1', date: '2026-09-21', type: 'strength', name: 'Upper body hypertrophy: Push primary', workout_status: 'planned', training_plan_id: 'p' },
+  { id: 'sprint', date: '2026-09-21', type: 'run', name: 'Sprint / power', workout_status: 'planned', training_plan_id: 'p', tags: ['slot:1:0', 'one_run', 'band:above'] },
+  { id: 'mlss', date: '2026-09-21', type: 'run', name: 'Surge and Float', workout_status: 'planned', training_plan_id: 'p', tags: ['slot:1:1', 'one_run', 'one_run_part2', 'band:above'] },
+  // Next week's pair — same slots, another plan day: never partnered with this week's.
+  { id: 'sprint2', date: '2026-09-28', type: 'run', name: 'Sprint / power', workout_status: 'planned', training_plan_id: 'p', tags: ['slot:1:0', 'one_run'] },
+  { id: 'mlss2', date: '2026-09-28', type: 'run', name: 'Surge and Float', workout_status: 'planned', training_plan_id: 'p', tags: ['slot:1:1', 'one_run', 'one_run_part2'] },
+  run('easy', '2026-09-24'),
+];
+
+Deno.test('⛔ p245/p253: either part of a joined run names the other as moving with it — this week only', () => {
+  const rs = joinedRows();
+  assertEquals(movesWith(rs[1], rs).map((r) => r.id), ['mlss']);
+  assertEquals(movesWith(rs[2], rs).map((r) => r.id), ['sprint']);
+  assertEquals(movesWith(rs[5], rs), []);
+  // A moved part still finds its partner by the plan day it left.
+  const moved = rs.map((r) => (r.id === 'mlss' ? { ...r, date: '2026-09-23', tags: [...(r.tags as string[]), 'moved_from:2026-09-21'] } : r));
+  assertEquals(movesWith(moved[1], moved).map((r) => r.id), ['mlss']);
+});
+
+Deno.test('⛔ p245/p253: the second part is not a session of its own on the day, and the check reads both moved', () => {
+  const rs = joinedRows();
+  // Monday: the lift and the one run.
+  assertEquals(sessionsOn(rs, '2026-09-21', 'none'), 2);
+  // Moving the run to Thursday (an easy run there): one note for one run, not a third session and not two runs.
+  const c = checkMove({ session: rs[1], toDate: '2026-09-24', rows: rs, daysOff: [] });
+  assertEquals(c.notes.some((n) => /three sessions/.test(n.text)), false);
+  assertEquals(c.notes.some((n) => /two hard runs/.test(n.text)), false);
+});
+
+Deno.test('⛔ p245/p253: a lost day moves both parts to one day, or takes both off', () => {
+  const rs = joinedRows();
+  const plan = placeLostDay({ lostDate: '2026-09-21', rows: rs, daysOff: [], today: '2026-09-20' });
+  const to = (id: string) => plan.sessions.find((s) => s.id === id)!;
+  assertEquals(to('sprint').to, to('mlss').to);
+  assertEquals(to('sprint').dropped, to('mlss').dropped);
+  // The athlete drags the second part: the first goes with it.
+  const dragged = placeLostDay({ lostDate: '2026-09-21', rows: rs, daysOff: [], today: '2026-09-20', moves: { mlss: '2026-09-26' } });
+  assertEquals(dragged.sessions.find((s) => s.id === 'sprint')!.to, '2026-09-26');
+});

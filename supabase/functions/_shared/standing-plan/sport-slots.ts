@@ -17,7 +17,7 @@
 
 import { archetypesFor, FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
-import { clampRideLevel, FRAMES } from './frames.ts';
+import { clampRideLevel, FRAMES, isJoinedSlot } from './frames.ts';
 import type { EnduranceSlot, FrameDay, FrameId } from './frames.ts';
 
 export type SportMix = {
@@ -614,7 +614,7 @@ export const HARD_SLOT_FRAME_KEYS = { hard1: '1:0', hard2: '3:0' } as const;
  */
 function hardPairIsInterchangeable(days: FrameDay[]): boolean {
   const hard: EnduranceSlot[] = [];
-  for (const d of days) for (const slot of d.endurance ?? []) if (isHardSlot(slot)) hard.push(slot);
+  for (const d of days) for (const slot of d.endurance ?? []) if (isHardSlot(slot) && !isJoinedSlot(slot)) hard.push(slot);
   // Viada p246: the week's first two hard slots (days 1 and 3); p274 prints the second as a ride.
   return hard.slice(0, 2).length === 2
     && hard.slice(0, 2).every((s) => !String(s.family).startsWith('ride_'));
@@ -624,7 +624,7 @@ function hardPairIsInterchangeable(days: FrameDay[]): boolean {
 function hardKeysOf(days: FrameDay[]): string[] {
   const keys: string[] = [];
   for (const d of days) {
-    (d.endurance ?? []).forEach((slot, i) => { if (isHardSlot(slot)) keys.push(`${d.day}:${i}`); });
+    (d.endurance ?? []).forEach((slot, i) => { if (isHardSlot(slot) && !isJoinedSlot(slot)) keys.push(`${d.day}:${i}`); });
   }
   return keys.slice(0, 2);
 }

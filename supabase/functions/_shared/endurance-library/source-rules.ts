@@ -452,6 +452,20 @@ export type PrintedIntervals = {
   betweenSetsIntensity?: Intensity;
 };
 
+/**
+ * ⛔ A DISTANCE SESSION AS PRINTED (2026-09-23, Michael: everything a plan prints gets built). p230-231's
+ * "2 rounds of 3 x 150m as 50m @ >vVO2, 50m @ all-out, 50m @ >vVO2 from flying start, full recovery between sets, full
+ * recovery and stretch/mobility between rounds": each rep is written out as its segments, run straight through.
+ * `betweenReps` / `betweenRounds` 'open' = the page's "full recovery" (no duration is invented).
+ */
+export type PrintedDistance = {
+  rounds: number;
+  repsPerRound: number;
+  rep: Array<{ meters: number; intensity: Intensity; label?: string }>;
+  betweenReps: 'open';
+  betweenRounds: 'open';
+};
+
 export type ArchetypeShape =
   /** Timed work reps, optionally with a second prescribed segment and optionally grouped into sets. */
   | 'intervals'
@@ -578,6 +592,8 @@ export type Archetype = {
    * here falls back to the band builder.
    */
   printedIntervalsByLevel?: Partial<Record<Level, PrintedIntervals>>;
+  /** The same ruling for a distance session — see `PrintedDistance`. Overrides the distance builder at its levels. */
+  printedDistanceByLevel?: Partial<Record<Level, PrintedDistance>>;
   /**
    * ⛔ THE REP'S SECONDS AT EACH LEVEL where the page prints one number per level rather than a band
    * (p237's progressive repeats: 45 s / 1 min / 1:30). Read before `repBand` by the shape builder.
@@ -598,6 +614,12 @@ export type Archetype = {
 };
 
 const pct = (lo: number, hi = lo): Intensity => ({ kind: 'pct_threshold', lo, hi });
+// Viada pp230-231: one 150 m rep as 50 m @ >vVO2, 50 m @ all-out, 50 m @ >vVO2.
+const MIXED_150_REP: PrintedDistance['rep'] = [
+  { meters: 50, intensity: { kind: 'faster_than_vvo2' } },
+  { meters: 50, intensity: { kind: 'all_out' } },
+  { meters: 50, intensity: { kind: 'faster_than_vvo2' } },
+];
 const vt1: Intensity = { kind: 'vt1' };
 
 /**
@@ -702,6 +724,27 @@ export const FAMILIES: Record<FamilyId, {
         recovery: { kind: 'stated', band: { lo: 120, hi: 180 }, intensity: easy },
         set: { repeatsPerSet: { lo: 2, hi: 3 }, restBand: { lo: 120, hi: 180 }, intensity: easy },
         cite: 'Viada pp230-231 — 2- to 3-minute recovery between sets',
+      },
+      {
+        /**
+         * ⛔ PRINTED AT ALL THREE LEVELS (p230 levels 1-2, p231 level 3), 2026-09-23: "2 rounds of 3 x 150m as 50m @
+         * >vVO2, 50m @ all-out, 50m @ >vVO2 from flying start" — level 2 is 4 x 150m. Built as printed; the bands are
+         * the page's one rep length and its counts, kept for readers that ask for them.
+         */
+        id: 'mixed_150',
+        shape: 'distance_intervals',
+        label: '150 m in three parts',  // not-instruction: session name; Michael approved the words 2026-09-24
+        repBand: { lo: 150, hi: 150 },
+        repsBand: { lo: 6, hi: 8 },
+        work: { kind: 'faster_than_vvo2' },
+        recovery: { kind: 'open' },
+        printedDistanceByLevel: {
+          // not-instruction: segment labels (names for a step); Viada p230-231
+          1: { rounds: 2, repsPerRound: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
+          2: { rounds: 2, repsPerRound: 4, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
+          3: { rounds: 2, repsPerRound: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
+        },
+        cite: 'Viada pp230-231',
       },
     ],
   },

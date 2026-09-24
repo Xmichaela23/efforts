@@ -84,6 +84,16 @@ const REQUIRED_PATTERNS = ['horizontal_push', 'vertical_push', 'horizontal_pull'
  *  would have been satisfied by the two lateral raises that were there all along. */
 const isPress = (name: string) => /press|dip|push up|pushup/i.test(name);
 
+/**
+ * ⛔ THE TWO PAGES THAT PRINT NO OVERHEAD PRESS (2026-09-23, the PM's ruling: the page settles it). p244 (Hypertrophy + 5K)
+ * and p252 (Hypertrophy + Half-Marathon) name no overhead or vertical push on any row. Their one upper-push row whose
+ * list holds one — "1 x ME: Secondary push" (p220: seated DB press, Arnold press) — is the day's opener, and the All
+ * Rounder's rule for that row is the competition bench with p220's secondaries on its swap. The All Rounder's built
+ * overhead press sits in a separate "DE: secondary push" cell (p274), which neither page prints. So these two weeks press
+ * nothing overhead, and only that one assertion is skipped for them; every pattern above is still asserted.
+ */
+const PRINTS_NO_OVERHEAD_PRESS: ReadonlySet<FrameId> = new Set(['hyp_5k', 'hyp_half']);  // Viada p244, p252
+
 for (const frame of FRAME_IDS) {
   Deno.test(`⛔ RULE 1 — ${frame}'s standard week covers every pattern a lifting week must have`, () => {
     for (const [kitName, kit] of Object.entries(KITS)) {
@@ -94,6 +104,7 @@ for (const frame of FRAME_IDS) {
           `⛔ ${frame} @ ${kitName}: the week contains no ${want}.\n`
           + `   rows: ${rows.map((e) => e.name).join(', ')}`);
       }
+      if (PRINTS_NO_OVERHEAD_PRESS.has(frame)) continue;  // Viada p244, p252 — see PRINTS_NO_OVERHEAD_PRESS
       const overhead = rows.filter((e) =>
         String(resolveExerciseConfig(String(e.name)).config?.pattern) === 'vertical_push'
         && isPress(String(e.name)));

@@ -882,6 +882,78 @@ Source: Viada pp250-251 · 4 lifting days · weekly rate anchor: **0.0025**
   day 7   (rest)               —
 ```
 
+### `hyp_5k` — Hypertrophy + 5K
+
+Source: Viada pp244-245 · 4 lifting days · weekly rate anchor: **0.0033333333333333335**
+
+**standard column**
+
+```
+  day 1   Upper body hypertrophy: Push primary ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+                               endurance: run_sprint_power · run_mlss
+  day 2   Lower body hypertrophy: Hinge primary DE:primary · HYP:secondary · HYP:braced · HYP:braced · HYP:focused · DE:braced
+  day 3   (plyometrics)        —
+                               endurance: run_near_threshold
+  day 4   Upper body hypertrophy: Pull primary ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+                               endurance: run_vt1
+  day 5   Lower body hypertrophy: Push primary DE:primary · HYP:secondary · HYP:braced · HYP:braced · HYP:focused · SKILL:braced
+  day 6   —                    —
+                               endurance: run_lsd
+  day 7   (rest)               —
+```
+
+**taper column**
+
+```
+  day 1   Upper body hypertrophy: Push primary DE:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused
+                               endurance: run_sprint_power
+  day 2   Lower body hypertrophy: Hinge primary DE:primary · HYP:secondary · HYP:focused · DE:braced
+  day 3   (plyometrics)        —
+                               endurance: run_near_threshold
+  day 4   Upper body hypertrophy: Pull primary ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused
+  day 5   Lower body hypertrophy: Push primary SKILL:primary · HYP:secondary · HYP:focused · SKILL:braced
+  day 6   —                    —
+                               endurance: run_vt1
+  day 7   (rest)               —
+```
+
+### `hyp_half` — Hypertrophy + Half-Marathon
+
+Source: Viada pp252-253 · 4 lifting days · weekly rate anchor: **ZERO — progression is earned, never scheduled**
+
+**standard column**
+
+```
+  day 1   Lower body hypertrophy: Hinge DE:primary · HYP:secondary · HYP:secondary · HYP:braced · HYP:braced · SKILL:braced
+                               endurance: run_mlss · run_vt1
+  day 2   Upper body hypertrophy: Push ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+  day 3   (plyometrics)        —
+                               endurance: run_near_threshold
+  day 4   Upper body hypertrophy: Pull ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+                               endurance: run_vt1
+  day 5   Lower body hypertrophy: Push DE:primary · HYP:secondary · SKILL:secondary · HYP:braced · HYP:braced · HYP:focused · HYP:focused
+  day 6   —                    —
+                               endurance: run_lsd
+  day 7   —                    —
+                               endurance: run_vt1
+```
+
+**taper column**
+
+```
+  day 1   Lower body hypertrophy: Hinge DE:primary · HYP:secondary · HYP:secondary · HYP:braced · HYP:braced · SKILL:braced
+                               endurance: run_sprint_power
+  day 2   Upper body hypertrophy: Push ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+  day 3   (plyometrics)        —
+                               endurance: run_near_threshold · run_vt1
+  day 4   Upper body hypertrophy: Pull ME:primary · HYP:braced · HYP:braced · HYP:focused · HYP:focused · HYP:focused
+                               endurance: run_vt1
+  day 5   Lower body hypertrophy: Push DE:primary · HYP:secondary · SKILL:secondary · HYP:braced · HYP:braced · HYP:focused · HYP:focused
+  day 6   —                    —
+                               endurance: run_lsd
+  day 7   (rest)               —
+```
+
 ### `all_rounder` — The All Rounder
 
 Source: Viada pp274-275 · 4 lifting days · weekly rate anchor: **ZERO — progression is earned, never scheduled**
@@ -987,6 +1059,36 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `single_leg_b` — Leg variation
 - `quad_iso` — Leg isolation
 - `core` — Core  ⚠️ names no printed cell (opt-in addition)
+
+**`hyp_5k`** — 12 cells
+
+- `braced_push` — Machine press
+- `ar_arms_push_1` — Arms superset · push
+- `ar_arms_pull_1` — Arms superset · pull
+- `ar_push_iso_1` — Push isolation
+- `braced_hinge` — Back extension
+- `braced_leg` — Leg press
+- `ham_iso` — Hamstring isolation
+- `braced_pull` — Machine pull
+- `ar_arms_push_4` — Arms superset · push
+- `ar_arms_pull_4` — Arms superset · pull
+- `ar_pull_iso_4` — Pull isolation
+- `quad_iso` — Leg isolation
+
+**`hyp_half`** — 12 cells
+
+- `braced_push` — Machine press
+- `ar_arms_push_1` — Arms superset · push
+- `ar_arms_pull_1` — Arms superset · pull
+- `ar_push_iso_1` — Push isolation
+- `braced_hinge` — Back extension
+- `braced_leg` — Leg press
+- `ham_iso` — Hamstring isolation
+- `braced_pull` — Machine pull
+- `ar_arms_push_4` — Arms superset · push
+- `ar_arms_pull_4` — Arms superset · pull
+- `ar_pull_iso_4` — Pull isolation
+- `quad_iso` — Leg isolation
 
 **`all_rounder`** — 15 cells
 

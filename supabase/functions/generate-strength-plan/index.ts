@@ -123,9 +123,11 @@ const corsHeaders = {
  * Cycling: Base, anything else (including absent) → Strength + 5K, which is what every caller before
  * the focus cards existed already gets.
  */
-function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' | 'run_half' {
+function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' {
   const raw = (body as Record<string, unknown> | null)?.focus;
   // ⛔ 'run_half' → 5HR + Strength (p250), 2026-09-22.
+  // ⛔ 'run_hyp' → Hypertrophy + 5K (p244), 'run_half_hyp' → Hypertrophy + Half-Marathon (p252), 2026-09-23.
+  if (raw === 'run_hyp' || raw === 'run_half_hyp') return raw;
   return raw === 'standard' ? 'standard' : raw === 'ride' ? 'ride' : raw === 'run_half' ? 'run_half' : 'run';
 }
 

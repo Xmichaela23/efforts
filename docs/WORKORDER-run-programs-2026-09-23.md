@@ -38,6 +38,10 @@ to `[105, 120, 135]` (or the nearest buildable) and re-run `run-strength-lengths
 
 ## Stage 1 — Build muscle: Strength Lead + Muscle (p244–245) and Run Lead + Muscle (p252–253)
 
+**✅ BUILT 2026-09-23/24 (worktree `stage1-build-muscle`), words approved by Michael 2026-09-24; awaiting his ship go.**
+Frames `hyp_5k` / `hyp_half`, SOURCE Parts E4 / E5, choices in `STATE-SOURCES.md`.
+
+
 **Frames:** `hyp_5k` (p244) and `hyp_half` (p252). Read both pages off the photos and transcribe first.
 - p244 week: 4 lifting days (upper push / lower hinge / upper pull / lower push), 5–6 cells each, HYP supersets
   ("2 × HYP: focused push/pull (arms) superset", "braced hinge / braced lower push superset"); day 1 opens on
@@ -58,6 +62,10 @@ to `[105, 120, 135]` (or the nearest buildable) and re-run `run-strength-lengths
 - Runs screen: hours are what the built week comes to (~4h for p244; measure p252).
 
 ## Stage 2 — Race: Half marathon (p250–251 + the taper)
+
+**⛔ REMOVED BY MICHAEL (2026-09-24, via the PM chat).** Run Lead stays a training program. A half-marathon race build is a
+separate later item, saved on branch `worktree-agent-a0a867e464367783c`. Everything below is history.
+
 
 - The Run Lead week, built back from a race date: the deload column 2 weeks out is NOT what p251 says — p251 says
   4–5 weeks out from a MEET run the deload RUNNING portion unless a race is within 6 weeks; for the RACE itself the

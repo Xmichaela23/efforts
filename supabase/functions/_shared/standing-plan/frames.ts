@@ -20,7 +20,7 @@ import type { TestedLift } from './working-number.ts';
  * `strength_5k` is FROZEN AS A DESIGN — stop shaping new work around its quirks — and still fully
  * guarded by its tests, because both frames share the composer, the materializer and the progression.
  */
-export type FrameId = 'strength_5k' | 'strength_half' | 'all_rounder' | 'cycling_base';
+export type FrameId = 'strength_5k' | 'strength_half' | 'hyp_5k' | 'hyp_half' | 'all_rounder' | 'cycling_base';
 
 /**
  * ⛔⛔⛔ WHETHER THIS FRAME ASKS FOR A WEEKLY HOURS TOTAL AT ALL — Michael, 2026-08-31:
@@ -278,8 +278,25 @@ export type EnduranceSlot = {
    * guard is `compose.ts`'s, not this field's.
    */
   carriesStrides?: boolean;
+  /**
+   * ⛔ THIS SLOT IS THE SECOND HALF OF THE SLOT BEFORE IT — ONE RUN, NOT TWO (2026-09-23).
+   * p245 (Hypertrophy + 5K): *"Monday's session is a single run with two components. A sprint workout should be chosen
+   * (level 1), and the cooldown removed. The second section of the run should be chosen from the MLSS+ workouts, with
+   * the warm-up removed."* p253 (Hypertrophy + Half-Marathon): *"The MLSS+ session should flow directly into the VT1
+   * work, with the latter serving as an extended 'cooldown' for the former."*
+   * ⚠️ BUILT AS TWO ROWS ON ONE DAY, TAGGED AS ONE (`JOINED_TAG`): the first loses its cooldown, this one its warm-up;
+   * this one always lands on the first one's day, takes no hard pick of its own, is not a row on the runs screen, and
+   * is not counted as a second session by the week's warnings. No existing slot builds two families as one row.
+   */
+  joinsPrevious?: boolean;
   sourceText: string;
 };
+
+/** ⛔ The tag on both rows of a joined run (`EnduranceSlot.joinsPrevious`), and the one on its second half. */
+export const JOINED_TAG = 'one_run';
+export const JOINED_PART_TAG = 'one_run_part2';
+/** The slot key's second half, where the frame joins it to the slot before (`${day}:${i}`). */
+export const isJoinedSlot = (slot: { joinsPrevious?: boolean } | null | undefined): boolean => slot?.joinsPrevious === true;
 
 export type FrameDay = {
   day: number;
@@ -772,6 +789,293 @@ const STRENGTH_HALF_TAPER: FrameDay[] = [
   },
   // p250 day 6, taper: Plyo x 1, VT1 (level 2).
   { day: 6, label: null, strength: [], endurance: [E('run_vt1', 2, 'VT1 (level 2)')], plyo: true, plyoCount: 1 },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔⛔ HYPERTROPHY + 5K (p244, notes p245) — "Strength Lead + Muscle". Transcribed from `p244.jpg` 2026-09-23,
+ * `SOURCE-viada-hybrid-athlete.md` Part E4. Work order: `WORKORDER-run-programs-2026-09-23.md` Stage 1.
+ *
+ * Four lifting days named for their pattern (upper push, lower hinge, upper pull, lower push), five or six rows each,
+ * a plyo warm-up on day 3, an LSD on day 6, day 7 REST. Running: day 1 is ONE run of two parts (sprint/power level 1
+ * then MLSS+ level 1, p245 — `joinsPrevious`), NT (3) on day 3, VT1 (1) on day 4, LSD (2) on day 6.
+ * p245: "hybrid training at its most basic", "can be used by athletes of most levels", "If you're interested in a first
+ * program to start with in this book, this is the one." 1RM: "assume 1 percent every 3 weeks as a starting point".
+ *
+ * ⛔ THE DAY-OPENING ROWS ARE PRINTED "Secondary" AND OPEN ON THE COMPETITION LIFT — the All Rounder's ruling (Michael,
+ * 2026-09-11) on the same notation (p274 prints `ME: secondary push`), and p245's own strength note: *"The lifting days
+ * usually begin with a max effort or dynamic effort lift. These are lifter preference but will typically be a compound
+ * barbell movement."* The page's secondaries are the row's swap (`swapSecondaries`). OURS — see the ledger.
+ * ⚠️ THE SUPERSETS ARE ADJACENT ROWS, as on p274 (`ALL_ROUNDER_STANDARD`'s note): "2 x HYP: X/Y superset" is one X row
+ * and one Y row. Nothing in the app pairs exercises today.
+ * ⚠️ NO OVERHEAD PRESS IS PRINTED, SO NONE IS BUILT. The page's one row whose list holds one (p220 secondary push: seated
+ * DB press, Arnold press) is day 1's opener, which opens on the bench under the ruling above; the overhead presses are its
+ * swap. The All Rounder's built press sits in a separate DE secondary push cell that p244 does not print.
+ * `frame-rules.test.ts` skips its press check here (`PRINTS_NO_OVERHEAD_PRESS`).
+ */
+/** Viada p229-231: the five sprint/power shapes the library builds, rotated week to week ("alternate", p229). */
+const SPRINT_ROTATION = ['short_max', 'speed_endurance', 'flying_short', 'flying_long', 'mixed_150'];
+
+const HYP_5K_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Upper body hypertrophy: Push primary',
+    strength: [
+      // p244 day 1, standard column: row text verbatim
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Secondary push', { swapSecondaries: true }),  // Viada p244
+      // p221 braced push upper is three chest presses, and braced pull upper is rows and the pulldown — see ALL_ROUNDER_STANDARD.
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Focused push'),  // Viada p244
+    ],
+    // p244 day 1: "1 x Sprint/power (level 1)" and "1 x MLSS+ (level 1)"; p245: one run, the sprint's cooldown and the
+    // MLSS+'s warm-up removed, "around 45 to 50 minutes of total training time".
+    endurance: [
+      // p229: "I encourage you to try each type of workout in each segment… alternate" — all five of the library's
+      // p230-231 shapes, rotated week to week. The watch gets no pace target on three of them (session-vocabulary.ts).
+      E('run_sprint_power', 1, '1 x Sprint/power (level 1)', { role: 'hard', archetypes: SPRINT_ROTATION }),
+      E('run_mlss', 1, '1 x MLSS+ (level 1)', { role: 'hard', joinsPrevious: true }),
+    ],
+  },
+  {
+    day: 2,
+    label: 'Lower body hypertrophy: Hinge primary',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: Secondary hinge', { swapSecondaries: true }),  // Viada p244
+      // p220 secondary hinge lower, whole: the swing and the bench reverse hyper are filed elsewhere in the catalogue.
+      S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'quadriceps' }),  // Viada p244
+      // p223 names the hip thrust first in the hamstrings row — see ALL_ROUNDER_STANDARD day 2.
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: Focused hamstring', {  // Viada p244
+        muscle: 'hamstrings',
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+      }),
+      // p245: "Each lower body day finishes with a braced DE or skill asymmetrical push movement" — split squats among them.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
+    ],
+    endurance: [],
+  },
+  // p244 day 3: "Plyo warmup", NT (level 3). p245: "NT workouts with 5- to 8-minute work intervals" — p247's words, so the
+  // same three level-3 sessions as STRENGTH_5K_STANDARD day 3.
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 3, 'NT (level 3)', { archetypes: ['sustained_5min_90', 'sustained_6min_88', 'sustained_8min30_85'] })], plyo: true },
+  {
+    day: 4,
+    label: 'Upper body hypertrophy: Pull primary',
+    strength: [
+      S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: Secondary pull', { swapSecondaries: true }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Focused pull'),  // Viada p244
+    ],
+    // p244 day 4: VT1 (level 1). The week's strides ride here, as on p246's day 4 (STRENGTH_5K_STANDARD).
+    endurance: [E('run_vt1', 1, 'VT1 (level 1)', { carriesStrides: true })],
+  },
+  {
+    day: 5,
+    label: 'Lower body hypertrophy: Push primary',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Secondary push', { swapSecondaries: true }),  // Viada p244
+      S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'quadriceps' }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Focused quadriceps', { muscle: 'quadriceps' }),  // Viada p244
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),  // Viada p244
+    ],
+    endurance: [],
+  },
+  // p244 day 6: LSD (level 2). p245's Saturday LSD words are p247's ("up to 90 to 100 minutes… LT intervals… fartlek").
+  { day: 6, label: null, strength: [], endurance: [E('run_lsd', 2, 'LSD (level 2)', { archetype: 'long_with_inserts' })] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ p244's TAPER/DELOAD COLUMN, BOTH SIDES. Day 1's ME opener becomes DE and the single focused push comes off; day 2
+ * loses the braced superset; day 4 loses the single focused pull; day 5's DE opener and asymmetrical row become SKILL.
+ * Running: sprint/power (level 1) alone on day 1, NT (race tempo) (level 1) on day 3, VT1 (level 1) on day 6.
+ */
+const HYP_5K_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Upper body hypertrophy: Push primary',
+    strength: [
+      // p244 day 1, taper column: row text verbatim
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Secondary push'),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+    ],
+    endurance: [E('run_sprint_power', 1, '1 x Sprint/power (level 1)', { role: 'hard', archetypes: SPRINT_ROTATION })],
+  },
+  {
+    day: 2,
+    label: 'Lower body hypertrophy: Hinge primary',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: Secondary hinge'),  // Viada p244
+      S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: Focused hamstring', {  // Viada p244
+        muscle: 'hamstrings',
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+      }),
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
+    ],
+    endurance: [],
+  },
+  // p244 day 3, taper: Plyo warmup, NT (race tempo) (level 1) — the same cell as p246's taper day 3.
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 1, 'NT (race tempo) (level 1)', { archetype: 'below_threshold', raceTempo: true })], plyo: true },
+  {
+    day: 4,
+    label: 'Upper body hypertrophy: Pull primary',
+    strength: [
+      S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: Secondary pull'),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+    ],
+    endurance: [],
+  },
+  {
+    day: 5,
+    label: 'Lower body hypertrophy: Push primary',
+    // OURS — a SKILL opener is not the heavy leg day, so the day is marked as the lighter kind ('de').
+    lowerRole: 'de',
+    strength: [
+      S('SKILL', 'competition', 'primary', 'press_lower', '1 x SKILL: Secondary push'),  // Viada p244
+      S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Focused quadriceps', { muscle: 'quadriceps' }),  // Viada p244
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),  // Viada p244
+    ],
+    endurance: [],
+  },
+  { day: 6, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔⛔ HYPERTROPHY + HALF-MARATHON (p252, notes p253) — "Run Lead + Muscle". Transcribed from `p252.jpg` 2026-09-23,
+ * `SOURCE-viada-hybrid-athlete.md` Part E5.
+ *
+ * The same four hypertrophy days as p244 in a different order — lower hinge, upper push, upper pull, lower push —
+ * p253: *"the slight change in order, with the two upper body days only having one day between them, and the more
+ * intense running sessions falling after the first leg day and between the two upper lifts."* Plyo x 2 on day 3.
+ * Running: day 1 is ONE run (MLSS+ level 1 flowing into VT1 level 2, p253 — `joinsPrevious`), NT (2) on day 3, VT1 (2)
+ * on day 4, LSD (3) on day 6 and VT1 (1) on day 7 — so the STANDARD WEEK HAS NO REST DAY (the taper's day 7 is REST).
+ * ⚠️ READING OF THE PAGE: "LSD (level 3)" sits between the day 6 and day 7 rows, as on p250; read the same way
+ * (Part E3's note): the LSD on day 6, the VT1 (level 1) on day 7.
+ * p253: "intended for athletes with a solid strength background"; "can, like many others, be run almost indefinitely".
+ * ⚠️ p253 PRINTS NO RATE for the 1RM — see RATE_ANCHOR.hyp_half.
+ */
+const HYP_HALF_LOWER_HINGE: FrameDay['strength'] = [
+  // p252 day 1, standard and taper columns: row text verbatim
+  S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: Secondary hinge', { swapSecondaries: true }),  // Viada p252
+  S('HYP', 'accessory', 'secondary', 'hinge_lower', '2 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p252
+  S('HYP', 'accessory', 'secondary', 'hinge_lower', '2 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'quadriceps' }),  // Viada p252
+  S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p252
+];
+const HYP_HALF_UPPER_PUSH: FrameDay['strength'] = [
+  // p252 day 2: row text verbatim
+  S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Secondary push', { swapSecondaries: true }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Focused push'),  // Viada p252
+];
+const HYP_HALF_UPPER_PULL: FrameDay['strength'] = [
+  // p252 day 4: row text verbatim
+  S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: Secondary pull', { swapSecondaries: true }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Focused pull'),  // Viada p252
+];
+const HYP_HALF_LOWER_PUSH: FrameDay['strength'] = [
+  // p252 day 5: row text verbatim
+  S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Secondary push', { swapSecondaries: true }),  // Viada p252
+  S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Secondary push'),  // Viada p252
+  S('SKILL', 'accessory', 'secondary', 'hinge_lower', '1 x SKILL: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),  // Viada p252
+  S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'quadriceps' }),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'press_lower', '2 x HYP: Focused quadriceps/focused hamstring superset', { muscle: 'quadriceps' }),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'hinge_lower', '2 x HYP: Focused quadriceps/focused hamstring superset', {  // Viada p252
+    muscle: 'hamstrings',
+    alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+  }),
+];
+
+const HYP_HALF_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Lower body hypertrophy: Hinge',
+    lowerRole: 'de',
+    strength: HYP_HALF_LOWER_HINGE,
+    // p252 day 1: MLSS+ (level 1), VT1 (level 2); p253: the MLSS+ flows directly into the VT1, its extended cooldown.
+    endurance: [
+      E('run_mlss', 1, 'MLSS+ (level 1)', { role: 'hard' }),
+      E('run_vt1', 2, 'VT1 (level 2)', { role: 'easy', joinsPrevious: true }),
+    ],
+  },
+  { day: 2, label: 'Upper body hypertrophy: Push', strength: HYP_HALF_UPPER_PUSH, endurance: [] },
+  // p252 day 3: Plyo x 2, NT (level 2). p253: half-marathoners may choose NT workouts at 92 to 97 percent.
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 2, 'NT (level 2)')], plyo: true, plyoCount: 2 },
+  {
+    day: 4,
+    label: 'Upper body hypertrophy: Pull',
+    strength: HYP_HALF_UPPER_PULL,
+    // p252 day 4: VT1 (level 2). The week's strides ride here, as on p250's day 4.
+    endurance: [E('run_vt1', 2, 'VT1 (level 2)', { carriesStrides: true })],
+  },
+  { day: 5, label: 'Lower body hypertrophy: Push', lowerRole: 'de', strength: HYP_HALF_LOWER_PUSH, endurance: [] },
+  // p252 day 6: LSD (level 3) — see the reading note above.
+  { day: 6, label: null, strength: [], endurance: [E('run_lsd', 3, 'LSD (level 3)', { archetype: 'long_with_inserts' })] },
+  // p252 day 7: VT1 (level 1). No rest day in the standard column.
+  { day: 7, label: null, strength: [], endurance: [E('run_vt1', 1, 'VT1 (level 1)')] },
+];
+
+/**
+ * ⛔ p252's TAPER/DELOAD COLUMN. The lifting is the standard column's, row for row (the page prints it again); only the
+ * running comes down: sprint/power (level 1) on day 1, Plyo x 1 with NT (level 1) and VT1 (level 1) on day 3, VT1
+ * (level 1) on day 4, LSD (level 1) on day 6, day 7 REST.
+ * ⚠️ READING OF THE PAGE: the taper's endurance column sits lower than its strength column on the photo; NT (level 1) and
+ * the first VT1 (level 1) fall inside day 3's band, the second VT1 (level 1) inside day 4's, and LSD (level 1) above REST.
+ * ⚠️ Day 3's NT and VT1 are printed as two sessions; p253's "flow directly" is written of day 1 and is not applied here.
+ */
+const HYP_HALF_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'Lower body hypertrophy: Hinge',
+    lowerRole: 'de',
+    strength: HYP_HALF_LOWER_HINGE.map((s) => ({ ...s, swapSecondaries: undefined })),
+    // p252 day 1, taper: 1 x Sprint/power (level 1) — the five shapes rotated, as on p244 (HYP_5K_STANDARD).
+    endurance: [E('run_sprint_power', 1, '1 x Sprint/power (level 1)', { role: 'hard', archetypes: SPRINT_ROTATION })],
+  },
+  { day: 2, label: 'Upper body hypertrophy: Push', strength: HYP_HALF_UPPER_PUSH.map((s) => ({ ...s, swapSecondaries: undefined })), endurance: [] },
+  {
+    // p252 day 3, taper: Plyo x 1; NT (level 1), VT1 (level 1).
+    day: 3, label: null, strength: [], plyo: true, plyoCount: 1,
+    endurance: [E('run_near_threshold', 1, 'NT (level 1)'), E('run_vt1', 1, 'VT1 (level 1)')],
+  },
+  {
+    day: 4,
+    label: 'Upper body hypertrophy: Pull',
+    strength: HYP_HALF_UPPER_PULL.map((s) => ({ ...s, swapSecondaries: undefined })),
+    // p252 day 4, taper: VT1 (level 1).
+    endurance: [E('run_vt1', 1, 'VT1 (level 1)')],
+  },
+  { day: 5, label: 'Lower body hypertrophy: Push', lowerRole: 'de', strength: HYP_HALF_LOWER_PUSH.map((s) => ({ ...s, swapSecondaries: undefined })), endurance: [] },
+  { day: 6, label: null, strength: [], endurance: [E('run_lsd', 1, 'LSD (level 1)')] },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
@@ -1285,6 +1589,20 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
 export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
   strength_5k: { perWeek: 0.01 / 3, cite: 'Viada p247 — 1% every 3 weeks' },
   strength_half: { perWeek: 0.01 / 4, cite: 'Viada p251 — "1% every four weeks or so as a solid starting point"' },
+  hyp_5k: { perWeek: 0.01 / 3, cite: 'Viada p245 — "assume 1 percent every 3 weeks as a starting point"' },
+  /**
+   * ⛔ p253 PRINTS NO RATE, SO p112's GENERAL RULE GOVERNS, AND IT IS THE EARNED PROGRESSION (2026-09-23, PM review):
+   * *"If you're meeting or exceeding expectations at this load… you can increase the load incrementally… and decrease
+   * load if you fail to achieve targets at any point."* No calendar rise: the bar moves when targets are hit
+   * (`progressionVerdict` / `advanceStep`, the ME and bar ladders in `progression.ts`) and comes back when they are
+   * missed (`undoLastStep`). ⚠️ p112's 75/80/85% week-to-week wave is NOT built anywhere in the engine — reported, not
+   * invented here.
+   */
+  hyp_half: {
+    perWeek: 0,
+    cite: 'Viada p112 — raise the load when targets are met, lower it when they are missed (p253 prints no rate); '
+      + 'the earned progression owns the number, no calendar rise.',
+  },
   /**
    * ⛔⛔ ZERO, AND ZERO IS A RULING RATHER THAN A MISSING NUMBER (Michael, 2026-08-30).
    * **Progression is EARNED or it does not happen.** Read the whole chain before restoring a rate
@@ -1372,6 +1690,40 @@ export const FRAMES: Record<FrameId, Frame> = {
     columns: { standard: STRENGTH_HALF_STANDARD, taper: STRENGTH_HALF_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_half.perWeek,
     testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
+    laysOutWeekByDay: false,
+    enduranceSports: ['run', 'swim'],
+  },
+  hyp_5k: {
+    id: 'hyp_5k',
+    sourceName: 'Hypertrophy + 5K',
+    cite: 'Viada pp244-245',
+    liftingDays: 4,
+    // Viada p235: VT1 level 1 is 25–30 min; LSD level 2 is 68–100 min. p245: "runs up to 90 to 100 minutes" — Strength
+    // Lead's chips (p247 prints the same words).
+    // p245: "can add one or two short VT1 sessions (running or cross-training)" — the extra easy runs, with p245's own line
+    // (`RUNS_COPY.extra_line_by_frame`, Michael approved 2026-09-24).
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 70, longRunChips: [70, 75, 90], offersExtraEasyRuns: true },
+    columns: { standard: HYP_5K_STANDARD, taper: HYP_5K_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.hyp_5k.perWeek,
+    // ⚠️ NO OVERHEAD PRESS IS NAMED (see HYP_5K_STANDARD), so week one does not test one — CYCLING_BASE's precedent.
+    testedLifts: ['bench', 'squat', 'deadlift'],
+    laysOutWeekByDay: false,
+    enduranceSports: ['run', 'swim'],
+  },
+  hyp_half: {
+    id: 'hyp_half',
+    sourceName: 'Hypertrophy + Half-Marathon',
+    cite: 'Viada pp252-253',
+    liftingDays: 4,
+    // Viada p235: LSD level 3 is 1.5h up to 2–2.5h; VT1 level 2 is 45–60 min. Run Lead's lengths (same levels, p250).
+    runStrengthWeek: {
+      easyRunMinutes: 30, longRunChipCeilingMinutes: 150, longRunCeilingMinutes: 150, longRunDefaultMinutes: 105,
+      longRunChips: [105, 120, 134], easyRunChipsByLevel: { 2: [45, 50, 60] }, easyRunRangeByLevel: { 2: [45, 60] },
+    },
+    columns: { standard: HYP_HALF_STANDARD, taper: HYP_HALF_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.hyp_half.perWeek,
+    // ⚠️ NO OVERHEAD PRESS IS NAMED (see HYP_HALF_STANDARD), so week one does not test one — CYCLING_BASE's precedent.
+    testedLifts: ['bench', 'squat', 'deadlift'],
     laysOutWeekByDay: false,
     enduranceSports: ['run', 'swim'],
   },

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useCarryDrag, type CarryItem } from '@/hooks/useCarryDrag';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { movePatch } from '@/lib/session-move';
+import { moveWithPartners } from '@/lib/session-move';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore, STATUS_COLORS } from '@/lib/context-utils';
@@ -594,7 +594,7 @@ export default function WorkoutCalendar({
       // ⛔ A same-sport session already on the target day STAYS (Michael, 2026-09-20: "Both stay"). This used to
       // delete it before the move.
       // ⛔ It stays the plan's session and records the day it left (`@/lib/session-move`, 2026-09-21).
-      await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, reschedulePending.newDate));
+      await moveWithPartners(updatePlannedWorkout, reschedulePending.workoutId, reschedulePending.newDate, validationResult?.moves_with);
 
       // Invalidate to refresh calendar
       invalidateWorkoutScreens();
@@ -618,7 +618,7 @@ export default function WorkoutCalendar({
   const handleFitDayClick = async (date: string) => {
     if (!reschedulePending || !updatePlannedWorkout) return;
     try {
-      await updatePlannedWorkout(reschedulePending.workoutId, await movePatch(reschedulePending.workoutId, date));
+      await moveWithPartners(updatePlannedWorkout, reschedulePending.workoutId, date, validationResult?.moves_with);
       invalidateWorkoutScreens();
       setShowValidationPopup(false);
       setReschedulePending(null);

@@ -35,9 +35,10 @@ import {
   type SlotSport,
 } from '../../../../src/lib/standing-plan-week-copy.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
-import { FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FRAMES, isJoinedSlot, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
+import { frameRotatedArchetype } from './compose.ts';
 import { fill, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
 
 export type IntakeRow = {
@@ -230,7 +231,18 @@ export function enduranceIntakeReadout(args: {
       return {
         key: row.key,
         title: fill(RUNS_COPY.row, { day: row.frameDay, label }),
-        session: sessionName(row.family, row.archetype ?? null),
+        session: (() => {
+          // ⛔ ONE RUN OF TWO PARTS (p245 / p253): the second part is named on the first part's row.
+          const [fd, idx] = row.frameKey.split(':').map(Number);
+          const next = FRAMES[frame].columns.standard.find((d) => d.day === fd)?.endurance[idx + 1];
+          if (!isJoinedSlot(next)) return sessionName(row.family, row.archetype ?? null);
+          // ⛔ AND ITS FIRST PART IS THE SAMPLE WEEK'S OWN SESSION where the frame rotates it (Your week shows week two;
+          // Michael, 2026-09-24: "use that week's sprint name").
+          const own = sessionName(row.family,
+            frameRotatedArchetype({ archetypes: row.archetypes }, { family: row.family }, row.level, 2) ?? row.archetype ?? null);
+          const second = next!.family === 'run_vt1' ? RUNS_COPY.joined_easy : sessionName(next!.family, next!.archetype ?? null);
+          return fill(RUNS_COPY.joined_row, { first: own, second });
+        })(),
         length: row.role === 'long' ? null : row.role === 'easy'
           ? (rsw.easyRunRangeByLevel?.[row.level]
             ? `${rsw.easyRunRangeByLevel[row.level]![0]}–${rsw.easyRunRangeByLevel[row.level]![1]} min`  // Viada p235
@@ -266,7 +278,7 @@ export function enduranceIntakeReadout(args: {
       // ⛔ THE ATHLETE'S EXTRA EASY RUNS (Viada p247 "one or two VT1 sessions"), built as VT1 level 1 (p235).
       extra: !rsw.offersExtraEasyRuns ? undefined : {
         label: fill(RUNS_COPY.extra_label, { minutes: rsw.easyRunMinutes }),
-        line: RUNS_COPY.extra_line,
+        line: RUNS_COPY.extra_line_by_frame[frame] ?? RUNS_COPY.extra_line,
         options: [0, 1, 2].map((n) => ({ count: n, label: RUNS_COPY.extra_chip[n] })),
         rows: [1, 2].map((n) => ({
           title: fill(RUNS_COPY.extra_row, { n }),

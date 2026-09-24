@@ -11,6 +11,8 @@ export interface MoveCheckResult {
   refused: boolean;
   notes: string[];
   days_that_fit: string[];
+  /** Rows that move with this one (the other part of a joined run). The caller moves them; this file does not. */
+  moves_with?: string[];
 }
 
 interface RescheduleValidationPopupProps {

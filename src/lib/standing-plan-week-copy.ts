@@ -12,7 +12,7 @@
  * words or not at all.
  */
 
-import { FRAMES, type ColumnKind, type FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { FRAMES, isJoinedSlot, type ColumnKind, type FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { isHardSlot, isLongSlot } from '../../supabase/functions/_shared/standing-plan/sport-slots.ts';
 
 
@@ -123,6 +123,8 @@ export function frameSlots(
   const seen: Record<SlotRole, number> = { hard: 0, easy: 0, long: 0 };
   for (const d of days) {
     (d.endurance ?? []).forEach((slot, i) => {
+      // ⛔ The second half of one run (p245 / p253, `EnduranceSlot.joinsPrevious`) is not a row of its own.
+      if (isJoinedSlot(slot)) return;
       const role: SlotRole = isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : 'easy';
       seen[role] += 1;
       const n = seen[role];

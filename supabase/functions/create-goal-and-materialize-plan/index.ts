@@ -2593,7 +2593,8 @@ Deno.serve(async (req: Request) => {
             // same rule `generate-strength-plan` applies; keep the two together. No frame → all four.
             const gsEntryFrame = resolveFrame({
               enduranceSport: gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null,
-              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' || gsTp.focus === 'run_half' ? gsTp.focus : 'run',
+              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' || gsTp.focus === 'run_half'
+                || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? gsTp.focus : 'run',
             }).frame;
             const gsEntryLifts: string[] = gsEntryFrame ? FRAMES[gsEntryFrame].testedLifts : ['squat', 'bench', 'deadlift', 'overheadPress'];
             const gsLow = liftsBelowEntryMinimum(gsMaxes)
@@ -3146,7 +3147,8 @@ Deno.serve(async (req: Request) => {
                * through, so a stale or malformed client cannot name a frame that does not exist.
                */
               // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
-              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half' ? { focus: gsTp.focus } : {}),
+              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half'
+                || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? { focus: gsTp.focus } : {}),
               /**
                * ⛔ THE RIDE COUNT (Ride + Strength, p278's 4 or 5, 2026-09-13). Same allowlist, same
                * failure: `generate-strength-plan` reads `ride_count` off its own body, so a hop that drops

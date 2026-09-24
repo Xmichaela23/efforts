@@ -373,7 +373,7 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'ride_strength' | 'marathon';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'run_muscle' | 'run_half_muscle' | 'ride_strength' | 'marathon';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
   standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength'],
@@ -384,7 +384,7 @@ const PROGRAM_COPY: Record<ProgramId, {
   /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
   goal: NonRaceGoalId | null;
   /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
-  focus: 'standard' | 'run' | 'ride' | 'run_half';
+  focus: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
    * ⛔ A BUILT PROGRAMME WHOSE SCREENS' WORDS ARE NOT ALL APPROVED YET STAYS DIMMED (Ride + Strength,
    * 2026-09-13: every athlete-facing line goes through Michael before the card is switched on).
@@ -406,6 +406,15 @@ const PROGRAM_COPY: Record<ProgramId, {
     Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
     goal: 'get_stronger', focus: 'run_half',
   },
+  // ⛔ BUILD MUSCLE (Viada p244, p252) — the cards' words approved by Michael 2026-09-24.
+  run_muscle: {
+    Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
+    goal: 'get_stronger', focus: 'run_hyp',
+  },
+  run_half_muscle: {
+    Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
+    goal: 'get_stronger', focus: 'run_half_hyp',
+  },
   // ⛔ THE RACE CARD, INSIDE RUN (Michael, 2026-09-23). Tapping it opens the race flow the Goals screen's race entry used
   // to open; `goal: 'marathon'` is what `reseed` reads.
   marathon: {
@@ -421,13 +430,16 @@ const PROGRAM_COPY: Record<ProgramId, {
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 /** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
-const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half', FrameId> = {
+const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp', FrameId> = {
   standard: 'all_rounder',
   run: 'strength_5k',
   // ⛔ Ride Focus → Ride + Strength → Cycling: Base (p278). `resolveFrame` takes the same word.
   ride: 'cycling_base',
   // ⛔ 5HR + Strength → Strength + Half-Marathon (p250), 2026-09-22.
   run_half: 'strength_half',
+  // ⛔ Build muscle → Hypertrophy + 5K (p244) and Hypertrophy + Half-Marathon (p252), 2026-09-23.
+  run_hyp: 'hyp_5k',
+  run_half_hyp: 'hyp_half',
 };
 
 /**
@@ -436,14 +448,14 @@ const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half', FrameId> = {
  * is the whole class of defect the per-slot answer exists to prevent.
  * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
-const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'run_half' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
 
 /**
  * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4). The page
  * fixes every ride at level 1 and the athlete's one answer is four rides or five. Keyed on what the
  * frame DECLARES (`printedWeekOnly` and a `fewerRidesDropsSlot`), never on its id.
  */
-const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' }): boolean =>
+const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
   st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.fewerRidesDropsSlot != null;
 
 /**
@@ -460,8 +472,9 @@ const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standar
  * ⚠️ ONE OWNER, READ IN BOTH SCOPES — the payload assembler and the component. Two copies of this
  * test is how the screen and the payload come to disagree about what was asked.
  */
-const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' }): boolean =>
-  st.goal === 'get_stronger' && (frameOf(st) === 'strength_5k' || frameOf(st) === 'strength_half');
+const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
+  st.goal === 'get_stronger' && (frameOf(st) === 'strength_5k' || frameOf(st) === 'strength_half'
+    || frameOf(st) === 'hyp_5k' || frameOf(st) === 'hyp_half');
 
 // ⛔ THE STRONG / HEAVY TIER SCREEN IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a
 // no-op routing into `get_stronger`; Heavy was dark; nothing in the payload read the tier. The
@@ -904,7 +917,7 @@ export type NonRaceState = {
    * card existed. It never changes what that path builds.
    * ⚠️ `'ride'` = Ride + Strength (Cycling: Base, p278), 2026-09-13.
    */
-  focus?: 'standard' | 'run' | 'ride' | 'run_half';
+  focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
    * ⛔ RIDE + STRENGTH'S ONE ENDURANCE ANSWER — four rides or five (p278; the 4-ride week leaves out
    * the Day 2 easy ride). Absent = the page's five.
@@ -1638,6 +1651,9 @@ function assemblePayload(
           ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
           // ⛔ 5HR + Strength (p250), 2026-09-22 — without this the build falls back to the 5K frame.
           ...(isStrengthFocusPath && state.focus === 'run_half' ? { focus: 'run_half' } : {}),
+          // ⛔ Build muscle (p244, p252), 2026-09-23 — the same forward.
+          ...(isStrengthFocusPath && state.focus === 'run_hyp' ? { focus: 'run_hyp' } : {}),
+          ...(isStrengthFocusPath && state.focus === 'run_half_hyp' ? { focus: 'run_half_hyp' } : {}),
           // ⚠️ ONLY WHEN THE ATHLETE PICKED (2026-09-13): the build keeps the page's own count otherwise.
           ...(printedRideWeekPath(state) && state.rideCount != null ? { ride_count: state.rideCount } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on

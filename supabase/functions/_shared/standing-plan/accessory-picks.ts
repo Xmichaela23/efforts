@@ -170,6 +170,14 @@ export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
   strength_5k: VIADA_PICK_KEYS,
   // p250 prints p246's HYP accessory cells (focused pull/push, accessory lower, secondary push lower), so it takes p246's keys.
   strength_half: VIADA_PICK_KEYS,
+  /**
+   * ⛔ p244 AND p252 PRINT p274's HYP CELLS — braced push/pull, the arms superset, focused push/pull, the braced
+   * hinge/lower push superset, focused hamstring and quadriceps — so they take p274's keys, and `picksForFrame` keeps
+   * the ones that reach a cell. ⚠️ NO CORE: neither page prints a core row. ⚠️ p252's push day is day 2, so the
+   * day-1 arms keys reach nothing there and that day's arms and focused push cells are the engine's.
+   */
+  hyp_5k: ALL_ROUNDER_PICK_KEYS.filter((k) => !String(k).startsWith('core')),
+  hyp_half: ALL_ROUNDER_PICK_KEYS.filter((k) => !String(k).startsWith('core')),
   all_rounder: ALL_ROUNDER_PICK_KEYS,
   /**
    * ⛔ p278 PRINTS THE SAME THREE HYP ACCESSORY CELLS AS p246's DAYS 1 AND 2 (focused pull, focused
@@ -179,6 +187,17 @@ export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
   // ⛔ AND THE CARRY ROW (D-479, 2026-09-16) — p278 day 4 is the only frame cell that prints a carry.
   cycling_base: [...VIADA_PICK_KEYS.filter((k) => k !== 'core'), 'carry'],
 };
+
+/**
+ * ⛔ A DAY-SCOPED KEY'S DAY, ON A FRAME THAT PRINTS THE SAME CELLS ON ANOTHER DAY (2026-09-23). p252 prints p274's
+ * upper-push day (arms superset + focused push) on day 2, not day 1, so p274's day-1 keys answer day 2 there.
+ */
+const PICK_DAY_BY_FRAME: Partial<Record<FrameId, Record<number, number>>> = { hyp_half: { 1: 2 } };
+/** The frame day a pick's spec is scoped to on this frame, or null when the spec is day-agnostic. */
+export function specDayOn(slot: { frameDay?: number } | null | undefined, frame: FrameId): number | null {
+  if (slot?.frameDay == null) return null;
+  return PICK_DAY_BY_FRAME[frame]?.[slot.frameDay] ?? slot.frameDay;
+}
 
 /**
  * ⚠️⚠️ WHY THE ME, DE AND SKILL SLOTS TAKE NO PICK, AND IT IS **OURS RATHER THAN HIS** — verified
@@ -1119,7 +1138,7 @@ export function frameHasArmsSuperset(key: ViadaPickKey, frame: FrameId): boolean
   // ⛔ A KEY THAT NAMES ITS CELL ANSWERS FROM THE MARKER, not from a scan of the day.
   if (slot.arms != null) return slot.arms;
   return Object.values(FRAMES[frame]?.columns ?? {}).some((days) => (days ?? []).some((day) =>
-    (slot.frameDay == null || day.day === slot.frameDay)
+    (specDayOn(slot, frame) == null || day.day === specDayOn(slot, frame))
     && day.strength.some((sl) => sl.category === slot.category && sl.pattern === slot.pattern
       && /\(arms\)/i.test(String(sl.sourceText ?? '')))));
 }
@@ -1164,7 +1183,7 @@ export function pickKeyForSlot(
       if (fallback == null) fallback = key;
       continue;
     }
-    if (frameDay != null && slot.frameDay === frameDay) return key;
+    if (frameDay != null && specDayOn(slot, frame) === frameDay) return key;
   }
   return fallback;
 }
@@ -1192,7 +1211,7 @@ export function frameDaysForPick(
     // ⛔ A DAY-SCOPED PICK CLAIMS ONE DAY, NOT EVERY DAY ITS CELL FALLS ON. Without this the two
     // isolation-pull picks would both tag days 1 and 4 and the screen would print the same pair
     // twice for two controls that do different things.
-    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) continue;
     const hit = day.strength.some((s) =>
       s.intent === 'HYP' && s.role === 'accessory'
       && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern
@@ -1213,7 +1232,7 @@ export function frameDaysForPick(
    * which leaves the three picks without one unsorted at the front. Here the frame is still the
    * authority and the spec answers only where the frame's HYP cells are silent.
    */
-  if (out.length === 0 && spec.slot?.frameDay != null) return [spec.slot.frameDay];
+  if (out.length === 0 && specDayOn(spec.slot, frame) != null) return [specDayOn(spec.slot, frame)!];
   return out;
 }
 
@@ -1302,7 +1321,7 @@ export function pickReachesFrame(
   if (!spec.slot) return false;
   const days = FRAMES[frame]?.columns[column] ?? [];
   return days.some((day) => {
-    if (spec.slot!.frameDay != null && day.day !== spec.slot!.frameDay) return false;
+    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) return false;
     return day.strength.some((sl) =>
       sl.intent === (spec.slot!.intent ?? 'HYP') && sl.role === 'accessory'
       && sl.category === spec.slot!.category && sl.pattern === spec.slot!.pattern);
@@ -1331,7 +1350,7 @@ export function frameAdmitsForPick(
   const spec = VIADA_PICKS[key];
   if (!spec.slot) return [];
   for (const day of FRAMES[frame]?.columns[column] ?? []) {
-    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) continue;
     for (const sl of day.strength) {
       if (sl.intent !== (spec.slot.intent ?? 'HYP') || sl.role !== 'accessory') continue;
       if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;
@@ -1349,7 +1368,7 @@ export function frameMuscleForPick(
   const spec = VIADA_PICKS[key];
   if (!spec.slot) return null;
   for (const day of FRAMES[frame]?.columns[column] ?? []) {
-    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) continue;
     for (const sl of day.strength) {
       if (sl.intent !== (spec.slot.intent ?? 'HYP') || sl.role !== 'accessory') continue;
       if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;

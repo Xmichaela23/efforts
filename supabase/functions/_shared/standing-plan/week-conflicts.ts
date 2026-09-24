@@ -20,7 +20,7 @@
 import { buildUnits, type Load, type Session } from '../week-model/model.ts';
 import { unmetNeeds, type Placement } from '../week-model/resolve.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
-import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
+import { FRAMES, JOINED_PART_TAG, type ColumnKind, type FrameId } from './frames.ts';
 import { WEEKDAYS, frameDayOn, weekdayForFrameDay, type DayArrangement, type Weekday } from './day-map.ts';
 import { isHardSlot, isLongSlot } from './sport-slots.ts';
 import type { PlanSession } from './compose.ts';
@@ -334,11 +334,22 @@ function framePrintsHardOnHeavyDay(
   day: Weekday,
   dayOffset: DayArrangement,
 ): boolean {
+  return framePrintsHardOnLowerDay(frame, column, day, dayOffset, 'me');
+}
+
+/** The same question for either kind of lower day — the speed (DE) day asks it for p252's day 1. */
+function framePrintsHardOnLowerDay(
+  frame: FrameId,
+  column: ColumnKind,
+  day: Weekday,
+  dayOffset: DayArrangement,
+  kind: 'me' | 'de',
+): boolean {
   const frameDay = frameDayOn(day, dayOffset);
   const d = FRAMES[frame].columns[column].find((x) => x.day === frameDay);
   if (!d) return false;
-  const heavy = lowerDaysOf(frame, column).me.includes(d.day);
-  return heavy && d.endurance.some((slot) => isHardSlot(slot));
+  const lower = lowerDaysOf(frame, column)[kind].includes(d.day);
+  return lower && d.endurance.some((slot) => isHardSlot(slot));
 }
 
 /**
@@ -455,9 +466,12 @@ const capitalize = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1)
  * off the `lower:de` tag, and the rest-day line is not written.
  */
 export function conflictsOfTyped(
-  typed: TypedSession[],
+  typedIn: TypedSession[],
   ctx: { frame: FrameId; column: ColumnKind; dayOffset: DayArrangement } | null,
 ): WeekConflict[] {
+  // ⛔ ONE RUN OF TWO PARTS IS ONE SESSION (p245 / p253, `EnduranceSlot.joinsPrevious`): its second half is not
+  // counted as another session on the day, and its first half speaks for it.
+  const typed = typedIn.filter((t) => !(t.s.tags ?? []).includes(JOINED_PART_TAG));
   const { placements, dayOfLabel, nameOfLabel } = placementsOf(typed);
   const byName = new Map<string, TypedSession>();
   typed.forEach((t, i) => byName.set(`${t.s.name} #${i}`, t));
@@ -609,7 +623,12 @@ export function conflictsOfTyped(
       const speed = typed.find((t) =>
         ((t.s.tags ?? []).includes('lower:de') || t.s.name === 'DE: Lower') && t.s.day === speedDay);
       const hard = typed.find((t) => t.load === 'hard_cardio' && t.s.day === speedDay);
-      if (speed && hard) {
+      // ⛔ A PAGE THAT PRINTS THE HARD RUN ON ITS SPEED LEG DAY IS SILENT, as the heavy day is
+      // (`framePrintsHardOnHeavyDay`): p252 day 1, and p253 answers it — "the majority of movements in the weight room
+      // on Monday should be hinge movements… no single muscle group will be so fatigued as to make quality speed work
+      // impossible."
+      const printed = ctx != null && framePrintsHardOnLowerDay(ctx.frame, ctx.column, speedDay, ctx.dayOffset, 'de');
+      if (speed && hard && !printed) {
         push({
           kind: 'cost',
           rule: 'hard_on_speed_leg_day',

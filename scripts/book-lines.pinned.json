@@ -186,6 +186,7 @@
   "supabase/functions/_shared/standing-plan/setup-copy.ts": [
    "If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.",
    "If a powerlifting meet is 4 to 5 weeks away, the recommendation is to switch the running to the deload",
+   "deload week.",
    "to month beyond updating 1RM and threshold as you improve.",
    "The plan sets your weights and paces from these. Anything not on file is tested in week one. You can add",
    "from your logged sets",
@@ -203,6 +204,8 @@
    "{n} long and easy",
    "Add up to two {minutes}-minute easy runs to your week.",
    "For more advanced runners, to test recovery.",
+   "One or two short easy sessions, running or cross-training, when the week leaves room for more recovery.",
+   "easy running",
    "Extra easy run {n}",
    "Easy run · {length}"
   ],

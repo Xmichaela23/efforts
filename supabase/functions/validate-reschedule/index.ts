@@ -13,7 +13,7 @@
  * `new_date` equal to the session's own date asks only for the days that fit.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { checkMove, daysBetween, daysThatFit, type MoveRow } from '../_shared/move-check/index.ts';
+import { checkMove, daysBetween, daysThatFit, movesWith, type MoveRow } from '../_shared/move-check/index.ts';
 import { athleteToday } from '../_shared/plan-refresh.ts';
 
 const corsHeaders = {
@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
       refused: check.refused,
       notes: check.notes.map((n) => n.text),
       days_that_fit: daysThatFit({ session: s, fromDate, toDate, rows: all, daysOff, today }),
+      // ⛔ THE OTHER PART OF A JOINED RUN (p245 / p253): the phone moves these rows to the same day with the session.
+      moves_with: movesWith(s, all).map((r) => r.id),
     });
   } catch (e) {
     console.error('[validate-reschedule]', e);

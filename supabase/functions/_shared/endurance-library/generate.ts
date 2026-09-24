@@ -41,7 +41,7 @@ import {
   WRAPPERS,
   type Archetype,
 } from './source-rules.ts';
-import type { PrintedIntervals, PrintedLongRun, PrintedRide } from './source-rules.ts';
+import type { PrintedDistance, PrintedIntervals, PrintedLongRun, PrintedRide } from './source-rules.ts';
 import { anchorFor, resolveEnduranceAnchors, UNKNOWN_ANCHORS, type EnduranceAnchors, type EnduranceBaselines } from './anchors.ts';
 import type {
   AnchorReport,
@@ -95,6 +95,12 @@ export type SessionRequest = {
    * a slot the athlete moved to the bike simply has no strides on it.
    */
   addOn?: SessionAddOnId;
+  /**
+   * ⛔ ONE RUN BUILT FROM TWO SESSIONS (Viada p245, Hypertrophy + 5K day 1): *"A sprint workout should be chosen
+   * (level 1), and the cooldown removed. The second section of the run should be chosen from the MLSS+ workouts, with
+   * the warm-up removed."* p253 joins Hypertrophy + Half-Marathon's MLSS+ to its VT1 the same way. Absent = both kept.
+   */
+  omit?: { warmup?: boolean; cooldown?: boolean };
 };
 
 // ── small arithmetic ────────────────────────────────────────────────────────────────────────────
@@ -523,8 +529,42 @@ function buildIntervals(ctx: BuildContext): Block[] {
   }];
 }
 
+/**
+ * ⛔ A DISTANCE SESSION AS PRINTED — see `Archetype.printedDistanceByLevel`. One block per the page: `rounds` repeats of
+ * the round, each round `repsPerRound` reps written out segment by segment with the page's full recovery between reps,
+ * and full recovery between rounds. The clock is the family's own lower bound, as `buildDistanceIntervals` gives it.
+ */
+function buildPrintedDistance(ctx: BuildContext, p: PrintedDistance): Block[] {
+  const { archetype: a, sport, anchor } = ctx;
+  const segment = (sg: PrintedDistance['rep'][number]): Step => {
+    const pctForClock = sg.intensity.kind === 'pct_threshold' ? sg.intensity.hi : sport === 'run' ? SPRINT_CLOCK_BOUND_PCT : null;
+    const { seconds, fromDistance } = secondsForDistance(sg.meters, sport, anchor, pctForClock);
+    return step('work', sg.label ?? `${sg.meters} m`, seconds, sg.intensity, sport, anchor, {
+      meters: sg.meters,
+      secondsFromDistance: fromDistance || undefined,
+      secondsIsLowerBound: (fromDistance && sg.intensity.kind !== 'pct_threshold') || undefined,
+    });
+  };
+  const full = recoveryStep(a, 0, sport, anchor);
+  const inner: Step[] = [];
+  for (let i = 0; i < p.repsPerRound; i++) {
+    inner.push(...p.rep.map(segment));
+    if (full && i < p.repsPerRound - 1) inner.push({ ...full });
+  }
+  const repMeters = p.rep.reduce((t, sg) => t + sg.meters, 0);
+  return [{
+    repeat: Math.max(1, p.rounds),
+    label: `${p.rounds} x ${p.repsPerRound} x ${repMeters} m`,
+    steps: inner,
+    restBetween: full ? { ...full } : null,
+  }];
+}
+
 function buildDistanceIntervals(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
+  // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE FOR THIS LEVEL — see `buildPrintedDistance`.
+  const printedDistance = a.printedDistanceByLevel?.[ctx.level];
+  if (printedDistance) return buildPrintedDistance(ctx, printedDistance);
   // OURS — `buildDistanceIntervals` rounds a rep distance to whole 25 m lengths, 25 m at least; no page.
   const repMeters = Math.max(25, Math.round(lerp(a.repBand, levelT(ctx.level)) / 25) * 25);
   const reps = repCount(a, ctx, repMeters);
@@ -1017,8 +1057,11 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       case 'descending': blocks = buildDescending(ctx); break;
     }
 
-    const warmup: Step[] = wrapper.warmup.map((w) => step('warmup', w.label, w.seconds, w.intensity, sport, anchor));
-    const cooldown: Step[] = wrapper.cooldown.map((c) => step('cooldown', c.label, c.seconds, c.intensity, sport, anchor));
+    // Viada p245 / p253 — the half of a joined run that loses its warm-up or cooldown (`SessionRequest.omit`).
+    const warmup: Step[] = req.omit?.warmup ? []
+      : wrapper.warmup.map((w) => step('warmup', w.label, w.seconds, w.intensity, sport, anchor));
+    const cooldown: Step[] = req.omit?.cooldown ? []
+      : wrapper.cooldown.map((c) => step('cooldown', c.label, c.seconds, c.intensity, sport, anchor));
 
     // The swim opener IS the warm-up (pp240-241 print no box), and it is built with a distance.
     if (openerMeters > 0) {

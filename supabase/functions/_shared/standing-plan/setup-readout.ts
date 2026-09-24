@@ -145,6 +145,8 @@ export function setupBlock(equipment: string[] | null): SetupBlock {
       all_rounder: buildFocusBlock('all_rounder', equipment),
       strength_5k: buildFocusBlock('strength_5k', equipment),
       strength_half: buildFocusBlock('strength_half', equipment),
+      hyp_5k: buildFocusBlock('hyp_5k', equipment),
+      hyp_half: buildFocusBlock('hyp_half', equipment),
       cycling_base: buildFocusBlock('cycling_base', equipment),
     },
   };
