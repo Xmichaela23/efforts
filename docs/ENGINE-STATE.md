@@ -153,7 +153,24 @@
 > Baselines buttons on efforts.work, the equipment rebuild and a retest on HIS plan · Q-303 Ladder Drills has no how-to ·
 > Q-304 the sandwich ride's rest prints no "easy spin" in the list (task chip spawned).
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-23, PM chat — everything below PUSHED to main through `d72f762e3`, every importer DEPLOYED, phone build from `d72f762e3`)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-24, PM chat — main = `cbd29cd68`, PUSHED; Stage 1's 31 importers DEPLOYED; phone build has Stage 1 + the plyo fold)
+
+> **The Run-programs workorder is PAUSED, not open.** `docs/WORKORDER-run-programs-2026-09-23.md`:
+> - **Stage 0 DONE** (`07e63fdff`): Run Lead long-run chips 1h45 / 2h / 2h14 build to the minute.
+> - **Stage 1 DONE** (`6b9c7a392`): Build muscle — Strength Lead + Muscle (p244) and Run Lead + Muscle (p252); day-1
+>   sprint rotates all five p230–231 sprint workouts (p229); the day-1 two-part run moves as one; lifts follow p112's
+>   hit-raise / miss-lower. UNVERIFIED on Michael's phone.
+> - **Stage 2 REMOVED** by Michael: Run Lead is a training program, not a race. The half-marathon race build is saved on
+>   `origin/later/half-marathon-race` (not for main as is; it saves the date in preferences, so no race features fire —
+>   the fix is an event goal routed to Run Lead, see that branch's report in the workorder history).
+> - **Stages 3–4 TABLED** as later work. Pages transcribed: SOURCE Parts E6 (ultra), E7 (Runner Pivot), E8 (Speed
+>   Solution), E9 (every open question answered with a page). Ruling for when they resume: everything a plan prints
+>   gets built, even if the app lacks it; no scheduled deload (every deload in the book names a cause, p120 + J4).
+> - **Also live:** the plyo warm-up card folds to its drill names (`64ecc5828`, client only).
+> - **Known, outside this workorder:** the engine has no p112 75/80/85% weekly wave, and its 5 lb / 10 lb step is ours
+>   against p112's "a pound or two".
+
+## (older banner) NEXT SESSION — START HERE (written 2026-09-23, PM chat — everything below PUSHED to main through `d72f762e3`, every importer DEPLOYED, phone build from `d72f762e3`)
 
 > **How to talk to Michael (read first):** `~/.claude/CLAUDE.md`, the voice example at the top. He listens to replies
 > read aloud. Numbers without page citations after each one; three tiers, not five-minute steps; say "I inferred" when
