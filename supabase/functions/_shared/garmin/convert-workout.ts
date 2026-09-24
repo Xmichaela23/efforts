@@ -1047,7 +1047,26 @@ function estimateWorkoutSeconds(
   const mpsFromSecPerMi = (sec: number) => 1609.34 / Math.max(1, sec);
   const fallbackMps = mpsFromSecPerMi(570); // ~9:30/mi
 
+  // A ride's open warm-up (2026-09-24, `source-rules.ts` RIDE_* wrappers): the step carries no duration on the watch
+  // but the row still has its seconds, and the estimate keeps them. A lap-button step with no seconds (strides, the
+  // hill recovery) adds nothing, as before.
+  const openUsed = new Set<number>();
+  const openSeconds = (s: GarminStep): number => {
+    const kind = s.intensity === 'WARMUP' ? 'warmup' : s.intensity === 'COOLDOWN' ? 'cooldown' : null;
+    if (!kind) return 0;
+    for (let i = 0; i < computedSteps.length; i += 1) {
+      const cs = computedSteps[i];
+      if (openUsed.has(i) || cs?.lap_button !== true) continue;
+      if (String(cs?.type || cs?.kind || '').toLowerCase() !== kind) continue;
+      openUsed.add(i);
+      const sec = Number(cs?.duration_s ?? cs?.seconds);
+      return Number.isFinite(sec) && sec > 0 ? Math.floor(sec) : 0;
+    }
+    return 0;
+  };
+
   for (const s of steps) {
+    if (s.durationType === 'OPEN') { total += openSeconds(s); continue; }
     if (s.durationType === 'TIME') {
       total += Math.max(0, s.durationValue || 0);
       if (s.intensity !== 'REST' && s.intensity !== 'RECOVERY') { nextWork(); idx += 1; }

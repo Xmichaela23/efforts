@@ -8,6 +8,7 @@ import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds, secondsInPaceRangeBetween } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW, shareInPowerRange } from '../_shared/ride-power.ts';
+import { FAMILIES } from '../_shared/endurance-library/source-rules.ts';
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -386,6 +387,21 @@ const ALIGN = {
    * A lap slower than this is a walk and is never paired with a work step (`lapIsWalkForStep`).
    */
   walk_run_transition_mps: 2.06,
+  /**
+   * OURS — the effort finder's numbers (2026-09-24, WORKORDER-outdoor-ride-matching), for a structured ride whose laps
+   * neither snap nor anchor. FIELD for the idea only: TrainingPeaks' interval detection compares power to the athlete's
+   * threshold to find the work intervals, and TrainerRoad's interval search finds them on a ride where the rider never
+   * pressed lap (cyclingnews.com/features/trainerroad). Neither publishes how a stretch is cut, so the cuts are ours —
+   * one ledger row in docs/STATE-SOURCES.md:
+   *   · `len_frac` 0.5 — a stretch at or above the floor is an effort of the plan when it lasts between half and twice
+   *     its planned work step; shorter is a surge, longer is a climb or a steady ride.
+   *   · `gap_frac` 0.5 — a drop under the floor shorter than half the shortest planned recovery is a dip inside one
+   *     effort, not the rest between two.
+   *   · `count_over` 1 — at most one stretch more than the plan's work steps; the extra one is dropped.
+   *   · `count_min_frac` 0.5 — at least half the plan's work steps found; fewer and this is not the session.
+   * The floor itself is not ours: `FAMILIES[family].workFloorPct` × the FTP the plan was priced off.
+   */
+  effort: { len_frac: 0.5, gap_frac: 0.5, count_over: 1, count_min_frac: 0.5 },
   tol: {
     run:  { dist_short_m: 10, dist_long_pc: 0.02, time_work_s: 3, time_rec_s: 8 },
     ride: { dist_long_pc: 0.05, time_work_s: 2, time_rec_s: 6 },
@@ -705,7 +721,8 @@ Deno.serve(async (req) => {
     if (w.planned_id) {
       const { data: p } = await supabase
         .from('planned_workouts')
-        .select('id,computed,intervals')
+        // `tags` (2026-09-24): the row's `family:` tag names the ride type whose work floor the effort finder reads.
+        .select('id,computed,intervals,tags')
         .eq('id', w.planned_id)
         .maybeSingle();
       planned = p || null;
@@ -1212,6 +1229,10 @@ Deno.serve(async (req) => {
       // rep run faster or slower than the target never fitted it — no lap on Michael's 6 × 4:00 matched its step.
       const targetM = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
       const targetS = deriveSecondsFromPlannedStep(st);
+      // ⛔ A RIDE'S WARM-UP LAP HAS NO LENGTH TO MATCH (2026-09-24): the Edge shows the warm-up until the press
+      // (`source-rules.ts` RIDE_* wrappers, `lap_button`), so a 20:00 lap against the row's 12:30 IS the step. Any
+      // lap-button step on a ride takes its lap the same way. Rides only; a run's rungs are unchanged.
+      if (sport === 'ride' && (role === 'warmup' || st?.lap_button === true)) return true;
       if (targetM && st?.type !== 'time') {
         if (sport === 'run') {
           const tol = targetM <= 1000 ? ALIGN.tol.run.dist_short_m : targetM * ALIGN.tol.run.dist_long_pc;
@@ -1654,7 +1675,22 @@ Deno.serve(async (req) => {
     let snapped: any[] | null = null;
     let snapMode = 'snap-to-laps';
     const structuredPlan = plannedSteps.filter((st: any) => stepRole(st) === 'work').length >= 2;
-    if ((sport === 'run' || sport === 'walk') && structuredPlan && laps.length >= 2) {
+    /**
+     * ⛔ THE LAP BUTTON ON A RIDE, THE WAY IT ALREADY WORKS ON A RUN (2026-09-24, WORKORDER-outdoor-ride-matching, Michael
+     * on a road ride with a 20-minute roll-out: "1 lap press would take you to intervals?"). The three rungs below were
+     * gated to runs; a ride's laps had only `trySnapToLaps`, so a ride whose laps did not all fit was walked by time
+     * from second zero and its first work rows landed on the warm-up. On a ride, in this order:
+     *   1. `trySnapToLaps` (existing) — the laps ARE the steps, every one within `ALIGN.tol.ride`.
+     *   2. `laps-matched` / `laps-paired` / `laps-in-order` — the run rungs, same rules, `ALIGN.tol.ride` (2 s work,
+     *      6 s recovery); no walk-pace gate (`lapIsWalkForStep` is a running fact).
+     *   3. ONE press → the walk starts at it (`rideAnchorIdx`, below the snapped return).
+     *   4. no usable laps → the effort finder (`findRideEfforts`).
+     *   5. the time walk from second zero, and the mismatch detector, as today.
+     * FIELD — TrainingPeaks, "Open-ended steps for Structured Workouts" (help.trainingpeaks.com, article 115003385172):
+     * an open-ended warm-up ends on the lap press. A run's order is unchanged: rungs first, `trySnapToLaps` after.
+     */
+    if (sport === 'ride' && structuredPlan && laps.length >= 2) snapped = trySnapToLaps(plannedSteps, laps);
+    if (!snapped && (sport === 'run' || sport === 'walk' || sport === 'ride') && structuredPlan && laps.length >= 2) {
       const placed = laps.map((L) => ({ L, win: windowIdxFromLap(rows, L) })).filter(({ win: [a, b] }) => b > a);
       const lapWins = placed.map((x) => x.win);
       if (lapWins.length >= 2) {
@@ -1770,6 +1806,8 @@ Deno.serve(async (req) => {
         }
       }
     }
+    // On a ride, laps that fit nothing are not the rows ("Lap 1…N" is a run's ruling, above): rungs 3–5 follow (2026-09-24).
+    if (sport === 'ride' && snapMode === 'laps-unmatched') snapped = null;
     /**
      * ⛔ A STRUCTURED RUN WITH NO LAPS IS ONE WHOLE-RUN ROW (2026-09-14, Michael). Cutting the recording at the plan's
      * distances invented reps and "not done" rows; with no laps there is nothing that says where a rep was. The
@@ -1892,6 +1930,103 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success:true, computed, mode: snapMode }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
+    // Detect pool swims: check if rows have distance progression
+    const hasDistanceProgression = rows.length > 1 && rows.some(r => (r.d || 0) > 1);
+    const isPoolSwim = sport === 'swim' && !hasDistanceProgression;
+    /**
+     * ⛔ THE WALK ENDS WHERE THE ATHLETE STOPPED MOVING, NOT WHERE THE RECORDING ENDS (2026-09-13,
+     * Michael: "it says 14 of 14 intervals — I missed some"). His Sept 10 ride: 60 minutes moving, and
+     * the head unit kept taking power samples for another 17 with no distance and no heart rate. The
+     * walk laid intervals 13 and 14 over that stretch, the analyser graded them in range, and only the
+     * steps after them were marked not done. The Duration tile already trusts the device's MOVING time;
+     * the step walk now does too: the last sample where distance still grew is the end of the session,
+     * and every step at or past it is `not_done`. FIELD — Garmin's moving time is "time with speed",
+     * and it is the number the tile prints. ⚠️ OURS — "distance grew" as the moving test on the samples;
+     * a pool swim (no distance progression) keeps the full recording.
+     * (Computed here, above the mismatch detector, since 2026-09-24: the ride anchor and the effort finder read it.)
+     */
+    const walkEndIdx = (() => {
+      if (!hasDistanceProgression) return rows.length - 1;
+      let last = 0;
+      for (let j = 1; j < rows.length; j += 1) if ((rows[j].d || 0) > (rows[j - 1].d || 0) + 0.5) last = j;
+      return Math.max(0, last);
+    })();
+
+    // ────────────── RIDE: ONE PRESS ANCHORS THE WALK; NO USABLE LAPS → THE EFFORT FINDER ──────────────
+    /**
+     * ⛔ ONE LAP PRESS ENDS THE WARM-UP (2026-09-24, WORKORDER-outdoor-ride-matching). On a structured ride whose laps
+     * neither snapped nor matched above, exactly one lap boundary inside the recording is the press: the warm-up is
+     * everything before it, whatever its length, and the work and recovery steps are laid by time from it, as the
+     * walk lays them from second zero today. FIELD — TrainingPeaks "end step on lap button" (article 115003385172).
+     * ⚠️ A press makes TWO laps on a Garmin or a Strava export (the one before, the one after), so it is the
+     * boundaries that are counted, not the laps; a lone lap that starts with the recording is the device's whole-ride
+     * lap and anchors nothing. Only a plan that opens with a warm-up anchors — the press ends a warm-up.
+     */
+    const rideAnchorIdx: number | null = (() => {
+      if (sport !== 'ride' || !structuredPlan || rows.length < 2 || !laps.length) return null;
+      if (stepRole(plannedSteps[0]) === 'work') return null;
+      const inside = new Set<number>();
+      for (const L of laps) {
+        const [s] = windowIdxFromT(rows, L.start_ts, L.start_ts);
+        if (s > 0 && s < walkEndIdx) inside.add(s);
+      }
+      return inside.size === 1 ? [...inside][0] : null;
+    })();
+    /**
+     * ⛔ THE EFFORT FINDER (2026-09-24, WORKORDER-outdoor-ride-matching). No snap, no match, no press: the work efforts
+     * are found in the power stream — contiguous stretches at or above the ride type's work floor
+     * (`FAMILIES[family].workFloorPct`, source-rules.ts: 1.3 sprints, 1.0 anaerobic, 1.10 VO2, 0.80 sweet spot — p237's
+     * anaerobic floor IS the prescription) × the FTP the plan was priced off (`computed.anchors.ftp_w`), separated by
+     * drops. The planned work steps are laid on them in order, the recoveries between them, the warm-up before the
+     * first, the cool-down after the last; work steps past the last effort found were never reached (`not_done`, the
+     * cut-short rule of 2026-09-03). Nothing found, or the wrong count → the time walk, as today. The cuts are
+     * `ALIGN.effort` (OURS, see there). Returns each effort as [first sample at the floor, last sample at the floor].
+     */
+    function findRideEfforts(): Array<[number, number]> | null {
+      if (sport !== 'ride' || !structuredPlan || rows.length < 2) return null;
+      const tagsP: string[] = Array.isArray((planned as any)?.tags) ? (planned as any).tags.map((t: unknown) => String(t ?? '').toLowerCase()) : [];
+      const family = tagsP.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null;
+      const fam = family ? (FAMILIES as Record<string, { workFloorPct: number }>)[family] : undefined;
+      const ftp = Number(planned?.computed?.anchors?.ftp_w);
+      if (!fam || !(fam.workFloorPct > 0) || !(ftp > 0)) return null;
+      const floorW = fam.workFloorPct * ftp;
+      const stream = powerStreamW(rows.map((r: any) => r?.p));
+      if (!stream.length) return null;
+      const work = plannedSteps.map((st: any) => ({ st, sec: deriveSecondsFromPlannedStep(st) || 0 })).filter((x) => stepRole(x.st) === 'work' && x.sec > 0);
+      if (work.length < 2) return null;
+      const recSecs = plannedSteps.filter((st: any) => stepRole(st) === 'recovery').map((st: any) => deriveSecondsFromPlannedStep(st) || 0).filter((n: number) => n > 0);
+      const workSecs = work.map((x) => x.sec);
+      const gapS = ALIGN.effort.gap_frac * (recSecs.length ? Math.min(...recSecs) : Math.min(...workSecs));
+      const t = (i: number) => Number(rows[i]?.t ?? 0);
+      // Stretches at or above the floor, up to the last moving sample.
+      const raw: Array<[number, number]> = [];
+      let s = -1;
+      for (let i = 0; i <= walkEndIdx; i += 1) {
+        const above = stream[i] >= floorW;
+        if (above && s < 0) s = i;
+        if (!above && s >= 0) { raw.push([s, i - 1]); s = -1; }
+      }
+      if (s >= 0) raw.push([s, walkEndIdx]);
+      // A drop shorter than the gap is a dip inside one effort.
+      const merged: Array<[number, number]> = [];
+      for (const r of raw) {
+        const last = merged[merged.length - 1];
+        if (last && t(r[0]) - t(last[1] + 1) < gapS) last[1] = r[1]; else merged.push([r[0], r[1]]);
+      }
+      // The row's window ends on the sample after the last one at the floor (the walk's shared boundary).
+      const lenOf = (r: [number, number]) => t(Math.min(r[1] + 1, walkEndIdx)) - t(r[0]);
+      const fits = (r: [number, number], plannedSec: number) => lenOf(r) >= ALIGN.effort.len_frac * plannedSec && lenOf(r) <= plannedSec / ALIGN.effort.len_frac;
+      const found = merged.filter((r) => fits(r, Math.min(...workSecs)) || fits(r, Math.max(...workSecs)));
+      const N = work.length;
+      if (found.length > N + ALIGN.effort.count_over || found.length < Math.ceil(N * ALIGN.effort.count_min_frac)) return null;
+      // In order: effort k is work step k, and must be about its length.
+      const lay = (list: Array<[number, number]>) => (list.length <= N && list.every((r, k) => fits(r, work[k].sec))) ? list : null;
+      if (found.length <= N) return lay(found);
+      for (let drop = 0; drop < found.length; drop += 1) { const l = lay(found.filter((_, i) => i !== drop)); if (l) return l; }
+      return null;
+    }
+    const rideEfforts: Array<[number, number]> | null = rideAnchorIdx == null ? findRideEfforts() : null;
+
     // ────────────── MISMATCH DETECTOR ──────────────
     // If the execution fundamentally doesn't match the planned structure,
     // skip alignment entirely and emit overall-only metrics.
@@ -1977,7 +2112,10 @@ Deno.serve(async (req) => {
       return { mismatch: false, reason: null };
     }
 
-    const mismatchCheck = detectMismatch(plannedSteps, laps, rows, sport, w);
+    // A press or the efforts already said where the work was: rungs 3 and 4 come before the detector (2026-09-24).
+    const mismatchCheck: MismatchResult = (rideAnchorIdx != null || rideEfforts)
+      ? { mismatch: false, reason: null }
+      : detectMismatch(plannedSteps, laps, rows, sport, w);
     if (mismatchCheck.mismatch) {
       console.log(`[compute] mismatch detected: ${mismatchCheck.reason} — emitting overall-only`);
 
@@ -2053,32 +2191,68 @@ Deno.serve(async (req) => {
     let idx = 0;
     let cursorT = rows.length ? rows[0].t : 0;
     let cursorD = rows.length ? (rows[0].d || 0) : 0;
-
-    // Detect pool swims: check if rows have distance progression
-    const hasDistanceProgression = rows.length > 1 && rows.some(r => (r.d || 0) > 1);
-    const isPoolSwim = sport === 'swim' && !hasDistanceProgression;
-    /**
-     * ⛔ THE WALK ENDS WHERE THE ATHLETE STOPPED MOVING, NOT WHERE THE RECORDING ENDS (2026-09-13,
-     * Michael: "it says 14 of 14 intervals — I missed some"). His Sept 10 ride: 60 minutes moving, and
-     * the head unit kept taking power samples for another 17 with no distance and no heart rate. The
-     * walk laid intervals 13 and 14 over that stretch, the analyser graded them in range, and only the
-     * steps after them were marked not done. The Duration tile already trusts the device's MOVING time;
-     * the step walk now does too: the last sample where distance still grew is the end of the session,
-     * and every step at or past it is `not_done`. FIELD — Garmin's moving time is "time with speed",
-     * and it is the number the tile prints. ⚠️ OURS — "distance grew" as the moving test on the samples;
-     * a pool swim (no distance progression) keeps the full recording.
-     */
-    const walkEndIdx = (() => {
-      if (!hasDistanceProgression) return rows.length - 1;
-      let last = 0;
-      for (let j = 1; j < rows.length; j += 1) if ((rows[j].d || 0) > (rows[j - 1].d || 0) + 0.5) last = j;
-      return Math.max(0, last);
-    })();
+    // (`hasDistanceProgression`, `isPoolSwim` and `walkEndIdx` are computed above the mismatch detector.)
 
     type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra'; notDone?: boolean };
     const infos: Info[] = [];
 
-    for (let i=0;i<plannedSteps.length;i+=1) {
+    /**
+     * Steps laid over one window [startIdx, endIdx] by their planned seconds' share of it (the interior fill's rule,
+     * below): the warm-up lines before a press or a first effort, the recoveries between two efforts, the steps after
+     * the last. Each step keeps its own role. Rides only (2026-09-24).
+     */
+    function layShares(steps: any[], startIdx: number, endIdx: number): Info[] {
+      const out: Info[] = [];
+      if (!steps.length) return out;
+      const secs = steps.map((st: any) => deriveSecondsFromPlannedStep(st) || 0);
+      const sum = secs.reduce((a: number, b: number) => a + b, 0);
+      const lastIdx = rows.length - 1;
+      const endAt = Math.min(Math.max(endIdx, startIdx + 1), lastIdx);
+      const t0 = Number(rows[startIdx]?.t || 0), span = Number(rows[endAt]?.t || 0) - t0;
+      let s = startIdx, tCursor = t0;
+      steps.forEach((st: any, k: number) => {
+        let e = endAt;
+        if (k < steps.length - 1) {
+          const share = sum > 0 ? secs[k] / sum : 1 / steps.length;
+          const goalT = tCursor + share * span;
+          e = s + 1; while (e < endAt && Number(rows[e]?.t || 0) < goalT) e += 1;
+          tCursor = goalT;
+        }
+        e = Math.min(Math.max(e, s + 1), lastIdx);
+        out.push({ st, startIdx: s, endIdx: e, measured: true, role: stepRole(st) });
+        s = e;
+      });
+      return out;
+    }
+
+    // The anchored walk (rung 3): the warm-up lines take everything before the press; the walk starts there.
+    let walkFrom = 0;
+    if (rideAnchorIdx != null) {
+      const firstWork = plannedSteps.findIndex((st: any) => stepRole(st) === 'work');
+      infos.push(...layShares(plannedSteps.slice(0, firstWork), 0, rideAnchorIdx));
+      idx = rideAnchorIdx; cursorT = rows[idx].t; cursorD = rows[idx].d || cursorD; walkFrom = firstWork;
+    }
+
+    if (rideEfforts) {
+      // Rung 4: work step k on effort k; the steps between two efforts share the gap; the steps after the last laid
+      // effort, up to the next planned work step, take the rest of the ride; everything from that work step on was
+      // never reached.
+      const workIdx = plannedSteps.map((st: any, i: number) => (stepRole(st) === 'work' ? i : -1)).filter((i: number) => i >= 0);
+      infos.push(...layShares(plannedSteps.slice(0, workIdx[0]), 0, rideEfforts[0][0]));
+      for (let j = 0; j < rideEfforts.length; j += 1) {
+        const [s, e] = rideEfforts[j];
+        const endIdx = Math.min(e + 1, walkEndIdx);
+        infos.push({ st: plannedSteps[workIdx[j]], startIdx: s, endIdx, measured: true, role: 'work' });
+        const nextWork = j + 1 < workIdx.length ? workIdx[j + 1] : plannedSteps.length;
+        const between = plannedSteps.slice(workIdx[j] + 1, nextWork);
+        if (j + 1 < rideEfforts.length) infos.push(...layShares(between, endIdx, rideEfforts[j + 1][0]));
+        else {
+          infos.push(...layShares(between, endIdx, walkEndIdx));
+          for (const stND of plannedSteps.slice(nextWork)) infos.push({ st: stND, startIdx: rows.length - 1, endIdx: rows.length - 1, measured: true, role: stepRole(stND), notDone: true });
+        }
+      }
+    }
+    else for (let i=walkFrom;i<plannedSteps.length;i+=1) {
       const st = plannedSteps[i];
       const role = stepRole(st);
       const startIdxThis = idx;
@@ -2211,8 +2385,9 @@ Deno.serve(async (req) => {
         }
       }
       // force last to end of file
+      // (not on the efforts path, 2026-09-24: a plan that ends on a work step keeps that effort's own end)
       const last = infos[infos.length-1];
-      if (last) last.endIdx = Math.max(last.endIdx ?? 0, rows.length - 1);
+      if (last && !rideEfforts) last.endIdx = Math.max(last.endIdx ?? 0, rows.length - 1);
     }
 
     // Materialize intervals
@@ -2551,7 +2726,8 @@ Deno.serve(async (req) => {
     const computed: any = {
       version: COMPUTED_VERSION,
       // 2026-09-03: say which path built this; the overall-only branch's stale reason must not survive a re-run.
-      alignment_mode: 'aligned',
+      // 2026-09-24: on a ride, which rung laid the rows — the press (`aligned-from-lap`), the efforts (`aligned-on-efforts`).
+      alignment_mode: rideEfforts ? 'aligned-on-efforts' : rideAnchorIdx != null ? 'aligned-from-lap' : 'aligned',
       mismatch_reason: null,
       intervals: outIntervals,
       // 2026-09-03: how many planned steps the recording never reached (a session cut short); 0 = all laid out.

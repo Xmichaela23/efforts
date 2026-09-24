@@ -2282,6 +2282,9 @@ function expandBikeToken(
     out.push({
       id: uid(), kind: wrapRide.kind, label: wrapRide.label, page_label: true,
       ...(wrapRide.seconds != null && wrapRide.seconds > 0 ? { duration_s: wrapRide.seconds } : { lap_button: true }),
+      // ⛔ THE ONE STEP THAT CARRIES BOTH (2026-09-24, rides): an easy-spin warm-up line keeps its seconds for the card
+      // and the step walk AND is the lap-button step on the watch (`source-rules.ts` RIDE_* wrappers, `lapButton`).
+      ...(wrapRide.lapButton ? { lap_button: true } : {}),
       ...(power ? { power_range: power } : {}),
     });
     return out;
