@@ -2566,3 +2566,341 @@ chapter 7 "Advanced concepts"). Read directly. Gap #9's "190 thermoregulation" e
   book's. The book gives no temperature.
 - The one thing the page would justify on a screen: a note that a hot run costs the next day's
   recovery more than it costs today's pace, and that hydration after it is the lever. Not built.
+
+---
+
+# PART E6 — STRENGTH + ULTRAMARATHON (Chapter 10, pp.254–256)
+
+**Transcribed 2026-09-23 from `p254.jpg`, `p255.jpg` and `p256.jpg`, all three read directly.** The table header prints
+**STANDARD** and **DELOAD** (not "TAPER/DELOAD").
+
+## E6a. The week (p254)
+
+| Day | STANDARD strength | STANDARD endurance | DELOAD strength | DELOAD endurance |
+|---|---|---|---|---|
+| **1** | — | MLSS+ (level 1) · VT1 (level 1)/ strategy | — | 1 x NT (level 1) · VT1 (strategy) |
+| **2** | **Lower speed/power** — 1 x DE: Primary lower push/ hinge (alternate) · 2 x SKILL: Secondary lower · 1 x DE: Braced lower | VT1 (level 1) (cross-train) | **Lower speed/power** — 1 x DE: Primary lower push/ hinge (alternate) · 2 x SKILL: Secondary lower · 1 x DE: Braced lower | VT1 (level 1) (cross-train) |
+| **3** | Plyo x 2 | NT (level 2) · VT1 (level 1) | Plyo x 1 | VT1 (level 2) |
+| **4** | **Upper body** — 1 x DE: Primary upper push/pull (alternate) · 1 x SKILL: Secondary upper push · 1 x SKILL: Secondary upper pull · 2 x HYP: Braced upper push/pull (superset) | VT1 (level 2) | **Upper body** — 1 x DE: Primary upper push/pull (alternate) · 1 x SKILL: Secondary upper push · 1 x SKILL: Secondary upper pull · 2 x HYP: Braced upper push/pull (superset) | VT1 (level 1) |
+| **5** | **Lower hypertrophy/core** — 2 x HYP: Secondary lower push/ pull (superset) · 2 x HYP: Focused lower push/ pull (superset) · 1 x HYP: Core · 1 x HYP: Focused upper (rotate/ superset) | — | **Lower hypertrophy/core** — 2 x HYP: Focused lower push/ pull (superset) · 1 x HYP: Core · 1 x HYP: Focused upper (rotate/ superset) | — |
+| **6** | — | LSD (level 3)/ strategy · VT1 (level 1) | — | LSD (level 2)/ strategy |
+| **7** | — | Optional VT1 level 1 or LSD level 2 if doing runs back to back | — | Optional VT1 (level 1) |
+
+⚠️ **Reading of the page.** The standard column's "VT1 (level 1)" under "LSD (level 3)/ strategy" sits at the line
+between the day 6 and day 7 rows. Cropped and read at full size, it sits inside day 6's shaded band, so it is placed on
+day 6 (two runs that day). Not certain. p256 names only the weekend LSD choices and does not mention a second day 6 run.
+No REST is printed on any day in either column (days 1, 6 and 7 have no lifting).
+
+**What the table shows:**
+- Three lifting days (2, 4, 5) and a plyo-only day 3. No ME slot anywhere. The DE slots are day 2's primary and braced
+  lower and day 4's primary upper.
+- The deload strength is a cut on two days only: day 3 plyo x 2 → x 1, and day 5 loses the "Secondary lower push/ pull"
+  superset. Days 2 and 4 are unchanged.
+- The deload endurance changes day 1 (MLSS+ → 1 x NT (level 1)), day 3 (NT + VT1 → one VT1 level 2), day 4 (VT1 level
+  2 → 1), day 6 (LSD level 3 → level 2), day 7 (only VT1 level 1 as the option).
+- "/" in "VT1 (level 1)/ strategy" and "LSD (level 3)/ strategy" reads as "or": p256 calls it *"the weekend choice
+  between LSD level 3, LSD strategy, and back-to-back LSD level 2s"*.
+
+## E6b. Notes (pp.255–256), key lines
+
+- Reduced strength: fewer work sets, *"more intended for 'running strength'"*; *"not a program for a competitive
+  powerlifter"*. Also for outdoor expeditions, and for *"a fairly solid road runner who wants to train for something off
+  road and ambitious."*
+- **Hills:** the Monday and Wednesday sessions should *"rotate in hill-focused intervals if the target terrain mandates
+  this"*: hill repeats and incline MLSS/NT, hard up, easy jog down. As events get closer you may switch this, *"with
+  harder intervals emphasizing the downhill"* (downhill/eccentric loading drives fatigue and leg "failure" in ultras).
+- **Strategy sessions:** in racing kit if possible (*"full water bladders when indicated to simulate race weight"*),
+  continuously testing feeding strategies and kit. *"Any strategy session, regardless of length, should include full
+  fueling practice."* Fasted "fat adapt" sessions are *"contraindicated"* at this volume.
+- Strength notes: "skill" movements *"can and should rotate"*; unfamiliar movements encouraged; coordination and
+  balance/proprioception are *"a major component"*. Friday's work always precedes the weekend long run, so be judicious
+  with intensity; LSD may feel taxing until acclimated. *"Consider, then, rotating between more RIR and fewer RIR as
+  personal preference dictates."* No RIR number and no rate of 1RM increase is printed.
+- Running notes: 50K flat ultras may suit another program; for longer ultras *"this program should be tweaked
+  accordingly"*. Desired performance, not event distance, dictates mileage and intensity.
+- **The strategy sessions are the ones to modify for longer events.** *"Back-to-back 2-hour sessions may do far more
+  for durability than a single 6-hour session!"* For longer ultras, strategy sessions include extended hikes on mixed
+  terrain, testing footwear and kit, all-day fueling; *"a long, 7- to 8-hour hike on the weekend as a strategy
+  session"*, and *"these sessions should take place every third week or so."*
+- *"Monday's strategy session should be about race terrain and kit and building efficiency under similar environments
+  to race environment."* The weekend choice (LSD 3 / LSD strategy / back-to-back LSD 2s) *"should be based on athlete
+  schedule, but all three are encouraged."* *"100 milers may want to hit an LSD 3 on Saturday and LSD 2 on Sunday, if
+  schedule allows."* (Read together: day 1 = Monday, day 5 = Friday, day 6 = Saturday, day 7 = Sunday.)
+- Deload: still *"relatively high training frequency"*. If truly injured or overtrained, plan a separate recovery,
+  *"with a potential 3- to 4-week pivot to an easier program."* If only time off is needed, *"many of the sessions on the
+  deload week can be cross-training sessions!"*
+
+## E6c. Reading notes for the builder
+
+- **New session types.** Searched `source-rules.ts` for "hill", "incline", "strategy", "fuel", "cross-train" (family
+  and archetype ids and comments); none is a family or archetype. (1) **Strategy session**: a VT1 or LSD run in race kit
+  with full fuelling practice. (2) **Hill intervals**: hill repeats / incline MLSS or NT, and the downhill-emphasis
+  variant near the race. Part D records "work intervals may be done on hills" for sprint and MLSS, but no hill archetype
+  exists. (3) **Cross-train VT1** (day 2): a VT1 in another modality. (4) **7–8 hour strategy hike**: longer than the
+  `hike` archetype's 300-minute top (`source-rules.ts`, `repBand hi: 300 * 60`).
+- **Two runs on one day:** day 1 (MLSS+ and VT1/strategy), day 3 (NT and VT1), and day 6 (LSD and VT1, see ambiguity).
+- **Optional sessions:** day 7 is printed "Optional" in both columns.
+- **Length / switch rules:** no block length for the program. 7–8 h strategy hike *"every third week or so"*. Injured or
+  overtrained: *"potential 3- to 4-week pivot to an easier program"* (the easier program is not named).
+- **Not printed:** when to run the deload week; any taper or race-week rule (no taper column); rate of 1RM progression;
+  RIR values; strategy session duration (except the 7–8 h hike); hill grade or rep length.
+- **Ambiguous on the photo:** day 6 vs day 7 placement of the standard "VT1 (level 1)".
+- **Ambiguous in the text:** "Primary lower push/ hinge (alternate)" and "Primary upper push/pull (alternate)" give no
+  cadence for the alternation (inferred: week to week, as p247's rotation; not stated here). "Focused upper (rotate/
+  superset)" gives no rotation cadence. "2 x SKILL: Secondary lower", "1 x DE: Braced lower" and "1 x HYP: Core" name a
+  region, not a push/pull/hinge category.
+
+---
+
+# PART E7 — THE RUNNER: PIVOT (Chapter 10, pp.258–259)
+
+**Transcribed 2026-09-23 from `p258.jpg` and `p259.jpg`, both read directly.** The table header prints **STANDARD** and
+**DELOAD**.
+
+## E7a. The week (p258)
+
+| Day | STANDARD strength | STANDARD endurance | DELOAD strength | DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **Dynamic balance and explosive** — Plyo: 2 drills · 1 x SKILL: Secondary lower push · 1 x DE: Secondary lower push · 1 x DE: Secondary lower pull | 1 x MLSS+ (level 2) | **Dynamic balance and explosive** — Plyo: 2 drills · 1 x SKILL: Secondary lower push · 1 x SKILL: Secondary lower pull · 1 x HYP: Secondary lower pull | MLSS+ (level 1) |
+| **2** | — | VT1 (level 1 to 2) | **REST** | |
+| **3** | — | NT (level 1) · NT (level 1 to 2) (separate sessions) | — | NT (level 1) |
+| **4** | **Upper and core** — Plyo: 1 drill · 2 x DE: Secondary upper push/ pull (superset) · 2 x HYP: Braced upper push/ pull (superset) · 2 x HYP: Focused (core) | — | **Upper and core** — Plyo: 1 drill · 2 x HYP: Braced upper push/pull (superset) · 2 x HYP: Focused (core) | — |
+| **5** | **Full body** — 2 x Plyo · 2 x SKILL: Secondary lower push/pull (superset) · 2 x HYP: Focused upper push/ pull (superset) · 1 x HYP: Focused (core) | VT1 (level 1 to 2) | **Full body** — 2 x Plyo · 2 x SKILL: Secondary lower push/pull (superset) · 1 x HYP: Focused (core) | VT1 (level 1) |
+| **6** | — | LSD (level 3) | — | VT1 (level 2) |
+| **7** | Plyo x 2 | VT1 (level 1) | Plyo x 2 | VT1 cross-train (level 1) |
+
+Rows read cleanly off the photo (days 6 and 7 cropped and checked). The only REST is the deload's day 2, printed across
+both deload columns. The standard week has no rest day.
+
+**What the table shows:**
+- No ME and no primary slot anywhere; every lift is secondary, braced or focused. Plyo on four days (1, 4, 5, 7).
+- Standard runs: 7 sessions — MLSS+ (2), VT1 (1 to 2), two NT on day 3, VT1 (1 to 2), LSD (3), VT1 (1).
+- Deload runs: 6 sessions — MLSS+ (1), NT (1), VT1 (1), VT1 (2), VT1 cross-train (1); day 2 is REST and day 3 is one NT.
+- Deload strength: day 1 DE → SKILL/HYP; day 4 loses the DE superset; day 5 loses the HYP upper superset.
+
+## E7b. Notes (p259), key lines
+
+- For *"pure running performance"*, a road-focused runner, *"distances ranging from the 5K to the half-marathon"*; not
+  ideal for a mile specialist or sprinter. Lifting is *"almost entirely supportive of the running"*; emphasis on
+  explosive strength and dynamic balance (Monday's brief session, plyos in each lifting session).
+- Experienced hybrid athletes with a running deficit *"may wish to consider this as a pivot program for several
+  cycles"*.
+- The midweek back-to-back sessions: *"each one should be around 30 minutes or so"*; the two-a-day is for session
+  quality, *"not a way of adding volume."* Option: *"combine these two sessions into a single longer NT session
+  (mandated level 3) and possibly convert Friday to NT level 1 + VT1 level 1"*. Larger athletes may struggle with longer
+  NT sessions.
+- Plyos can be standalone with no run after; *"more than just 'prerun drills'"*.
+- Peaking: the Saturday run takes *"race pace" finishes or intervals*, and *"one of Thursday's NT sessions
+  incorporating race pace repeats."*
+- **Length:** *"this program is not an obligate 'pivot program' and can be run for an extended period of time"*; it can
+  also be used as a pivot before a race-specific program.
+- Strength notes: *"little need for significant overload"*; raise estimated 1RM slowly, focus on concentric velocity,
+  balance, proficiency. Plyo: *"bounds and skips are the clear preference"*; lateral drills less important.
+- Running notes: *"The Thursday back-to-back should typically have the higher intensity but shorter run early in the
+  day, with a lower intensity but perhaps longer run later in the day."* Hill repeats/sprints *"encouraged here for at
+  least one of these NT runs"* to reduce eccentric strain. Level 1 vs 2 on the two VT1 days depends on runner level, not
+  event: experienced *"in excess of 60 minutes"*, newer runners *"under 45 minutes"*.
+
+## E7c. Reading notes for the builder
+
+- **Day conflict on the pages:** the table puts the two NT sessions on **day 3**; p259 calls them **"Thursday"** twice.
+  p259's *"Monday's relatively brief session"* matches day 1, which makes day 3 Wednesday. The pages disagree; not
+  resolved here.
+- **Two sessions on one day:** day 3, NT + NT (*"separate sessions"*), ~30 min each, the shorter higher-intensity one
+  early in the day.
+- **New session types:** hill repeats inside an NT run (no hill archetype in `source-rules.ts`, searched "hill" and
+  "incline"); VT1 cross-train (deload day 7). Race-pace work already has archetypes: `race_repeats` (NT) and
+  `race_pace_finish` (LSD).
+- **Level ranges printed as "level 1 to 2"** (days 2, 3, 5): the choice is by runner level, with the 45/60-minute guide
+  above.
+- **Length / switch rules:** can be run for an extended period; no block length; *"several cycles"* when used as a pivot,
+  and a cycle's length is not stated. The All Rounder names it as the race pivot about a month out (Part E, p275).
+- **Not printed:** rate of 1RM increase ("slowly" only); when to run the deload week; any race-week or taper rule (no
+  taper column).
+- "Plyo: 2 drills" (day 1), "2 x Plyo" (day 5) and "Plyo x 2" (day 7) are three spellings; inferred to mean the same
+  thing (two drills).
+
+---
+
+# PART E8 — THE SPEED SOLUTION: PIVOT PROGRAM (Chapter 10, pp.276–277)
+
+**Transcribed 2026-09-23 from `p276.jpg` and `p277.jpg`, both read directly.** Printed title *"THE SPEED SOLUTION: PIVOT
+PROGRAM"*; header STANDARD and TAPER/DELOAD.
+
+## E8a. The week (p276)
+
+| Day | STANDARD strength | STANDARD endurance | TAPER/DELOAD strength | TAPER/DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **Upper** — 1 x DE: Secondary upper push · 1 X DE: Secondary upper pull · 2 x SKILL: Braced upper push/pull superset · 2 x Focused core | Sprint/power (level 2) | **Upper** — 1 x DE: Secondary upper push · 1 X DE: Secondary upper pull · 2 x Focused core | Sprint/power (level 1) |
+| **2** | 2 x Plyo drills | VT1 (level 1) | 2 x Plyo drills | — |
+| **3** | **Lower** — 1 x DE: Secondary lower push · 2 x DE: Braced lower push/pull superset · 1 x SKILL: Lower carry · 1 x Plyo drill | Sprint/lower (level 1) · MLSS+ (level 1) | **Lower** — 1 x SKILL: Secondary lower push · 1 x SKILL: Lower carry · 1 x Plyo drill | MLSS+ (level 1) |
+| **4** | — | NT (level 2) | — | VT1 (level 1) |
+| **5** | **Triple extension** — 1 x DE: Pick · 1 x DE: Primary lower hinge · 1 x REP: OLY variant · 2 x GROOVE: OLY mod (supersets) | MLSS+ (level 1) | **Triple extension** — 1 x SKILL: Secondary lower hinge · 1 x REP: OLY variant · 1 x GROOVE: OLY mod | MLSS+ (level 1) |
+| **6** | 1 x Plyo drill | Sprint/power (level 1) | — | Sprint/power (level 1) |
+| **7** | **REST** | | **REST** | |
+
+Days 4–7 cropped and checked. Standard day 6 has "1 x Plyo drill"; the deload day 6 strength cell is empty. Deload day 2
+endurance is empty.
+
+**What the table shows:**
+- Three lifting days (1, 3, 5) and plyo-only days 2 and 6. One primary slot in the week (day 5, DE: Primary lower hinge).
+- Standard runs: Sprint/power (2), VT1 (1), Sprint/lower (1) + MLSS+ (1), NT (2), MLSS+ (1), Sprint/power (1). Three
+  sprint sessions, one VT1.
+- Deload runs: Sprint/power (1), MLSS+ (1), VT1 (1), MLSS+ (1), Sprint/power (1). Day 2 loses the VT1, day 3 loses the
+  sprint, day 4 NT → VT1.
+- Deload strength: DE → SKILL on days 3 and 5; the supersets and the braced work drop.
+
+## E8b. Notes (p277), key lines
+
+- *"This is an obligate pivot program; in other words, it isn't intended for consistent use."* Purpose: *"quickly
+  progress an athlete from slower running to faster, more explosive movement."* Strength supports strength and power
+  with *"a minor emphasis on triple extension/explosive movements"*; running is *"simply about speed"*, *"only a minimal
+  amount of VT1."*
+- Sprint/power work is *"far more 'strength training' than endurance"*; marginal cardio gains at most, and highly
+  experienced runners *"may actually regress in this arena if they remain on this program for more than a 4- to 6-week
+  block."*
+- For a good aerobic base with minimal speed/power (including moving from an offseason of VT1 into a track or 5K
+  season), or field sport athletes. *"A perfectly acceptable reason to run a cycle or two every few months."*
+- Strength notes: emphasis on quality and minimizing fatigue, *"not necessarily pushing big weight with ultra high
+  effort"*; progression matters most on plyo and Olympic-style work. Plyo: *"heavily focused on bounding and
+  countermovement jumps"*. Triple extension day: a *"natural progression of movements"* with a *"flow"* between lifts.
+  The carry on the lower day: *"either a very light carry or a sled push/pull. The latter is actually preferable"*, but
+  not required.
+- Running notes: sprint selection purpose-driven; field/team athletes standing starts, runners *"may prefer to focus on
+  flying start 200s and 400s."* *"Full recovery between 'sets' is crucial."* *"The MLSS+ work is intended to help with
+  'speed extension.' As such, sessions of the 'sprint to cruise' or 'surge and hold' variety are preferred here."* Not
+  suited to speed or power in cycling or other modalities.
+
+## E8c. Reading notes for the builder
+
+- **Fixed block length and exit:** *"a 4- to 6-week block"*; obligate pivot; *"a cycle or two every few months."* The
+  program to return to is not named on these pages (inferred: the one the athlete came from).
+- **OLY slots on day 5** (*REP: OLY variant*, *GROOVE: OLY mod*) use the Olympic vocabulary of Part A3, which is ruled
+  out of scope for Efforts. Day 5 cannot be built as printed without them.
+- **"DE: Pick"** is a carry-category movement (p226, Part A2). **"SKILL: Lower carry"**: sled push/pull preferred.
+- **"Sprint/lower (level 1)"** on standard day 3 is not a family in Part D or `source-rules.ts` (searched
+  "sprint/lower"). It may be a misprint of "Sprint/power" or a lower-body sprint variant; not resolved.
+- **"sprint to cruise" / "surge and hold"** MLSS+ variants are named but not defined on p277; neither name appears in
+  `source-rules.ts` or elsewhere in this file (searched both). Closest by shape is `surge_float` (inferred only).
+- **Flying 200s and 400s:** `flying_long` covers 150–200 m; a flying-start 400 is not an existing archetype
+  (`speed_endurance` covers 150–400 m but is not a flying start).
+- "2 x Focused core" (day 1) has no intent prefix (no DE/SKILL/HYP). "1 X DE" is printed with a capital X.
+- **Not printed:** rate of progression; when the deload week runs inside the 4–6 week block; sprint rep counts beyond
+  the Part D levels.
+
+---
+
+# PART E9 — STAGE 3/4 READING NOTES (2026-09-24, read off the photographs)
+
+**Pages opened for this pass:** p104, p112, p136, p137, p218, p219, p220, p224, p225, p226, p227, p229–237, p239,
+p244, p245, p248, p249, p251, p253–256, p258, p259, p275–277, p282–284. Chapter 10's opening pages (p242–243) are
+**not photographed**; nothing below comes from them.
+
+## E9a. Which day things sit on
+
+- **p254 standard "VT1 (level 1)" = day 6.** Cropped at full size: it sits inside day 6's shaded band in the
+  standard endurance column, above that column's own row line; day 7's cell starts below the line with "Optional VT1
+  level 1 or LSD level 2 if doing runs back to back". The deload column has day 6 = LSD alone, day 7 = optional VT1.
+  Same layout elsewhere: p248's "Sprint/power (level 2) · Tempo (level 1)" straddles the day 6/7 line with day 7
+  REST, and p249 calls them *"Saturday's runs … each a single session"* (day 6). p256 does not mention the day 6 VT1.
+- **Day 1 = Monday in every Chapter 10 program checked.** p245 (Monday sprint+MLSS+ = day 1, Wednesday NT = day 3,
+  Saturday LSD = day 6); p249 (Wednesday = day 3, Saturday = day 6); p253 (Monday = day 1); p255–256 (Monday = day 1,
+  Friday = day 5, Saturday/Sunday = days 6/7); p259 itself (Monday's brief session = day 1, "convert Friday to NT
+  level 1 + VT1 level 1" = day 5 VT1, Saturday run = day 6 LSD).
+- **p258/259 "Thursday" vs day 3:** Thursday = day 4, which has no run on p258. The table places both NT runs on day 3
+  with "(separate sessions)". The pages do not resolve it. Inferred: day 3 (Wednesday) is meant; "Thursday" on p259
+  (twice) disagrees with every other day name on the same page.
+
+## E9b. Session types and where the book defines them
+
+- **"Sprint/lower (level 1)" (p276 day 3):** no such session exists. The only running sprint family is
+  "Sprint/Power" (p229–231); every other table prints "Sprint/power" (p244, p248, p252, p276 days 1 and 6). The
+  deload drops it (day 3 = MLSS+ only). Inferred: a misprint of "Sprint/power".
+- **Strategy session:** defined in prose only. p255: racing kit if possible, full water bladders when indicated,
+  testing and retesting feeding and kit, *"any strategy session, regardless of length, should include full fueling
+  practice"*, no fasted sessions. p256: Monday's strategy session is about race terrain and kit and efficiency in a
+  race-like environment; for longer ultras, extended hikes on mixed-terrain trails, footwear/kit testing, all-day
+  fueling. p251 and p253: marathoners may extend the weekend LSD *"up to 3 hours as blended 'strategy sessions'"*,
+  fast finishes and food/drink tolerance. **No duration or intensity of its own**; p254 prints it as the alternative
+  to "VT1 (level 1)" (p235: 25–30 min) on day 1 and "LSD (level 3)" on day 6 (p235 LSD 3 includes *"3-plus-hour mixed
+  terrain hike/VT1 jog (up to 5 hours for ultrarunners)"*). Using those lengths is inferred.
+- **Hill intervals:** p255 — Monday (MLSS+) and Wednesday (NT) sessions *"rotate in hill-focused intervals if the
+  target terrain mandates this"*: hill repeats and incline versions of MLSS/NT workouts, hard up for the work
+  intervals, easy jog down for the rest; nearer events, harder intervals emphasizing the downhill. p229 and p231: any
+  sprint or MLSS work interval may be run on hills, pace adjusted to hold target intensity. p259: hill
+  repeats/sprints for at least one NT run. p136: uphill-only training (run up, walk down) as a stressor change.
+  **No grade, rep length or rep count printed**; reps come from the chosen MLSS (p231–232) or NT (p233–234) workout.
+- **VT1 as cross-training:** p235 VT1 = any workout at or below VT1, level = duration (1: 25–30 min, 2: 45–60, 3:
+  80–90), talk test after 5 and 20 min. p137: cross-train easy work, not threshold or sprint; cycling or Arc
+  Trainer/elliptical; when injured add aqua jogging, Arc Trainer, other non-impact. p275: rower, ski erg, air bike,
+  elliptical, arc trainer. p284: rower, air bike. p137: 4–5 week crash course for a new modality, 2–3 week refresher.
+- **7–8 hour strategy hike:** p256 only — weekend, mixed terrain, fueling and hydration protocol, *"every third week
+  or so."* p235: LSD may include rests or pauses in the hike/jog.
+- **"Sprint to cruise", "surge and hold" (p277):** named only. Not in the running library (p229–235), the cycling
+  library (p236–239), or any other page opened. p253 has a related name, *"surge and sustain"*: brief, *"fast
+  movement/strides over vVO2 pace … then finish the session with some easy miles."* Closest printed MLSS shapes
+  (inferred, not named by the book): p231 L1 "6 rounds of 15 s @130% / 45 s @105% / 1 min @VT1" (surge, hold) and
+  p232 L2 "2 sets of 3 rounds of 10 s @100% / 10 s all-out / 50 s @115% / 1 min @95% / 1 min @90% / 2 min @VT1"
+  (sprint, then easing).
+- **Flying 400s:** p277 *"flying start 200s and 400s"*; p249 *"flying 200/400 repeats"* for the mile. The library
+  prints flying 200s (p230 L1/L2: 2 rounds of 4 or 2 x 200 m @ >vVO2, flying start, 2-min between sets, 3-min
+  between rounds; p231 L3: 1 round of 2 x 200 m @ max pace flying, full recovery; 2 x 200 m as 50 m fly >vVO2 / 100 m
+  all-out / 50 m run out). **No flying 400 is printed**; 400s appear only from a dead stop (p230 L2, p231 L3: 2 rounds
+  of 2 x 400 m @ 130–140%, full recovery, stretch/mobility between rounds). Flying start (p229): brief jog, about LT
+  pace when the interval starts. p277: full recovery between sets. p249: reduced-effort flying 200s = lowest-stress
+  sprint for a deload.
+
+## E9c. The Olympic slots (p276 day 5)
+
+- **No substitute for an Olympic lift is printed anywhere opened** (p218–227, p244–284 notes). p283 is the only
+  guidance on choosing: newer lifters keep variants/mods simple unless a coach recommends otherwise; hang variants
+  *"almost universally useful"*; beware overuse of partials.
+- **REP: OLY variant** — p224: 80–90%, *"steady repetitions until form compromised"*; p225: *"clustered singles"*.
+  Variant list (p224): clean from low/high hang, clean low pulls, hang snatch, split jerk/push jerk off blocks,
+  clean/snatch from blocks.
+- **GROOVE: OLY mod** — p224: 70–80%, quality singles through triples, nonfatiguing, stopping well shy of
+  breakdown; p225: done warmed up and moving well; drop the weight when fatigue sets in. Mod list (p225): tall jerk,
+  push jerk, clean high pulls, drop snatch, snatch balance, power variants of competition lifts (power clean pictured).
+- **Not printed:** set counts for any OLY intent; what the percentages are of (inferred: that lift's own max). "2 x
+  GROOVE: OLY mod (supersets)" — p282 prints "2 x SKILL: OLY mod/GROOVE: mod (different movements, superset)", which
+  suggests two different mods paired (inferred).
+- **DE: Pick** — p226 DE: light weight, speed and turnover, fatigue from rapid reps expected; a pick = lift the
+  implement and set it down without moving; farmer's/frame carries and tire flips named as pick-phase movements.
+  **DE: Primary lower hinge** — p218 DE: 2–4 reps, 70–80%, max velocity, 3–4 RIR, 4–6 sets; p219 hinge list.
+- ⚠️ Part E0's roster says Weightlifting and Running (p282) is the **only** program using OLY. Wrong: p276 day 5
+  uses it too.
+- p277: triple extension day = a *"natural progression"* of similar movements with a *"flow"* between lifts.
+
+## E9d. Deload, rise and length for p254 / p258 / p276
+
+- **Ultra:** no deload timing; deload still *"relatively high training frequency"*; injured/overtrained → separate
+  recovery and *"a potential 3- to 4-week pivot to an easier program"* (not named); time off needed → deload sessions
+  as cross-training (p256). Rise: *"maintain strength or build it slowly"*, rotate more/fewer RIR (p255). No number.
+- **Runner:** *"little need for significant overload"*, *"increase their estimated 1RM slowly"* (p259). No number, no
+  deload timing. Length: run for an extended period, or as a pivot (*"several cycles"*, cycle not defined); p275:
+  *"A month or so on The Runner prior to a race-specific training program."*
+- **Speed Solution:** 4–6 week block (p277); *"a cycle or two every few months"*; p104 calls it *"a crash course in
+  getting faster"*. Return program not named. Rise: progression matters most on plyo and Olympic work; no number. No
+  deload timing for the TAPER/DELOAD column.
+- **General pages:** p218 sets stay at the low end when starting, rise only with progress and recovery to spare.
+  p112 rotate 75/80/85% week to week, then raise the max *"a pound or two"*; raise load when meeting targets at a lower
+  RPE, lower it when missing. Numeric rates exist only for p245/p247 (1% every 3 weeks) and p251 (1% every 4 weeks).
+
+## E9e. Stage 1 choices checked against the pages
+
+- **Secondary slot built as a competition lift:** p220 defines Secondary as *"compound noncontested movements"*;
+  bench, deadlift, squat, pull-up are Primary (p218–219). p245: the opening lift is *"lifter preference"*, typically a
+  compound barbell movement. p275 (All Rounder, same notation): *"This is not to say primary lifts can't be
+  substituted here."* The book allows it; it does not choose it.
+- **Overhead press:** p244/p252 name none, but p220's Secondary push upper list includes seated DB press and Arnold
+  press, so a "Secondary push" row can be an overhead press. Testing none is ours.
+- **Sprint choice:** p245 *"A sprint workout should be chosen (level 1)"*; p229 encourages trying each type and
+  alternating liked/disliked. p253 (p252's Monday speed work): brief, "surge and sustain", strides over vVO2, then easy
+  miles. Short accelerations only is ours; the pages point to rotating.
+- **Two-part Monday run:** p245 and p253 decide it.
+- **No rise on p252:** p253 prints no rate (confirmed off the photo). The general rule is p112's.
+- **Extra easy runs on p244:** p245 *"can add one or two short VT1 sessions (running or cross-training)"* when there
+  is recovery left.
+- **p252 no rest day:** p252 prints VT1 (level 1) on standard day 7, same layout as p250/p251. **p244 deload day 5
+  opens with "1 x SKILL: Secondary push":** printed. Treating it as the lighter day is ours (p218 defines SKILL and DE
+  separately).

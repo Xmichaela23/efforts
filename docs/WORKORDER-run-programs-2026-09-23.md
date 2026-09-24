@@ -78,6 +78,11 @@ separate later item, saved on branch `worktree-agent-a0a867e464367783c`. Everyth
 
 ## Stage 3 — Trails: Strength + Ultramarathon (p254–256)
 
+**⏸ TABLED BY MICHAEL (2026-09-24) as later work.** The pages are transcribed in `SOURCE-viada-hybrid-athlete.md` Part E6, and
+every open question has a page answer in Part E9. His ruling for when it resumes: everything the plan prints gets built,
+even if the app lacks it (new session types, Olympic lifts); no scheduled deload (every deload in the book names a cause).
+
+
 - Read p254 (the table) — not yet transcribed. p255: reduced lifting ("running strength"), hill-focused MLSS/NT
   intervals when terrain demands (uphill work / downhill later), long "strategy sessions" in race kit with fuelling;
   p256 not yet read. New endurance families or archetypes are likely (hill repeats, strategy session) — check
@@ -85,6 +90,11 @@ separate later item, saved on branch `worktree-agent-a0a867e464367783c`. Everyth
 - Words: the Trails section's card.
 
 ## Stage 4 — Get faster: The Runner: Pivot (p258–259) and The Speed Solution: Pivot (p276–277)
+
+**⏸ TABLED BY MICHAEL (2026-09-24) as later work.** The pages are transcribed in `SOURCE-viada-hybrid-athlete.md` Parts E7–E8, and
+every open question has a page answer in Part E9. His ruling for when it resumes: everything the plan prints gets built,
+even if the app lacks it (new session types, Olympic lifts); no scheduled deload (every deload in the book names a cause).
+
 
 - Both are pivots: running-first, lifting in support; the Speed Solution is 4–6 weeks and "highly experienced runners
   may regress aerobically if they stay longer" (Part E0). A block with an END is new for the standing-plan builder —
