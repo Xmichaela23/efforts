@@ -321,6 +321,28 @@ export function usesTwoDumbbellsOnKit(name: string, equipment: string[] | null |
   return first != null && first.includes('dumbbells');
 }
 
+/** The keys that put weight in the athlete's hands, in the order a route names them. */
+const IMPLEMENT_KEYS: readonly GearKey[] = ['machine', 'barbell', 'dumbbells', 'kettlebell', 'cable', 'bands'];
+
+/**
+ * ⛔ WHAT THIS KIT HOLDS THE MOVEMENT WITH (2026-09-24, the arms superset). The same route the name and the "each"
+ * mark are read from: the machine when the kit owns one, else the first route of `gearRoutesFor` the kit reaches,
+ * reduced to its loading key. `null` for an undeclared kit, an untagged movement, a route the kit does not reach, or
+ * a route that loads nothing (bodyweight). `usesTwoDumbbellsOnKit` above and `executionName` walk the routes the
+ * same way; this only names the implement so the composer can ask two rows whether they share one.
+ */
+export function implementOnKit(name: string, equipment: string[] | null | undefined): GearKey | null {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return null;
+  const routes = gearRoutesFor(name);
+  if (routes.length === 0) return null;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  const station = routes.find((r) => r.includes('machine') && r.every((k) => keys.has(k)));
+  const route = station ?? routes.find((r) => r.every((k) => keys.has(k)));
+  if (!route) return null;
+  return IMPLEMENT_KEYS.find((k) => route.includes(k)) ?? null;
+}
+
 /** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
 export function builderReaches(name: string, equipment: string[] | null | undefined): boolean {
   return reachable(name, equipment);
@@ -683,9 +705,23 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
     { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
   ],
   // ⛔ THE DUMBBELL SKULL CRUSHER (Michael, 2026-09-18): the lying dumbbell extension, folded into p222's skull crushers.
+  // ⛔ AND THE ROW SAYS WHAT IT IS HELD WITH, ON EVERY KIT (Michael, 2026-09-24, `docs/WORKORDER-arms-superset-
+  // implement-2026-09-24.md`): the arms superset is built on one implement — dumbbells when the kit has them, the bar
+  // only when it does not (`strength-gear.ts` route order) — and the three p222 arm movements a kit could do either
+  // way carry it in the name, the way Strong and Hevy do ("Skullcrusher (Dumbbell)"). "DB", the catalogue's own form
+  // (`db bench press`, `DB Romanian Deadlift`; `strength/shown-name.ts`). Dumbbells first: `byRoute` takes the first
+  // entry the kit reaches. The canonical name underneath is unchanged, so logged history keys as before.
   'skull crusher': [
-    { route: ['barbell'], value: 'Skull Crusher' },
-    { route: ['dumbbells'], value: 'Dumbbell Skull Crusher' },
+    { route: ['dumbbells'], value: 'DB Skull Crusher' },
+    { route: ['barbell'], value: 'Barbell Skull Crusher' },
+  ],
+  'drag curl': [
+    { route: ['dumbbells'], value: 'DB Drag Curl' },
+    { route: ['barbell'], value: 'Barbell Drag Curl' },
+  ],
+  'spider curl': [
+    { route: ['dumbbells', 'incline_bench'], value: 'DB Spider Curl' },
+    { route: ['barbell', 'incline_bench'], value: 'Barbell Spider Curl' },
   ],
   // ⛔ ON A DUMBBELL KIT, THE DUMBBELL VERSION BY THAT NAME (Michael, 2026-09-18); with a barbell, his name.
   'stiff legged deadlift': [
@@ -1082,11 +1118,13 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
   'skater hops': { text: 'Stand with your feet hip-width apart. Leap sideways to the right and land lightly on your right foot, knee bent, swinging your left leg behind your right. Push off your right foot and leap to the left, landing on your left foot and swinging your right leg behind you. Swing your arms with each leap.',
     source: 'Jesse Zucker, CPT / BarBend, "The 12 Best Cardiovascular Exercises" (Skater) — https://barbend.com/best-cardiovascular-exercises/' },
   // ⛔ TWO ROUTES SINCE 2026-09-18 (Michael): the dumbbell skull crusher is the lying dumbbell extension, ACE's words.
+  // ⚠️ DUMBBELLS FIRST (2026-09-24), the same order as the name in `EXECUTION_NAME`, so a barbell + dumbbell kit reads
+  // the dumbbell how-to under "DB Skull Crusher". Same two texts.
   'skull crusher': [
-    { route: ['barbell'], value: { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
-      source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' } },
     { route: ['dumbbells'], value: { text: 'Lie on your back with your knees bent and feet on the floor, a dumbbell in each hand and your arms straight up over your chest. Bend your elbows to lower the dumbbells toward your ears, keeping your shoulders still. Straighten your arms to bring the dumbbells back up.',
       source: 'ACE, Sabrena Jo, "Tone Up Your Triceps with These Three Exercises" — https://www.acefitness.org/resources/everyone/blog/4930/tone-up-your-triceps-with-these-three-exercises/' } },
+    { route: ['barbell'], value: { text: 'Lie on a flat bench holding a barbell or dumbbells above your chest with your arms straight. Bend only your elbows to lower the weight toward your forehead, then straighten your arms to lift it back up. Keep your upper arms still.',
+      source: 'ExRx, "Barbell Lying Triceps Extension" — https://exrx.net/WeightExercises/Triceps/BBLyingTriExt' } },
   ],
   'sled pull': { text: 'Put on a shoulder harness attached to the sled and face away from it. Lean forward and walk or run forward with short, quick steps, heels off the ground. Keep your back flat.',
     source: 'ExRx, "Sled Pull" — https://exrx.net/WeightExercises/Power/WTPullSprint' },

@@ -856,7 +856,15 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
 
   // ── focused arms: two ways into most of them ───────────────────────────────────────────────────
   'tate press': [['dumbbells', 'bench']],
-  'skull crusher': [['barbell', 'bench'], ['dumbbells', 'bench']],
+  // ⛔ DUMBBELLS LEAD THE SKULL CRUSHER AND THE DRAG CURL (Michael, 2026-09-24 — `docs/WORKORDER-arms-superset-
+  // implement-2026-09-24.md`): his Upper Pull day built "Skull Crusher + Drag Curl" on a barbell + dumbbell kit and
+  // neither row said what it is held with. The FIRST ROUTE is what the kit resolves to (`executionName`,
+  // `usesTwoDumbbellsOnKit`, `equipmentFitRank` all read it), so the order IS the rule for these two: their dumbbell
+  // form when the kit has dumbbells, the bar only when it does not. OURS — the page (p222) prints "skull crushers" and "drag curls" with
+  // no implement. Field: Strong and Hevy name the implement in the exercise ("Skullcrusher (Dumbbell)" /
+  // "(Barbell)"); the published skull-crusher superset is dumbbell or EZ bar with a curl, and a lying + standing pair
+  // cannot share one straight bar. Ledger: `docs/STATE-SOURCES.md` (2026-09-24).
+  'skull crusher': [['dumbbells', 'bench'], ['barbell', 'bench']],
   // ⛔ A PREACHER CURL NEEDS A PREACHER BENCH (2026-09-10, Michael's home-gym block prescribed one).
   // The tag read `[['barbell', 'bench'], ['dumbbells', 'bench']]` — a FLAT bench — so every athlete
   // who ticked "Bench (flat/adjustable)" reached it, and the composer led his day-4 arm cell with it.
@@ -883,7 +891,8 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // `strength-equipment-tier.test.ts` ("Bench (flat/adjustable)" IS NOT INCLINE CAPABILITY) is the
   // law.
   'spider curl': [['dumbbells', 'incline_bench'], ['barbell', 'incline_bench']],
-  'drag curl': [['barbell'], ['dumbbells']],
+  // ⚠️ DUMBBELLS FIRST — the same 2026-09-24 rule as the skull crusher above.
+  'drag curl': [['dumbbells'], ['barbell']],
 
 };
 

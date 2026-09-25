@@ -80,8 +80,11 @@ import { localDateInTz } from './local-date.ts';
 // 29 (2026-09-24): rides build for the road (docs/SPEC-outdoor-rides-2026-09-24.md) — the rotation walks road shapes
 //   unless the slot carries venue:trainer; a ride's easy-spin warm-up carries `lap_button` so Garmin holds it until the
 //   press (docs/WORKORDER-outdoor-ride-matching-2026-09-24.md).
+// 30 (2026-09-24): the arms superset never puts both movements on the barbell; a kit with dumbbells does the skull crusher
+//   and the drag curl with dumbbells (`weight_per: 'each'`), and the skull crusher, drag curl and spider curl say what
+//   they are held with (DB Skull Crusher / Barbell Drag Curl) (docs/WORKORDER-arms-superset-implement-2026-09-24.md).
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 29;
+export const PLAN_WRITER_VERSION = 30;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

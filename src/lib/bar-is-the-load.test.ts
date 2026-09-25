@@ -43,6 +43,18 @@ Deno.test('the kit decides where the routes are ambiguous', () => {
   assertEquals(barIsTheLoad('Preacher Curl', null), false);
 });
 
+Deno.test('⛔ THE ARMS SUPERSET (2026-09-24): dumbbells where the kit has them, the bar only where it does not', () => {
+  const BB_DB = ['Barbell', 'Dumbbells', 'Bench (flat/adjustable)'];
+  const BB = ['Barbell', 'Bench (flat/adjustable)'];
+  const DB = ['Dumbbells', 'Bench (flat/adjustable)'];
+  for (const n of ['Skull Crusher', 'Drag Curl']) {
+    assertEquals(barIsTheLoad(n, BB_DB), false, `${n}: dumbbells lead, no bar chip`);
+    assertEquals(barIsTheLoad(n, DB), false, `${n}: no bar to speak of`);
+    assertEquals(barIsTheLoad(n, GYM), false, `${n}: a gym has dumbbells`);
+    assertEquals(barIsTheLoad(n, BB), true, `${n}: the bar is the only way to load it`);
+  }
+});
+
 Deno.test('the four tested lifts are on a bar', () => {
   for (const n of ['Back Squat', 'Bench Press', 'Deadlift', 'Overhead Press']) assertEquals(barIsTheLoad(n, GYM), true, n);
 });

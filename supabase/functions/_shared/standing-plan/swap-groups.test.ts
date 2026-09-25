@@ -79,9 +79,11 @@ Deno.test('⛔ ONE NAME PER MOVEMENT ON A KIT (Michael, 2026-09-18)', () => {
 Deno.test('⛔ "EACH" ON TWO-DUMBBELL ROWS ONLY (Michael, 2026-09-18)', async () => {
   const { usesTwoDumbbellsOnKit } = await import('../strength-grid/grid.ts');
   const HOME_DB = ['Dumbbells', 'Bench (flat/adjustable)'];
-  // The dumbbell skull crusher logs per dumbbell; at a gym it is the barbell one, one total.
+  // The dumbbell skull crusher logs per dumbbell — on every kit with dumbbells since 2026-09-24 (the arms superset is
+  // built on dumbbells where the kit has them, `strength-gear.ts` route order); a bar-only kit keeps one total.
   assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', HOME_DB), true);
-  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', GYM), false);
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', GYM), true);
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', ['Barbell', 'Bench (flat/adjustable)']), false);
   // Dumbbell-only movements read "each" on any kit.
   assertEquals(usesTwoDumbbellsOnKit('DB Bench Press', GYM), true);
   assertEquals(usesTwoDumbbellsOnKit('Seated DB Press', null), true);

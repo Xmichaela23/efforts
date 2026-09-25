@@ -35,8 +35,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -63,8 +63,8 @@ WEEK 02  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -85,8 +85,8 @@ WEEK 02  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -112,8 +112,8 @@ WEEK 03  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -134,8 +134,8 @@ WEEK 03  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -161,8 +161,8 @@ WEEK 04  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -183,8 +183,8 @@ WEEK 04  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -210,8 +210,8 @@ WEEK 05  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -232,8 +232,8 @@ WEEK 05  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -259,8 +259,8 @@ WEEK 06  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -281,8 +281,8 @@ WEEK 06  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -308,8 +308,8 @@ WEEK 07  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -330,8 +330,8 @@ WEEK 07  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -357,8 +357,8 @@ WEEK 08  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -379,8 +379,8 @@ WEEK 08  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -406,8 +406,8 @@ WEEK 09  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -428,8 +428,8 @@ WEEK 09  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -455,8 +455,8 @@ WEEK 10  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -477,8 +477,8 @@ WEEK 10  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -504,8 +504,8 @@ WEEK 11  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -526,8 +526,8 @@ WEEK 11  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
@@ -553,8 +553,8 @@ WEEK 12  column=standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
       DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
       HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -575,8 +575,8 @@ WEEK 12  column=standard
       ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
       DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
+      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
       HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)

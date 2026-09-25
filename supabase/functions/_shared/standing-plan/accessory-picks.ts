@@ -34,6 +34,7 @@ import {
   bandRouteName,
   hipThrustStandIn,
   builderReaches,
+  implementOnKit,
   STAND_INS,
   type GridMovement,
   type ViadaCategory,
@@ -1128,6 +1129,21 @@ export function focusedArmFit(pattern: string, inSuperset: boolean, name: string
 }
 
 /**
+ * ⛔ THE ARMS SUPERSET NEVER PUTS BOTH MOVEMENTS ON THE BARBELL, AND NEVER A SKULL CRUSHER ON THE STRAIGHT BAR
+ * (Michael, 2026-09-24, `docs/WORKORDER-arms-superset-implement-2026-09-24.md`; PM refinement the same day). A lying
+ * and a standing movement cannot share one bar, and the straight-bar skull crusher is not the standard. So a
+ * barbell-held option ranks behind every other in the two "(arms)" rows; cable, machine, bench-station and dumbbell
+ * pairings are left exactly as picked (a gym's Triceps Pushdown + Preacher Curl stands). Where the kit has dumbbells
+ * the skull crusher and the drag curl are already their dumbbell form (`strength-gear.ts` route order), so this key
+ * only bites on a kit with a bar and no dumbbells (below the plan's minimum kit of barbell + rack + dumbbells; not
+ * designed for — a bar-only kit reads the bar on both rows). OURS — the page prints the pair and names no implement. A
+ * sort, not a filter.
+ */
+export function armsOnTheBar(name: string, equipment: string[] | null | undefined): number {
+  return implementOnKit(name, equipment) === 'barbell' ? 1 : 0;
+}
+
+/**
  * Whether this frame prints the "(arms)" superset in the pick's cell — p274 does on days 1 and 4; p246's focused
  * rows are not a superset, so the arms ordering never reaches that frame.
  */
@@ -2028,7 +2044,9 @@ export function defaultPickFor(
   // ⛔ p274's "(arms)" superset (2026-09-10): the pick answers the pair first, so its default is arm work.
   const armsSlot = VIADA_PICKS[key].slot;
   if (armsSlot?.pattern && frameHasArmsSuperset(key, frame)) {
-    const arm = opts.find((o) => focusedArmFit(String(armsSlot.pattern), true, o.name) === 0);
+    const arms = opts.filter((o) => focusedArmFit(String(armsSlot.pattern), true, o.name) === 0);
+    // ⛔ OFF THE BARBELL FIRST (2026-09-24, `armsOnTheBar`) — the same key the composer sorts on.
+    const arm = arms.find((o) => armsOnTheBar(o.name, equipment) === 0) ?? arms[0];
     if (arm) return arm.name;
   }
   return opts[0].name;

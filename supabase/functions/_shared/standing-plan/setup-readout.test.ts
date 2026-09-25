@@ -43,7 +43,8 @@ Deno.test('⛔ Build focus: Ride + Strength at a home kit reads as the screen di
   assertEquals(sled.options.map((o) => o.label), ['Farmers Carry', 'Sled Push', 'Sled Pull']);
   assertEquals(sled.default, 'farmers carry');
   const pull = b.groups[0].rows[1];
-  assertEquals(pull.options.map((o) => o.label), ['Bent-Over Dumbbell Rear Delt Fly', 'Concentration Curl', 'Drag Curl']); // the home pullover left 2026-09-18 (p220 DB pullover)
+  // The home pullover left 2026-09-18 (p220 DB pullover); the drag curl says its implement since 2026-09-24.
+  assertEquals(pull.options.map((o) => o.label), ['Bent-Over Dumbbell Rear Delt Fly', 'Concentration Curl', 'DB Drag Curl']);
 });
 
 Deno.test('⛔ Build focus: Run + Ride + Strength day 5 carries the day-2 superset line', () => {

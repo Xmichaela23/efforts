@@ -51,6 +51,7 @@ import {
   VIADA_PICKS,
   type ViadaPickKey,
   focusedArmFit,
+  armsOnTheBar,
   frameHasArmsSuperset,
 } from './accessory-picks.ts';
 import {
@@ -1645,6 +1646,9 @@ function exerciseForSlot(
       const rank = (name: string): number[] => [
         isTaken(name) ? 1 : 0,
         armsCell ? focusedArmFit(pattern, inSuperset, name) : 0,
+        // ⛔ NEVER BOTH ON THE BARBELL, NEVER A SKULL CRUSHER ON THE STRAIGHT BAR (2026-09-24, `armsOnTheBar`): a
+        // barbell-held option ranks last in the two "(arms)" rows; every other pairing stands as picked.
+        armsCell && inSuperset ? armsOnTheBar(name, args.equipment ?? null) : 0,
         his.has(canonicalize(name)) ? 0 : 1,
         carryLeadRank(name),
         demoteBodyweight && isBodyweightLoad(name) ? 1 : 0,
