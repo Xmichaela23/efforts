@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, Repeat, Info } from 'lucide-react';
 import { repFloorFor, repsAreBlank } from '@/lib/logged-rep-entry';
+// ⛔ THE ROW'S ENTRY RULES (2026-09-24, WORKORDER-logger-set-entry §1–2): what Next walks, what the check fills.
+import { checkFillFor, keypadChainAfter, type CheckFillInput, type KeypadField, type SetBoxes } from '@/lib/logger-set-entry';
 import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ THE SWAP LIST IS THE SERVER'S (2026-09-18, the Stage C follow-up): `swap-list` returns what the plan builder
@@ -880,16 +882,39 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // D-351: `band` writes the BAND LOAD IN POUNDS onto `resistance_level` — the field that held
   // "Light"/"Moderate"/"Heavy" until 2026-08-01. One field, two encodings, and the server's
   // `bandLoadLb` is the single place that reads both (history is deliberately not migrated).
-  type KeypadField = 'reps' | 'weight' | 'rir' | 'band';
-  const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean } | null>(null);
+  // `KeypadField` is `@/lib/logger-set-entry`'s (2026-09-24) — the chain rule there names the same four fields.
+  /**
+   * ⛔ NEXT, NOT SAVE + CLOSE (2026-09-24, WORKORDER-logger-set-entry §1). A box's keypad carries the boxes
+   * after it on the same row (`next`, built by the row from what it drew — `keypadChainAfter`). The confirm
+   * reads "Next" while there is one, commits the box and opens the next one in the same sheet; on the last
+   * box it reads "Save", commits and closes. The row's check stays a separate tap: it is the athlete's "done"
+   * and it starts the rest, as in Strong and Hevy. Drag-down and tap-outside still close without saving.
+   * ⚠️ EVERY BRANCH RENDERS THROUGH ONE GRID — standing-plan rows, the baseline test, the week-12 retest,
+   * accessories, bodyweight, assist-capable, per-side and plyo rows — so the chain is computed per row from
+   * the columns that row drew, never from the movement name.
+   */
+  /**
+   * ⛔ THE KEYPAD IS A NUMBER KEYBOARD AND THE BOX IS ITS DISPLAY (2026-09-24, ruled mid-build): a panel of
+   * keyboard height, no title, no display line, no Save or Close row. The number being typed is drawn live in
+   * the row's own cell (`keypadTarget` is state, not a ref, so the row re-renders with it); the plates key on a
+   * bar-loaded weight box toggles the same plate math the row's chip does; the row being edited is scrolled
+   * above the panel (`setRowRefs`). `title` survives only as the panel's screen-reader name.
+   */
+  type KeypadStep = { field: KeypadField; title: string; initialValue: string; allowDecimal?: boolean; hint?: string; plates?: boolean };
+  const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean; next?: KeypadStep[] } | null>(null);
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [keypadTitle, setKeypadTitle] = useState<string>('');
   const [keypadValue, setKeypadValue] = useState<string>('');
   const [keypadAllowDecimal, setKeypadAllowDecimal] = useState<boolean>(false);
-  const [keypadConfirmLabel, setKeypadConfirmLabel] = useState<string>('Save');
-  const [keypadSecondaryLabel, setKeypadSecondaryLabel] = useState<string | undefined>(undefined);
   const [keypadHint, setKeypadHint] = useState<string | undefined>(undefined);
-  const keypadSecondaryHandlerRef = useRef<(() => void) | undefined>(undefined);
+  const [keypadTarget, setKeypadTarget] = useState<{ exerciseId: string; setIndex: number; field: KeypadField; plates: boolean } | null>(null);
+  const setRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const closeKeypad = () => {
+    setKeypadOpen(false);
+    setKeypadTarget(null);
+    keypadCtxRef.current = null;
+    setKeypadHint(undefined);
+  };
   // D-134: inline RIR confirm-on-Done. When Done is tapped on a set with no RIR yet, we
   // surface a quick confirm-or-adjust RIR selector on that set's card (suggested value
   // pre-highlighted, one tap to accept) instead of opening the numeric keypad. RIR stays
@@ -972,27 +997,46 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     title: string;
     initialValue: string;
     allowDecimal?: boolean;
-    confirmLabel?: string;
-    secondaryLabel?: string;
-    onSecondary?: () => void;
     alsoComplete?: boolean;
     hint?: string;
+    /** The boxes after this one on the same row, in order (§1). Empty or absent: Next commits and closes. */
+    next?: KeypadStep[];
+    /** The plates key — a weight box whose bar is the load (the row's own chip gate). */
+    plates?: boolean;
   }) => {
+    const next = opts.next && opts.next.length > 0 ? opts.next : undefined;
     keypadCtxRef.current = {
       exerciseId: opts.exerciseId,
       setIndex: opts.setIndex,
       field: opts.field,
       alsoComplete: opts.alsoComplete,
+      next,
     };
     setKeypadTitle(opts.title);
     setKeypadValue(opts.initialValue);
     setKeypadAllowDecimal(Boolean(opts.allowDecimal));
-    setKeypadConfirmLabel(opts.confirmLabel || 'Save');
-    setKeypadSecondaryLabel(opts.secondaryLabel);
     setKeypadHint(opts.hint);
-    keypadSecondaryHandlerRef.current = opts.onSecondary;
+    setKeypadTarget({ exerciseId: opts.exerciseId, setIndex: opts.setIndex, field: opts.field, plates: opts.plates === true });
     setKeypadOpen(true);
   };
+
+  // ⛔ THE ROW BEING EDITED STAYS ABOVE THE PANEL (2026-09-24). When a box opens, if the panel would cover its
+  // row, the row scrolls to the middle of the screen; the list gets panel-height padding while the keypad is
+  // open so the last rows can get there too.
+  useEffect(() => {
+    if (!keypadOpen || !keypadTarget) return;
+    const row = setRowRefs.current[`${keypadTarget.exerciseId}-${keypadTarget.setIndex}`];
+    if (!row) return;
+    const id = window.setTimeout(() => {
+      try {
+        const panel = document.querySelector('[data-keypad-panel]') as HTMLElement | null;
+        const panelH = panel?.getBoundingClientRect().height || 280;
+        const r = row.getBoundingClientRect();
+        if (r.bottom > window.innerHeight - panelH - 8 || r.top < 0) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {}
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [keypadOpen, keypadTarget]);
 
   // Keep performed date in sync with external targetDate changes (e.g., user tapped a different calendar day).
   useEffect(() => {
@@ -1005,7 +1049,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const commitKeypad = (rawOverride?: string) => {
     const ctx = keypadCtxRef.current;
     if (!ctx) {
-      setKeypadOpen(false);
+      closeKeypad();
       return;
     }
 
@@ -1058,7 +1102,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       updateSet(ctx.exerciseId, ctx.setIndex, { rir: rirVal, ...(ctx.alsoComplete ? { completed: true } : null) });
     }
 
-    setKeypadOpen(false);
+    // §1: "Next" — the box is committed above; the same sheet now opens the row's next box. The step's initial
+    // value was read by the row when the first box was tapped; it is another field's number, so the commit
+    // above did not move it. The last box's confirm ("Save") falls through and closes.
+    const [step, ...rest] = ctx.next ?? [];
+    if (step) {
+      openKeypadForSet({ exerciseId: ctx.exerciseId, setIndex: ctx.setIndex, ...step, next: rest });
+      return;
+    }
+    closeKeypad();
   };
   
   // Session RPE prompt state
@@ -3670,11 +3722,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch {}
   };
 
-  const handleSetComplete = (exerciseId: string, setIndex: number) => {
+  /**
+   * ⛔ THE CHECK FILLS AN EMPTY BOX FROM ITS GREY NUMBER (2026-09-24, WORKORDER-logger-set-entry §2; Michael's
+   * Drag Curl set 1 went in as 10 reps and no weight). `entry` is what the row drew — its boxes and the grey
+   * number each empty box shows — passed by the one caller (the row's check). `checkFillFor` decides: a number
+   * shown is written with the completion; a band ("6-12"), a total, "AMRAP" or nothing under an empty reps box
+   * blocks the check and opens the reps keypad, as the 2026-08-13 blank-set rule already did.
+   * ⚠️ AN EMPTY RIR BOX IS NOT FILLED HERE. The adjust strip below (`setRirConfirm`) already opens on the check
+   * for a set with no reserve, and on a row with a number placeholder the reserve seed is already saved with
+   * `rir_autofilled` — that strip IS the prompt; a keypad on top of it would be a second ask.
+   * ⚠️ THE FILL RIDES ON THE COMPLETION WRITE (`completeSet`), not on a write of its own: `updateSet` maps over
+   * this render's `exercises`, so two calls in one tap would keep only the second.
+   */
+  const handleSetComplete = (exerciseId: string, setIndex: number, entry?: { fill: CheckFillInput; openRepsKeypad: () => void }) => {
     const exercise = exercises.find(ex => ex.id === exerciseId);
-    const set = exercise?.sets[setIndex];
-    
-    if (!exercise || !set) return;
+    const setAsDrawn = exercise?.sets[setIndex];
+
+    if (!exercise || !setAsDrawn) return;
+
+    const checked = entry ? checkFillFor(entry.fill) : null;
+    const fill: Partial<LoggedSet> = checked?.fill ?? {};
+    // The set as it will be saved — the pretest branch reads the weight, and a filled one is the one it reads.
+    const set: LoggedSet = { ...setAsDrawn, ...fill };
+    const completeSet = (extra: Partial<LoggedSet> = {}) => updateSet(exerciseId, setIndex, { ...fill, ...extra, completed: true });
 
     // If THIS set's RIR adjust strip is open, Done CLOSES it (keeps the saved set + suggested RIR).
     // Checked BEFORE the toggle-off below so Done dismisses the strip instead of un-completing the set.
@@ -3696,7 +3766,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     // If mobility mode, just mark as complete without RIR prompt
     if (isMobilityMode) {
-      updateSet(exerciseId, setIndex, { completed: true });
+      completeSet();
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -3718,19 +3788,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // ⚠️ AND A TYPED ZERO IS NOT BLANK (2026-08-26). On the heavy slot a zero the athlete entered is
     // the failed attempt — a real result the progression reads — so it completes like any other count.
     // An untouched or cleared cell still cannot be ticked, which is what the 2026-08-13 fix was for.
-    const repsBlank = repsAreBlank(set);
-    if (repsBlank && set.setType !== 'warmup'
-        && set.duration_seconds === undefined && !isDurationLogged(exercise.name)) {
-      openKeypadForSet({
-        exerciseId,
-        setIndex,
-        field: 'reps',
-        title: 'Reps',
-        initialValue: '',
-        allowDecimal: false,
-        hint: 'Add the rep count to mark this set done.',
-      });
-      return;
+    // 2026-09-24 (§2): the row's own answer first — it knows what the reps box shows. A number shown was
+    // written into `fill` above; a band, a total, "AMRAP" or nothing blocks and opens the reps keypad, with
+    // the same hint and, from there, Next to the RIR box. The inline test below is the fallback for a caller
+    // that passed no `entry`; there is none today (the row's check is the only caller).
+    if (checked) {
+      if (checked.block === 'reps') {
+        entry!.openRepsKeypad();
+        return;
+      }
+    } else {
+      const repsBlank = repsAreBlank(set);
+      if (repsBlank && set.setType !== 'warmup'
+          && set.duration_seconds === undefined && !isDurationLogged(exercise.name)) {
+        openKeypadForSet({
+          exerciseId,
+          setIndex,
+          field: 'reps',
+          title: 'Reps',
+          initialValue: '',
+          allowDecimal: false,
+          hint: 'Add the rep count to mark this set done.',
+        });
+        return;
+      }
     }
 
     /**
@@ -3762,7 +3843,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const done = exercises.map((ex) => {
         if (ex.id !== exerciseId) return ex;
         const sets = [...ex.sets];
-        sets[setIndex] = { ...sets[setIndex], completed: true, prefilled: false, from_previous: false };
+        // `fill` (§2): a grey weight the row showed over an empty box rides on this write too; `weight_lb` is
+        // cleared with it, the way `updateSet` clears it for a weight saved from the box.
+        sets[setIndex] = { ...sets[setIndex], ...fill, ...('weight' in fill ? { weight_lb: undefined } : {}), completed: true, prefilled: false, from_previous: false };
         return { ...ex, sets };
       });
       setExercises(done);
@@ -3798,7 +3881,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
-      updateSet(exerciseId, setIndex, { completed: true });
+      completeSet();
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -3809,7 +3892,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // (Michael, on device). Just complete — no RIR autofill, no confirm strip. The populate computes the
     // result from weight×reps (AMRAP) or the count (rep-max); neither gates on RIR. (Q-097 / Q-102)
     if (set.amrap === true || set.repMaxTest === true) {
-      updateSet(exerciseId, setIndex, { completed: true });
+      completeSet();
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -3848,10 +3931,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const durationToRecord = (typeof set.duration_seconds === 'number' && set.duration_seconds > 0)
         ? set.duration_seconds
         : prescribed;
-      updateSet(exerciseId, setIndex, {
-        completed: true,
-        ...(durationToRecord ? { duration_seconds: durationToRecord } : {}),
-      });
+      completeSet(durationToRecord ? { duration_seconds: durationToRecord } : {});
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -3865,7 +3945,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Done just completes the set. `rir_tracked === false` is stamped by materialize off the
     // protocol profile — see `protocolUsesRir`. Every other protocol keeps the strip below.
     if (exercise.rir_tracked === false) {
-      updateSet(exerciseId, setIndex, { completed: true });
+      completeSet();
       autoStartRestForSet(exerciseId, setIndex);
       return;
     }
@@ -3895,7 +3975,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // 2026-09-18: a p218 row saves no reserve on Done — the page gives a band, not a number in it.
     const suggestedRir = typeof exercise.reserve_seed === 'number' ? exercise.reserve_seed : null;
     if (suggestedRir == null) {
-      updateSet(exerciseId, setIndex, { completed: true });
+      completeSet();
       autoStartRestForSet(exerciseId, setIndex);
       if (set.setType !== 'warmup') setRirConfirm({ exerciseId, setIndex });
       return;
@@ -3903,7 +3983,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // D-203: auto-saved with the SUGGESTED RIR, not an observed signal. Mark it so
     // e1RM + RIR-adherence exclude it; the adjust strip below clears the flag if the
     // athlete taps a real number.
-    updateSet(exerciseId, setIndex, { rir: suggestedRir, completed: true, rir_autofilled: true });
+    completeSet({ rir: suggestedRir, rir_autofilled: true });
     autoStartRestForSet(exerciseId, setIndex);
     if (set.setType !== 'warmup') setRirConfirm({ exerciseId, setIndex });
   };
@@ -4502,7 +4582,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     >
     <div 
       className="flex-1 overflow-y-auto pb-4 overscroll-contain"
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      // Room under the list for the number keyboard, so the row being edited can scroll above it (2026-09-24).
+      style={{ WebkitOverflowScrolling: 'touch', ...(keypadOpen ? { paddingBottom: 'calc(300px + env(safe-area-inset-bottom, 0px))' } : {}) }}
     >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
@@ -5592,6 +5673,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                    */
                   const exOpenRepBand = /^\d+\s*[-–]\s*\d+$/.test(String(exercise.target_reps ?? '').trim());
                   const exRepsLeft = exRepTotal != null ? repsRemaining(exRepTotal, exercise.sets) : 0;
+                  // §3 (2026-09-24): once per exercise, where the per-set line carried them — see the block under `advanceNudge`.
+                  const wordsLine = exIsPlyo ? null : (exercise.prescription_words ?? null);
+                  const perSideLine = (exPerSide && !exIsPlyo && !exHasRepTotal && exercise.target_reps)
+                    ? `target ${String(exercise.target_reps).replace(/\+$/, '')} per side${exercise.rir_tracked !== false && exercise.reserve_text ? ` · ${exercise.reserve_text} in reserve` : ''}`
+                    : null;
 
                   return (
                     <>
@@ -5636,6 +5722,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {advanceNudge && (
                         <div className="px-1.5 pb-2 text-caption text-label-secondary leading-snug">
                           {advanceNudge}
+                        </div>
+                      )}
+                      {/* §3 (2026-09-24): two things the per-set target line used to carry, each printed ONCE here instead —
+                          a row prescribed in words (the p226 carry: its words ARE its target) and "per side" on a unilateral
+                          row (the 2026-09-17 words, which the server's intent line does not carry). Same treatment as the
+                          nudge above. */}
+                      {wordsLine && (
+                        <div className="px-1.5 pb-2 text-caption text-label-secondary leading-snug">
+                          {wordsLine}
+                        </div>
+                      )}
+                      {perSideLine && (
+                        <div className="px-1.5 pb-2 text-caption text-label-secondary leading-snug">
+                          {perSideLine}
                         </div>
                       )}
                       {/* Rep-total countdown (option A) — a prominent number + progress bar, its own
@@ -5725,7 +5825,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // sitting on its rule exactly as before — the box grows upward, the ink does
                         // not move — and the grid switches to `alignItems: end` so every cell, the set
                         // index and the Previous column all share the one baseline.
-                        const numCls = `w-full h-11 flex items-end justify-center whitespace-nowrap bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
+                        const numClsBase = 'w-full h-11 flex items-end justify-center whitespace-nowrap bg-transparent border-0 border-b-[1.5px] pb-1.5 text-center tabular-nums leading-none transition-colors';
+                        const numCls = `${numClsBase} ${done ? `${rowAccent.underline} ${rowAccent.num}` : 'border-white/25 text-white'}`;
+                        // ⛔ THE BOX IS THE KEYPAD'S DISPLAY (2026-09-24): the cell being typed into draws the live number on a
+                        // brighter underline; the other cells are untouched. `keypadValue` empty shows the cell's own placeholder.
+                        const editingField: KeypadField | null = (keypadOpen && keypadTarget && keypadTarget.exerciseId === exercise.id && keypadTarget.setIndex === setIndex)
+                          ? keypadTarget.field : null;
+                        const cellCls = (field: KeypadField) => (editingField === field ? `${numClsBase} border-white/80 text-white` : numCls);
+                        const liveText = (field: KeypadField): string | null => (editingField === field && keypadValue.length > 0 ? keypadValue : null);
                         // One step down the type scale under 400 px (`--set-num-size`, index.css) so "245.5" and "12-15" fit.
                         const numStyle: React.CSSProperties = { fontSize: 'var(--set-num-size, var(--type-body))'};
                         // D-097 / D-406: a value that came from the previous session or from the
@@ -5770,6 +5877,63 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           if (Object.keys(patch).length > 0) updateSet(exercise.id, setIndex, patch);
                         };
 
+                        /**
+                         * ⛔ THE BOXES THIS ROW DREW, AND THE STEPS NEXT WALKS (2026-09-24, WORKORDER-logger-set-entry §1–2).
+                         * Read off the same gates the cells below render with — `exShowWeight`, `exIsAssistCapable`, `exEquip`,
+                         * `exShowRir`, the reps cell's own "no cell" test — so the chain, the check and the grid cannot disagree.
+                         * Every branch passes through here: standing-plan rows, the baseline test, the week-12 retest,
+                         * accessories, bodyweight, assist-capable, per-side, plyo and holds.
+                         */
+                        // 2026-09-03 (Michael: "shouldn't 2-4 be greyed in there?"): a planned set with a rep target shows it
+                        // greyed in the box, the way the weight and the reserve already do. Tap to type.
+                        const repTargetGhost = (!exIsPlyo && exercise.target_reps) ? String(exercise.target_reps).replace(/\+$/, '') : null;
+                        // ⚠️ A TYPED ZERO SHOWS AS 0 — it is the failed attempt, a real result
+                        // the progression reads, and rendering it empty would make the one
+                        // session that undoes a jump look like a set nobody touched.
+                        const repsEntered = set.reps_entered === true;
+                        // The reps cell is a keypad box unless it is a hold's clock or the "until" row's empty span (`renderRepsCell`).
+                        const repsBoxShown = !isDurationBased
+                          && !(set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal && !exOpenRepBand && !repTargetGhost);
+                        const rirBoxShown = exShowRir && !isDurationBased;
+                        const loadBox: SetBoxes['load'] = !exShowWeight ? null
+                          : exIsAssistCapable ? 'assist'
+                          : exEquip === 'band' ? 'band'
+                          : (isDurationBased && !isLoadedDurationExercise(exercise.name)) ? null
+                          : 'weight';
+                        const boxes: SetBoxes = { load: loadBox, reps: repsBoxShown, rir: rirBoxShown };
+                        // The one keypad step per box, as the box's own tap opens it — used by the tap and by Next alike.
+                        const repsStep: KeypadStep = {
+                          field: 'reps', title: 'Reps', allowDecimal: false,
+                          initialValue: ((exIsPlyo && !repsEntered) || (set.reps === 0 && !repsEntered)) ? '' : String(set.reps ?? ''),
+                        };
+                        const rirStep: KeypadStep = {
+                          field: 'rir', title: 'RIR (reps in reserve)', allowDecimal: false,
+                          initialValue: (set.rir === undefined || set.rir === null) ? '' : String(set.rir),
+                        };
+                        const stepsAfter = (from: KeypadField): KeypadStep[] =>
+                          keypadChainAfter(boxes, from).map((f) => (f === 'reps' ? repsStep : rirStep));
+                        // §2: what the check knows — the boxes and the grey number each empty box shows (`checkFillFor`).
+                        const checkFill: CheckFillInput = {
+                          boxes,
+                          weightEmpty: !(typeof set.weight === 'number' && set.weight > 0),
+                          // The grey suggestion is drawn by the plain weight cell only (D-406, `renderWeightCell`).
+                          weightGhost: loadBox === 'weight' ? suggestedGhostWeight(exercise, set) : null,
+                          repsBlank: repsAreBlank(set),
+                          // The empty reps cell shows the target, except on an AMRAP set, where it shows "AMRAP" (`renderRepsCell`).
+                          repsPlaceholder: set.amrap ? null : repTargetGhost,
+                          isTest: set.amrap === true || set.repMaxTest === true || exIsBaselineTest,
+                          isWarmup,
+                          isDuration: isDurationBased || isDurationLogged(exercise.name),
+                        };
+                        const checkEntry = {
+                          fill: checkFill,
+                          // The reps keypad a blocked check opens: the 2026-08-13 hint, then Next to the RIR box where there is one.
+                          openRepsKeypad: () => openKeypadForSet({
+                            exerciseId: exercise.id, setIndex, ...repsStep, initialValue: '',
+                            hint: 'Add the rep count to mark this set done.', next: stepsAfter('reps'),
+                          }),
+                        };
+
                         const renderWeightCell = () => {
                           if (!exShowWeight) return null;
                           // ⛔ ASSIST-CAPABLE (dips, chin-ups, pull-ups): band help and added weight
@@ -5791,24 +5955,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     initialValue: assistNum == null ? '' : String(assistNum),
                                     allowDecimal: true,
                                     hint: exUnit === 'kg' ? 'Kilograms of help from the band or machine. Leave blank if none.' : 'Pounds of help from the band or machine. Leave blank if none.',
+                                    next: stepsAfter('band'), // §1: assist → Next → reps (the added-weight half is skipped: the two exclude each other)
                                   })}
-                                  className={`${numCls} flex-1 min-w-0`}
+                                  className={`${cellCls('band')} flex-1 min-w-0`}
                                   style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                                   aria-label={exUnit === 'kg' ? 'Assist in kilograms' : 'Assist in pounds'}
                                 >
-                                  {assistNum == null ? <span className="text-label-secondary">−</span> : `-${assistNum}`}
+                                  {liveText('band') != null ? `-${liveText('band')}` : assistNum == null ? <span className="text-label-secondary">−</span> : `-${assistNum}`}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => openKeypadForSet({
                                     exerciseId: exercise.id, setIndex, field: 'weight', title: 'Added weight',
                                     initialValue: added == null ? '' : String(added), allowDecimal: true,
+                                    next: stepsAfter('weight'), // §1: added weight → Next → reps
                                   })}
-                                  className={`${numCls} flex-1 min-w-0`}
+                                  className={`${cellCls('weight')} flex-1 min-w-0`}
                                   style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                                   aria-label="Added weight"
                                 >
-                                  {added == null ? <span className="text-label-secondary">+</span> : `+${added}`}
+                                  {liveText('weight') != null ? `+${liveText('weight')}` : added == null ? <span className="text-label-secondary">+</span> : `+${added}`}
                                 </button>
                               </div>
                             );
@@ -5826,12 +5992,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   exerciseId: exercise.id, setIndex, field: 'band', title: exUnit === 'kg' ? 'Band (kg)' : 'Band (lb)',
                                   initialValue: bandNum == null ? '' : String(bandNum),
                                   allowDecimal: true, hint: exUnit === 'kg' ? BAND_KG_HINT : BAND_LB_HINT,
+                                  next: stepsAfter('band'), // §1: band load → Next → reps
                                 })}
-                                className={numCls}
+                                className={cellCls('band')}
                                 style={numStyle}
                                 aria-label={exUnit === 'kg' ? 'Band kilograms' : 'Band pounds'}
                               >
-                                {bandNum == null ? <span className="text-label-secondary">—</span> : String(bandNum)}
+                                {liveText('band') ?? (bandNum == null ? <span className="text-label-secondary">—</span> : String(bandNum))}
                               </button>
                             );
                           }
@@ -5854,14 +6021,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   title: exEquip === 'dumbbell' ? 'Weight (per hand)' : 'Weight',
                                   initialValue: String(ghost ?? (set.weight === 0 ? '' : (set.weight ?? ''))),
                                   allowDecimal: true,
+                                  next: stepsAfter('weight'), // §1: weight → Next → reps → Next → RIR
+                                  plates: !isDurationBased && !exIsBodyweight && exBarLoaded, // the row's own plates-chip gate
                                 })}
-                                className={numCls}
+                                className={cellCls('weight')}
                                 style={numStyle}
                                 aria-label="Weight"
                               >
-                                <span className={(set.from_previous && !done) || ghost != null ? ghostCls : undefined}>
-                                  {shownW}
-                                </span>
+                                {liveText('weight') != null
+                                  ? <span>{liveText('weight')}</span>
+                                  : <span className={(set.from_previous && !done) || ghost != null ? ghostCls : undefined}>
+                                      {shownW}
+                                    </span>}
                               </button>
                             </div>
                           );
@@ -5902,16 +6073,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           // this branch and rendered NO REPS FIELD AT ALL — the athlete had
                           // nowhere to type, so the one signal the whole progression reads could
                           // not be entered on those rows.
-                          // 2026-09-03 (Michael: "shouldn't 2-4 be greyed in there?"): a planned set with a rep target shows it
-                          // greyed in the box, the way the weight and the reserve already do. Tap to type.
-                          const repTargetGhost = (!exIsPlyo && exercise.target_reps) ? String(exercise.target_reps).replace(/\+$/, '') : null;
-                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal && !exOpenRepBand && !repTargetGhost) {
+                          // `repTargetGhost` and `repsEntered` are the row's (above, 2026-09-24) — the check and Next read them too.
+                          if (!repsBoxShown) {
                             return <span aria-hidden="true" />;
                           }
-                          // ⚠️ A TYPED ZERO SHOWS AS 0 — it is the failed attempt, a real result
-                          // the progression reads, and rendering it empty would make the one
-                          // session that undoes a jump look like a set nobody touched.
-                          const repsEntered = set.reps_entered === true;
                           // ⛔ A DRILL'S EFFORTS CELL OPENS EMPTY (Michael 2026-09-02: "4 what?"). The plan's `reps` on a
                           // plyo row is a capacity, not a prescription; showing it reads as a target.
                           const shown = (exIsPlyo && !repsEntered)
@@ -5922,19 +6087,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           return (
                             <button
                               type="button"
-                              onClick={() => openKeypadForSet({
-                                exerciseId: exercise.id,
-                                setIndex,
-                                field: 'reps',
-                                title: 'Reps',
-                                initialValue: ((exIsPlyo && !repsEntered) || (set.reps === 0 && !repsEntered)) ? '' : String(set.reps ?? ''),
-                                allowDecimal: false,
-                              })}
-                              className={numCls}
+                              // §1: reps → Next → RIR where the row has an RIR box; else Save.
+                              onClick={() => openKeypadForSet({ exerciseId: exercise.id, setIndex, ...repsStep, next: stepsAfter('reps') })}
+                              className={cellCls('reps')}
                               style={numStyle}
                               aria-label="Reps"
                             >
-                              <span className={set.from_previous && !done ? ghostCls : undefined}>
+                              {liveText('reps') != null ? <span>{liveText('reps')}</span> : <span className={set.from_previous && !done ? ghostCls : undefined}>
                                 {/* An open set and a set someone forgot to fill in looked
                                     identical, and the session was logged wrong because of it. The
                                     placeholder sits where the eyes already are. */}
@@ -5943,7 +6102,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   : (shown === '' || shown === '—')
                                     ? (repTargetGhost && !done ? <span className={ghostCls}>{repTargetGhost}</span> : (shown === '' ? '\u00a0' : shown))
                                     : shown}
-                              </span>
+                              </span>}
                             </button>
                           );
                         };
@@ -5955,19 +6114,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           return (
                             <button
                               type="button"
-                              onClick={() => openKeypadForSet({
-                                exerciseId: exercise.id,
-                                setIndex,
-                                field: 'rir',
-                                title: 'RIR (reps in reserve)',
-                                initialValue: (set.rir === undefined || set.rir === null) ? '' : String(set.rir),
-                                allowDecimal: false,
-                              })}
-                              className={numCls}
+                              // §1: the last box — its confirm is Save; it commits and closes. The check stays a separate tap.
+                              onClick={() => openKeypadForSet({ exerciseId: exercise.id, setIndex, ...rirStep, next: stepsAfter('rir') })}
+                              className={cellCls('rir')}
                               style={{ ...numStyle, fontSize: 'var(--type-subhead)' }}
                               aria-label="RIR"
                             >
-                              {hasValue
+                              {liveText('rir') != null ? <span>{liveText('rir')}</span> : hasValue
                                 ? <span className={set.from_previous && !done ? ghostCls : undefined}>{set.rir >= 5 ? '5+' : set.rir}</span>
                                 : <span className={exercise.reserve_text ? 'text-strength font-medium' : 'text-label-secondary'}>{exercise.reserve_text ?? '—'}</span>}
                             </button>
@@ -6003,25 +6156,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                          * suppression is deliberate (a per-set line read as "50 on this set"), and
                          * the reserve is not worth reinstating it for. Noted, not built.
                          */
-                        // 2026-09-18: the band p218 gives (HYP 0 to 2), from the one formatter the plan uses.
-                        const rirText = (!set.amrap && exercise.rir_tracked !== false) ? (exercise.reserve_text ?? null) : null;
-                        const rirHint = rirText ? `${rirText} in reserve` : null;
+                        /**
+                         * ⛔ ONE COPY OF THE TARGET (2026-09-24, WORKORDER-logger-set-entry §3). The per-set line under every
+                         * unlogged set — "target 6-12 · 0 to 2 in reserve" (`targetHint`) — came off. The header's `intent_line`
+                         * prints the reps, the reserve and the tempo words once, and the boxes carry "6-12" and "0 to 2" as
+                         * placeholders (`repTargetGhost`, `reserve_text`); Strong and Hevy print the target once, in the box.
+                         * What the line also carried, and where each piece is now:
+                         *   · `advanceNudge` — its own line under the header, unchanged;
+                         *   · the ME sentence — the header's `intent_line` (p218, p219), unchanged;
+                         *   · the test-day hint — `set.setHint`, its own line on the test row, unchanged;
+                         *   · the AMRAP set's "AMRAP · 5 minimum" — still above that one set (`amrapLine`, below): it is the
+                         *     flagged set's own instruction, not the exercise's target repeated;
+                         *   · a row prescribed in words (`prescription_words`, the p226 carry) — once under the header (`wordsLine`);
+                         *   · "per side" on a unilateral row — once under the header (`perSideLine`), the 2026-09-17 words.
+                         */
                         // An AMRAP with no target prints nothing (2026-09-10, audit H-S17): the "5" had no source.
-                        const repHint = set.amrap
-                          ? (exercise.target_reps ? `AMRAP · ${String(exercise.target_reps).replace(/\+$/, '')} minimum` : null)
-                          : (exHasRepTotal
-                            ? null
-                            : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}${exPerSide ? ' per side' : ''}` : null));
-                        // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — its words are the target line.
-                        const targetHint = exIsPlyo ? null : (exercise.prescription_words
-                          ?? ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null));
-                        const cue: string | null = null; // the bar-speed lines are gone (2026-09-18)
+                        const amrapLine = (set.amrap && !exIsPlyo && exercise.target_reps)
+                          ? `AMRAP · ${String(exercise.target_reps).replace(/\+$/, '')} minimum` : null;
                         const platesOpen = !isDurationBased && !exIsBodyweight && exBarLoaded
                           && expandedPlates[`${exercise.id}-${setIndex}`];
 
                         return (
                           <div
                             key={setIndex}
+                            ref={(el) => { setRowRefs.current[`${exercise.id}-${setIndex}`] = el; }}
                             // `py-1`, down from `py-2` (2026-08-27): the number cells now carry 44px
                             // of their own height, so the container's padding is no longer what makes
                             // the row tappable — it is only separation, and 8px of it was the row
@@ -6064,12 +6222,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                             {/* AMRAP's instruction sits ABOVE its set — mirroring how the bar-speed
                                 cue sits above the exercise (Michael 2026-08-11). */}
-                            {set.amrap && (targetHint || cue) && (
+                            {amrapLine && (
                               // No horizontal padding here — the set container already adds px-1.5, so
                               // this lands flush with the bar-speed cue above the exercise (which has
                               // its own px-1.5 and no container). Same vertical line as "SET".
                               <div className="pt-0.5 pb-2 text-caption font-medium text-strength leading-snug">
-                                {[targetHint, cue].filter(Boolean).join(' — ')}
+                                {amrapLine}
                               </div>
                             )}
 
@@ -6102,7 +6260,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               {/* The ONLY boxed element on the row — it is the action. */}
                               <button
                                 type="button"
-                                onClick={() => handleSetComplete(exercise.id, setIndex)}
+                                onClick={() => handleSetComplete(exercise.id, setIndex, checkEntry)} // §2: the row hands the check what it drew
                                 className={`h-8 w-8 rounded-lg border-2 flex items-center justify-center transition-colors ${done ? rowAccent.checkOn : 'border-white/25 bg-white/[0.04] hover:border-white/45'}`}
                                 aria-label={done ? `Mark set ${setIndex + 1} not done` : `Mark set ${setIndex + 1} done`}
                                 aria-pressed={done}
@@ -6128,13 +6286,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 directly under the LB cell (Michael 2026-08-11). Accessory rep-total
                                 target on the left; plates centered under the weight; timed-work control
                                 under weight/reps. AMRAP's own instruction renders ABOVE the row. */}
-                            {((targetHint && !set.amrap && exercise.rir_tracked !== false) || (!isDurationBased && !exIsBodyweight && exBarLoaded) || isDurationBased) && (
+                            {/* §3 (2026-09-24): the per-set target line that sat in columns 1–3 here came off — see `amrapLine`. */}
+                            {((!isDurationBased && !exIsBodyweight && exBarLoaded) || isDurationBased) && (
                               <div style={gridStyle} className="pt-1.5 pb-0.5">
-                                {targetHint && !set.amrap && exercise.rir_tracked !== false && (
-                                  <span style={{ gridColumn: '1 / 4' }} className="text-caption font-medium text-label-secondary leading-snug">
-                                    {targetHint}
-                                  </span>
-                                )}
                                 {!isDurationBased && !exIsBodyweight && exBarLoaded && (
                                   <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }} className="flex items-center gap-1.5">
                                     <button
@@ -6270,8 +6424,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </div>
                                 <PlateMath
                                   step={platePlanForSets(
-                                    exercise.sets.map((x) => ({
-                                      weight: x.weight,
+                                    exercise.sets.map((x, i) => ({
+                                      // The number being typed, while this set's weight box is the keypad's display (2026-09-24).
+                                      weight: (i === setIndex && liveText('weight') != null) ? Number(liveText('weight')) : x.weight,
                                       barLoad: plateBarFor(exBarKeyFor(x.barType), exUnit ?? 'lb').load,
                                       bar: exBarKeyFor(x.barType),
                                     })),
@@ -6909,7 +7064,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </SheetContent>
       </Sheet>
 
-      {/* Numeric keypad sheet (reps / weight / RIR) */}
+      {/* The number keyboard (reps / weight / RIR / band) — the row's own box is its display (2026-09-24). */}
       <NumericKeypadSheet
         open={keypadOpen}
         title={keypadTitle}
@@ -6917,22 +7072,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         onChange={setKeypadValue}
         allowDecimal={keypadAllowDecimal}
         hint={keypadHint}
-        confirmLabel={keypadConfirmLabel}
-        secondaryLabel={keypadSecondaryLabel}
-        onSecondary={() => {
-          try {
-            keypadSecondaryHandlerRef.current?.();
-          } catch {}
-          setKeypadOpen(false);
-        }}
+        editKey={keypadTarget ? `${keypadTarget.exerciseId}-${keypadTarget.setIndex}-${keypadTarget.field}` : undefined}
+        plates={keypadTarget?.plates
+          ? { open: Boolean(expandedPlates[`${keypadTarget.exerciseId}-${keypadTarget.setIndex}`]), onToggle: () => togglePlateCalc(keypadTarget.exerciseId, keypadTarget.setIndex) }
+          : null}
         onConfirm={(raw) => commitKeypad(raw)}
         onOpenChange={(open) => {
-          setKeypadOpen(open);
-          if (!open) {
-            keypadSecondaryHandlerRef.current = undefined;
-            keypadCtxRef.current = null;
-            setKeypadHint(undefined);
-          }
+          if (open) setKeypadOpen(true);
+          else closeKeypad();
         }}
       />
 
