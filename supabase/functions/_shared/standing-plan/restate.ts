@@ -406,6 +406,9 @@ export function restateFromTest(args: {
       if (PLYO_DRILL_NAMES.has(nameOf(fresh)) && typeof fr.notes === 'string' && fr.notes !== er.notes) shape.notes = fr.notes;
       // …and so is its benefit line (2026-09-20): a drill row built before Today's (i) gets it on the next rebuild.
       if (PLYO_DRILL_NAMES.has(nameOf(fresh)) && (fr.benefit_line ?? null) !== (er.benefit_line ?? null)) shape.benefit_line = fr.benefit_line;
+      // ⛔ THE SET-COUNT LINE IS SHAPE (2026-09-25): stamped on the week the count moved, written as an absence on the
+      // next rebuild so it is gone (`sets_line`, `EARNED_SETS_EVERY_ROW_IS_OURS`).
+      if ((fr.sets_line ?? null) !== (er.sets_line ?? null)) shape.sets_line = fr.sets_line;
       if (shapeOnly) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;

@@ -68,6 +68,7 @@ import {
   applyEnduranceAdjustments,
   ENDURANCE_SLOT_PREFIX,
   enduranceSlotName,
+  isEnduranceAdjustment,
   optionsFromSwapTags,
   swapClassOf,
   trainerSlotsByWeek,
@@ -508,8 +509,29 @@ Deno.serve(async (req: Request) => {
      * on their calendar. Composing the probe with the earned counts would be circular.
      */
     const probe = composeBlock(composeBase);
+    // The calendar date of a block week's weekday — the stored rows say it; the block's Monday-anchored weeks otherwise.
+    const dateByWeekDay = new Map<string, string>();
+    for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
+      // ⛔ The plan's date, not a moved row's (`_shared/moved-from.ts`) — this maps the plan's slots.
+      if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(planDateOf(r))}`, planDateOf(r));
+    }
+    const dateOfSlot = (week: number, day: string) => dateByWeekDay.get(`${week}|${day}`) ?? null;
+    /**
+     * ⛔ THE ATHLETE'S LIFT SWAPS, FOR THE LADDER (2026-09-25). materialize-plan applies a rest-of-plan swap when it
+     * expands the row, so the calendar and the log carry the substitute while the composed row keeps the original;
+     * `earnedMeSets` resolves each composed row the same way (`resolveLiftSwap`, on the plan day) before matching.
+     */
+    const liftSwaps = await (async () => {
+      const { data } = await supabase.from('plan_adjustments')
+        .select('id, exercise_name, substitute_exercise_name, applies_from, applies_until, status, created_at')
+        .eq('user_id', userId).eq('status', 'active').not('substitute_exercise_name', 'is', null);
+      return ((data ?? []) as Array<{ exercise_name: string; substitute_exercise_name: string | null; applies_from: string; applies_until?: string | null; status: string; created_at?: string | null }>)
+        .filter((a) => !isEnduranceAdjustment(a));
+    })();
     const ladder = earnedMeSets({
       composed: probe,
+      liftSwaps,
+      dateOfSlot,
       // ⛔ A RETEST IS MEASURED, NOT EARNED (D-469's rule, applied to the mid-block retest): its all-out set
       // re-prices the block through `readTestWeek` and must not also read as a rung on that weekday.
       logged: joined.filter((r) => r.is_retest !== true),
@@ -519,6 +541,22 @@ Deno.serve(async (req: Request) => {
       // ⛔ A TEST-WEEK BLOCK TRAINED WEEK ONE BY FEEL; the probe re-prices it, the ladder must not read it.
       byFeelWeek: sp.test_skipped === true ? null : TEST_WEEK_INDEX,
     });
+    /**
+     * ⛔ THE DE, SKILL AND HYP COUNTS, OFF THE SAME READ (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`) — `earnedMeSets`
+     * extended, not a second reader. `from` is the count the last rebuild stored (`earned_sets_by_movement`), which is
+     * what the row's one-time line is measured against; null on the first rebuild reads as the band's low end.
+     */
+    const earnedBefore = (sp.earned_sets_by_movement && typeof sp.earned_sets_by_movement === 'object')
+      ? sp.earned_sets_by_movement as Record<string, number> : {};
+    const earnedSets: Record<string, { sets: number; from: number | null }> = {};
+    for (const [key, sets] of Object.entries(ladder.setsByMovement ?? {})) {
+      const before = Number(earnedBefore[key]);
+      earnedSets[key] = { sets, from: Number.isFinite(before) ? before : null };
+    }
+    // ⛔ A SWAPPED ROW IS COMPOSED UNDER THE ORIGINAL NAME: it takes the substitute's count (`composedAliases`).
+    for (const [composedKey, movementKey] of Object.entries(ladder.composedAliases ?? {})) {
+      if (earnedSets[movementKey] && !earnedSets[composedKey]) earnedSets[composedKey] = earnedSets[movementKey];
+    }
 
     /**
      * ⛔ THE EARNED BAR REACHES THE REMAINING WEEKS HERE (item 7, 2026-08-26) — and it is the SAME
@@ -587,13 +625,6 @@ Deno.serve(async (req: Request) => {
         else { migrated = inserts.length; swaps = await loadSwaps(); }
       }
     }
-    // The calendar date of a block week's weekday — the stored rows say it; the block's Monday-anchored weeks otherwise.
-    const dateByWeekDay = new Map<string, string>();
-    for (const r of (plannedRows ?? []) as Record<string, unknown>[]) {
-      // ⛔ The plan's date, not a moved row's (`_shared/moved-from.ts`) — this maps the plan's slots.
-      if (typeof r.week_number === 'number' && r.date) dateByWeekDay.set(`${r.week_number}|${weekdayOfDate(planDateOf(r))}`, planDateOf(r));
-    }
-    const dateOfSlot = (week: number, day: string) => dateByWeekDay.get(`${week}|${day}`) ?? null;
     const trainerSlots = trainerSlotsByWeek(probe, swaps, dateOfSlot);
 
     const composed = composeBlock({
@@ -606,6 +637,9 @@ Deno.serve(async (req: Request) => {
       // so a working block stops looking frozen, and the logger's rep cell opens on it instead of on
       // the top of the band — the phantom five-rep session that used to move the bar.
       ...(Object.keys(ladder.lastReps).length > 0 ? { meLastRepsByPattern: ladder.lastReps } : {}),
+      // ⛔ THE OTHER THREE ROWS' EARNED COUNTS, FROM THE WEEK AFTER THE LIVE ONE (2026-09-25). The live week keeps
+      // the count it is being trained against; the counts reach the unstarted weeks on this rebuild.
+      ...(Object.keys(earnedSets).length > 0 ? { earnedSetsByMovement: earnedSets, earnedSetsFromWeek: currentWeek + 1 } : {}),
     });
 
     /**
@@ -733,6 +767,8 @@ Deno.serve(async (req: Request) => {
         // ⛔ WHAT THE BAR HAS EARNED AND OFF WHAT — the same rule the set ladder ships under. A
         // surface offering the athlete this diff has to be able to say why a weight moved early.
         me_bar: { by_pattern: ladder.bar, state: ladder.barState, last_reps: ladder.lastReps },
+        // ⛔ WHAT THE OTHER THREE ROWS HAVE EARNED AND OFF WHAT (2026-09-25) — the same rule the two above ship under.
+        earned_sets: { by_movement: ladder.setsByMovement, history: ladder.setHistory },
       });
     }
 
@@ -809,6 +845,9 @@ Deno.serve(async (req: Request) => {
             // re-derives it from logged history on every restate, so a stale value here can never
             // prescribe a weight.
             me_bar_offsets_by_pattern: Object.keys(ladder.bar).length > 0 ? ladder.bar : null,
+            // ⛔ WHAT THE DE, SKILL AND HYP MOVEMENTS HAVE EARNED, ON THE SAME TERMS (2026-09-25): provenance, and the
+            // `from` the next rebuild's one-time line is measured against. The composition re-derives it every time.
+            earned_sets_by_movement: Object.keys(ladder.setsByMovement ?? {}).length > 0 ? ladder.setsByMovement : null,
             /**
              * ⛔ THE FIVE WEEKLY NUMBERS, REFRESHED OFF THE WEEKS THIS RESTATE JUST COMPOSED.
              *

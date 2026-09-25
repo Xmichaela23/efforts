@@ -9,8 +9,8 @@
 // `rematerialize-standing-block`'s own law requires — *"it proposes; it does not silently write."*
 // ============================================================================
 
-import type { ComposedWeek, MeRowIndex } from './compose.ts';
-import { LOWER_PATTERNS, ME_SETS_BAND } from './compose.ts';
+import type { ComposedWeek, MeRowIndex, SetRowIndex } from './compose.ts';
+import { earnedSetsKey, LOWER_PATTERNS, ME_SETS_BAND } from './compose.ts';
 import {
   advanceStep,
   BAR_LADDER_START,
@@ -18,15 +18,18 @@ import {
   barSessionSignal,
   meLadderStep,
   meSessionOutcome,
+  setSessionOutcome,
   type BarLadderState,
   type BarSessionSignal,
   type LoggedMeSet,
   type MeLadderState,
   type MeSessionOutcome,
 } from './progression.ts';
-import { prescribe, type ViadaPattern } from '../strength-grid/index.ts';
+import { prescribe, rirBandFor, type ViadaPattern } from '../strength-grid/index.ts';
+import { canonicalize } from '../canonicalize.ts';
 import { weekdayOf } from './restate.ts';
 import { planDateOf } from '../moved-from.ts';
+import { resolveLiftSwap, type LiftSwapAdjustment } from '../session-swap/lift-swap.ts';
 
 /**
  * ⚠️ DB shape, deliberately loose — a completed strength workout joined to its planned week.
@@ -82,6 +85,21 @@ export type MeLadderReading = {
   }[]>>;
   /** ⛔ ME rows the reader found no logged session for. Silence holds; saying so is not optional. */
   unread: number;
+  /**
+   * ⛔ WHAT EACH DE, SKILL AND HYP MOVEMENT HAS EARNED (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`) — the same
+   * ladder, walked per movement and intent (`earnedSetsKey`) off the same three-key match. Only a movement with a
+   * logged session appears; every other row is the band's low end by omission. `composeWeek` reads it through
+   * `earnedSetsByMovement`.
+   */
+  setsByMovement: Record<string, number>;
+  /** Per movement and intent, the sessions read and what each was. Provenance, never a decision. */
+  setHistory: Record<string, { week: number; day: string; movement: string; intent: 'DE' | 'SKILL' | 'HYP'; outcome: MeSessionOutcome }[]>;
+  /**
+   * ⛔ THE COMPOSED ROW'S KEY → THE KEY THE ATHLETE'S HISTORY IS UNDER, where a lift swap renamed the row (2026-09-25).
+   * The count is stored under the movement the athlete did (the substitute); the composer still names the row the
+   * original, so the caller hands it the substitute's count under the composed key too.
+   */
+  composedAliases: Record<string, string>;
 };
 
 // ── THE DELOAD TRIGGER — a SECOND QUESTION over the reading above ───────────────────────────────
@@ -340,9 +358,29 @@ export function earnedMeSets(args: {
    * that; the caller says which week was by feel. `null` when the block priced week one (Use current).
    */
   byFeelWeek?: number | null;
+  /**
+   * ⛔ THE ATHLETE'S LIFT SWAPS, READ ON THE COMPOSED ROW THE WAY MATERIALIZE-PLAN READS THEM (2026-09-25). A rest-of-plan
+   * swap (`plan_adjustments`, `resolveLiftSwap`) renames the calendar row and the athlete's log to the substitute while
+   * the composed row keeps the original, so a name-keyed match never saw those sessions — the swapped movement never
+   * earned or lost a set, on the ME ladder as well. The composed row is resolved to the substitute on its plan day
+   * (`dateOfSlot`) before the index is built, and the count is kept under the movement the athlete did.
+   * ⚠️ A swap on the day it was tapped (before expansion applied it) and a typed "just today" rename reach the log as
+   * `name` = the substitute with `substituted_for` = the planned name; that field is the fallback key below.
+   * ⚠️ NOT COVERED: a rename by `substituteExerciseForEquipment` at expansion (the kit changed after the build). Position
+   * on the day was the other candidate and was refused: the logger drops a row with no sets at save, so positions shift.
+   */
+  liftSwaps?: LiftSwapAdjustment[] | null;
+  /** The plan date of a block week's weekday, for the swap window. Absent = no swap is resolved. */
+  dateOfSlot?: ((week: number, day: string) => string | null) | null;
 }): MeLadderReading {
   const band = ME_SETS_BAND;
   const repBand = meRepBand();
+  const composedAliases: Record<string, string> = {};
+  const swapOf = (movement: string, week: number, day: string): string | null => {
+    if (!args.liftSwaps?.length || !args.dateOfSlot) return null;
+    const date = args.dateOfSlot(week, day);
+    return date ? resolveLiftSwap(movement, args.liftSwaps, { date }) : null;
+  };
 
   const index = new Map<string, MeRowIndex>();
   for (const wk of args.composed) {
@@ -356,15 +394,43 @@ export function earnedMeSets(args: {
        * ME band, copied from a set that was never prescribed. Skip the row; the test week's own read
        * (`readTestWeek`) is where those sets are measured.
        */
+      /**
+       * ⛔ A SWAPPED ME ROW IS READ UNDER THE SUBSTITUTE'S NAME (2026-09-25). Its weight is the ORIGINAL lift's number
+       * and materialize-plan re-prices the substitute off its own reference, so there is no number here for a logged
+       * set to fall short of: `weight: null`, read (not skipped — the by-feel skip below is for the unpriced week).
+       */
+      const swapped = swapOf(row.movement, row.week, row.day);
+      if (swapped) {
+        index.set(`${row.week}|${row.day}|${swapped.toLowerCase()}`, { ...row, movement: swapped, weight: null, swapped: true } as MeRowIndex & { swapped: true });
+        continue;
+      }
       if (row.weight == null) continue;
       if (args.byFeelWeek != null && row.week === args.byFeelWeek) continue;
       index.set(`${row.week}|${row.day}|${row.movement.toLowerCase()}`, row);
     }
   }
 
+  /**
+   * ⛔ THE DE, SKILL AND HYP ROWS, ON THE SAME THREE KEYS (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`) — one reader,
+   * extended, not a second one. Keyed on the canonical name because the stored row's name is the movement's label
+   * (`rowDisplayName`), which differs from the composer's movement in case only. ⚠️ No by-feel guard: these rows
+   * are read on reps and reserve, never on a weight, so a week composed unpriced is still evidence.
+   */
+  const setIndex = new Map<string, SetRowIndex>();
+  for (const wk of args.composed) {
+    for (const row of wk.setRows ?? []) {
+      if (row.week > args.throughWeek) continue;
+      // ⛔ A SWAPPED ROW IS INDEXED UNDER THE SUBSTITUTE (2026-09-25), and the composed name is aliased to it.
+      const swapped = swapOf(row.movement, row.week, row.day);
+      if (swapped) composedAliases[earnedSetsKey(row.movement, row.intent)] = earnedSetsKey(swapped, row.intent);
+      setIndex.set(`${row.week}|${row.day}|${canonicalize(swapped ?? row.movement)}`, swapped ? { ...row, movement: swapped } : row);
+    }
+  }
+  const setSeen: { row: SetRowIndex; outcome: MeSessionOutcome }[] = [];
+
   // ⚠️ THE RAW SETS TRAVEL WITH THE ROW. The set ladder reads an OUTCOME and the bar ladder reads the
   // reps themselves against a different threshold, so one walk feeds two mechanisms off one match.
-  type Seen = { row: MeRowIndex; outcome: MeSessionOutcome; sets: LoggedMeSet[] };
+  type Seen = { row: MeRowIndex; outcome: MeSessionOutcome; sets: LoggedMeSet[]; onAnotherBar?: boolean };
   const seen: Seen[] = [];
   const matched = new Set<string>();
 
@@ -381,19 +447,46 @@ export function earnedMeSets(args: {
     if (!day) continue;
     const exercises = Array.isArray(wkRow?.strength_exercises) ? wkRow.strength_exercises : [];
     for (const ex of exercises as Record<string, unknown>[]) {
-      const key = `${week}|${day}|${String(ex?.name ?? '').trim().toLowerCase()}`;
-      const row = index.get(key);
-      if (!row) continue;
-      matched.add(key);
+      const loggedName = String(ex?.name ?? '').trim();
+      /**
+       * ⛔ THE LOGGER'S OWN DECLARATION IS THE FALLBACK KEY (2026-09-25). A swap on the day it was tapped, or a typed
+       * "just today" rename, is logged as `name` = the movement done with `substituted_for` = the planned name
+       * (`StrengthLogger`, Q-181). The row is found under the planned name and the count kept under the name done.
+       */
+      const declared = typeof ex?.substituted_for === 'string' && ex.substituted_for.trim() ? ex.substituted_for.trim() : null;
+      const key = `${week}|${day}|${loggedName.toLowerCase()}`;
+      const declaredKey = declared ? `${week}|${day}|${declared.toLowerCase()}` : null;
+      const row = index.get(key) ?? (declaredKey ? index.get(declaredKey) : undefined);
+      if (!row) {
+        // ⛔ NOT AN ME ROW — a DE, SKILL or HYP row on the same day, read on reps and reserve (2026-09-25).
+        const setRow = setIndex.get(`${week}|${day}|${canonicalize(loggedName)}`)
+          ?? (declared ? setIndex.get(`${week}|${day}|${canonicalize(declared)}`) : undefined);
+        if (!setRow) continue;
+        const q = prescribe(setRow.intent, 'barbell');
+        if (q.kind !== 'barbell') continue;
+        if (canonicalize(setRow.movement) !== canonicalize(loggedName)) {
+          composedAliases[earnedSetsKey(setRow.movement, setRow.intent)] = earnedSetsKey(loggedName, setRow.intent);
+        }
+        setSeen.push({
+          row: canonicalize(setRow.movement) === canonicalize(loggedName) ? setRow : { ...setRow, movement: loggedName },
+          outcome: setSessionOutcome({ sets: setsOf(ex), prescribedSets: setRow.sets, repBand: q.reps, rirBand: rirBandFor(setRow.intent) }),
+        });
+        continue;
+      }
+      matched.add(index.has(key) ? key : (declaredKey as string));
       const sets = setsOf(ex);
+      // ⛔ A SWAP IS A DIFFERENT BAR: the set ladder reads it, the bar ladder does not (2026-09-25). A jump earned on a
+      // substitute at its own weight must not move the pattern's heavy bar. `row.weight` is null on a swapped row.
+      const onAnotherBar = (row as MeRowIndex & { swapped?: boolean }).swapped === true || (!index.has(key) && declaredKey != null);
       seen.push({
-        row,
+        row: onAnotherBar && row.movement.toLowerCase() !== loggedName.toLowerCase() ? { ...row, movement: loggedName } : row,
         sets,
+        onAnotherBar,
         outcome: meSessionOutcome({
           sets,
           prescribedSets: row.sets,
           repBand,
-          prescribedWeight: row.weight,
+          prescribedWeight: onAnotherBar ? null : row.weight,
         }),
       });
     }
@@ -430,9 +523,9 @@ export function earnedMeSets(args: {
       LOWER_PATTERNS.includes(s.row.pattern),
       args.smallestPlatePairLb ?? null,
     );
-    const nextBar = barLadderStep(bars.get(s.row.pattern) ?? BAR_LADDER_START, {
-      sets: s.sets, repBand, stepLb,
-    });
+    const prevBar = bars.get(s.row.pattern) ?? BAR_LADDER_START;
+    // ⛔ A SWAPPED SESSION DOES NOT WALK THE BAR (2026-09-25) — see `onAnotherBar` above.
+    const nextBar = s.onAnotherBar ? prevBar : barLadderStep(prevBar, { sets: s.sets, repBand, stepLb });
     bars.set(s.row.pattern, nextBar);
 
     (history[s.row.pattern] ??= []).push({
@@ -440,7 +533,7 @@ export function earnedMeSets(args: {
       day: s.row.day,
       movement: s.row.movement,
       outcome: s.outcome,
-      bar: barSessionSignal(s.sets, repBand).signal,
+      bar: s.onAnotherBar ? 'no_evidence' : barSessionSignal(s.sets, repBand).signal,
       barOffsetLb: nextBar.offsetLb,
     });
   }
@@ -459,8 +552,28 @@ export function earnedMeSets(args: {
     if (st.recentReps.length > 0) lastReps[pattern] = st.recentReps;
   }
 
+  /**
+   * ⛔ THE OTHER THREE INTENTS WALK THE SAME LADDER, PER MOVEMENT (2026-09-25). `meLadderStep` with the intent's
+   * p218 band — the same function, the same two-in-a-row bar, the same hold on silence. Trained order, as above.
+   */
+  setSeen.sort((a, b) => (a.row.week - b.row.week)
+    || (DAY_ORDER.indexOf(a.row.day) - DAY_ORDER.indexOf(b.row.day)));
+  const setState = new Map<string, MeLadderState>();
+  const setHistory: MeLadderReading['setHistory'] = {};
+  for (const s of setSeen) {
+    const q = prescribe(s.row.intent, 'barbell');
+    if (q.kind !== 'barbell') continue;
+    const key = earnedSetsKey(s.row.movement, s.row.intent);
+    const cur = setState.get(key) ?? { sets: q.setsBand.lo, cleanRun: 0 };
+    setState.set(key, meLadderStep(cur, s.outcome, q.setsBand));
+    (setHistory[key] ??= []).push({ week: s.row.week, day: s.row.day, movement: s.row.movement, intent: s.row.intent, outcome: s.outcome });
+  }
+  const setsByMovement: Record<string, number> = {};
+  for (const [key, st] of setState) setsByMovement[key] = st.sets;
+
   return {
     sets, bar, barState, lastReps, history,
     unread: [...index.keys()].filter((k) => !matched.has(k)).length,
+    setsByMovement, setHistory, composedAliases,
   };
 }

@@ -52,6 +52,19 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
+## QUEUED (2026-09-25, Michael) — THE PROGRAM HAS NO OUTLINE OF ITSELF
+
+The block description now says how sets grow ("Every exercise starts at the low end of its set range…"),
+but nothing on screen gives the athlete the ranges that sentence refers to, or the shape of the week.
+Michael: "we don't really have range context … a bit of a real outline of the program itself that would
+sit in the weekly section that you get from the focus screen."
+
+What it is: one short outline, in the weekly section reached from the Focus screen, in the athlete's terms:
+the four lifting days and what each is for; the four row types as the cards label them (maximum effort,
+dynamic effort, skill, hypertrophy) with their rep range, reserve and set range from p218; the endurance
+sessions of the week. Facts only, said the way a person says them (memory: copy sounds spoken). Every
+number is p218's / the frame's page; nothing new. Copy through Michael.
+
 ## QUEUED (2026-09-18) — HEAVY LIFTERS GET SEVEN WARM-UP SETS OF FIVE
 
 Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb squat or 400 lb deadlift gets seven

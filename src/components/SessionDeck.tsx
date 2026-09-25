@@ -78,6 +78,8 @@ export type LiftCardRow = {
   key: string; name: string; kind: string | null; cues: string[]; meta: string | null; rows: number;
   /** What opens behind the (i) beside the name — a plyo drill's benefit (`today-lines.ts`), or null. */
   info: string | null;
+  /** The server's set-count line(s) (`sets_line`, 2026-09-25), the week the row's count moved. Usually empty. */
+  notes: string[];
 };
 
 /**
@@ -102,6 +104,7 @@ export function liftCardRowsFor(session: TodayRow, useImperial: boolean): LiftCa
         meta: unique.length > 0 ? unique.join(' · ') : null,
         rows: line.rows.length,
         info: line.info,
+        notes: line.notes,
       };
     })
     .filter((c) => c.name);
@@ -418,6 +421,10 @@ export const LiftSessionCard: React.FC<{
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
             {showWords && c.cues.map((cue) => (
               <div key={cue} className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{cue}</div>
+            ))}
+            {/* server-word: the row's `sets_line` (2026-09-25) — the count moved this week; the phone prints it as sent. */}
+            {showWords && c.notes.map((note) => (
+              <div key={note} className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label)' }}>{note}</div>
             ))}
           </div>
         ))}

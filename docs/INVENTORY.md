@@ -547,7 +547,7 @@ no-deploy.**
 |---|---|
 | `copy.ts` | `swap-session` |
 | `library-session.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
-| `lift-swap.ts` | `materialize-plan` |
+| `lift-swap.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `rematerialize-standing-block` |
 | `plan-adjustments.ts` | `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
 | `resolve-write.ts` | `swap-session` |
 | `sheet.ts` | `swap-session` |

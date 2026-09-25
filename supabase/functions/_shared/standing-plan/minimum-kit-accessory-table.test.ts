@@ -323,5 +323,6 @@ Deno.test('⛔ PART C — every strength row on the minimum kit is performable o
     assert(canPerform(b.row.name, MIN), `${frame} week ${b.week} ${b.day}: ${shown(b.row)} (${b.row.name}) is not performable on the minimum kit`);
   }
   assert(rows > 900, `only ${rows} rows`);
-  assertEquals(PLAN_WRITER_VERSION, 31);
+  // 32 since 2026-09-25 (sets are earned on every row); this pin follows every bump.
+  assertEquals(PLAN_WRITER_VERSION, 32);
 });

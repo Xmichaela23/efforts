@@ -531,6 +531,14 @@ export const PAIN_TOLERANCE_NOTE =
   + 'clear; higher tolerance may bring little benefit or may even be bad for longer-term health.';
 
 /**
+ * ⛔ HOW THE SET COUNTS MOVE, SAID ONCE ON THE BLOCK (Michael's final words, 2026-09-25, approved;
+ * `EARNED_SETS_EVERY_ROW_IS_OURS`). Printed as approved; the set ranges and caps are p218's.
+ */
+export const SETS_EARNED_PARAGRAPH =
+  'Every exercise starts at the low end of its set range. Two sessions at the top of the rep range add a set, up to '
+  + 'its cap. One session under the range takes one off. The row shows the count.';
+
+/**
  * ⛔ THE PLAN'S OWN DESCRIPTION, OFF A COMPOSED BLOCK — ONE WRITER, TWO CALLERS (2026-09-19). The build
  * (`buildStandingPlanRow`) and the version refresh (`rematerialize-standing-block`, the same pass that rewrites the
  * sessions) both call this, so a plan built before a wording change gets the new wording on its next refresh.
@@ -621,6 +629,7 @@ function describeBlock(
         + 'on. Log those two and the weights fill in from there, including the rest of week one.'
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
+    SETS_EARNED_PARAGRAPH, // Michael 2026-09-25, approved
     PAIN_TOLERANCE_NOTE, // p125
     ...sourced,
   ].join(' ');

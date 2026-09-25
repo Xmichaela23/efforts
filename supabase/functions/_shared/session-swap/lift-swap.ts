@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { planDateOf } from '../moved-from.ts';
+import { canonicalize } from '../canonicalize.ts';
 
 export type LiftSwapAdjustment = {
   exercise_name: string;
@@ -24,7 +25,17 @@ export type LiftSwapAdjustment = {
   created_at?: string | null;
 };
 
-/** The substitute for `exerciseName` on the session `row`, or null. Name-matching and window rules as `applyAdjustment`. */
+/**
+ * ⛔ THE SWAP NAMES ONE MOVEMENT (2026-09-25): the adjustment's name and the row's name are the same movement by
+ * `canonicalize`, never by substring. The substring rule this replaced (`applyAdjustment`'s, since the first swap) made a
+ * rest-of-plan swap on "db bench press" rename that day's "Bench Press" too. `canonicalize` is the app's one owner of
+ * "the same movement" (plurals, synonyms, a trailing parenthetical).
+ */
+export function sameLift(a: string, b: string): boolean {
+  return canonicalize(String(a ?? '')) === canonicalize(String(b ?? ''));
+}
+
+/** The substitute for `exerciseName` on the session `row`, or null. Window rules as `applyAdjustment`; the name by `sameLift`. */
 export function resolveLiftSwap(
   exerciseName: string,
   adjustments: LiftSwapAdjustment[],
@@ -32,14 +43,12 @@ export function resolveLiftSwap(
 ): string | null {
   if (!adjustments.length) return null;
   const date = planDateOf(row) || new Date().toISOString().split('T')[0];
-  const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
   // ⛔ THE LATEST SWAP COVERING THE DATE WINS (2026-09-19): a "Just today" swap is a one-date row inside a "Rest of plan"
   // one's window, and it has to beat it on that date. Latest start, then latest made.
   const swap = adjustments.filter(adj => {
     if (adj.status !== 'active') return false;
     if (!adj.substitute_exercise_name) return false;
-    const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
-    if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
+    if (!sameLift(adj.exercise_name, exerciseName)) return false;
     if (adj.applies_from > date) return false;
     if (adj.applies_until && adj.applies_until < date) return false;
     return true;

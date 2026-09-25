@@ -32,6 +32,8 @@ export type TodayStrengthRow = {
   how_to?: string | null;
   /** A plyo drill's benefit alone (p227's table), written by the server; it opens behind the (i) beside the name. */
   benefit_line?: string | null;
+  /** The row's set count moved (2026-09-25): the server's line, on the week it moved and no later one. Printed as it is. */
+  sets_line?: string | null;
 };
 
 /** A planned or completed row as `get-week` hands it over. Only the fields this file reads. */
@@ -121,6 +123,8 @@ export type LiftLine = {
   key: string; movement: string; kind: string | null; cue: string | null;
   /** What opens behind the (i) beside the name — a plyo drill's benefit. Null on every other row. */
   info: string | null;
+  /** The server's set-count line (`sets_line`), the week the row's count moved. Null on every other row. */
+  note: string | null;
 };
 
 /**
@@ -151,10 +155,12 @@ export function liftLinesFor(
     // kit actually reaches, `name` is the key everything else matches on.
     const movement = String(ex?.execution_name || ex?.name || '').replace(/_/g, ' ').trim();
     const key = `${movement}:${i}`;
-    if (!movement) return { key, movement: '', kind: null, cue: null, info: null };
+    // server-word: the row's `sets_line` (2026-09-25) — the count moved; printed as sent.
+    const note = typeof ex?.sets_line === 'string' && ex.sets_line.trim() ? ex.sets_line.trim() : null;
+    if (!movement) return { key, movement: '', kind: null, cue: null, info: null, note: null };
 
     if (noteOnly) {
-      const note = typeof ex?.notes === 'string' && ex.notes.trim() ? ex.notes.trim() : null;
+      const rowNote = typeof ex?.notes === 'string' && ex.notes.trim() ? ex.notes.trim() : null;
       /**
        * ⛔ A PLYO DRILL READS ITS HOW-TO, AND ITS BENEFIT OPENS BEHIND AN (i) (Michael, 2026-09-20: "benefit should be
        * an (i) to not suck up too much real estate"; "a general sourced cue on how to do the exercise"). Both are the
@@ -165,20 +171,20 @@ export function liftLinesFor(
       const benefit = typeof ex?.benefit_line === 'string' && ex.benefit_line.trim() ? ex.benefit_line.trim() : null;
       if (hasTag(session, 'plyo') && benefit) {
         const howTo = typeof ex?.how_to === 'string' && ex.how_to.trim() ? ex.how_to.trim() : null;
-        return { key, movement, kind: null, cue: howTo, info: benefit };
+        return { key, movement, kind: null, cue: howTo, info: benefit, note };
       }
-      return { key, movement, kind: null, cue: note, info: null };
+      return { key, movement, kind: null, cue: rowNote, info: null, note };
     }
 
     const intent = intentOf(ex);
     // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): no kind word and no cue; its words are in the corner.
     if (!intent || (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim())) {
-      return { key, movement, kind: null, cue: null, info: null };
+      return { key, movement, kind: null, cue: null, info: null, note };
     }
 
     const cue = intentLine(intent);
 
-    return { key, movement, kind: KIND_WORD[intent], cue, info: null };
+    return { key, movement, kind: KIND_WORD[intent], cue, info: null, note };
   });
 }
 
@@ -204,6 +210,8 @@ export type LiftCardLine = {
   rows: number[];
   /** What opens behind the (i) beside the name (a plyo drill's benefit), or null. */
   info: string | null;
+  /** The server's set-count lines (`sets_line`) for the rows this line stands for, in row order. Empty on most rows. */
+  notes: string[];
 };
 
 export function liftCardLinesFor(
@@ -232,11 +240,12 @@ export function liftCardLinesFor(
         cues: cues.filter((c, at) => cues.indexOf(c) === at),
         rows: [i, i + 1],
         info: line.info ?? next.info ?? null,
+        notes: [line.note, next.note].filter((n): n is string => !!n),
       });
       i += 1;
       continue;
     }
-    out.push({ key: line.key, movement: line.movement, kind: line.kind, cues: line.cue ? [line.cue] : [], rows: [i], info: line.info });
+    out.push({ key: line.key, movement: line.movement, kind: line.kind, cues: line.cue ? [line.cue] : [], rows: [i], info: line.info, notes: line.note ? [line.note] : [] });
   }
   return out;
 }

@@ -140,13 +140,12 @@ function applyAdjustment(
     return { weight: calculatedWeight, adjusted: false };
   }
   
-  const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
-  
   // Find matching active adjustment for this exercise and date
+  // ⛔ THE SAME MOVEMENT BY NAME, NEVER BY SUBSTRING (2026-09-25, `lift-swap.ts sameLift`): a weight adjustment on
+  // "bench press" reached "db bench press" and "incline bench press" through the substring rule that stood here.
   const adjustment = adjustments.find(adj => {
     if (adj.status !== 'active') return false;
-    const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
-    if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
+    if (!sameLift(adj.exercise_name, exerciseName)) return false;
     if (adj.applies_from > workoutDate) return false;
     if (adj.applies_until && adj.applies_until < workoutDate) return false;
     return true;
@@ -322,7 +321,7 @@ type SwimIntentMat = 'focus' | 'race' | null;
 
 import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
 import { PLAN_WRITER_VERSION } from '../_shared/plan-refresh.ts';
-import { resolveLiftSwap } from '../_shared/session-swap/lift-swap.ts';
+import { resolveLiftSwap, sameLift } from '../_shared/session-swap/lift-swap.ts';
 import { ftpTestSteps, P210_STRIDE_COUNT, P210_STRIDE_LABEL, runTestSteps, RUN_TEST_TRIAL_MIN, type ProtocolStep } from '../_shared/baseline-test-rows.ts';
 
 /**

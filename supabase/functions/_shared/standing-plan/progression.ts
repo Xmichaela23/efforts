@@ -504,6 +504,58 @@ export function setPositionForCount(count: number, band: { lo: number; hi: numbe
   return (clamped - band.lo) / (band.hi - band.lo);
 }
 
+// ── OURS: THE SAME LADDER ON EVERY ROW WITH A SET BAND (2026-09-25) ─────────────────────────────
+
+/**
+ * ⛔ THE ME LADDER, EXTENDED TO DE, SKILL AND HYP (Michael, 2026-09-25: "we need to turn the dials a bit because
+ * it's not like our customer is reading the book"). Until today only the ME slot climbed its p218 set band; the
+ * other three rows sat at the low end of theirs for twelve weeks unless a muscle chip lifted HYP to four.
+ *
+ * ⛔ NO NEW NUMBER. The bands are p218's (DE 4-6, SKILL 3-5, HYP 3-4), the start is p218's low end, the earn bar is
+ * p245's two in a row (`ME_CLEAN_SESSIONS_TO_EARN`), "within one rep of the top" is `ME_CLEAN_REPS_WITHIN_TOP`, and
+ * the reserve is p218's own band for the intent (`rirBandFor`). The walk is `meLadderStep` / `meSetsFromHistory`
+ * unchanged, called with the intent's band. What is ours is reading those across to the other three rows — one
+ * ledger row, `docs/STATE-SOURCES.md`.
+ *
+ * ⚠️ IT IS KEYED BY MOVEMENT, NOT BY SLOT (`me-history.ts earnedMeSets`): accessories rotate and swap, and the
+ * athlete's history is on the movement. A swapped-in movement starts at the low end.
+ */
+export const EARNED_SETS_EVERY_ROW_IS_OURS =
+  'Every row with a set range starts at its low end and climbs the same way the heavy lift does: two sessions '
+  + 'in a row at the top of the rep range with the reserve on target add a set, a session under the range takes '
+  + 'one back, and nothing logged holds. The ranges, the start and the two-in-a-row bar are the source\'s; '
+  + 'applying the heavy lift\'s ladder to the other rows is ours.';
+
+/**
+ * ⛔ WHAT ONE LOGGED DE, SKILL OR HYP SESSION ON ONE MOVEMENT WAS — the same four answers as `meSessionOutcome`.
+ *
+ * @param rirBand p218's reserve band for the intent (HYP 0-2, DE/SKILL 3-4), or null where the row carries none.
+ *
+ * ⛔ THE RESERVE RULE IS "INSIDE THE BAND" AND NOTHING MORE (the work order's own line). A reserve ABOVE the band's
+ * top (too easy) still counts as clean on reps; a set at 0 inside a 0-2 band is clean; an ABSENT reserve is the
+ * athlete not saying (D-324) and is never read against them. A reserve UNDER the band's floor is a set not on
+ * target: it neither earns nor costs — the run breaks (`mid_band`).
+ * ⛔ A SHORT SESSION IS A MISS, as it is for the heavy lift. Fewer completed sets than the row asked for is the
+ * athlete not finishing the prescription.
+ * ⚠️ NO WEIGHT TEST. The work order states the rule in reps and reserve; a HYP row carries no load at all (p218).
+ */
+export function setSessionOutcome(args: {
+  sets: LoggedMeSet[] | null | undefined;
+  prescribedSets: number;
+  repBand: { lo: number; hi: number };
+  rirBand: { lo: number; hi: number } | null;
+}): MeSessionOutcome {
+  const logged = (args.sets ?? []).filter((s) => s?.completed === true);
+  if (logged.length === 0) return 'no_evidence';
+  if (logged.some((s) => Number(s.reps) < args.repBand.lo)) return 'setback';
+  if (logged.length < Math.max(1, Math.round(args.prescribedSets))) return 'setback';
+  const cleanFrom = args.repBand.hi - ME_CLEAN_REPS_WITHIN_TOP;
+  const repsClean = logged.every((s) => Number(s.reps) >= cleanFrom);
+  const reserveOnTarget = args.rirBand == null
+    || logged.every((s) => typeof s.rir !== 'number' || s.rir >= args.rirBand!.lo);
+  return repsClean && reserveOnTarget ? 'clean' : 'mid_band';
+}
+
 // ── OURS: THE BAR LADDER — THE REPS CARRY THE PROGRESSION ───────────────────────────────────────
 
 /**

@@ -88,8 +88,11 @@ import { localDateInTz } from './local-date.ts';
 //   DB Skull Crusher + Dumbbell Curl (drag curl barbell only); the trap bar deadlift only with a trap bar; split squat
 //   reads "each"; the rear delt machine on a dumbbell kit is stored as the rear delt fly
 //   (docs/WORKORDER-minimum-kit-and-accessory-table-2026-09-24.md).
+// 32 (2026-09-25): sets are earned on every row, not only the heavy lift — DE, SKILL and HYP climb their p218 band on the
+//   same ladder, keyed by movement; the row carries a one-time line the week its count moves (`sets_line`); the block
+//   description gets the set paragraph (docs/WORKORDER-earned-sets-every-row-2026-09-25.md).
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 31;
+export const PLAN_WRITER_VERSION = 32;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

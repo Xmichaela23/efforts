@@ -353,6 +353,12 @@ export type StrengthExercise = {
    *  a frame accessory cell. `name` is the catalogue spelling, `display` what the athlete reads. */
   swap_options?: { name: string; display: string }[];
   set_plan?: PlannedSet[];
+  /**
+   * ⛔ THE ROW'S SET COUNT MOVED, SAID ONCE (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`). The server's own words
+   * (`SETS_LINE_UP` / `SETS_LINE_DOWN`), stamped on the first unstarted row of the movement whose earned count differs
+   * from what the calendar carried, and on no later week. Today's card prints it as it is; the phone works nothing out.
+   */
+  sets_line?: string;
   /** Seconds the logger's countdown runs after a work set / a warm-up set, and the line beside it.
    *  Stamped on every row by `composeWeek` from `_shared/strength/rest-seconds.ts` (2026-09-10, H-S07). */
   rest_seconds?: number;
@@ -902,6 +908,20 @@ export type ComposeArgs = {
    */
   meLastRepsByPattern?: Partial<Record<ViadaPattern, number[]>> | null;
   /**
+   * ⛔ HOW MANY SETS EACH DE, SKILL AND HYP MOVEMENT HAS EARNED (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`) — the
+   * same ladder as `meSetsByPattern`, keyed by movement and intent (`earnedSetsKey`) rather than by pattern, because
+   * accessories rotate and swap and the athlete's history is on the movement. `sets` is the earned count; `from` is
+   * the count the calendar carried before this rebuild (null on the first), which is what the row's one-time line
+   * is measured against. Absent is the band's low end — every block at the moment it is authored. Read by
+   * `earnedMeSets` and handed here by `rematerialize-standing-block`, never authored.
+   */
+  earnedSetsByMovement?: Record<string, { sets: number; from?: number | null }> | null;
+  /**
+   * ⛔ THE FIRST WEEK THE EARNED COUNTS REACH (2026-09-25): the week after the live one. The live week keeps the count
+   * it is being trained against; weeks before this compose as authored. Absent, the counts reach every week.
+   */
+  earnedSetsFromWeek?: number | null;
+  /**
    * ⛔ THE RIDE SLOTS THE ATHLETE HAS PUT ON THE TRAINER, BY BLOCK WEEK (2026-09-24,
    * `docs/SPEC-outdoor-rides-2026-09-24.md` §3B). Keyed by week, each entry the frame slot's own key
    * (`${frameDay}:${index}` — the `slot:` tag on the row, the `sportMix.minutes` key). A slot listed
@@ -936,6 +956,34 @@ export type MeRowIndex = {
   weight: number | null;
 };
 
+/**
+ * ⛔ ONE DE, SKILL OR HYP ROW, FOR THE EARNED-SETS READER (2026-09-25) — `MeRowIndex`'s shape for the other three
+ * intents, keyed by movement. In memory only, for the same reason `MeRowIndex` is.
+ */
+export type SetRowIndex = {
+  week: number;
+  day: string;
+  movement: string;
+  intent: 'DE' | 'SKILL' | 'HYP';
+  /** How many sets the row asked for — the chip's four on a dialled HYP row. A short session is measured against this. */
+  sets: number;
+};
+
+/** `earnedSetsByMovement`'s key: the canonical movement and its intent. One movement under two intents is two ladders
+ *  — the bands differ (HYP 3-4, SKILL 3-5). */
+export function earnedSetsKey(movement: string, intent: string): string {
+  return `${canonicalize(movement)}|${String(intent).toUpperCase()}`;
+}
+
+/**
+ * ⛔ THE ROW'S ONE-TIME LINE, THE SERVER'S WORDS (Michael, 2026-09-25, replaced the same day). The number is the row's
+ * new count. Printed on Today's card as it is; nothing else new on screen.
+ */
+export const SETS_LINE_UP = (to: number): string =>
+  `Up to ${to} sets. You hit the top of the range two sessions in a row.`; // Michael 2026-09-25, approved
+export const SETS_LINE_DOWN = (to: number): string =>
+  `Back to ${to} sets. Last session came in under the range.`; // Michael 2026-09-25, approved
+
 export type ComposedWeek = {
   frame: FrameId;
   week: number;
@@ -954,6 +1002,8 @@ export type ComposedWeek = {
   enduranceLedger: EnduranceLedger;
   /** ⛔ THE ME ROWS THIS WEEK PRESCRIBED — see {@link MeRowIndex}. Empty in the test week. */
   meRows: MeRowIndex[];
+  /** ⛔ THE DE, SKILL AND HYP ROWS THIS WEEK PRESCRIBED — see {@link SetRowIndex} (2026-09-25). */
+  setRows: SetRowIndex[];
   notes: ComposeNote[];
   /**
    * ⛔ WHAT THIS WEEK BREAKS AND WHAT IT COSTS — `week-conflicts.ts`, Q-288's wiring. Structured
@@ -1936,9 +1986,35 @@ function exerciseForSlot(
    */
   const dialSlot = slot.intent === 'HYP' && slot.role === 'accessory'
     && dialMuscles.has((musclesWorkedBy(movement)?.primary ?? '') as MuscleGroup);
+  /**
+   * ⛔ THE OTHER THREE ROWS EARN THEIR SETS THE SAME WAY (2026-09-25, `EARNED_SETS_EVERY_ROW_IS_OURS`). The count
+   * arrives per movement from `earnedMeSets` through the restater, from the week after the live one
+   * (`earnedSetsFromWeek`), and goes back through stage 2's band exactly as the ME count does.
+   * ⛔ THE CHIP'S FOURTH HYP SET IS THE FLOOR for that muscle: the earned count never takes the row under what the
+   * chip set, and `setPositionForCount` clamps both to p218's band, so neither can leave the page.
+   * ⚠️ THE LINE IS SAID ONCE. `from` is what the calendar carried before this rebuild; the row says the move only
+   * where the two differ, and `composeBlock` keeps it on the movement's first such row and on no later week.
+   */
+  const earnedRow = slot.intent !== 'ME' && slot.category !== 'carry'
+    ? args.earnedSetsByMovement?.[earnedSetsKey(movement, slot.intent)] ?? null
+    : null;
+  const earnedReaches = earnedRow != null && Number.isFinite(Number(earnedRow.sets))
+    && (args.earnedSetsFromWeek == null || args.week >= args.earnedSetsFromWeek);
+  const earnedBand = (() => { const q = prescribe(slot.intent, 'barbell'); return q.kind === 'barbell' ? q.setsBand : null; })();
+  const earnedFloor = earnedBand ? (dialSlot ? earnedBand.hi : earnedBand.lo) : null;
+  const inBand = (n: number) => (earnedBand ? Math.min(earnedBand.hi, Math.max(earnedBand.lo, Math.round(n))) : n);
+  const earnedCount = earnedReaches && earnedBand ? inBand(Math.max(earnedFloor as number, Number(earnedRow!.sets))) : null;
+  const earnedFrom = earnedReaches && earnedBand
+    ? inBand(Math.max(earnedFloor as number, Number.isFinite(Number(earnedRow!.from)) && earnedRow!.from != null ? Number(earnedRow!.from) : earnedBand.lo))
+    : null;
+  const setsLine = earnedCount != null && earnedFrom != null && earnedCount !== earnedFrom
+    ? (earnedCount > earnedFrom ? SETS_LINE_UP(earnedCount) : SETS_LINE_DOWN(earnedCount))
+    : null;
   const setPosition = Number.isFinite(earnedMe)
     ? setPositionForCount(earnedMe, ME_SETS_BAND)
-    : (dialSlot ? 1 : undefined);
+    : (earnedCount != null && earnedBand
+      ? setPositionForCount(earnedCount, earnedBand)
+      : (dialSlot ? 1 : undefined));
   /**
    * ⛔⛔ A CARRY IS PRESCRIBED IN WORDS (p226: *"no reps and no percentage"*). Approved row, Michael
    * 2026-09-13: `Farmers Carry · medium weight, no fatigue, full rest` — no sets, no reps. Only the
@@ -2082,6 +2158,7 @@ function exerciseForSlot(
         sets,
         reps,
         load_prescribed: false,
+        ...(setsLine ? { sets_line: setsLine } : {}), // the row's set count moved (2026-09-25)
         ...(targetRir != null ? { target_rir: targetRir } : {}),
         ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
         slot_intent: slot.intent,
@@ -2246,6 +2323,7 @@ function exerciseForSlot(
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
       // on that shape, so the result travels as its own field rather than inside the string.
       ...(lastReps.length > 0 ? { last_reps: lastReps } : {}),
+      ...(setsLine ? { sets_line: setsLine } : {}), // the row's set count moved (2026-09-25)
       // ⛔ 2026-09-18: no warm-up ramp in front of the work sets — its weights and reps were ours
       // (`warmup.ts`). `set_plan` is the work sets only.
       set_plan: [
@@ -2843,6 +2921,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const builtEndurance: EnduranceSession[] = [];
   /** ⛔ THE EARN RULE'S INDEX — see {@link MeRowIndex}. Never persisted. */
   const meRows: MeRowIndex[] = [];
+  /** ⛔ THE SAME INDEX FOR THE OTHER THREE INTENTS — see {@link SetRowIndex} (2026-09-25). Never persisted. */
+  const setRows: SetRowIndex[] = [];
   /**
    * ⛔ WEEK ONE IS THE TEST WEEK — UNLESS THE ATHLETE TOOK THE SKIP (Michael, 2026-08-23), and the
    * skip is only offerable when logged history already carries a trustworthy max for every lift the
@@ -3405,6 +3485,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
               // logged set to fall short of, and the outcome test must not invent one.
               weight: Number.isFinite(top) && top > 0 ? top : null,
             });
+          } else if (slot.category !== 'carry' && (slot.intent === 'DE' || slot.intent === 'SKILL' || slot.intent === 'HYP')) {
+            // ⛔ THE DE, SKILL AND HYP ROWS, FOR THE EARNED-SETS READER (2026-09-25). A carry has no set band (p226).
+            setRows.push({ week: args.week, day: dayNameFor(args, day.day), movement, intent: slot.intent, sets });
           }
         }
         // ⛔ "The other lifting days run by feel this week — the numbers arrive once the test is done." CAME OFF
@@ -3429,6 +3512,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           for (let i = exercises.length - 1; i >= 0; i--) if (testNames.has(exercises[i].name)) exercises.splice(i, 1);
           for (let i = dosed.length - 1; i >= 0; i--) if (testNames.has(dosed[i].movement)) dosed.splice(i, 1);
           for (let i = meRows.length - 1; i >= 0; i--) if (meRows[i].week === args.week && testNames.has(meRows[i].movement)) meRows.splice(i, 1);
+          for (let i = setRows.length - 1; i >= 0; i--) if (setRows[i].week === args.week && testNames.has(setRows[i].movement)) setRows.splice(i, 1);
           partialTest = testDaySession(day, args, notes, partialHere);
         }
         if (droppedHere > 0) {
@@ -4561,7 +4645,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     // ⛔ EVERY LIFTING DAY CARRIES ITS TITLE IN THE BOOK'S TERMS (2026-09-18) — `intent_title`, "Maximum Effort:
     // Upper" for `ME: Upper` (`_shared/intent-title.ts`). The name stays the engine string; screens print the title.
     sessions: sessions.map((s) => (String(s.type).toLowerCase() === 'strength' ? { ...s, intent_title: intentTitle(s.name) } : s)),
-    ledger, meRows, notes, conflicts, volume,
+    ledger, meRows, setRows, notes, conflicts, volume,
     // ⛔ p146's BUCKETS 1-3, counted off the sessions as the library built them. See
     // `endurance-ledger.ts` — nothing surfaces it, and it asks the athlete nothing.
     enduranceLedger: enduranceLedgerFor(builtEndurance),
@@ -4576,6 +4660,21 @@ export function composeBlock(
   const taper = new Set(args.taperWeeks ?? []);
   for (let week = 1; week <= args.weeks; week++) {
     out.push(composeWeek({ ...args, week, column: taper.has(week) ? 'taper' : 'standard' }));
+  }
+  /**
+   * ⛔ THE SET-COUNT LINE IS SAID ONCE PER MOVEMENT (2026-09-25): on the first week that carries the new count, and on
+   * no later week. `composeWeek` stamps it wherever the count differs from what the calendar carried; a movement that
+   * rotates by week (p247's ME/DE swap) may first appear a week after `earnedSetsFromWeek`, so the keep is done here.
+   */
+  const said = new Set<string>();
+  for (const wk of out) {
+    for (const s of wk.sessions) {
+      for (const ex of s.strength_exercises ?? []) {
+        if (typeof ex.sets_line !== 'string') continue;
+        const key = earnedSetsKey(ex.name, String(ex.slot_intent ?? ''));
+        if (said.has(key)) delete ex.sets_line; else said.add(key);
+      }
+    }
   }
   return out;
 }
