@@ -15,7 +15,7 @@
  * a row the builder had to fill from another cell (the kit reached nothing in its own) is offered the cell of the
  * movement it holds.
  */
-import { cellOptions, builderReaches, executionHowTo, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
+import { cellOptions, builderReaches, executionHowTo, executionMovement, usesTwoDumbbellsOnKit } from '../strength-grid/grid.ts';
 import { shownNameOnKit } from '../strength/shown-name.ts';
 import { drillAllowed, PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from './plyo.ts';
 import { CATEGORY_DEFINITION, filingOf, type ViadaCategory } from '../strength-grid/taxonomy.ts';
@@ -92,12 +92,15 @@ export function swapGroupsFor(
   // per movement (`shownNameOnKit`): the option, the row and State print the same words.
   const label = (name: string) => shownNameOnKit(name, equipment);
   for (const m of cellOptions(filed.category, filed.pattern, equipment)) {
-    const k = canonicalize(m.name);
-    const display = label(m.name);
+    // ⛔ THE MOVEMENT THE KIT DOES (2026-09-24, minimum-kit work order B7): his rear delt machine on a dumbbell kit is
+    // the rear delt fly, and a row stored as the fly is not offered the fly again under the machine's name.
+    const name = executionMovement(m.name, equipment);
+    const k = canonicalize(name);
+    const display = label(name);
     if (k === now || seen.has(k) || shown.has(display.toLowerCase())) continue;
     seen.add(k);
     shown.add(display.toLowerCase());
-    options.push({ name: m.name, display, ...(usesTwoDumbbellsOnKit(m.name, equipment) ? { weight_per: 'each' as const } : {}), ...kitWords(m.name, equipment) });
+    options.push({ name, display, ...(usesTwoDumbbellsOnKit(name, equipment) ? { weight_per: 'each' as const } : {}), ...kitWords(name, equipment) });
   }
   // The slot's own movement comes back after a swap, if the kit reaches it.
   if (rowNow && canonicalize(rowNow) !== canonicalize(slotName) && !seen.has(canonicalize(slotName))

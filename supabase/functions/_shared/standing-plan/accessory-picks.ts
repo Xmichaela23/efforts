@@ -32,9 +32,9 @@ import {
   resolveSlot,
   executionName,
   bandRouteName,
-  hipThrustStandIn,
   builderReaches,
   implementOnKit,
+  executionMovement,
   STAND_INS,
   type GridMovement,
   type ViadaCategory,
@@ -671,7 +671,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     label: 'Arms superset · push',
     slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: true },
     hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
-    leadWith: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    // ⛔ THE SKULL CRUSHER BEHIND THE PUSHDOWN (2026-09-24, minimum-kit work order B5): the arms pair on any kit
+    // with dumbbells is DB Skull Crusher + Dumbbell Curl — what a Strong / Hevy lifter picks for it — and a gym's
+    // day 1 keeps Triceps Pushdown + Preacher Curl. The order is OURS within his list.
+    leadWith: ['triceps pushdown', 'tricep pushdown', 'skull crusher', 'tate press', 'behind the neck db triceps extension', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     pairedWith: 'ar_arms_pull_1',
     servesChips: ['arms'],
@@ -744,7 +747,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ 2026-09-18 (Michael): p223's two hip thrusts lead; the barbell hip thrust stands in, marked, only where the
     // kit has neither (`hipThrustStandIn`).
     hisList: ['machine hip thrust', 'smith machine hip thrust', 'split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
-    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
+    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust', 'split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
     leadCite: 'Viada p247 — accessory lower (non-competition, similar pattern); p220 — secondary press lower',
     servesChips: [],
     requiresLoad: true,
@@ -810,7 +813,16 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * athlete with bands. The note above that "true single-joint quad work does not exist without a
      * machine" was written before the band route existed and is superseded by this line.
      */
-    subLeadWith: ['banded leg extension'],
+    /**
+     * ⛔ THE GOBLET SQUAT LEADS THE STAND-INS (owner's ruling, 2026-09-25): on the minimum kit's focused-quadriceps row —
+     * where p223's list is all station work and the one-lunge rule (`LUNGE_FAMILY`) keeps the lunges on the asymmetrical
+     * row — the row builds the goblet squat (one dumbbell at the chest, one total, no bar). FIELD — the goblet squat is
+     * the standard free-weight quad accessory where there is no leg extension (Hevy, Strong, Outlift list it as the
+     * leg-extension alternative). The Zercher squat is p220 printed and stays offered behind it in the picker and the
+     * Swap list. OURS — a variant chosen over a printed movement by ruling; ledger row docs/STATE-SOURCES.md
+     * (2026-09-25). The banded leg extension (the 2026-09-11 like-for-like) follows for a bands owner.
+     */
+    subLeadWith: ['goblet squat', 'banded leg extension'],
     servesChips: [],
   },
   /**
@@ -927,6 +939,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     leadWith: ['reverse hyperextension', 'ghd back extension', 'machine back extension'],
     alsoHis: ['weighted reverse hyper'],
     /**
+     * ⛔ THE MINIMUM KIT'S HINGE HALF (2026-09-24, minimum-kit work order B1). The floor back extension under a
+     * loaded bar is deleted (B2), so on a kit with no back extension bench and no station this half is a
+     * dumbbell hinge: the DB Romanian deadlift (p220's RDL, dumbbell variant) is the named stand-in, behind the
+     * bench reverse hyper the frame admits (p220's own "bench reverse hyper"). A superset never holds two barbell
+     * movements (`onTheBar`), so the leg-press half keeps the front squat. OURS — the choice of stand-in.
+     */
+    subLeadWith: ['db romanian deadlift'],
+    /**
      * ⚠️⚠️ THE `excludes: ['reverse hyper']` THAT STOOD HERE IS GONE, AND ITS PREMISE WAS WRONG.
      * It read *"one movement, one option — two `EXERCISE_CONFIG` entries for the same exercise"*, and
      * they are NOT the same exercise: p221's is the machine and the other is the bench execution
@@ -1006,17 +1026,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     slot: { category: 'focused', pattern: 'hinge_lower' },
     hisList: ['machine hip thrust', 'smith machine hip thrust', 'leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
     /**
-     * ⛔ ONE MOVEMENT, THREE SPELLINGS — merged on evidence, 2026-08-30. `nordic curl`,
-     * `nordic curls` and `nordic hamstring curl` carry **identical `EXERCISE_CONFIG` entries and the
-     * identical gear route**, and in the field they are one exercise under three names; the plural is
-     * a plural. Two of them were surfacing side by side in this row's substitutes, so a dropdown of
-     * two options held one real choice.
-     * ⚠️ THIS IS THE OPPOSITE CALL FROM THE REVERSE HYPERS, and deliberately so. Those looked like
-     * twins and were two executions on different apparatus — checked before splitting. These looked
-     * like twins and are twins — checked before merging. **The check is the same either way; the
-     * answer is not.** `nordic hamstring curl` survives as the most specific name.
+     * ⛔ THE NORDIC IS OFF THIS ROW (2026-09-24, minimum-kit work order B3). The exclusion was written as
+     * `nordic curl` / `nordic curls` — spellings `SAME_MOVEMENT` folds into `nordic hamstring curl` — so it never
+     * matched the one entry and the floor-anchored nordic (feet under a loaded bar) filled the row on a home kit.
+     * Spelled as the entry is, it fires: the row offers p223's own movements the kit reaches (the dumbbell leg
+     * curl on the minimum kit's bench, the hip thrust stand-in) and the single-leg RDL where nothing his is.
+     * The 2026-08-30 note that stood here merged the three spellings on evidence; the merge lives in `SAME_MOVEMENT`.
      */
-    excludes: ['nordic curl', 'nordic curls'],
+    excludes: ['nordic hamstring curl'],
     /**
      * ⛔ THE HAMSTRING MOVEMENTS LEAD, and the hip thrust is an option rather than the opening
      * answer. p223 prints it first in the row, which is why it is admitted at all — but p274's cell
@@ -1029,7 +1046,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔⛔ SUPERSEDED 2026-09-13 (Michael): the HIP THRUST is the default now. p223 prints the machine and Smith
     // versions first on this row; a kit without them gets the barbell hip thrust, marked as a stand-in like
     // every other. The note above is history.
-    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust', 'leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
+    // ⛔ THE BARBELL HIP THRUST IS FILED (2026-09-25, follow-up 1): p223's hip thrust on the minimum kit's bench, named for
+    // its implement, bar chip and plate math; the bench-only `hip thrust` stand-in is gone.
+    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust', 'leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
     leadCite: 'Viada p223 — focused hamstrings',
     servesChips: ['glutes'],
   },
@@ -1129,19 +1148,20 @@ export function focusedArmFit(pattern: string, inSuperset: boolean, name: string
 }
 
 /**
- * ⛔ THE ARMS SUPERSET NEVER PUTS BOTH MOVEMENTS ON THE BARBELL, AND NEVER A SKULL CRUSHER ON THE STRAIGHT BAR
- * (Michael, 2026-09-24, `docs/WORKORDER-arms-superset-implement-2026-09-24.md`; PM refinement the same day). A lying
- * and a standing movement cannot share one bar, and the straight-bar skull crusher is not the standard. So a
- * barbell-held option ranks behind every other in the two "(arms)" rows; cable, machine, bench-station and dumbbell
- * pairings are left exactly as picked (a gym's Triceps Pushdown + Preacher Curl stands). Where the kit has dumbbells
- * the skull crusher and the drag curl are already their dumbbell form (`strength-gear.ts` route order), so this key
- * only bites on a kit with a bar and no dumbbells (below the plan's minimum kit of barbell + rack + dumbbells; not
- * designed for — a bar-only kit reads the bar on both rows). OURS — the page prints the pair and names no implement. A
- * sort, not a filter.
+ * ⛔ NO SUPERSET EVER HOLDS TWO BARBELL MOVEMENTS (Michael, 2026-09-24 — `docs/WORKORDER-arms-superset-implement-
+ * 2026-09-24.md` for the arms pair, generalised to every `superset_group` by `docs/WORKORDER-minimum-kit-and-
+ * accessory-table-2026-09-24.md` B1). Two movements cannot share one loaded bar back to back. 1 when this kit holds
+ * the movement with the barbell, 0 otherwise — a sort key, never a filter. The composer reads it two ways: in the
+ * "(arms)" rows a barbell-held option ranks last outright (a lying + standing pair, and the straight-bar skull crusher
+ * is not the standard); in every other printed superset it ranks last once the pair's first row has taken the bar,
+ * so a dumbbell hinge is followed by the front squat and never both halves on the bar. Cable, machine, bench-station
+ * and dumbbell pairings stand as picked. OURS — the page prints the pair and names no implement.
  */
-export function armsOnTheBar(name: string, equipment: string[] | null | undefined): number {
+export function onTheBar(name: string, equipment: string[] | null | undefined): number {
   return implementOnKit(name, equipment) === 'barbell' ? 1 : 0;
 }
+/** The arms-row reading of `onTheBar` (the 2026-09-24 arms work order's name for it). */
+export const armsOnTheBar = onTheBar;
 
 /**
  * Whether this frame prints the "(arms)" superset in the pick's cell — p274 does on days 1 and 4; p246's focused
@@ -1358,6 +1378,33 @@ export function pickReachesFrame(
  * reconcile; a frame that ever printed two different muscles for one cell would need a per-day
  * answer and this is where that would go.
  */
+/**
+ * ⛔ ONE LUNGE-PATTERN MOVEMENT PER DAY (2026-09-25, minimum-kit follow-up 2, owner's ruling). The lunge, the reverse and
+ * walking lunge, the split squat and the Bulgarian split squat count as one family; a day whose SKILL / asymmetrical
+ * row already holds one gives its other rows a non-lunge option. OURS — the page prints the rows, not the pairing.
+ * Ledger: docs/STATE-SOURCES.md (2026-09-25).
+ */
+export const LUNGE_FAMILY: readonly string[] = [
+  'lunge', 'lunges', 'reverse lunge', 'walking lunge', 'barbell walking lunge', 'dumbbell walking lunge',
+  'split squat', 'bulgarian split squat', 'lateral lunge', 'bodyweight lunges',
+];
+const LUNGE_KEYS = new Set(LUNGE_FAMILY.map((n) => canonicalize(n)));
+export function isLungeFamily(name: string): boolean {
+  return LUNGE_KEYS.has(canonicalize(String(name ?? '')));
+}
+/** Does this pick's cell sit on a day whose asymmetrical row takes the lunge? (Its own row is never asymmetrical.) */
+export function frameReservesLungeForPick(key: ViadaPickKey, frame: FrameId, column: ColumnKind = 'standard'): boolean {
+  const spec = VIADA_PICKS[key];
+  if (!spec.slot) return false;
+  for (const day of FRAMES[frame]?.columns[column] ?? []) {
+    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) continue;
+    const here = day.strength.some((sl) => sl.role === 'accessory' && sl.category === spec.slot!.category
+      && sl.pattern === spec.slot!.pattern && sl.intent === (spec.slot!.intent ?? 'HYP') && sl.asymmetrical !== true);
+    if (here && day.strength.some((sl) => sl.asymmetrical === true)) return true;
+  }
+  return false;
+}
+
 export function frameAdmitsForPick(
   key: ViadaPickKey,
   frame: FrameId,
@@ -1458,7 +1505,7 @@ export function picksForFrame(
    */
   return reachable.filter((k) => VIADA_PICKS[k].slot == null
     || pickOptions(k, equipment, frameMuscleForPick(k, frame, column),
-      frameAdmitsForPick(k, frame, column)).length >= 1);
+      frameAdmitsForPick(k, frame, column), frameReservesLungeForPick(k, frame, column)).length >= 1);
 }
 
 /**
@@ -1683,6 +1730,11 @@ export function pickOptions(
    * cannot disagree about whether p223's hip thrust belongs in his hamstring row.
    */
   alsoAdmits?: string[] | null,
+  /**
+   * ⛔ ONE LUNGE PER DAY (2026-09-25, follow-up 2, `frameReservesLungeForPick`): when the day's asymmetrical row holds the
+   * lunge, this row offers no lunge-family movement — unless nothing else is reachable.
+   */
+  reserveLunge = false,
 ): PickOption[] {
   const spec = VIADA_PICKS[key];
   const cellIntent = spec.slot?.intent ?? 'HYP';
@@ -1727,11 +1779,15 @@ export function pickOptions(
    * is false on absent, which is the conservative arm and the app's existing §0h rule.
    */
   const dropBodyweight = spec.requiresLoad === true && ownsLoadingImplement(equipment);
+  // ⛔ A MOVEMENT THE ROW ADMITS BY NAME FROM THIS CELL'S OWN POOL IS KEPT (2026-09-24, B5): the dumbbell curl is
+  // filed in the arms cell itself (focused pull, p222 variant), so `admittedPool` below — which asks the OTHER
+  // categories — never finds it, and the his-list cut dropped it here. Same `alsoAdmits` set, read once more.
+  const admitted = new Set((alsoAdmits ?? []).map((n) => canonicalize(n)));
   const pool = dedupeByCanonical(resolved.options).filter((m) => {
     if (excluded.has(canonicalize(m.name))) return false;
     // HIS LIST ONLY. An empty `hisList` would offer nothing, so a spec without one is a bug rather
     // than an opt-out - every pick carries one.
-    if (his.size > 0 && !his.has(canonicalize(m.name)) && !ours.has(canonicalize(m.name))) return false;
+    if (his.size > 0 && !his.has(canonicalize(m.name)) && !ours.has(canonicalize(m.name)) && !admitted.has(canonicalize(m.name))) return false;
     return !(dropBodyweight && isBodyweightLoad(m.name));
   });
   const leadKeys = spec.leadWith.map((n) => canonicalize(n));
@@ -1833,11 +1889,15 @@ export function pickOptions(
     return noBw.filter((m) => {
       const stripped = String(m.name).replace(FREE_WEIGHT_PREFIX, '').trim();
       if (stripped === m.name) return true;
-      return !bare.has(canonicalize(stripped));
+      if (!bare.has(canonicalize(stripped))) return true;
+      // ⛔ TWO EXECUTIONS THE KIT DOES BOTH WAYS ARE TWO OPTIONS (2026-09-24, minimum-kit work order B1): on a kit
+      // with a bar the bare Romanian deadlift IS the barbell one (`executionName`), and the DB Romanian deadlift is
+      // the dumbbell hinge the braced hinge row names — collapsing it hid the named stand-in. The collapse stands
+      // where the bare name loads on nothing in particular (the lunges, the hip thrust on the bench).
+      return implementOnKit(stripped, equipment) === 'barbell' && implementOnKit(m.name, equipment) === 'dumbbells';
     });
   };
   const primaryOf = (name: string) => musclesWorkedBy(name)?.primary ?? null;
-  const admitted = new Set((alsoAdmits ?? []).map((n) => canonicalize(n)));
   /**
    * ⛔⛔ AN ADMITTED MOVEMENT HAS TO BE FETCHED, NOT JUST PERMITTED — measured, 2026-08-30. The
    * first cut filtered on `alsoAdmits` and the hip thrust still did not appear, because **it is not
@@ -1849,7 +1909,8 @@ export function pickOptions(
    */
   const admittedPool: GridMovement[] = admitted.size === 0 ? [] : (() => {
     const found: GridMovement[] = [];
-    for (const cat of ['secondary', 'braced', 'focused'] as ViadaCategory[]) {
+    // ⛔ `primary` IS ASKED TOO, FOR A NAMED MOVEMENT ONLY (2026-09-25, follow-up 3): p218's barbell row on the DE pull row.
+    for (const cat of ['secondary', 'braced', 'focused', 'primary'] as ViadaCategory[]) {
       if (cat === spec.slot?.category) continue;
       for (const m of resolveSlot({
         category: cat,
@@ -1865,11 +1926,6 @@ export function pickOptions(
      * lower" row is a hinge in the catalogue. Only a name the row admits and not already found above is
      * looked for there; nothing else crosses the pattern. The composer runs the same search.
      */
-    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
-    if (admitted.has(canonicalize('hip thrust')) || admitted.has(canonicalize('barbell hip thrust'))) {
-      const stand = hipThrustStandIn(equipment);
-      if (stand && !found.some((m) => canonicalize(m.name) === canonicalize(stand.name))) found.push(stand);
-    }
     const have = new Set([...resolved.options, ...found].map((m) => canonicalize(m.name)));
     for (const pat of ['push_upper', 'pull_upper', 'press_lower', 'hinge_lower'] as ViadaPattern[]) {
       if (pat === spec.slot?.pattern) continue;
@@ -1887,8 +1943,13 @@ export function pickOptions(
   const onMuscle = (name: string) => primaryOf(name) === muscle || admitted.has(canonicalize(name));
   const narrowed = muscle
     ? (() => {
-      const his = refine(dedupeByCanonical([...pool, ...admittedPool]).filter((m) => onMuscle(m.name)));
-      if (his.length > 0) return { list: his, substituted: false };
+      const withAdmitted = refine(dedupeByCanonical([...pool, ...admittedPool]).filter((m) => onMuscle(m.name)));
+      // ⛔ ONLY HIS OWN LIST (OR AN `oursList` ADDITION) HOLDS THE ROW UNSUBSTITUTED (2026-09-24, minimum-kit work
+      // order B1). A movement the row merely admits by name — the bench reverse hyper on the braced hinge row —
+      // does not stop the widening below, or a kit reaching none of p222's machines saw one option and never the
+      // named stand-in (`subLeadWith`). The admitted movement still leads the widened list (`alsoHis` rank).
+      const own = withAdmitted.filter((m) => his.has(canonicalize(m.name)) || ours.has(canonicalize(m.name)));
+      if (own.length > 0) return { list: withAdmitted, substituted: false };
       /**
        * ⛔⛔ THE SUBSTITUTE POOL WIDENS BY CATEGORY, NEVER BY MUSCLE OR PATTERN (Michael's amendment,
        * 2026-08-30: *"substitute known barbell/dumbbell versions that hit the SAME muscle… split
@@ -1963,11 +2024,14 @@ export function pickOptions(
     // row that admits nothing, which was every muscle-less row before.
     : { list: refine(dedupeByCanonical([...pool, ...admittedPool.filter((m) => !excluded.has(canonicalize(m.name)))])), substituted: false };
 
-  return narrowed.list
+  const lunged = reserveLunge ? narrowed.list.filter((m) => !isLungeFamily(m.name)) : narrowed.list;
+  return (lunged.length > 0 ? lunged : narrowed.list)
     .map((m, i) => ({ m, i, r: rank(m) }))
     .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
     .map(({ m }) => ({
-      name: m.name,
+      // ⛔ THE MOVEMENT THE KIT DOES (2026-09-24, B7, `executionMovement`): his rear delt machine on a dumbbell kit
+      // with no incline bench is stored as the rear delt fly, the row it will be. Every other entry is its own name.
+      name: executionMovement(m.name, equipment),
       // THE NAME THEY WILL READ, which is his unless the free-weight route is the one their kit
       // resolved on. `name` above stays canonical - it is what the picker stores and what every
       // matcher reads.
@@ -2034,7 +2098,7 @@ export function defaultPickFor(
   // ⛔ AN OPT-IN ROW HAS NO DEFAULT. Empty is the answer, and a caller must treat it as "nothing
   // added" rather than as a missing value to fill in.
   if (VIADA_PICKS[key].optIn === true) return '';
-  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame));
+  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame));
   if (opts.length === 0) return '';
   const wanted = musclesForChips(dial.filter((c) => VIADA_PICKS[key].servesChips.includes(c)));
   if (wanted.size > 0) {
@@ -2045,8 +2109,8 @@ export function defaultPickFor(
   const armsSlot = VIADA_PICKS[key].slot;
   if (armsSlot?.pattern && frameHasArmsSuperset(key, frame)) {
     const arms = opts.filter((o) => focusedArmFit(String(armsSlot.pattern), true, o.name) === 0);
-    // ⛔ OFF THE BARBELL FIRST (2026-09-24, `armsOnTheBar`) — the same key the composer sorts on.
-    const arm = arms.find((o) => armsOnTheBar(o.name, equipment) === 0) ?? arms[0];
+    // ⛔ OFF THE BARBELL FIRST (2026-09-24, `onTheBar`) — the same key the composer sorts on.
+    const arm = arms.find((o) => onTheBar(o.name, equipment) === 0) ?? arms[0];
     if (arm) return arm.name;
   }
   return opts[0].name;
@@ -2097,7 +2161,7 @@ export function defaultViadaPicks(
     const first = defaultPickFor(key, equipment, dial, frame);
     let chosen = first;
     if (clash(first)) {
-      const alt = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
+      const alt = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame))
         .map((o) => o.name)
         .find((n) => !clash(n));
       // ⚠️ NO ALTERNATIVE MEANS KEEP THE DEFAULT. A cell whose every option is already used today has
@@ -2460,6 +2524,8 @@ export type ViadaAccessoryPrefs = {
    * A total type would have forced every screen to invent answers for cells its week does not have.
    */
   picks: Partial<Record<ViadaPickKey, string>>;
+  /** The deadlift's form, chosen on the lift (2026-09-25, `DEADLIFT_FORMS`); absent = barbell. */
+  deadlift_form?: 'barbell' | 'trap_bar';
   dial: DialChip[];
   /**
    * The named movement for each extra row a chip adds, keyed `<chip>:<n>`. Absent = the engine
@@ -2518,7 +2584,7 @@ export function normalizeViadaPrefs(
      * p274's hamstring cell at a home kit, so every answer to that row failed and was overwritten.
      */
     const offered = pickOptions(
-      key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame),
+      key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame),
     );
     const exact = stored !== '' && offered.find((o) => canonicalize(o.name) === canonicalize(stored));
     /**
@@ -2556,7 +2622,9 @@ export function normalizeViadaPrefs(
     if (k.startsWith('core')) continue;
     dial_rows[k] = name;
   }
-  return { version: 1, picks, dial, dial_rows };
+  // The deadlift form rides the same block (2026-09-25); an unknown value reads as absent.
+  const form = String(obj.deadlift_form ?? '').trim().toLowerCase();
+  return { version: 1, picks, dial, dial_rows, ...(form === 'barbell' || form === 'trap_bar' ? { deadlift_form: form } : {}) };
 }
 
 /** Every movement the athlete named, flattened — the composer's existing `accessoryPicks` pipe. */

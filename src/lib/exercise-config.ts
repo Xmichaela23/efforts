@@ -1536,13 +1536,8 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
-  'back extension': {
-    pattern: 'hip_dominant',
-    primaryRef: null,
-    ratio: 0.0,
-    displayFormat: 'bodyweight',
-    isUnilateral: false,
-  },
+  // ⛔ THE FLOOR `back extension` ENTRY IS DELETED (2026-09-24, WORKORDER-minimum-kit-and-accessory-table B2): the
+  // name resolves to `ghd back extension` through `SAME_MOVEMENT` — the movement "Back Extension" means on a bench.
 
   'soleus raise': {
     pattern: 'calf',
@@ -2541,13 +2536,16 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   'larsen press':    { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.90, displayFormat: 'total', isUnilateral: false },
   'jm press':        { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.55, displayFormat: 'total', isUnilateral: false },
   'seated db press': { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.45, displayFormat: 'perHand', isUnilateral: false, ratioIsTotal: true }, // two dumbbells: 0.45 = both together, printed per hand like 'dumbbell shoulder press'
-  'arnold press':    { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.40, displayFormat: 'total', isUnilateral: false },
+  // ⛔ PER HAND, THE NUMBER UNCHANGED (2026-09-25, minimum-kit follow-up 6): two dumbbells, the logger's header reads "each";
+  // `ratioIsTotal` keeps 0.40 as both dumbbells together and prints half per hand, as `seated db press` does.
+  'arnold press':    { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.40, displayFormat: 'perHand', isUnilateral: false, ratioIsTotal: true },
 
   // ── SECONDARY PULL UPPER (p220) — ⛔ THIS CELL WAS COMPLETELY EMPTY ──────────────────────────────
   'kroc row':        { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.55, displayFormat: 'total', isUnilateral: true },
   't-bar row':       { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.75, displayFormat: 'total', isUnilateral: false },
   'meadows row':     { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.45, displayFormat: 'total', isUnilateral: true },
-  'gorilla row':     { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.50, displayFormat: 'total', isUnilateral: true },
+  // Per hand the same way (2026-09-25): two dumbbells on the floor, rowed one at a time; 0.50 stays the pair's number.
+  'gorilla row':     { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.50, displayFormat: 'perHand', isUnilateral: true, ratioIsTotal: true },
   'db pullover':     { pattern: 'vertical_pull',   primaryRef: 'bench', ratio: 0.35, displayFormat: 'total', isUnilateral: false },
 
   // ── SECONDARY HINGE / PRESS LOWER (p220) ────────────────────────────────────────────────────────
@@ -2572,7 +2570,9 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // its gear route is `[['dumbbells', 'bench']]` and the athlete logs a per-hand weight. `total` had it
   // reading as one loaded bar, and the logger drew plate math and a 45 lb bar under it.
   'tate press':     { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'perHand', isUnilateral: false },
-  'skull crusher':  { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  // Per hand (2026-09-25): on every declared kit the skull crusher is two dumbbells (`strength-gear.ts` route order) and the
+  // header reads "each"; no ratio, so nothing is halved. The barbell form on an undeclared kit still draws no bar (no `primaryRef`).
+  'skull crusher':  { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'perHand', isUnilateral: false },
   'pec deck':       { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
   // ── FOCUSED PULL / ARMS (p222) — ⛔ ONE OF FIVE WAS PRESENT ─────────────────────────────────────
@@ -2704,6 +2704,8 @@ export interface ConfigResolution {
  */
 export const SAME_MOVEMENT: Record<string, string> = {
   "ab rollout": "ab wheel rollout",
+  // 2026-09-24 (B2): the floor version under a loaded bar is deleted; "Back Extension" is the bench movement.
+  "back extension": "ghd back extension",
   "barbell back squat": "back squat",
   "barbell bench press": "bench press",
   "barbell rows": "barbell row",

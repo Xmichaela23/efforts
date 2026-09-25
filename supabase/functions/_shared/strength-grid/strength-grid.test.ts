@@ -621,21 +621,24 @@ Deno.test('undeclared equipment offers everything; declared equipment gates', ()
   }
 
   // ⛔ A TAGGED MOVEMENT THE ATHLETE CANNOT PERFORM IS EXCLUDED — the gate itself, not just the tag
-  // check. An incline bench press needs a barbell AND an incline bench.
+  // check. An incline bench press needs a barbell AND an incline bench. ⚠️ EVERY DECLARED KIT IS AT LEAST THE
+  // MINIMUM (2026-09-24): "Dumbbells" alone is the minimum kit — bar, rack, bench, dumbbells, pull-up bar — so
+  // the incline is the gate that still bites, and dips (rack or bench) are reachable.
   const dbOnly = resolveSlot({ intent: 'HYP', category: 'secondary', pattern: 'push_upper', equipment: ['Dumbbells'] });
   assert(dbOnly.options.every((o) => o.name !== 'incline bench press'),
-    'a barbell-and-incline-bench movement was offered to a dumbbells-only athlete');
-  assert(dbOnly.options.every((o) => o.name !== 'dips'),
-    'a movement needing a rack or bench was offered to a dumbbells-only athlete');
+    'a barbell-and-incline-bench movement was offered to a kit with no incline bench');
+  assert(dbOnly.options.every((o) => o.name !== 'db incline press'),
+    'a dumbbell-and-incline-bench movement was offered to a kit with no incline bench');
 
-  // A bodyweight athlete must not be handed a barbell movement as if they owned one.
+  // A declared kit is never below the minimum: a pull-up bar alone reaches the bar and bench movements.
   const bw = resolveSlot({ intent: 'ME', category: 'secondary', pattern: 'push_upper', equipment: ['Pull-up bar'] });
   assert(bw.options.every((o) => o.name !== 'incline bench press'),
-    'a barbell-and-bench movement was offered to a bodyweight athlete');
+    'a barbell-and-incline-bench movement was offered to a kit with no incline bench');
+  assert(bw.options.some((o) => o.name === 'close grip bench press'), 'the minimum kit did not reach the bar and bench');
 
-  // And an athlete who owns dumbbells gets a dumbbell answer rather than a bodyweight one.
+  // And an athlete who owns dumbbells gets a loaded answer rather than a bodyweight one.
   const db = resolveSlot({ intent: 'ME', category: 'secondary', pattern: 'push_upper', equipment: ['Dumbbells'] });
-  assert(/dumbbell|db/.test(db.chosen.name), `a dumbbell owner was offered "${db.chosen.name}"`);
+  assert(!/push up|pushup/.test(db.chosen.name), `a dumbbell owner was offered "${db.chosen.name}"`);
 });
 
 Deno.test('a fixed-station movement is not offered to an athlete who declared no station', () => {

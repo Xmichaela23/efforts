@@ -79,7 +79,7 @@ import { roleForExercise, isMainBarbellLift } from '@/lib/exercise-role';
 // table. `isDurationLogged` reads the table (`loggedAs`); `equipmentForExercise` is the transcribed
 // EQUIPMENT axis the table does not carry — see the module header for why it is not derived.
 import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/lib/strength-logging-mode';
-import { barIsTheLoad } from '@/lib/strength-gear';
+import { barIsTheLoad, defaultBarKeyFor } from '@/lib/strength-gear';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
 // The plyo name test, for how a plyo row is drawn. Rest lengths are the server's (`rest_seconds` on the row).
@@ -1263,7 +1263,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       ...(r?.unit && Number(s?.weight) > 0 ? { weight_lb: Number(s.weight) } : {}),
       reps: Number(s?.reps) > 0 ? Number(s.reps) : undefined,
       setType: s?.set_type === 'warmup' ? 'warmup' : 'working',
-      barType: 'standard',
+      // The exercise's own bar (2026-09-25): the trap bar deadlift opens on the trap bar.
+      barType: defaultBarKeyFor(String(r?.name || ''), r?.unit === 'kg' ? 'kg' : 'lb') ?? 'standard',
       completed: false,
       ...(s?.amrap ? { amrap: true } : {}),
       ...(s?.rep_max_test ? { repMaxTest: true } : {}),
@@ -2858,7 +2859,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const plannedSet = plannedSetsFor(exercise)?.[setIndex];
             const baseSet: LoggedSet = {
               weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
-              barType: 'standard',
+              barType: defaultBarKeyFor(exercise.name) ?? 'standard',
               rir: undefined,
               completed: false,
               prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
@@ -2964,7 +2965,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     const plannedSet = plannedSetsFor(exercise)?.[setIndex];
                     const baseSet: LoggedSet = {
                       weight: plannedSet?.weight ?? exercise.weight ?? 0,
-                      barType: 'standard',
+                      barType: defaultBarKeyFor(exercise.name) ?? 'standard',
                       rir: undefined,
                       completed: false,
                       ...(plannedSet?.amrap ? { amrap: true } : null),
@@ -3060,7 +3061,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 const plannedSet = plannedSetsFor(exercise)?.[setIndex];
                 const baseSet: LoggedSet = {
                   weight: isBodyweightMove(exercise.name) ? 0 : (plannedSet?.weight ?? exercise.weight ?? 0),
-                  barType: 'standard',
+                  barType: defaultBarKeyFor(exercise.name) ?? 'standard',
                   rir: undefined,
                   completed: false,
                   prefilled: true, // D-204: plan prefill; cleared on first athlete edit/Done
@@ -3502,7 +3503,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           // max → last logged → baseline proxy) now resolves in one round trip instead of two branches
           // split across a sync call and an async one.
           weight: 0,
-          barType: 'standard',
+          barType: defaultBarKeyFor(nameToAdd) ?? 'standard',
           rir: undefined,
           completed: false,
         };
@@ -3634,7 +3635,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           weight: lastSet?.weight || 0,
           // The copied number is the same number, so its server pounds travel with it (Stage 4 session 4).
           ...(lastSet?.weight_lb != null ? { weight_lb: lastSet.weight_lb } : {}),
-          barType: lastSet?.barType || 'standard',
+          barType: lastSet?.barType || defaultBarKeyFor(exercise.name) || 'standard',
           // D-351: carry the previous set's band value forward, but never SEED one. The old default
           // was the word 'Light'; a numeric default would be an invented load, and blank correctly
           // prices at the flat token until the athlete says what the band is.
@@ -5531,9 +5532,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     : exEquip === 'band' ? (exUnit === 'kg' ? 'Band kg' : 'Band lb')
                     : exercise.weight_per === 'each' ? (exUnitWord ? `${exUnitWord} each` : '')
                     : exUnitWord;
-                  // The bar the chip and the plates read: the set's own if it is one of this unit's bars, else the unit's first.
+                  // The bar the chip and the plates read: the set's own if it is one of this unit's bars, else the exercise's own
+                  // default (the trap bar for the trap bar deadlift, 2026-09-25; `defaultBarKeyFor`), else the unit's first.
                   const exBarKeys = barKeysForUnit(exUnit ?? 'lb');
-                  const exBarKeyFor = (bt?: string) => (bt && exBarKeys.includes(bt) ? bt : exBarKeys[0]);
+                  const exBarKeyFor = (bt?: string) => (bt && exBarKeys.includes(bt) ? bt : (defaultBarKeyFor(exercise.name, exUnit ?? 'lb') ?? exBarKeys[0]));
 
                   // The RIR column — the SAME gate the tall card's RIR cell carried, unchanged.
                   // ⚠️ The card's ±1 nudge strip carried one EXTRA gate (`!sourcePlannedId`, the

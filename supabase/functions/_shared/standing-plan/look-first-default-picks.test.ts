@@ -28,17 +28,18 @@ Deno.test('⛔ the defaults Michael ruled, per plan and kit', () => {
     assertEquals(defaultViadaPicks(HOME, [], f).hinge_lower, 'romanian deadlift');
     // p223's hip thrust at a gym; the barbell one, a marked stand-in, where the kit has neither (2026-09-18).
     assertEquals(defaultViadaPicks(GYM, [], f).single_leg_a, 'machine hip thrust');
-    assertEquals(defaultViadaPicks(HOME, [], f).single_leg_a, 'hip thrust');
+    // The barbell hip thrust is filed as p223's variant (2026-09-25); the bench-only stand-in name is gone.
+    assertEquals(defaultViadaPicks(HOME, [], f).single_leg_a, 'barbell hip thrust');
     for (const kit of [GYM, HOME]) {
       assertEquals(defaultViadaPicks(kit, [], f).iso_push, 'lateral raise');
     }
   }
   for (const kit of [GYM, HOME]) assertEquals(defaultViadaPicks(kit, [], 'strength_5k').db_press, 'arnold press');
   assertEquals(defaultViadaPicks(GYM, [], 'all_rounder').ham_iso, 'machine hip thrust');
-  assertEquals(defaultViadaPicks(HOME, [], 'all_rounder').ham_iso, 'hip thrust');
+  assertEquals(defaultViadaPicks(HOME, [], 'all_rounder').ham_iso, 'barbell hip thrust');
   // The home hip thrust is marked as a stand-in, like every other.
   const homeHam = pickOptions('ham_iso', HOME, frameMuscleForPick('ham_iso', 'all_rounder'), frameAdmitsForPick('ham_iso', 'all_rounder'));
-  assertEquals(homeHam[0].name, 'hip thrust');
+  assertEquals(homeHam[0].name, 'barbell hip thrust');
   assert(homeHam[0].substituted === true, 'the barbell hip thrust is not marked as a stand-in');
   assertEquals(defaultViadaPicks(GYM, [], 'all_rounder').braced_pull, 'lat pulldown');
 });
@@ -65,7 +66,8 @@ Deno.test('⛔ Day 2 speed hinge row: only p220 movements, and the Hinge variati
 Deno.test('⛔ Day 2 builds the hip thrust on the accessory lower row with the defaults, sets and reps unchanged', () => {
   for (const f of ['strength_5k', 'cycling_base'] as const) {
     const rows = day2(f, HOME_KB, defaultViadaPicks(HOME_KB, [], f) as Record<string, string>);
+    // The trap bar deadlift needs the trap bar chip (2026-09-24, B4); a home kit falls to p219's sumo deadlift.
     assertEquals(rows.map((e) => `${e.slot_intent}:${e.name}:${e.sets}x${e.reps}`),
-      ['ME:Back Squat:1x1-5', 'ME:Trap Bar Deadlift:1x1-5', 'DE:KB Swing:4x2-4', 'HYP:Hip Thrust:3x6-12']);
+      ['ME:Back Squat:1x1-5', 'ME:Sumo Deadlift:1x1-5', 'DE:KB Swing:4x2-4', 'HYP:Barbell Hip Thrust:3x6-12']);
   }
 });

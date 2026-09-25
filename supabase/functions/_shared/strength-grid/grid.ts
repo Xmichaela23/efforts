@@ -28,7 +28,6 @@ import {
   CATEGORY_DEFINITION,
   filingOf,
   STAND_INS,
-  HIP_THRUST_STAND_IN,
   isAsymmetrical,
   equipmentFitRank,
   isGearTagged,
@@ -175,6 +174,16 @@ export function isBodyweightLoad(name: string): boolean {
  * ⚠️ AND IT IS A TIEBREAK, NEVER A GATE. It moves nothing between fit tiers: a band-tier movement
  * still sorts below every loadable one whichever way it is drawn, and nothing is excluded.
  */
+/**
+ * ⛔ AND THE PAGE'S OWN PRINTING BEFORE OUR READING OF IT (2026-09-24, minimum-kit work order, audit check 2.6). Among
+ * movements the kit reaches equally well, one the page PRINTS for the cell sorts ahead of a variant (the definition's
+ * own words) and a variant ahead of a judged one (ours) — `FILING`'s basis, the 2026-09-18 rule "the page's printed
+ * list for the slot, extended only by the definition's own words". Measured before this: a dumbbell kit's braced
+ * pull substitutes led with the DB row (variant) over the Kroc, T-bar, Meadows and gorilla rows p220 prints, and its
+ * quad row with the Bulgarian split squat (judged) over the split squat and lunges p220 prints, on catalogue order
+ * alone. A tiebreak, never a gate: equipment fit and the bodyweight demotion still come first.
+ */
+const BASIS_RANK: Record<string, number> = { printed: 0, variant: 1, judged: 2 };
 function rank(movements: GridMovement[], equipment: string[] | null | undefined): GridMovement[] {
   const demoteBodyweight = ownsLoadingImplement(equipment);
   return movements
@@ -183,12 +192,14 @@ function rank(movements: GridMovement[], equipment: string[] | null | undefined)
       i,
       r: equipmentFitRank(m.name, equipment),
       bw: demoteBodyweight && isBodyweightLoad(m.name) ? 1 : 0,
+      basis: BASIS_RANK[filingOf(m.name)?.basis ?? ''] ?? 3,
     }))
     .sort((a, b) => {
       const ar = a.r == null ? Number.MAX_SAFE_INTEGER : a.r;
       const br = b.r == null ? Number.MAX_SAFE_INTEGER : b.r;
       if (ar !== br) return ar - br;
       if (a.bw !== b.bw) return a.bw - b.bw;
+      if (a.basis !== b.basis) return a.basis - b.basis;
       return a.i - b.i;
     })
     .map((x) => x.m);
@@ -275,16 +286,6 @@ export function cellOptions(
 }
 
 /**
- * The barbell hip thrust as a marked stand-in, when the kit reaches neither hip thrust p223 prints; null otherwise
- * (`HIP_THRUST_STAND_IN`, Michael 2026-09-18).
- */
-export function hipThrustStandIn(equipment: string[] | null | undefined): GridMovement | null {
-  if (HIP_THRUST_STAND_IN.printed.some((n) => reachable(n, equipment))) return null;
-  if (!reachable(HIP_THRUST_STAND_IN.name, equipment)) return null;
-  return { name: HIP_THRUST_STAND_IN.name, category: 'focused', pattern: 'hinge_lower', asymmetrical: false, standIn: true };
-}
-
-/**
  * ⛔ TWO DUMBBELLS, ONE PER HAND (Michael, 2026-09-18): the logger's weight column reads "LB EACH" / "KG EACH" on these
  * rows when the kit does them with dumbbells; barbell, machine and one-dumbbell rows keep "LB" / "KG". Read off each
  * movement's approved how-to ("a dumbbell in each hand", "two dumbbells"). One-dumbbell movements (DB row, Kroc row, DB
@@ -294,11 +295,14 @@ export function hipThrustStandIn(equipment: string[] | null | undefined): GridMo
 const TWO_DUMBBELLS = new Set([
   'db bench press', 'db incline press', 'db floor press', 'db shoulder press', 'db push press', 'seated db press',
   'arnold press', 'chest fly', 'lateral raise', 'front raise', 'rear delt fly', 'rear delt machine', 'tate press',
-  'skull crusher', 'dumbbell curl', 'hammer curl', 'spider curl', 'drag curl', 'db romanian deadlift',
+  // ⚠️ `drag curl` LEFT THIS LIST 2026-09-24 (B5): its route is the barbell alone.
+  'skull crusher', 'dumbbell curl', 'hammer curl', 'spider curl', 'db romanian deadlift',
   'romanian deadlift', 'stiff-legged deadlift', 'weighted single leg calf raise', 'farmers carry', 'gorilla row',
   // ACE's lunge: "grip one dumbbell in each hand" — bodyweight on a kit with no dumbbells. The walking and reverse
   // lunges and the Bulgarian split squat the same (Michael, 2026-09-18; their how-tos hold a dumbbell in each hand).
-  'lunge', 'walking lunge', 'reverse lunge', 'bulgarian split squat',
+  // ⛔ AND THE SPLIT SQUAT (2026-09-24, B6): its first route is dumbbells, one in each hand, like the lunges beside
+  // it — it logged one bare total. On a kit whose only route to it is the bar it keeps "LB".
+  'lunge', 'walking lunge', 'reverse lunge', 'bulgarian split squat', 'split squat',
 ]);
 /**
  * Does this row use two dumbbells on this kit? A movement done only with dumbbells always does. One the kit could
@@ -322,7 +326,7 @@ export function usesTwoDumbbellsOnKit(name: string, equipment: string[] | null |
 }
 
 /** The keys that put weight in the athlete's hands, in the order a route names them. */
-const IMPLEMENT_KEYS: readonly GearKey[] = ['machine', 'barbell', 'dumbbells', 'kettlebell', 'cable', 'bands'];
+const IMPLEMENT_KEYS: readonly GearKey[] = ['machine', 'barbell', 'trap_bar', 'dumbbells', 'kettlebell', 'cable', 'bands'];
 
 /**
  * ⛔ WHAT THIS KIT HOLDS THE MOVEMENT WITH (2026-09-24, the arms superset). The same route the name and the "each"
@@ -341,6 +345,45 @@ export function implementOnKit(name: string, equipment: string[] | null | undefi
   const route = station ?? routes.find((r) => r.every((k) => keys.has(k)));
   if (!route) return null;
   return IMPLEMENT_KEYS.find((k) => route.includes(k)) ?? null;
+}
+
+/**
+ * ⛔ THE STORED NAME FOLLOWS THE MOVEMENT THE ATHLETE DOES (2026-09-24, B7). Where a kit resolves his name to a
+ * DIFFERENT MOVEMENT — not merely a different implement — the row is stored under that movement's own catalogue
+ * entry, so the logger keys history on it and the Swap sheet lists what the row is. Implement-only renames (the
+ * chest-supported row on an incline bench, the dumbbell leg curl, the bench reverse hyper) stay `execution_name`
+ * on his name. One entry today: p222's rear delt machine on a kit with dumbbells and no incline bench is the
+ * bent-over dumbbell rear delt fly — a different body position (`strength-gear.ts`, the 2026-08-29 note) — and the
+ * catalogue holds it as `rear delt fly` (p222 variant). Station owned, or the chest-supported incline route: his name.
+ * ⚠️ HISTORY: sets logged before this date under "Rear Delt Machine" on such a kit sit under that key; the new rows
+ * key on "Rear Delt Fly". Nothing is rewritten.
+ */
+const EXECUTION_MOVEMENT: Record<string, { route: GearKey[]; value: string | null }[]> = {
+  'rear delt machine': [
+    { route: ['machine'], value: null },
+    { route: ['dumbbells', 'incline_bench'], value: null },
+    { route: ['dumbbells'], value: 'rear delt fly' },
+  ],
+};
+export function executionMovement(name: string, equipment: string[] | null | undefined): string {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return name;
+  const entry = EXECUTION_MOVEMENT[foldExerciseName(name)];
+  if (!entry) return name;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  const hit = entry.find((e) => e.route.every((k) => keys.has(k)));
+  return hit?.value ?? name;
+}
+
+/**
+ * ⛔ THE LOGGED FORMAT FOLLOWS THE IMPLEMENT (2026-09-24, B8): a `perHand` movement done on the station logs one
+ * total — the chest-supported row is per hand with two dumbbells on the incline bench and one number on the machine.
+ * Everything else is the catalogue's own `displayFormat`. Read where a row's weight is displayed or priced per hand.
+ */
+export function displayFormatOnKit(name: string, equipment: string[] | null | undefined): string | null {
+  const fmt = resolveExerciseConfig(name).config?.displayFormat ?? null;
+  if (fmt === 'perHand' && implementOnKit(name, equipment) === 'machine') return 'total';
+  return fmt;
 }
 
 /** The builder's own reach test (declared kit, gear-tagged movement), for a list the builder already chose. */
@@ -633,20 +676,8 @@ function byRoute<T>(entry: ByRoute<T>, keys: Set<string>, fallback: T): T {
  * resolved.
  */
 const EXECUTION_NAME: Record<string, ByRoute<string>> = {
-  /**
-   * ⛔⛔ "BACK EXTENSION" IS NOT AN INSTRUCTION — Michael, 2026-08-30: *which version, and what does
-   * a home athlete actually do?* There are four in common use — a 45-degree bench, a GHD, a flat
-   * bench, and the floor — and the row said two words. The catalogue holds the GHD and the machine
-   * versions under their own names, so this entry is by elimination the non-machine one, and its
-   * gear route says which: `[['barbell']]`, the same anchor the kneel-and-lower family uses —
-   * *"feet under a loaded bar, which is what most people actually do."* Its config is
-   * `displayFormat: 'bodyweight'` at `ratio: 0.0`, so the bar is the ANCHOR and not the load.
-   * ⚠️ THE ATHLETE WAS NEVER TOLD ANY OF THAT. This is the fact they need to perform the row, in
-   * their own words, and it is display only — the canonical name is unchanged.
-   */
-  // ⚠️ PARENTHESES, NOT A DASH. The substitute mark appends " - for your gear", and two dashes in one
-  // option read as a run-on: *"Back Extension - feet under a loaded bar - for your gear"*.
-  'back extension': 'Back Extension',
+  // ⛔ THE FLOOR `back extension` ENTRY IS GONE (2026-09-24, B2) with the movement — see `strength-gear.ts`. The name
+  // "Back Extension" belongs to the GHD back extension on a bench below.
   /**
    * ⛔ THE LATERAL RAISE, NAMED FOR THE KIT WHEN THE PLAN IS BUILT (2026-09-17, clean-up batch item 3, option b). The
    * names are the ones materialize-plan's older equipment swap printed ("Dumbbell Lateral Raise", "Band Lateral
@@ -707,17 +738,14 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   // ⛔ THE DUMBBELL SKULL CRUSHER (Michael, 2026-09-18): the lying dumbbell extension, folded into p222's skull crushers.
   // ⛔ AND THE ROW SAYS WHAT IT IS HELD WITH, ON EVERY KIT (Michael, 2026-09-24, `docs/WORKORDER-arms-superset-
   // implement-2026-09-24.md`): the arms superset is built on one implement — dumbbells when the kit has them, the bar
-  // only when it does not (`strength-gear.ts` route order) — and the three p222 arm movements a kit could do either
+  // only when it does not (`strength-gear.ts` route order) — and the p222 arm movements a kit could do either
   // way carry it in the name, the way Strong and Hevy do ("Skullcrusher (Dumbbell)"). "DB", the catalogue's own form
   // (`db bench press`, `DB Romanian Deadlift`; `strength/shown-name.ts`). Dumbbells first: `byRoute` takes the first
   // entry the kit reaches. The canonical name underneath is unchanged, so logged history keys as before.
+  // ⚠️ THE DRAG CURL LEFT THIS TABLE 2026-09-24 (B5): barbell only, so "Drag Curl" needs no implement in the name.
   'skull crusher': [
     { route: ['dumbbells'], value: 'DB Skull Crusher' },
     { route: ['barbell'], value: 'Barbell Skull Crusher' },
-  ],
-  'drag curl': [
-    { route: ['dumbbells'], value: 'DB Drag Curl' },
-    { route: ['barbell'], value: 'Barbell Drag Curl' },
   ],
   'spider curl': [
     { route: ['dumbbells', 'incline_bench'], value: 'DB Spider Curl' },
@@ -728,15 +756,8 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
     { route: ['barbell'], value: 'Stiff-Legged Deadlift' },
     { route: ['dumbbells'], value: 'Dumbbell Stiff-Legged Deadlift' },
   ],
-  /**
-   * ⛔ THE CONCENTRATION CURL (Michael, 2026-09-10 — the third home route in the same addendum:
-   * "a bench, a rack and dumbbells is a pretty standard home gym"). The preacher curl's station
-   * fixes the upper arm on a pad; at home the inner knee fixes it, seated on the bench, one arm at
-   * a time. Same braced-arm biceps intent. Viada p275 permits the implement change (variety of
-   * implements); the substitution itself is field-standard, not a page. The station route keeps
-   * his name, because a gym member walks over to the preacher bench.
-   */
-  'preacher curl': 'Concentration Curl',
+  // ⛔ THE CONCENTRATION CURL IS GONE (2026-09-24, B5): the preacher curl is station-only again (`strength-gear.ts`),
+  // and a kit with dumbbells curls with the dumbbell curl. The 2026-09-10 home route is history.
   /**
    * ⛔⛔ THE CURL HAS A HOME EXECUTION AND THE NAME HAS TO SAY WHICH (2026-08-31). `leg curl` gained a
    * bench-and-dumbbell route so p223's hamstring curl is reachable without a stack — and it went on
@@ -802,8 +823,7 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Dumbbell Arnold Press" — https://exrx.net/WeightExercises/DeltoidAnterior/DBArnoldPress' },
   'b skip': { text: 'Skip forward as for an A-skip. At the top of each knee lift, straighten the leg out in front of you. Pull the foot down and back so it brushes the ground backwards as it lands under you. Swing your arms as you do when running.',
     source: 'Adam Hodges, PhD (USAT coach) / TrainingPeaks, "8 Running Drills to Improve Your Running Form" — https://www.trainingpeaks.com/blog/drills-for-proper-running-form/; Viada p227 names it' },
-  'back extension': { text: 'Lie face down on the floor with your feet hooked under a loaded barbell. Hands behind your head or across your chest. Raise your chest and shoulders off the floor as far as you can, pause, then lower. Keep your feet down and your neck in line with your back.',
-    source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' },
+  // ⚠️ The floor `back extension` how-to left with the movement (2026-09-24, B2); `ghd back extension` carries the words.
   'back squat': { text: 'Set the bar across your upper back, below the bony part of your neck, and stand with feet about shoulder-width apart, toes turned slightly out. Take a breath and hold it, then bend at the hips and knees together until your thighs are at least parallel to the floor. Stand back up. Keep your chest up and your knees in line with your toes.',
     source: 'ExRx, "Barbell Squat" — https://exrx.net/WeightExercises/Quadriceps/BBSquat' },
   'band lateral raise': { text: 'Stand on the middle of a band with both feet and hold the ends at your sides with an overhand grip. Lift your hands to shoulder height, pause, then lower them slowly.',
@@ -1047,12 +1067,9 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'Stephen Sheehan, CPT / Garage Gym Reviews, "18 Trainer-Approved Weight Plate Exercises" (Weight Plate Front Raise) — https://www.garagegymreviews.com/weight-plate-exercises' },
   'pogo hops': { text: 'Stand up straight with your feet hip-width apart, arms relaxed at your sides and knees slightly bent. Make small, quick hops off the balls of your feet, just high enough to leave the ground. Land quietly on the balls of your feet and hop again straight away.',
     source: 'Ryan Horton, CSCS / Horton Barbell, "Low Pogo Hops (How To, Benefits, Common Mistakes)" — https://hortonbarbell.com/low-pogo-hops-how-to-benefits-common-mistakes/; Viada p227 names it' },
-  'preacher curl': [
-    { route: ['machine'], value: { text: 'Sit at the preacher bench with the backs of your upper arms flat on the pad, holding the bar or handles with your palms up. Curl the weight up toward your shoulders, then lower it until your arms are nearly straight. Keep your upper arms on the pad.',
-      source: 'ExRx, "Barbell Preacher Curl" — https://exrx.net/WeightExercises/Brachialis/BBPreacherCurl' } },
-    { route: ['dumbbells', 'bench'], value: { text: 'Sit on the end of a flat bench with your feet wide and a dumbbell in one hand, arm hanging between your legs. Brace the back of that upper arm against the inside of the same-side knee. Curl the dumbbell up toward your shoulder, pause, then lower until your arm is straight. Keep the upper arm on the knee. Do all reps on one arm, then the other.',
-      source: 'OURS — Michael\'s approved words (docs/STATE-SOURCES.md, \'Exercise how-to lines\')' } },
-  ],
+  // ⚠️ The concentration-curl (dumbbells + bench) words left with that route (2026-09-24, B5); station only.
+  'preacher curl': { text: 'Sit at the preacher bench with the backs of your upper arms flat on the pad, holding the bar or handles with your palms up. Curl the weight up toward your shoulders, then lower it until your arms are nearly straight. Keep your upper arms on the pad.',
+    source: 'ExRx, "Barbell Preacher Curl" — https://exrx.net/WeightExercises/Brachialis/BBPreacherCurl' },
   'prone y t w raise': { text: 'Lie face down on the floor, arms straight above your head and thumbs up. Lift your arms off the floor in a Y shape, then lower them. Move them out to the sides in a T, lift and lower. Bend your elbows and pull them down into a W, lift and lower.',
     source: 'ACE, "Prone Scapular (Shoulder) Stabilization Exercises" — https://www.acefitness.org/resources/everyone/exercise-library/249/prone-scapular-shoulder-stabilization-series-i-y-t-w-o-formation/' },
   'pull up': { text: 'Hang from a bar with your hands just wider than your shoulders, palms facing away. Pull yourself up until your chin is over the bar, then lower until your arms are straight. Keep your legs still and do not swing.',
@@ -1219,8 +1236,9 @@ export function executionHowTo(name: string, equipment: string[] | null | undefi
  * kit, do not rename it". Every movement has words now, so the question gets its own answer, unchanged: the same 14
  * names and the same station test.
  */
+// ⚠️ `preacher curl` and the floor `back extension` left this list 2026-09-24 (B5, B2) with their home routes.
 const HOME_ROUTE_MOVEMENTS = new Set([
-  'rear delt machine', 'preacher curl', 'back extension', 'leg curl', 'leg curls', 'lying leg curl',
+  'rear delt machine', 'leg curl', 'leg curls', 'lying leg curl',
   'hamstring curl', 'chest supported row', 'reverse hyper', 'calf raise', 'calf raises', 'ghd back extension',
   'weighted reverse hyper',
 ]);

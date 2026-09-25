@@ -14,10 +14,10 @@ export type RebuildResult = 'rebuilt' | 'nothing' | 'failed';
  * Baselines and stores it as the block's own (`rematerialize-standing-block`, `use_current_equipment`); without it the
  * block keeps the kit it has, because new equipment can change which movement a session uses.
  */
-export async function rebuildUpcomingSessions(opts: { useCurrentEquipment?: boolean } = {}): Promise<RebuildResult> {
+export async function rebuildUpcomingSessions(opts: { useCurrentEquipment?: boolean; deadliftForm?: 'barbell' | 'trap_bar' } = {}): Promise<RebuildResult> {
   try {
     const { data, error } = await supabase.functions.invoke('rematerialize-standing-block', {
-      body: { apply: true, ...(opts.useCurrentEquipment ? { use_current_equipment: true } : {}) },
+      body: { apply: true, ...(opts.useCurrentEquipment ? { use_current_equipment: true } : {}), ...(opts.deadliftForm ? { deadlift_form: opts.deadliftForm } : {}) },
     });
     if (error) throw error;
     window.dispatchEvent(new CustomEvent('week:invalidate'));

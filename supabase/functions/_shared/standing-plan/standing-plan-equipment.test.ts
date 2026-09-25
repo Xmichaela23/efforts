@@ -352,7 +352,8 @@ Deno.test('⛔ AND A RESTATE THAT LOSES THE KIT IS THE BUG — the fixture prove
    * round-trip above would pass with the storage deleted and the pin would be decoration.
    */
   const gated = namesIn(week(HOME_GYM));
-  const ungated = namesIn(week(['Bands']));
+  // The undeclared kit (2026-09-24: a bands-only list is a declared kit and reads as the minimum plus bands).
+  const ungated = namesIn(week(null));
   assert(JSON.stringify(gated) !== JSON.stringify(ungated),
     'the gate makes no difference to this week — the round-trip pin above proves nothing');
 });

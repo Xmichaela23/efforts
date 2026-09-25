@@ -8,6 +8,8 @@ import { swapGroupsFor } from './swap-groups.ts';
 import { cellOptions, filingOf, STAND_INS } from '../strength-grid/index.ts';
 
 const GYM = ['Commercial gym'];
+// ⛔ EVERY DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24): barbell, rack, bench, dumbbells, pull-up bar. "Dumbbells +
+// bench" reads as the minimum; the assertions below say what the minimum kit's bar adds.
 const HOME = ['Dumbbells', 'Bench (flat/adjustable)'];
 const names = (g: ReturnType<typeof swapGroupsFor>) => g.flatMap((x) => x.options.map((o) => o.name));
 
@@ -19,7 +21,9 @@ Deno.test('⛔ THE REQUIRED CHECK: Seated DB Press offers p220 secondary upper p
     // p220 files the incline bench here, and the decline with it (Michael, 2026-09-18).
     'decline bench press']));
   assertEquals(new Set(names(swapGroupsFor('Seated DB Press', HOME))),
-    new Set(['arnold press', 'db bench press', 'db shoulder press', 'db floor press', 'db push press']));
+    new Set(['arnold press', 'db bench press', 'db shoulder press', 'db floor press', 'db push press',
+      // The minimum kit's bar and rack reach p220's barbell secondaries too (2026-09-24); the incline still needs its chip.
+      'larsen press', 'close grip bench press', 'jm press', 'decline bench press']));
   // The incline needs the incline bench chip (a flat/adjustable bench is not incline, 2026-08-29).
   assert(names(swapGroupsFor('Seated DB Press', [...HOME, 'Incline bench'])).includes('db incline press'));
 });
@@ -61,15 +65,17 @@ Deno.test('⛔ THE KIT\'S OWN NAME: no machine name without the machine; the dum
   // The pullover is p220's DB pullover at home, on the Secondary pull row, not here (Michael, 2026-09-18).
   assert(!home.includes('Flat-Bench DB Pullover') && !home.includes('Flat-Bench Dumbbell Pullover'), home.join(', '));
   const hinge = swapGroupsFor('Romanian Deadlift', HOME).flatMap((g) => g.options.map((o) => o.display));
-  // The book's "DB" habit on every dumbbell name (Michael, 2026-09-18, `strength/shown-name.ts`).
-  assert(hinge.includes('DB Stiff-Legged Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
+  // The minimum kit has a bar (2026-09-24), so the stiff-legged deadlift is his barbell one; the DB Romanian deadlift is
+  // its own option beside it (the book's "DB" habit, `strength/shown-name.ts`).
+  assert(hinge.includes('Stiff-legged Deadlift') && hinge.includes('DB Romanian Deadlift') && !hinge.includes('Sandbag Throw'), hinge.join(', '));
   assert(swapGroupsFor('Romanian Deadlift', [...HOME, 'Sandbag']).flatMap((g) => g.options.map((o) => o.display)).includes('Sandbag Throw'));
 });
 
 Deno.test('⛔ ONE NAME PER MOVEMENT ON A KIT (Michael, 2026-09-18)', () => {
   const HOME_DB = ['Dumbbells', 'Bench (flat/adjustable)'];
   const hinge = swapGroupsFor('Single Leg RDL', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
-  assertEquals(hinge.filter((d) => /romanian deadlift/i.test(d)), ['DB Romanian Deadlift']);
+  // On the minimum kit (a bar and dumbbells, 2026-09-24) the two Romanian deadlifts are two executions, one name each.
+  assertEquals(hinge.filter((d) => /romanian deadlift/i.test(d)), ['Romanian Deadlift', 'DB Romanian Deadlift']);
   const pull = swapGroupsFor('Drag Curl', HOME_DB).flatMap((g) => g.options.map((o) => o.display));
   assertEquals(pull.filter((d) => /rear delt/i.test(d)), ['Bent-Over DB Rear Delt Fly']);
   // A commercial gym has a sandbag, as it has a sled.
@@ -83,7 +89,10 @@ Deno.test('⛔ "EACH" ON TWO-DUMBBELL ROWS ONLY (Michael, 2026-09-18)', async ()
   // built on dumbbells where the kit has them, `strength-gear.ts` route order); a bar-only kit keeps one total.
   assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', HOME_DB), true);
   assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', GYM), true);
-  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', ['Barbell', 'Bench (flat/adjustable)']), false);
+  // A "bar + bench" list is a declared kit, so it is the minimum and has dumbbells (2026-09-24); only an undeclared kit
+  // reads one total for a movement the routes could hold either way.
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', ['Barbell', 'Bench (flat/adjustable)']), true);
+  assertEquals(usesTwoDumbbellsOnKit('Skull Crusher', null), false);
   // Dumbbell-only movements read "each" on any kit.
   assertEquals(usesTwoDumbbellsOnKit('DB Bench Press', GYM), true);
   assertEquals(usesTwoDumbbellsOnKit('Seated DB Press', null), true);
@@ -94,7 +103,9 @@ Deno.test('⛔ "EACH" ON TWO-DUMBBELL ROWS ONLY (Michael, 2026-09-18)', async ()
   // A gym does the rear delt machine on the machine; at home it is two dumbbells.
   assertEquals(usesTwoDumbbellsOnKit('Rear Delt Machine', GYM), false);
   assertEquals(usesTwoDumbbellsOnKit('Rear Delt Machine', HOME_DB), true);
-  // The Romanian deadlift is the barbell at a gym, dumbbells at home.
+  // The Romanian deadlift is the barbell one wherever there is a bar — every declared kit since 2026-09-24 (the minimum);
+  // the DB Romanian deadlift is its own row and reads "each".
   assertEquals(usesTwoDumbbellsOnKit('Romanian Deadlift', GYM), false);
-  assertEquals(usesTwoDumbbellsOnKit('Romanian Deadlift', HOME_DB), true);
+  assertEquals(usesTwoDumbbellsOnKit('Romanian Deadlift', HOME_DB), false);
+  assertEquals(usesTwoDumbbellsOnKit('DB Romanian Deadlift', HOME_DB), true);
 });

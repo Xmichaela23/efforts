@@ -2243,6 +2243,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       assistancePicks: { ...st.assistancePicks, viada: { ...cur, picks: { ...(cur.picks ?? {}), [key]: name } } as ViadaAccessoryPrefs },
     };
   });
+  // ⛔ THE DEADLIFT FORM — barbell or trap bar — chosen on the lift (2026-09-25, `builder.setup.deadlift_form`). Rides the
+  // same pick block to the server (`assistance_picks.viada.deadlift_form`); the number is not adjusted.
+  const deadliftFormRow = builder?.setup?.deadlift_form ?? null;
+  const chosenDeadliftForm = state.assistancePicks.viada?.deadlift_form ?? deadliftFormRow?.default ?? 'barbell';
+  const setViadaForm = (form: 'barbell' | 'trap_bar') => setState((st) => {
+    const cur = st.assistancePicks.viada ?? { version: 1 as const, picks: {}, dial: [], dial_rows: {} };
+    return { ...st, assistancePicks: { ...st.assistancePicks, viada: { ...cur, deadlift_form: form } as ViadaAccessoryPrefs } };
+  });
   const isRaceGoal = state.goal === 'marathon';
   /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
   const raceDiscipline: Discipline = RACE_DISCIPLINE[state.raceDistance] ?? 'run';
@@ -5247,6 +5255,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     </div>
                   );
                 })}
+                {deadliftFormRow ? (
+                  <div>
+                    {/* The deadlift's form (2026-09-25): the lift's own name as the label, the owner's two words as chips. */}
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="text-white/85 text-sm">{deadliftFormRow.label}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {deadliftFormRow.options.map((o) => (
+                        <GalaxyButton key={o.value} shape="chip" variant={chosenDeadliftForm === o.value ? 'primary' : 'secondary'}
+                          aria-pressed={chosenDeadliftForm === o.value} className={chosenDeadliftForm === o.value ? 'text-white' : 'text-white/55'}
+                          onClick={() => setViadaForm(o.value)}>{o.label}</GalaxyButton>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <p className="text-white/70 text-sm leading-relaxed">{buildFocus.dose_line}</p>
             </div>

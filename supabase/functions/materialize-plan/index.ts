@@ -59,7 +59,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
-import { executionHowTo, executionName, homeRouteOnKit, usesTwoDumbbellsOnKit } from '../_shared/strength-grid/grid.ts';
+import { displayFormatOnKit, executionHowTo, executionName, homeRouteOnKit, usesTwoDumbbellsOnKit } from '../_shared/strength-grid/grid.ts';
 import { canPerform } from '../../../src/lib/strength-gear.ts';
 import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
 import { liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
@@ -1316,10 +1316,13 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   // Check for gym access (old and new naming conventions)
   const hasGymAccess = equipment.includes('Full commercial gym access') || equipment.includes('Commercial gym');
   
+  // ⛔ A DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24, `MINIMUM_KIT_KEYS` in `src/lib/strength-gear.ts`): barbell,
+  // rack, bench, dumbbells and a pull-up bar under any non-empty list; the chips name extras only.
+  const onMinimum = equipment.length > 0;
   // Check for specific equipment (supporting both old and new names)
-  const hasBarbell = hasGymAccess || equipment.includes('Full barbell + plates') || equipment.includes('Barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Squat rack / Power cage');
-  const hasDumbbells = hasGymAccess || equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Dumbbells');
-  const hasBench = hasGymAccess || equipment.includes('Bench (flat/adjustable)');
+  const hasBarbell = onMinimum || hasGymAccess || equipment.includes('Full barbell + plates') || equipment.includes('Barbell + plates') || equipment.includes('Squat rack or power cage') || equipment.includes('Squat rack / Power cage');
+  const hasDumbbells = onMinimum || hasGymAccess || equipment.includes('Adjustable dumbbells') || equipment.includes('Fixed dumbbells') || equipment.includes('Dumbbells');
+  const hasBench = onMinimum || hasGymAccess || equipment.includes('Bench (flat/adjustable)');
   // Added 2026-08-13 with the Forever assistance catalog. ⛔ `hasAbWheel` deliberately does NOT read
   // `hasGymAccess`: a rack and a cable stack are what a commercial gym IS, a ten-dollar ab wheel is
   // not, and plenty of gyms stock none. Same reasoning as `hasAbWheel` in
@@ -1331,7 +1334,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   // ONLY thing standing between a home athlete and a machine they do not own, since the gate on
   // `Leg Curl` was removed for the same reason. Do not weaken both halves.
   const hasLegCurlMachine = hasGymAccess;
-  const hasPullUpBar = hasGymAccess || equipment.includes('Pull-up bar');
+  const hasPullUpBar = onMinimum || hasGymAccess || equipment.includes('Pull-up bar');
   const hasCable = hasGymAccess || equipment.includes('Cable machine/functional trainer') || equipment.includes('Cable machine');
   const hasKettlebells = hasGymAccess || equipment.includes('Kettlebells');
   const hasResistanceBands = equipment.includes('Resistance bands');
@@ -2702,7 +2705,8 @@ export function expandTokensForRow(
             const isMetricA = !!(baselines as any).isMetric;
             const wUnitA = isMetricA ? 'kg' : 'lb';
             prescribed = preResolvedNum as number;
-            if (exerciseConfig?.displayFormat === 'perHand') {
+            // The format the kit logs (2026-09-24, B8): a per-hand movement on its station is one total.
+            if (displayFormatOnKit(name, userEquipment) === 'perHand') {
               weightDisplay = `${prescribed} ${wUnitA} each`;
             } else {
               weightDisplay = `${prescribed} ${wUnitA}`;
@@ -3140,7 +3144,8 @@ export function expandTokensForRow(
             const isMetricB = !!(baselines as any).isMetric;
             const wUnitB = isMetricB ? 'kg' : 'lb';
             prescribed = preResolvedNum2 as number;
-            if (exerciseConfig?.displayFormat === 'perHand') {
+            // The format the kit logs (2026-09-24, B8): a per-hand movement on its station is one total.
+            if (displayFormatOnKit(name, userEquipment) === 'perHand') {
               weightDisplay = `${prescribed} ${wUnitB} each`;
             } else {
               weightDisplay = `${prescribed} ${wUnitB}`;

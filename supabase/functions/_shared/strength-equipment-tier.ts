@@ -58,10 +58,16 @@ export function hasCableMachine(strengthEquipment: string[]): boolean {
   );
 }
 
+// ⛔ A DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24, `MINIMUM_KIT_KEYS` in `src/lib/strength-gear.ts`): barbell,
+// rack, bench, dumbbells, pull-up bar. The four readers below answer true for any non-empty list; an empty list
+// still means "not asked".
+const declared = (strengthEquipment: string[]): boolean => normStrengthEquipmentStrings(strengthEquipment).length > 0;
+
 export function hasBarbellCapability(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
   const some = (sub: string) => n.some((s) => s.includes(sub));
   return (
+    declared(strengthEquipment) ||
     some('commercial gym') ||
     (some('barbell') && some('plate')) ||
     some('squat rack') ||
@@ -112,7 +118,7 @@ export function resolveStrengthEquipmentTypeForPlan(
 /** Detect dumbbell access (any DB chip). Adjustable, fixed, or pair counts all qualify. */
 export function hasDumbbells(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
-  return n.some(
+  return declared(strengthEquipment) || n.some(
     (s) =>
       s.includes('dumbbell') ||
       /\bdb\b/.test(s) ||
@@ -129,7 +135,7 @@ export function hasKettlebell(strengthEquipment: string[]): boolean {
 /** Detect pull-up / chin-up bar access. Drives Pull-ups vs band-assisted pull-down (spec §8.2). */
 export function hasPullUpBar(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
-  return n.some(
+  return declared(strengthEquipment) || n.some(
     (s) =>
       s.includes('pull-up bar') ||
       s.includes('pull up bar') ||
@@ -154,7 +160,7 @@ export function hasPullUpBar(strengthEquipment: string[]): boolean {
 export function hasBench(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
   // ⚠️ "Back extension bench" (D-479) is not a bench to press on.
-  return n.some((s) => s.includes('bench') && !s.includes('back extension'));
+  return declared(strengthEquipment) || n.some((s) => s.includes('bench') && !s.includes('back extension'));
 }
 
 /**

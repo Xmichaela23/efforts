@@ -22,8 +22,8 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, executionHowTo, executionName, hipThrustStandIn, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
-  type ViadaIntent, type ViadaPattern, rirBandFor } from '../strength-grid/index.ts';
+import { bandRouteName, displayFormatOnKit, executionHowTo, executionMovement, executionName, implementOnKit,
+  isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot, type ViadaIntent, type ViadaPattern, rirBandFor } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
@@ -51,8 +51,10 @@ import {
   VIADA_PICKS,
   type ViadaPickKey,
   focusedArmFit,
-  armsOnTheBar,
+  onTheBar,
   frameHasArmsSuperset,
+  isLungeFamily,
+  picksForFrame,
 } from './accessory-picks.ts';
 import {
   FRAMES,
@@ -336,6 +338,9 @@ export type StrengthExercise = {
   /** How to do the home version of a machine movement, in Michael's words (2026-09-08). Display only,
    *  behind an (i) beside the name. Absent when the athlete has the station or the name alone is enough. */
   how_to?: string;
+  /** The page's superset text, shared by both rows of a printed pair (2026-09-03); read back by the day loop so a
+   *  superset never holds two barbell movements (2026-09-24). */
+  superset_group?: string;
   /** A plyo drill's benefit alone ("Benefit: running gait and speed."), p227's table — behind the (i) beside the
    *  drill's name on Today's card (2026-09-20, `plyo.ts plyoBenefitLine`). Absent on every other row. */
   benefit_line?: string;
@@ -1204,9 +1209,22 @@ type PickPool = {
    * has ever built, for a defect nobody has reported. This changes only weeks that carry picks.
    */
   placed: Set<string>;
+  /**
+   * ⛔ A SLOT PICK IS RESERVED FOR ITS CELL (2026-09-25, minimum-kit follow-up 4): canonical name → the pick key that
+   * routes it, for every key this frame draws. Another row — the flat pool's HYP grab, or the grid's own default —
+   * never takes it. Measured: p244's secondary hinge row took the braced hinge pick (the bench reverse hyper) as the
+   * week's first HYP slot, the superset's hinge half fell to the DB Romanian deadlift, and the test week's Friday
+   * (no Tuesday rows) read differently from every other week for the same reason.
+   */
+  routed: Map<string, Set<ViadaPickKey>>;
 };
 
-function pickPool(names: string[] | null | undefined): PickPool {
+function pickPool(
+  names: string[] | null | undefined,
+  slotPicks: Partial<Record<ViadaPickKey, string>> | null | undefined,
+  frame: FrameId,
+  equipment: string[] | null | undefined,
+): PickPool {
   const byFold = new Map<string, string>();
   for (const raw of names ?? []) {
     const name = String(raw ?? '').trim();
@@ -1214,7 +1232,19 @@ function pickPool(names: string[] | null | undefined): PickPool {
     const key = canonicalize(name);
     if (key && key !== 'unknown' && !byFold.has(key)) byFold.set(key, name);
   }
-  return { byFold, unplaced: new Set(byFold.keys()), placed: new Set() };
+  // One name can answer two cells (p274's day-1 and day-4 arms rows both open on the skull crusher): every key holds it.
+  const routed = new Map<string, Set<ViadaPickKey>>();
+  if (slotPicks) {
+    const drawn = new Set(picksForFrame(frame, equipment ?? null));
+    for (const [k, v] of Object.entries(slotPicks)) {
+      const key = k as ViadaPickKey;
+      if (!drawn.has(key) || VIADA_PICKS[key]?.slot == null) continue;
+      const c = canonicalize(String(v ?? '').trim());
+      if (!c || c === 'unknown') continue;
+      routed.set(c, new Set([...(routed.get(c) ?? []), key]));
+    }
+  }
+  return { byFold, unplaced: new Set(byFold.keys()), placed: new Set(), routed };
 }
 
 /**
@@ -1284,6 +1314,12 @@ function exerciseForSlot(
    */
   frameDay: number | null = null,
   /**
+   * ⛔ THE PRINTED SUPERSETS WHOSE FIRST ROW TODAY IS ON THE BARBELL (2026-09-24, B1) — keyed by the row's
+   * `superset_group` text. A superset never holds two barbell movements: the second row of a pair whose first took
+   * the bar ranks every barbell-held option last (`onTheBar`). Filled by the day loop as rows are built.
+   */
+  supersetOnBar: Set<string> = new Set(),
+  /**
    * ⛔ NULL WHEN THE DAY HAS NO MOVEMENT LEFT FOR THIS SLOT — see the drop branch below. The caller
    * skips the slot and says so; it does not print the row above twice.
    */
@@ -1342,7 +1378,8 @@ function exerciseForSlot(
     const admittedNoMuscle = new Set((slot.alsoAdmits ?? []).map((n) => canonicalize(n)));
     const have = new Set(resolved.options.map((o) => canonicalize(o.name)));
     for (const pat of [pattern, ...(['push_upper', 'pull_upper', 'press_lower', 'hinge_lower'] as const).filter((p) => p !== pattern)]) {
-      for (const cat of ['secondary', 'braced', 'focused'] as typeof slot.category[]) {
+      // ⛔ `primary` TOO, FOR A NAMED MOVEMENT ONLY (2026-09-25, follow-up 3): p218's barbell row on p274's DE pull row.
+      for (const cat of ['secondary', 'braced', 'focused', 'primary'] as typeof slot.category[]) {
         if (pat === pattern && cat === slot.category) continue;
         for (const o of resolveSlot({
           category: cat, pattern: pat as typeof pattern, intent: slot.intent,
@@ -1352,11 +1389,6 @@ function exerciseForSlot(
           if (admittedNoMuscle.has(c) && !have.has(c)) { resolved.options.push(o); have.add(c); }
         }
       }
-    }
-    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
-    if (admittedNoMuscle.has(canonicalize('hip thrust')) || admittedNoMuscle.has(canonicalize('barbell hip thrust'))) {
-      const stand = hipThrustStandIn(args.equipment ?? null);
-      if (stand && !have.has(canonicalize(stand.name))) { resolved.options.push(stand); have.add(canonicalize(stand.name)); }
     }
   }
   if (slot.muscle) {
@@ -1406,13 +1438,13 @@ function exerciseForSlot(
         }
       }
     }
-    // The barbell hip thrust, a marked stand-in only where the kit has neither p223 hip thrust (2026-09-18).
-    if (admitted.has(canonicalize('hip thrust')) || admitted.has(canonicalize('barbell hip thrust'))) {
-      const stand = hipThrustStandIn(args.equipment ?? null);
-      if (stand && !resolved.options.some((x) => canonicalize(x.name) === canonicalize(stand.name))) resolved.options.push(stand);
-    }
     const onMuscle = resolved.options.filter((o) => keep(o.name));
-    if (onMuscle.length > 0) {
+    // ⛔ A ROW HELD ONLY BY THE MOVEMENTS IT ADMITS BY NAME STILL WIDENS (2026-09-24, minimum-kit work order B1): on a
+    // kit whose braced hinge reaches none of p222's machines, the admitted bench reverse hyper alone filled the
+    // cell and the picker's named stand-in (the DB Romanian deadlift) could not be honoured. The picker widens the
+    // same way (`pickOptions`); the admitted movement still leads the widened list.
+    const ownOnMuscle = onMuscle.filter((o) => musclesWorkedBy(o.name)?.primary === want);
+    if (ownOnMuscle.length > 0) {
       /**
        * ⛔⛔ A MOVEMENT THE FRAME NAMED OUTRANKS ONE THAT MERELY MATCHES THE MUSCLE (2026-09-01).
        *
@@ -1452,13 +1484,18 @@ function exerciseForSlot(
         }).options);
       }
       const seen = new Set<string>();
-      resolved.options = pooled.filter((o) => {
+      const widened = pooled.filter((o) => {
         if (!keep(o.name)) return false;
         const c = canonicalize(o.name);
         if (seen.has(c)) return false;
         seen.add(c);
         return true;
       });
+      // The movements the page names on this row lead the widened list too (the same law as above).
+      resolved.options = [
+        ...widened.filter((o) => admitted.has(canonicalize(o.name))),
+        ...widened.filter((o) => !admitted.has(canonicalize(o.name))),
+      ];
     }
   }
 
@@ -1522,6 +1559,33 @@ function exerciseForSlot(
   const isTaken = (name: string): boolean =>
     takenToday.has(canonicalize(name))
     || takenToday.has(canonicalize(bandRouteName(name, args.equipment ?? null)));
+
+  /**
+   * ⛔ ANOTHER CELL'S PICK IS NOT THIS ROW'S TO TAKE (2026-09-25, follow-up 4, `PickPool.routed`): a movement the athlete
+   * named for a different cell leaves this row's options — the bench reverse hyper picked for the braced hinge is not
+   * the secondary hinge row's grid default. Unless it is all the row has.
+   */
+  const reservedForAnother = (name: string): boolean => {
+    const keys = picks.routed.get(canonicalize(name));
+    return keys != null && keys.size > 0 && !(slotKey != null && keys.has(slotKey));
+  };
+  {
+    const free = resolved.options.filter((o) => !reservedForAnother(o.name));
+    if (free.length > 0) resolved.options = free;
+  }
+  /**
+   * ⛔ ONE LUNGE PER DAY (2026-09-25, follow-up 2, `LUNGE_FAMILY`, owner's ruling): a day whose asymmetrical row holds the
+   * lunge gives its other rows a non-lunge option — the quad row beside p274 day 5's reverse lunge is the Zercher squat
+   * (p220), not a second lunge. The picker reserves the same way (`frameReservesLungeForPick`). Unless nothing else is.
+   */
+  const dayHoldsLunge = !slot.asymmetrical
+    && frameDay != null
+    && (FRAMES[args.frame].columns[args.column] ?? []).find((d) => d.day === frameDay)?.strength
+      .some((s) => s.asymmetrical === true) === true;
+  if (dayHoldsLunge) {
+    const other = resolved.options.filter((o) => !isLungeFamily(o.name));
+    if (other.length > 0) resolved.options = other;
+  }
 
   /**
    * ⛔⛔⛔ HIS MOVEMENTS OUTRANK SUBSTITUTES, AT EVERY KIT (Michael, 2026-08-30). The page's own list
@@ -1629,9 +1693,15 @@ function exerciseForSlot(
       // way: the superset half ranks arm work first, the solo half ranks it last (`inSuperset`).
       const armsCell = frameHasArmsSuperset(slotKey, args.frame) || VIADA_PICKS[slotKey].slot?.arms != null;
       const inSuperset = /\(arms\)/i.test(String(slot.sourceText || ''));
+      // ⛔ NO SUPERSET EVER HOLDS TWO BARBELL MOVEMENTS (2026-09-24, B1, `onTheBar`): the arms pair ranks a
+      // barbell-held option last in both rows (the 2026-09-24 arms work order); every other printed superset ranks
+      // it last once the pair's first row has taken the bar — a dumbbell hinge is followed by the front squat.
+      const printedSuperset = /superset/i.test(String(slot.sourceText || ''));
+      const partnerOnBar = printedSuperset && supersetOnBar.has(noteForWeek(slot, args.week));
       // ⚠️ ONLY THE PICKER'S OPENING STAND-IN, AND ONLY WHEN THIS CELL HOLDS IT. The leg-press row names
       // `front squat` first, which lives in the primary pool, not here; ranking its later entries would
       // move that row off its printed Zercher squat onto a goblet squat.
+      const alsoHis = new Set((VIADA_PICKS[slotKey].alsoHis ?? []).map((n) => canonicalize(n)));
       const subLeadFirst = canonicalize((VIADA_PICKS[slotKey].subLeadWith ?? [])[0] ?? '');
       const subLeadHeld = subLeadFirst !== '' && resolved.options.some((o) => canonicalize(o.name) === subLeadFirst);
       const subLeadRank = (name: string): number => (subLeadHeld && canonicalize(name) === subLeadFirst ? 0 : 1);
@@ -1646,10 +1716,13 @@ function exerciseForSlot(
       const rank = (name: string): number[] => [
         isTaken(name) ? 1 : 0,
         armsCell ? focusedArmFit(pattern, inSuperset, name) : 0,
-        // ⛔ NEVER BOTH ON THE BARBELL, NEVER A SKULL CRUSHER ON THE STRAIGHT BAR (2026-09-24, `armsOnTheBar`): a
-        // barbell-held option ranks last in the two "(arms)" rows; every other pairing stands as picked.
-        armsCell && inSuperset ? armsOnTheBar(name, args.equipment ?? null) : 0,
+        // ⛔ NEVER BOTH ON THE BARBELL, NEVER A SKULL CRUSHER ON THE STRAIGHT BAR (2026-09-24, `onTheBar`): a
+        // barbell-held option ranks last in the two "(arms)" rows, and in any superset whose first row is on the bar.
+        (armsCell && inSuperset) || partnerOnBar ? onTheBar(name, args.equipment ?? null) : 0,
         his.has(canonicalize(name)) ? 0 : 1,
+        // ⛔ PRINTED ON ANOTHER PAGE FOR THIS PATTERN (`alsoHis`, 2026-09-24): behind his own list, ahead of every
+        // stand-in — the picker ranks it the same way, so the built week and the dropdown's default agree.
+        alsoHis.has(canonicalize(name)) ? 0 : 1,
         carryLeadRank(name),
         demoteBodyweight && isBodyweightLoad(name) ? 1 : 0,
         // ⛔ THE PICK'S NAMED OPENING STAND-IN (`subLeadWith[0]`, 2026-09-16) — the movement the picker opens
@@ -1684,8 +1757,13 @@ function exerciseForSlot(
         && !isTaken(o.name)
         && (!competition || canonicalize(o.name) !== canonicalize(competition)));
   };
+  // ⛔ A PICK STORED AS THE MOVEMENT THE KIT DOES (2026-09-24, B7): the picker stores `executionMovement`'s name
+  // (the rear delt fly for his rear delt machine on a dumbbell kit), so it is matched on either name.
+  const namesPick = (o: { name: string }) =>
+    canonicalize(o.name) === canonicalize(named)
+    || canonicalize(executionMovement(o.name, args.equipment ?? null)) === canonicalize(named);
   const fromSlotPick = named !== ''
-    ? (resolved.options.find((o) => canonicalize(o.name) === canonicalize(named)
+    ? (resolved.options.find((o) => namesPick(o)
       && !isTaken(o.name)
       && (!competition || canonicalize(o.name) !== canonicalize(competition))) ?? namedFromPrimary())
     : undefined;
@@ -1694,6 +1772,7 @@ function exerciseForSlot(
     ? resolved.options.find((o) => {
       const key = canonicalize(o.name);
       return picks.unplaced.has(key)
+        && !reservedForAnother(o.name)
         && !takenToday.has(key)
         && (!competition || key !== canonicalize(competition));
     })
@@ -1805,6 +1884,13 @@ function exerciseForSlot(
    * such collision groups exist in the grid's own index — so two slots on one day could print the
    * same lift twice under two spellings. `canonicalize` is the app's owner of that comparison.
    */
+  // ⛔ THE STORED NAME FOLLOWS THE MOVEMENT THE ATHLETE DOES (2026-09-24, B7, `executionMovement`): his rear delt
+  // machine on a dumbbell kit with no incline bench is stored as the rear delt fly. A competition lift is the
+  // athlete's name and is never moved. Both names are marked taken, so neither prints again today.
+  if (slot.role !== 'competition') {
+    const done = executionMovement(movement, args.equipment ?? null);
+    if (done !== movement) { takenToday.add(canonicalize(movement)); movement = done; }
+  }
   takenToday.add(canonicalize(movement));
   /**
    * ⛔⛔ AND THE NAME THE ATHLETE WILL READ, WHICH IS NOT ALWAYS THE ONE STORED (2026-08-30). Two
@@ -1971,7 +2057,8 @@ function exerciseForSlot(
         ? 'no_tested_lift'
         : ((() => {
             const cfg = resolveExerciseConfig(movement).config;
-            if (cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true) return true;
+            // The format the kit logs (2026-09-24, B8): a per-hand movement on its station is one total.
+            if (displayFormatOnKit(movement, args.equipment ?? null) === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true) return true;
             /**
              * ⚠️ THE TWO-HANDED TEST — a seated DB press read *"weights arrive once you log the
              * test"*, and no test will ever price it: it is held in two hands and one figure cannot
@@ -2785,7 +2872,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⛔ THE ATHLETE'S PICKS, POOLED FOR THE WHOLE WEEK (A1). Consumed by the HYP slots first, then
    * offered to the muscle floor, and whatever is left goes down the compromise channel.
    */
-  const picks = pickPool(args.accessoryPicks);
+  const picks = pickPool(args.accessoryPicks, args.slotPicks, args.frame, args.equipment);
   const focusMuscles = focusMuscleSet(args.focus);
   /**
    * ⛔ THE DIAL CHIPS, AS MUSCLES. Capped and validated by `musclesForChips`, so an unknown
@@ -3286,16 +3373,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const exercises: StrengthExercise[] = [];
         const dosed: DosingSession['sets'] = [];
         const takenToday = new Set<string>();
+        // The printed supersets whose first row today took the bar (2026-09-24, B1) — see `exerciseForSlot`.
+        const supersetOnBar = new Set<string>();
         let droppedHere = 0;
         // p247 — the rows whose weight the lower-body reduction touched today (see `exerciseForSlot`).
         const reducedRows = new Set<StrengthExercise>();
         for (const slot of day.strength) {
           const built = exerciseForSlot(
             slot, args, notes, hardRunBeforeLowerOn(day.day), takenToday, picks, focusMuscles,
-            dialMuscles, day.day);
+            dialMuscles, day.day, supersetOnBar);
           // ⛔ THE DAY RAN OUT OF MOVEMENTS FOR THIS PATTERN — see `exerciseForSlot`'s drop branch.
           if (!built) { droppedHere += 1; continue; }
           const { exercise, movement, sets, pattern } = built;
+          if (exercise.superset_group && implementOnKit(movement, args.equipment ?? null) === 'barbell') {
+            supersetOnBar.add(String(exercise.superset_group));
+          }
           if (built.reduced) reducedRows.add(exercise);
           exercises.push(exercise);
           dosed.push({ movement, intent: slot.intent, sets });

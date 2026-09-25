@@ -521,7 +521,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -605,7 +605,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -668,7 +668,10 @@ const STRENGTH_HALF_STANDARD: FrameDay[] = [
       // p250 day 1, standard column: row text verbatim
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),  // Viada p250
       S('SKILL', 'accessory', 'primary', 'pull_upper', '1 x SKILL: Accessory: primary pull'),  // Viada p250
-      S('DE', 'accessory', 'braced', 'push_upper', '1 x DE: Accessory: braced push'),  // Viada p250
+      // ⛔ THE DUMBBELL BENCH PRESS OPENS THE ROW WHERE NO MACHINE IS REACHABLE (Michael, 2026-09-16 — the ruling on
+      // p274's braced push row, `VIADA_PICKS.braced_push.subLeadWith`, carried to this frame's row 2026-09-24 so the
+      // two frames agree; this row has no pick key, so the frame says it). Inert where p221's machines are reachable.
+      S('DE', 'accessory', 'braced', 'push_upper', '1 x DE: Accessory: braced push', { prefer: ['dumbbell bench press'] }),  // Viada p250
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),  // Viada p250
     ],
@@ -683,9 +686,14 @@ const STRENGTH_HALF_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),  // Viada p250
       S('SKILL', 'accessory', 'primary', 'press_lower', '1 x SKILL: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),  // Viada p250
-      S('DE', 'accessory', 'braced', 'hinge_lower', '1 x DE: Accessory: braced hinge lower'),  // Viada p250
+      // ⛔ THE BENCH REVERSE HYPER FIRST WHERE NO STATION IS (2026-09-24, minimum-kit work order B1/B2): p222's four
+      // braced hinge movements are machines, and the floor back extension that filled this row on a home kit is
+      // deleted. p220 prints the bench reverse hyper (`weighted reverse hyper`), a torso-supported hinge on the
+      // minimum kit's bench, as the same frames admit it on p244/p252/p274's braced hinge row. `prefer` is inert
+      // where his machines are reachable. OURS — the choice among the reachable p220 movements.
+      S('DE', 'accessory', 'braced', 'hinge_lower', '1 x DE: Accessory: braced hinge lower', { prefer: ['weighted reverse hyper'] }),  // Viada p250
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory lower', {  // Viada p250
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -722,7 +730,11 @@ const STRENGTH_HALF_STANDARD: FrameDay[] = [
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),  // Viada p250
-      S('SKILL', 'accessory', 'braced', 'hinge_lower', '1 x SKILL: Accessory: braced hinge lower (rotate with braced push lower)', { rotatesWith: 'press_lower' }),  // Viada p250
+      // The bench reverse hyper first where no station is (2026-09-24) — see day 2's braced hinge row.
+      // ⚠️ `prefer` only, no `alsoAdmits`: the row rotates to press lower on even weeks, and an admitted hinge movement
+      // is fetched across patterns — it would have filled the leg-press weeks too. The ladder already reaches the
+      // bench reverse hyper on the hinge weeks; on the press weeks the name is not in the cell and `prefer` is inert.
+      S('SKILL', 'accessory', 'braced', 'hinge_lower', '1 x SKILL: Accessory: braced hinge lower (rotate with braced push lower)', { rotatesWith: 'press_lower', prefer: ['weighted reverse hyper'] }),  // Viada p250
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: secondary push lower'),  // Viada p250
       // ⚠️ p250 prints "focused push" on the lower day; read as the lower-body focused push, as p246 day 5 prints it.
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Accessory: focused push'),  // Viada p250
@@ -756,7 +768,7 @@ const STRENGTH_HALF_TAPER: FrameDay[] = [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate)', { rotatesWith: 'press_lower' }),  // Viada p250
       S('SKILL', 'accessory', 'primary', 'press_lower', '1 x SKILL: Accessory: primary push lower'),  // Viada p250
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {  // Viada p250
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -827,7 +839,7 @@ const HYP_5K_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Focused push'),  // Viada p244
     ],
     // p244 day 1: "1 x Sprint/power (level 1)" and "1 x MLSS+ (level 1)"; p245: one run, the sprint's cooldown and the
@@ -852,7 +864,7 @@ const HYP_5K_STANDARD: FrameDay[] = [
       // p223 names the hip thrust first in the hamstrings row — see ALL_ROUNDER_STANDARD day 2.
       S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: Focused hamstring', {  // Viada p244
         muscle: 'hamstrings',
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
       // p245: "Each lower body day finishes with a braced DE or skill asymmetrical push movement" — split squats among them.
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
@@ -870,7 +882,7 @@ const HYP_5K_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Focused pull'),  // Viada p244
     ],
     // p244 day 4: VT1 (level 1). The week's strides ride here, as on p246's day 4 (STRENGTH_5K_STANDARD).
@@ -910,7 +922,7 @@ const HYP_5K_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p244
     ],
     endurance: [E('run_sprint_power', 1, '1 x Sprint/power (level 1)', { role: 'hard', archetypes: SPRINT_ROTATION })],
   },
@@ -923,7 +935,7 @@ const HYP_5K_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: Focused hamstring', {  // Viada p244
         muscle: 'hamstrings',
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
     ],
@@ -939,7 +951,7 @@ const HYP_5K_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p244
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p244
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p244
     ],
     endurance: [],
   },
@@ -989,7 +1001,7 @@ const HYP_HALF_UPPER_PUSH: FrameDay['strength'] = [
   S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p252
   S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p252
   S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
-  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p252
   S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Focused push'),  // Viada p252
 ];
 const HYP_HALF_UPPER_PULL: FrameDay['strength'] = [
@@ -998,7 +1010,7 @@ const HYP_HALF_UPPER_PULL: FrameDay['strength'] = [
   S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: Braced pull', { muscle: 'lats' }),  // Viada p252
   S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: Braced push', { muscle: 'chest' }),  // Viada p252
   S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
-  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset'),  // Viada p252
+  S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: Focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),  // Viada p252
   S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Focused pull'),  // Viada p252
 ];
 const HYP_HALF_LOWER_PUSH: FrameDay['strength'] = [
@@ -1011,7 +1023,7 @@ const HYP_HALF_LOWER_PUSH: FrameDay['strength'] = [
   S('HYP', 'accessory', 'focused', 'press_lower', '2 x HYP: Focused quadriceps/focused hamstring superset', { muscle: 'quadriceps' }),  // Viada p252
   S('HYP', 'accessory', 'focused', 'hinge_lower', '2 x HYP: Focused quadriceps/focused hamstring superset', {  // Viada p252
     muscle: 'hamstrings',
-    alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+    alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
   }),
 ];
 
@@ -1200,7 +1212,10 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push', { muscle: 'chest' }),
       // ⚠️ THE ARMS SUPERSET — p274 prints these two as one paired entry. Display-first (DESIGN §5).
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      // ⛔ THE DUMBBELL CURL IS ADMITTED BY NAME (2026-09-24, minimum-kit work order B5): p222's biceps movements are the
+      // preacher curl (a station), the spider curl (an incline bench) and the drag curl (a bar the pair must not share),
+      // so on any kit with dumbbells the pair's biceps half is the dumbbell curl (p222 variant, single-joint biceps).
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
     ],
     endurance: [E('run_mlss', 2, 'MLSS+ (level 2)', { role: 'hard' })],
@@ -1226,7 +1241,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       // wins. See `StrengthSlot.alsoAdmits`. The barbell version is the same movement at bar+bench.
       S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', {
         muscle: 'hamstrings',
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
       // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
       // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
@@ -1254,14 +1269,18 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
        * and the barbell row is p219's PRIMARY pull; p220's secondary pulls are the Kroc, T-bar,
        * Meadows and gorilla rows and the dumbbell pullover. Ordered so the day's two pulls differ.
        */
+      // ⛔ THE BARBELL ROW TAKES THIS ROW (2026-09-25, minimum-kit follow-up 3, owner's ruling): p218 prints it, every
+      // declared kit has a bar, and with the pull-up on the ME row it appeared nowhere in the week. Admitted by name
+      // from p218's primary list and preferred; the Kroc row stays the braced pull's, p220's others follow.
       S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull', {
-        prefer: ['kroc row', 'gorilla row', 'meadows row', 't bar row', 'dumbbell pullover'],
+        alsoAdmits: ['barbell row'],
+        prefer: ['barbell row', 'kroc row', 'gorilla row', 'meadows row', 't bar row', 'dumbbell pullover'],
       }),
       // ⚠️ p221 braced pull upper is *chest-supported row · lat pulldown · cable upright row* — the
       // rows and the pulldown are lats and they are what the row is for. See `StrengthSlot.muscle`.
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull', { muscle: 'lats' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
     // p274 day 4 endurance cell: Cyc endurance (level 1)
@@ -1321,7 +1340,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       // p274 day 1, taper column: row text verbatim
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push', { muscle: 'chest' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
     ],
     // p274 day 1 taper endurance cell: MLSS+ (level 1)
@@ -1340,7 +1359,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       // wins. See `StrengthSlot.alsoAdmits`. The barbell version is the same movement at bar+bench.
       S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', {
         muscle: 'hamstrings',
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
       // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
       // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
@@ -1367,7 +1386,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       // rows and the pulldown are lats and they are what the row is for. See `StrengthSlot.muscle`.
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull', { muscle: 'lats' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
-      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
     // p274 day 4 taper endurance cell: Cyc endurance (level 1)
@@ -1469,7 +1488,7 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -1546,7 +1565,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
          * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
          * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
          */
-        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust'],
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],

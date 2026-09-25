@@ -23,7 +23,7 @@ import { equipmentForExercise } from '../../../src/lib/strength-logging-mode.ts'
 import { barWeightForType, DEFAULT_BAR_LB } from '../../../src/lib/bar-types.ts';
 import { canonicalize } from './canonicalize.ts';
 import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
-import { barIsTheLoad } from '../../../src/lib/strength-gear.ts';
+import { barIsTheLoad, defaultBarKeyFor } from '../../../src/lib/strength-gear.ts';
 
 /** ⛔ The fallback bar for a barbell movement whose set never named one — `BAR_TYPES.standard`, the
  *  same 45 the plan writer floors warm-ups at and the same default Strong and Hevy ship. */
@@ -835,6 +835,7 @@ export function barLbForExercise(name: string): number | null {
   // the ingest chain.
   const singular = raw.toLowerCase().replace(/(\w)s\b/g, '$1');
   const known = barIsTheLoad(raw, null) ?? barIsTheLoad(canonicalize(raw), null) ?? barIsTheLoad(singular, null);
-  if (known != null) return known ? OLYMPIC_BAR_LB : null;
+  // The exercise's own bar (2026-09-25): the trap bar deadlift is priced on the trap bar, not the Olympic bar.
+  if (known != null) return known ? (barWeightForType(defaultBarKeyFor(raw, 'lb')) ?? OLYMPIC_BAR_LB) : null;
   return equipmentForExercise(raw) === 'barbell' ? OLYMPIC_BAR_LB : null;
 }

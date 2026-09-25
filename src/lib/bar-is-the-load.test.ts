@@ -13,7 +13,7 @@ Deno.test('the six rows on the screen: only the Barbell Row is on a bar', () => 
   assertEquals(barIsTheLoad('Barbell Row', GYM), true);
   assertEquals(barIsTheLoad('Chest Supported Row', GYM), false, 'perHand format — dumbbells or the machine');
   assertEquals(barIsTheLoad('Tate Press', GYM), false, 'two dumbbells');
-  assertEquals(barIsTheLoad('Drag Curl', GYM), false, 'bar or dumbbells, isolation — nothing asserted');
+  assertEquals(barIsTheLoad('Drag Curl', GYM), true, 'barbell only since 2026-09-24 (minimum-kit work order B5) — the bar is the only way to load it');
   assertEquals(barIsTheLoad('Preacher Curl', GYM), false, 'a preacher station — the implement on it is not known');
   assertEquals(barIsTheLoad('Pull Up', GYM), false, 'bodyweight');
 });
@@ -31,27 +31,26 @@ Deno.test('a compound with a bar and a dumbbell route defaults to the bar; an is
 });
 
 Deno.test('the kit decides where the routes are ambiguous', () => {
-  // A bar and no dumbbells: the drag curl can only be loaded on the bar.
+  // ⛔ EVERY DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24, `MINIMUM_KIT_KEYS`): a bar, a rack, a bench, dumbbells
+  // and a pull-up bar. A "dumbbells only" or "bar only" chip list is below the minimum and reads as the minimum.
   assertEquals(barIsTheLoad('Drag Curl', ['barbell']), true);
-  // A preacher curl needs a preacher bench (2026-09-10) — a fixed station only the commercial-gym
-  // chip grants — so a bar and a flat bench do not reach it, and no bar is asserted.
+  // A preacher curl needs a preacher bench — a fixed station only the commercial-gym chip grants — so the
+  // minimum kit does not reach it, and no bar is asserted.
   assertEquals(barIsTheLoad('Preacher Curl', ['barbell', 'bench']), false);
-  // Dumbbells only: no bar to speak of.
-  assertEquals(barIsTheLoad('Romanian Deadlift', ['dumbbells']), false);
+  // The minimum kit has a bar, so the Romanian deadlift (bar first, priced off the deadlift) is on it.
+  assertEquals(barIsTheLoad('Romanian Deadlift', ['dumbbells']), true);
   // Unknown kit: every route counts, and the rule reads the same as a full gym.
   assertEquals(barIsTheLoad('Romanian Deadlift', []), true);
   assertEquals(barIsTheLoad('Preacher Curl', null), false);
 });
 
-Deno.test('⛔ THE ARMS SUPERSET (2026-09-24): dumbbells where the kit has them, the bar only where it does not', () => {
-  const BB_DB = ['Barbell', 'Dumbbells', 'Bench (flat/adjustable)'];
-  const BB = ['Barbell', 'Bench (flat/adjustable)'];
-  const DB = ['Dumbbells', 'Bench (flat/adjustable)'];
-  for (const n of ['Skull Crusher', 'Drag Curl']) {
-    assertEquals(barIsTheLoad(n, BB_DB), false, `${n}: dumbbells lead, no bar chip`);
-    assertEquals(barIsTheLoad(n, DB), false, `${n}: no bar to speak of`);
-    assertEquals(barIsTheLoad(n, GYM), false, `${n}: a gym has dumbbells`);
-    assertEquals(barIsTheLoad(n, BB), true, `${n}: the bar is the only way to load it`);
+Deno.test('⛔ THE ARMS SUPERSET (2026-09-24): the skull crusher on dumbbells, the drag curl on the bar, on every declared kit', () => {
+  // The minimum kit (any declared list) has dumbbells and a bar; the skull crusher leads with dumbbells (no bar
+  // chip), the drag curl is barbell only (minimum-kit work order B5) and draws the bar.
+  for (const kit of [['Home gym'], ['Barbell', 'Dumbbells', 'Bench (flat/adjustable)'], ['Dumbbells', 'Bench (flat/adjustable)'], GYM]) {
+    assertEquals(barIsTheLoad('Skull Crusher', kit), false, `skull crusher on ${kit.join('+')}: dumbbells lead, no bar chip`);
+    assertEquals(barIsTheLoad('Drag Curl', kit), true, `drag curl on ${kit.join('+')}: the bar is the only way to load it`);
+    assertEquals(barIsTheLoad('Dumbbell Curl', kit), false, `dumbbell curl on ${kit.join('+')}: per hand, no bar`);
   }
 });
 

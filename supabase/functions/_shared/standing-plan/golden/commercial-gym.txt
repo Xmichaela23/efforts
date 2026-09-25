@@ -33,7 +33,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -81,7 +81,7 @@ WEEK 02  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -129,7 +129,7 @@ WEEK 03  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -177,7 +177,7 @@ WEEK 04  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -225,7 +225,7 @@ WEEK 05  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -273,7 +273,7 @@ WEEK 06  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -321,7 +321,7 @@ WEEK 07  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -369,7 +369,7 @@ WEEK 08  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -417,7 +417,7 @@ WEEK 09  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -465,7 +465,7 @@ WEEK 10  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -512,7 +512,7 @@ WEEK 11  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
@@ -559,7 +559,7 @@ WEEK 12  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Chest Supported Row            3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to

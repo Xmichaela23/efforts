@@ -81,14 +81,17 @@ Deno.test('the swap sheet for the arm cells offers only what the kit reaches, un
   }
 });
 
-Deno.test('⛔ THE TWO HOME ROUTES (workorder addendum, 2026-09-10): his rear delt and pullover work reach a dumbbell + flat bench kit', () => {
+Deno.test('⛔ THE HOME ROUTE (workorder addendum, 2026-09-10; stored as the movement since 2026-09-24): his rear delt work reaches a dumbbell + flat bench kit', () => {
+  // ⛔ B7 (minimum-kit work order, 2026-09-24): the stored name follows the movement the kit does — on dumbbells with
+  // no incline bench his rear delt machine is the rear delt fly (`executionMovement`), shown bent-over.
   const a = pickOptions('iso_pull_a', FLAT, null, null);
-  const rearDelt = a.find((o) => o.name.toLowerCase() === 'rear delt machine');
+  const rearDelt = a.find((o) => o.name.toLowerCase() === 'rear delt fly');
   assert(rearDelt, `the rear delt work is missing from ${a.map((o) => o.name).join(', ')}`);
   assertEquals(rearDelt!.display, 'Bent-Over Dumbbell Rear Delt Fly');
+  assert(!a.some((o) => o.name.toLowerCase() === 'rear delt machine'), 'the machine name is still stored on a dumbbell kit');
   // ⛔ THE PULLOVER LEFT THIS ROW 2026-09-18 (Michael): at home it is p220's DB pullover, done on the Secondary pull row.
   assert(!a.some((o) => o.name.toLowerCase() === 'pullover machine'), 'the machine pullover is still offered at home');
-  // With the incline chip the rear delt work is chest-supported, which is closer to his position.
+  // With the incline chip the rear delt work is chest-supported — an implement change only, so his name is stored.
   const incl = pickOptions('iso_pull_a', INCLINE, null, null).find((o) => o.name.toLowerCase() === 'rear delt machine');
   assertEquals(incl?.display, 'Chest-Supported Rear Delt Fly');
   // A gym member sees his name, because that is what they will walk over to.
@@ -96,7 +99,7 @@ Deno.test('⛔ THE TWO HOME ROUTES (workorder addendum, 2026-09-10): his rear de
   assertEquals(gym?.display, 'Rear Delt Machine');
 });
 
-Deno.test('with the incline chip the spider curl is allowed, and the preacher curl is still the concentration curl', () => {
+Deno.test('with the incline chip the spider curl is allowed, and the preacher curl is the station\'s alone', () => {
   const offered = pickOptions('iso_pull_b', INCLINE, null, null);
   const names = offered.map((o) => o.name.toLowerCase());
   assert(names.includes('spider curl'), `spider curl missing from ${names.join(', ')}`);
@@ -105,50 +108,38 @@ Deno.test('with the incline chip the spider curl is allowed, and the preacher cu
   // ⚠️ `ar_arms_pull_4` SINCE 2026-09-11 — p274's day-4 arms pull has its own key on this frame.
   const picked = composeWeek({ ...BASE, week: 2, column: 'standard', equipment: INCLINE, slotPicks: { ar_arms_pull_4: 'spider curl' } } as never);
   assert(namesIn(picked).includes('spider curl'), 'the composed week never reaches the spider curl when it is picked');
-  // An incline bench is not a preacher bench: the name is still the home one.
-  assertEquals(offered.find((o) => o.name.toLowerCase() === 'preacher curl')?.display, 'Concentration Curl');
+  // ⛔ THE CONCENTRATION CURL IS GONE (2026-09-24, minimum-kit work order B5): the preacher curl is station-only.
+  assertEquals(offered.find((o) => o.name.toLowerCase() === 'preacher curl'), undefined);
 });
 
-Deno.test('⛔ THE THIRD HOME ROUTE (workorder addendum, 2026-09-10): the preacher curl reaches a dumbbell + bench kit as the concentration curl', () => {
-  // Reach: dumbbells and a bench, or the station. A bar and a bench alone do not curl one arm on a knee.
+Deno.test('⛔ THE PREACHER CURL IS THE STATION\'S (2026-09-24, minimum-kit work order B5): a dumbbell kit curls with the dumbbell curl', () => {
+  // The 2026-09-10 concentration-curl home route is gone; on any kit with dumbbells and no station the arms pair's
+  // biceps half is the dumbbell curl (p222 variant).
   assertEquals(canPerform('Preacher Curl', ['Commercial gym']), true);
-  assertEquals(canPerform('Preacher Curl', FLAT), true);
-  assertEquals(canPerform('Preacher Curl', INCLINE), true);
-  assertEquals(canPerform('Preacher Curl', ['Barbell + plates', 'Bench (flat/adjustable)']), false);
-  assertEquals(canPerform('Preacher Curl', ['Dumbbells']), false);
+  assertEquals(canPerform('Preacher Curl', FLAT), false);
+  assertEquals(canPerform('Preacher Curl', INCLINE), false);
   // §0h: nobody asked, so nothing is refused.
   assertEquals(canPerform('Preacher Curl', []), true);
   assertEquals(canPerform('Preacher Curl', null), true);
 
-  // The swap list for BOTH arm cells offers it, under the home name, with his name as the key.
   for (const key of ['iso_pull_a', 'iso_pull_b'] as const) {
-    const o = pickOptions(key, FLAT, null, null).find((x) => x.name.toLowerCase() === 'preacher curl');
-    assert(o, `${key}: the preacher curl is missing from the flat-bench swap list`);
-    assertEquals(o!.display, 'Concentration Curl');
+    assert(!pickOptions(key, FLAT, null, null).some((x) => x.name.toLowerCase() === 'preacher curl'), `${key}: the preacher curl is offered to a kit with no station`);
   }
   // A gym member sees his name, because that is what they will walk over to.
   const gym = pickOptions('iso_pull_b', ['Commercial gym'], null, null).find((o) => o.name.toLowerCase() === 'preacher curl');
   assertEquals(gym?.display, 'Preacher Curl');
 
-  // The composed week for that kit prescribes it under his name, shows the home name, and carries
-  // the how-to — one arm at a time, upper arm on the inner knee.
+  // The composed week for that kit never prescribes the preacher curl; the arms pair's biceps half is the dumbbell curl.
   const rows = [1, 2, 3, 4].flatMap((wk) => rowsIn(week(FLAT, wk)));
-  const curls = rows.filter((r) => r.name.toLowerCase() === 'preacher curl');
-  assert(curls.length > 0, 'no week on dumbbells + flat bench reached the preacher curl');
-  for (const r of curls) {
-    assertEquals(r.execution_name, 'Concentration Curl');
-    const howTo = String((r as { how_to?: string }).how_to ?? '');
-    assert(/one arm/i.test(howTo) && /knee/i.test(howTo), `how-to missing or wrong: "${howTo}"`);
-    assert((r as { swap_options?: { name: string; display: string }[] }).swap_options?.some((o) => o.display === 'Concentration Curl'),
-      'the row\'s own swap list does not carry the concentration curl');
-  }
-  // With the station, the row is his and carries the station's how-to (2026-09-18: every movement has one) —
-  // the arms on the preacher pad, not the knee.
+  assertEquals(rows.filter((r) => r.name.toLowerCase() === 'preacher curl'), []);
+  assert(rows.some((r) => r.name.toLowerCase() === 'dumbbell curl'), 'no week on dumbbells + flat bench reached the dumbbell curl');
+  // With the station, the row is his and carries the station's how-to (2026-09-18: every movement has one).
   const gymRows = [1, 2, 3, 4].flatMap((wk) => rowsIn(week(['Commercial gym'], wk))).filter((r) => r.name.toLowerCase() === 'preacher curl');
+  assert(gymRows.length > 0, 'a commercial gym never reached the preacher curl');
   for (const r of gymRows) {
     assertEquals(r.execution_name, undefined);
     const howTo = String((r as { how_to?: string }).how_to ?? '');
-    assert(/preacher bench/i.test(howTo) && !/knee/i.test(howTo), `station how-to missing or wrong: "${howTo}"`);
+    assert(/pad/i.test(howTo), `the station's how-to is missing: "${howTo}"`);
   }
 });
 

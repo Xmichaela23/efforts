@@ -280,7 +280,8 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'ghd back extension': F('braced', 'hinge_lower', 'printed', 'p222'),
   'ground-based deadlift machine': F('braced', 'hinge_lower', 'printed', 'p222'),
   'machine back extension': F('braced', 'hinge_lower', 'printed', 'p222'),
-  'back extension': F('braced', 'hinge_lower', 'printed', 'p222 — machine back extension, on a bench'),
+  // ⛔ THE FLOOR `back extension` (feet under a loaded bar) IS DELETED (2026-09-24, B2): p222 prints the machine and
+  // the GHD versions, both filed above; the name resolves to `ghd back extension` now (`SAME_MOVEMENT`).
   // FOCUSED — p222 push/arms, pull/arms; p223 push lower/quads, hinge lower/hamstrings
   'triceps pushdown': F('focused', 'push_upper', 'printed', 'p222'),
   'tate press': F('focused', 'push_upper', 'printed', 'p222'),
@@ -317,6 +318,10 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'soleus raise': F('focused', 'press_lower', 'variant', 'p223 — single-joint calf'),
   'machine hip thrust': F('focused', 'hinge_lower', 'printed', 'p223'),
   'smith machine hip thrust': F('focused', 'hinge_lower', 'printed', 'p223'),
+  // ⛔ THE BARBELL HIP THRUST IS A VARIANT OF p223's HIP THRUST (2026-09-25, minimum-kit follow-up 1): the same movement
+  // on the bench with a bar across the hips — the minimum kit's own form. It was a marked stand-in on no page
+  // (`HIP_THRUST_STAND_IN`, 2026-09-18); the bench and the bar being in every declared kit, it is filed.
+  'barbell hip thrust': F('focused', 'hinge_lower', 'variant', 'p223 — machine/Smith machine hip thrust, barbell on the bench'),
   'leg curl': F('focused', 'hinge_lower', 'printed', 'p223 — hamstring curls (seated or prone)'),
   'cable kickback': F('focused', 'hinge_lower', 'printed', 'p223'),
   'band leg curl': F('focused', 'hinge_lower', 'variant', 'p223 — hamstring curl, band'),
@@ -361,11 +366,8 @@ export const STAND_INS: Readonly<Record<ViadaPattern, readonly string[]>> = {
   press_lower: ['bodyweight squat', 'step up', 'single leg squat'],
 };
 
-/**
- * ⛔ THE BARBELL HIP THRUST, A MARKED STAND-IN ONLY WHERE THE KIT HAS NEITHER HIP THRUST p223 PRINTS (Michael,
- * 2026-09-18: "keep as a marked stand-in only where the kit has no hip thrust machine or Smith machine").
- */
-export const HIP_THRUST_STAND_IN = { name: 'hip thrust', printed: ['machine hip thrust', 'smith machine hip thrust'] } as const;
+// ⚠️ `HIP_THRUST_STAND_IN` (the bench-only `hip thrust`, 2026-09-18) is gone 2026-09-25: the barbell hip thrust is filed
+// above as p223's variant and reaches the row through the ordinary pool.
 
 /** The filing for a movement under any of its spellings, or null when no page reaches it. */
 export function filingOf(exerciseName: string): Filed | null {

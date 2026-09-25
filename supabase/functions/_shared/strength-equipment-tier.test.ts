@@ -124,7 +124,9 @@ Deno.test('⛔ THE ASSISTANCE GEAR MAP SPEAKS THE SHARED VOCABULARY — no secon
     'Bench (flat/adjustable)', 'Incline bench', 'Decline bench', 'Pull-up bar', 'Kettlebells',
     'Cable machine', 'Resistance bands', 'Ab wheel', 'Sandbag',
   ]);
-  assertEquals([...used].filter((k) => !reachable.has(k)), [],
+  // ⚠️ `trap_bar` IS THE ONE KEY NO CHIP PRODUCES (2026-09-25): the trap bar deadlift is a form of the deadlift, chosen
+  // on the lift, and its competition row is placed by name with no kit check (`DEADLIFT_FORMS`).
+  assertEquals([...used].filter((k) => !reachable.has(k) && k !== 'trap_bar'), [],
     'these keys cannot be produced by any equipment chip at all');
 });
 
@@ -134,12 +136,14 @@ Deno.test('⛔ THE KNEEL-AND-LOWER FAMILY ROUTES ON THE BARBELL — the ankle-an
   // rollers genuinely are the standard home GHD substitute. Still true of the world; no longer true
   // of anything the athlete can declare, because both chips were cut as unrecognisable. A route
   // nobody can satisfy is a movement nobody is offered, so the two went together.
-  for (const m of ['Nordic Curl', 'Glute-Ham Raise', 'Back Extension']) {
+  // ⛔ THE FLOOR BACK EXTENSION LEFT THIS FAMILY 2026-09-24 (minimum-kit work order B2): deleted, not routed.
+  for (const m of ['Nordic Curl', 'Glute-Ham Raise']) {
     assertEquals(gearRoutesFor(m), [['barbell']], m);
   }
-  // Feet under a loaded bar is the surviving anchor — and it is what most people actually use.
+  assertEquals(Object.prototype.hasOwnProperty.call(ASSISTANCE_GEAR, 'back extension'), false, 'the floor back extension is deleted');
+  // Feet under a loaded bar is the surviving anchor — and every declared kit has a bar (the minimum, 2026-09-24).
   assertEquals(canPerform('Nordic Curl', ['Barbell + plates']), true);
-  assertEquals(canPerform('Nordic Curl', ['Dumbbells', 'Bench (flat/adjustable)']), false);
+  assertEquals(canPerform('Nordic Curl', ['Dumbbells', 'Bench (flat/adjustable)']), true);
 });
 
 Deno.test('the tags the old advisory field got wrong', () => {
@@ -162,7 +166,7 @@ Deno.test('the gear map covers every movement the catalog and the live pools can
     'Dips', 'Push-Up', 'DB Bench Press', 'DB Incline Press', 'DB Shoulder Press', 'Plate Raise',
     'Triceps Pushdown', 'Triceps Extension', 'Chin-Up', 'Dumbbell Row', 'Barbell Row', 'Lat Pulldown',
     'Inverted Row', 'Face Pull', 'Dumbbell Curl', 'Reverse Lunge', 'Bulgarian Split Squat',
-    'Front Squat', 'Glute-Ham Raise', 'Back Extension', 'Reverse Hyper', 'Hanging Leg Raise',
+    'Front Squat', 'Glute-Ham Raise', 'Reverse Hyper', 'Hanging Leg Raise',
     'Ab Wheel Rollout', 'Weighted Sit-Up', 'DB Side Bend',
   ];
   // Still live until slice 5 retires them: the current menu + every ROLE_FALLBACK pool.
@@ -185,9 +189,10 @@ Deno.test('⛔ THE PICKER LIST AND THE KEY MAP AGREE — a renamed chip is a sil
   // ⛔ THE PICKER'S LIST VERBATIM (`TrainingBaselines.tsx`). Slice 7 cut six niche chips from it;
   // if a chip is renamed there and not here, this test still passes while every athlete who ticked it
   // silently loses the capability. Keep the two in step.
+  // ⛔ EXTRAS ONLY SINCE 2026-09-24 (minimum-kit work order Part A): the five minimum chips left the picker; every
+  // declared kit carries their keys (`MINIMUM_KIT_KEYS`). The stored minimum strings still read (minimum ∪ stored).
   const PICKER = [
-    'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
-    'Incline bench', 'Pull-up bar', 'Kettlebells', 'Cable machine', 'Resistance bands', 'Ab wheel',
+    'Incline bench', 'Kettlebells', 'Cable machine', 'Resistance bands', 'Agility ladder', 'Ab wheel',
     'TRX / suspension trainer', 'Stability ball', 'Back extension bench', 'Sled', 'Sandbag',
   ];
   const dead = PICKER.filter((chip) => athleteEquipmentToKeys([chip]).size === 0);
@@ -210,7 +215,7 @@ Deno.test('⛔ THE PICKER LIST AND THE KEY MAP AGREE — a renamed chip is a sil
   for (const routes of Object.values(ASSISTANCE_GEAR)) {
     for (const route of routes) for (const k of route) gateKeys.add(k);
   }
-  assertEquals([...gateKeys].filter((k) => !fromChips.has(k)), [],
+  assertEquals([...gateKeys].filter((k) => !fromChips.has(k) && k !== 'trap_bar'), [],
     'these keys GATE a movement but no home-gym chip produces them');
 });
 
@@ -226,8 +231,9 @@ Deno.test('⛔ A NORMAL HOME GYM CAN DIP — Slice 7 reverses the gate that said
   // Either route alone is enough — a rack with safety arms, or two benches.
   assertEquals(canPerform('Dips', ['Squat rack / Power cage']), true);
   assertEquals(canPerform('Dips', ['Bench (flat/adjustable)']), true);
-  // ⚠️ AND IT IS STILL A GATE, not a free pass: bands alone cannot dip.
-  assertEquals(canPerform('Dips', ['Resistance bands']), false);
+  // ⚠️ AND IT IS STILL A GATE: an undeclared kit dips (unknown means ungated), a declared kit dips on the
+  // minimum's rack or bench (2026-09-24). Bands alone is a declared kit, so it is the minimum plus bands.
+  assertEquals(canPerform('Dips', ['Resistance bands']), true);
 });
 
 Deno.test('⛔ THE GATE STILL BITES where the gear is required AND declarable', () => {
@@ -268,7 +274,8 @@ Deno.test('⛔ A HOME GYM STILL GETS HAMSTRING WORK — the rule, not the mechan
    * `materialize-plan/index.ts` with its own hand-rolled equipment checks and never reads these
    * routes. The two mechanisms were being described as one.
    */
-  const HAMSTRING_AT_HOME = ['Nordic Curl', 'Glute-Ham Raise', 'Back Extension', 'Romanian Deadlift'];
+  // ⚠️ 'Back Extension' left this list 2026-09-24 (B2): the floor version is deleted; the name is the GHD one on a bench.
+  const HAMSTRING_AT_HOME = ['Nordic Curl', 'Glute-Ham Raise', 'Romanian Deadlift', 'Leg Curl'];
   const reachable = HAMSTRING_AT_HOME.filter((n) => canPerform(n, HOME_GYM));
   assertEquals(reachable, HAMSTRING_AT_HOME,
     '⛔ a home gym has lost its hamstring work — THIS is the rule the leg-curl gate must never break');
@@ -290,15 +297,15 @@ Deno.test('⛔ A HOME GYM STILL GETS HAMSTRING WORK — the rule, not the mechan
    */
   assertEquals(canPerform('Leg Curl', HOME_GYM), true);
   assertEquals(canPerform('Leg Curl', ['Commercial gym']), true);
-  assertEquals(canPerform('Leg Curl', ['Barbell + plates', 'Squat rack / Power cage']), false,
-    'a kit with no bench and no dumbbells reaches the lying curl — it needs both');
+  // ⛔ EVERY DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24): a bench and dumbbells are in it.
+  assertEquals(canPerform('Leg Curl', ['Barbell + plates', 'Squat rack / Power cage']), true,
+    'a declared kit is the minimum — bench and dumbbells included — so the lying curl is reachable');
   assertEquals(canPerform('Seated Leg Curl', HOME_GYM), false,
     'the SEATED curl is a machine position and must not have followed the lying one home');
   assertEquals(canPerform('Glute-Ham Raise', HOME_GYM), true);
   assertEquals(canPerform('Nordic Curl', HOME_GYM), true);
-  assertEquals(canPerform('Back Extension', HOME_GYM), true);
-  // No barbell → the kneel-and-lower family has no anchor and is correctly off the menu.
-  assertEquals(canPerform('Glute-Ham Raise', ['Dumbbells']), false);
+  // The bar is in the minimum, so the kneel-and-lower family has its anchor on every declared kit.
+  assertEquals(canPerform('Glute-Ham Raise', ['Dumbbells']), true);
 });
 
 Deno.test('⛔ THE GUARDRAIL — a normal home gym performs the ENTIRE default block, nothing swapped', () => {

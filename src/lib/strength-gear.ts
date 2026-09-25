@@ -96,7 +96,21 @@ export type GearKey =
   | 'sled'
   // ⛔ THE SANDBAG (Michael, 2026-09-18): p220's sandbag throw is offered only to a kit with a sandbag. Passes the
   // one-test-per-chip rule: a sandbag is gear a person names, and it unlocks a movement the page prints.
-  | 'sandbag';
+  | 'sandbag'
+  // ⛔ THE TRAP BAR (2026-09-24 B4; 2026-09-25 follow-up 5): p219's trap bar deadlift was routed on the plain barbell
+  // and so built for a kit that has none. It routes that one movement only, and no chip produces the key: the trap
+  // bar is a FORM of the athlete's deadlift, chosen on the lift, and the competition row is placed by name.
+  | 'trap_bar';
+
+/**
+ * ⛔ THE MINIMUM KIT (Michael, 2026-09-24, the same work order, Part A): the strength plan is built on barbell +
+ * plates, a squat rack / power cage, a bench, dumbbells and a pull-up bar, and never below it. Every declared kit
+ * carries these five (`athleteEquipmentToKeys`); the chips name only the extras. FIELD — JuggernautAI states its
+ * minimum up front: barbell, plates, squat rack, adjustable bench, with dumbbells, kettlebells and bands optional
+ * (garagegymreviews.com/juggernautai-review). OURS — the pull-up bar: a rack has one. Ledger: `docs/STATE-SOURCES.md`
+ * (2026-09-24). An EMPTY list still means "we have not asked" (§0h) — the minimum is added only to a declared kit.
+ */
+export const MINIMUM_KIT_KEYS: readonly GearKey[] = ['barbell', 'rack', 'bench', 'dumbbells', 'pull_up_bar'];
 
 /** Athlete-facing label per key. Also the vocabulary's roster — a key absent here does not exist. */
 export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
@@ -118,6 +132,7 @@ export const STRENGTH_GEAR_LABEL: Record<GearKey, string> = {
   back_extension_bench: 'Back Extension Bench',
   sled: 'Sled',
   sandbag: 'Sandbag',
+  trap_bar: 'Trap Bar',
 };
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -143,6 +158,8 @@ export function exerciseRequiredGearKeys(name: string): string[] {
   if ((/overhead\s+press|push\s+press|\bohp\b/.test(n)) && !/\b(db|dumbbell|band)\b/.test(n)) {
     return ['barbell', 'rack'];
   }
+  // The trap bar is its own implement (2026-09-24, B4) — mentioned as such, ahead of the barbell deadlift clause.
+  if (/\btrap\s*bar\b/.test(n)) return ['trap_bar'];
   if (/\bdeadlift\b/.test(n) && !/\b(db|dumbbell|romanian|rdl|single-leg)\b/.test(n)) return ['barbell'];
   if (/^bench\s+press$|^bench\s+press\s+\(barbell/.test(n)) return ['barbell', 'rack', 'bench'];
   if (/barbell\s+row/.test(n)) return ['barbell'];
@@ -203,6 +220,10 @@ export function exerciseRequiredGearKeys(name: string): string[] {
 export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string> {
   const out = new Set<string>();
   const n = normStrengthEquipmentStrings(strengthEquipment);
+  // ⛔ KIT = MINIMUM ∪ EXTRAS (2026-09-24, Part A). A declared kit — any chip at all, the "Home gym" marker the
+  // sign-up and Profile store included — carries the five minimum keys; the chips only add to them. A stored list
+  // from before this date that still names a minimum chip reads the same way, so nothing is migrated.
+  if (n.length > 0) for (const k of MINIMUM_KIT_KEYS) out.add(k);
   for (const s of n) {
     if (s.includes('barbell') || s.includes('plate')) out.add('barbell');
     if (s.includes('rack') || s.includes('cage')) out.add('rack');
@@ -262,6 +283,9 @@ export function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string>
       // A commercial gym has a sandbag, as it has a sled (Michael, 2026-09-18).
       out.add('sandbag');
     }
+    // ⚠️ NO CHIP GRANTS `trap_bar` (2026-09-25, minimum-kit follow-up 5): the trap bar deadlift is a FORM of the athlete's
+    // deadlift, chosen on the lift (`DEADLIFT_FORMS`, `standing-plan/working-number.ts`), and the competition row is
+    // placed by name with no kit check. The chip of 2026-09-24 and the commercial-gym grant are gone.
     // ⛔ THE TWO CHIPS ADDED 2026-08-26 — see the GearKey note. Matched by SUBSTRING, like every
     // clause above, so "TRX / suspension trainer" and "Stability ball" both land.
     if (s.includes('trx') || s.includes('suspension')) out.add('suspension_trainer');
@@ -456,13 +480,16 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ⛔ Do not re-add them without re-adding the chips; a route nobody can satisfy is a movement
   // nobody is offered.
   // ⚠️ D-479 (2026-09-16): the chip that came back is a back extension bench, and it routes p222's
-  // printed GHD back extension (`ghd back extension`) only, not this family. Plain
-  // `back extension` stays on the barbell anchor — the floor version with the feet under a loaded bar.
+  // printed GHD back extension (`ghd back extension`) only, not this family.
+  // ⛔ THE FLOOR BACK EXTENSION IS DELETED (2026-09-24, B2): p222 prints the machine back extension, and a back
+  // extension needs a back extension bench, a GHD or a 45° bench — it is reachable only with the
+  // `back_extension_bench` extra or a commercial gym. The floor version under a loaded bar (its route, its filing,
+  // its shown name and its how-to) is gone outright; a typed or logged "Back Extension" resolves to
+  // `ghd back extension` (`SAME_MOVEMENT`), the movement that name means on a bench.
   'nordic curl': [['barbell']],
   'nordic curls': [['barbell']],
   'nordic hamstring curl': [['barbell']],
   'glute ham raise': [['barbell']],
-  'back extension': [['barbell']],
   /**
    * ⛔⛔ TWO EXECUTIONS, TWO ENTRIES, TWO ROUTES (2026-08-30) — and they were one ambiguous pair.
    *
@@ -532,9 +559,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'barbell back squat': [['barbell', 'rack']],
   'deadlift': [['barbell']],
   'conventional deadlift': [['barbell']],
-  // A trap bar is a barbell variant with no key of its own, and inventing one fails "commonly
-  // declarable". The plates chip is the honest minimum.
-  'trap bar deadlift': [['barbell']],
+  // ⛔ ONLY WITH THE TRAP BAR (2026-09-24, B4). It routed on the plain barbell — "a barbell variant with no key of
+  // its own" — and so was built for a kit with no trap bar in it. The chip passes the one-test rule (see `GearKey`).
+  'trap bar deadlift': [['trap_bar']],
   'sumo deadlift': [['barbell']],
   'bench': [['barbell', 'bench']],
   'bench press': [['barbell', 'bench']],
@@ -856,11 +883,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
 
   // ── focused arms: two ways into most of them ───────────────────────────────────────────────────
   'tate press': [['dumbbells', 'bench']],
-  // ⛔ DUMBBELLS LEAD THE SKULL CRUSHER AND THE DRAG CURL (Michael, 2026-09-24 — `docs/WORKORDER-arms-superset-
+  // ⛔ DUMBBELLS LEAD THE SKULL CRUSHER (Michael, 2026-09-24 — `docs/WORKORDER-arms-superset-
   // implement-2026-09-24.md`): his Upper Pull day built "Skull Crusher + Drag Curl" on a barbell + dumbbell kit and
   // neither row said what it is held with. The FIRST ROUTE is what the kit resolves to (`executionName`,
-  // `usesTwoDumbbellsOnKit`, `equipmentFitRank` all read it), so the order IS the rule for these two: their dumbbell
-  // form when the kit has dumbbells, the bar only when it does not. OURS — the page (p222) prints "skull crushers" and "drag curls" with
+  // `usesTwoDumbbellsOnKit`, `equipmentFitRank` all read it), so the order IS the rule: its dumbbell
+  // form when the kit has dumbbells, the bar only when it does not. OURS — the page (p222) prints "skull crushers" with
   // no implement. Field: Strong and Hevy name the implement in the exercise ("Skullcrusher (Dumbbell)" /
   // "(Barbell)"); the published skull-crusher superset is dumbbell or EZ bar with a curl, and a lying + standing pair
   // cannot share one straight bar. Ledger: `docs/STATE-SOURCES.md` (2026-09-24).
@@ -873,17 +900,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // commercial-gym chip, the only thing that grants `machine`. A home athlete gets his spider curl
   // (chest-down on the incline, the same fixed-arm curl) where the kit has an incline bench, and
   // the drag curl where it does not.
-  // ⛔ AND A HOME ROUTE (Michael, 2026-09-10 — `docs/WORKORDER-kill-ours-2026-09-09.md` third home
-  // route: "a bench, a rack and dumbbells is a pretty standard home gym"): the preacher curl's home
-  // version is the CONCENTRATION CURL — seated on the bench (flat is enough), upper arm braced
-  // against the inner knee, one arm at a time. Same braced-arm biceps intent: the pad fixes the
-  // upper arm on the station, the knee fixes it at home. Viada p275 permits the implement change
-  // (variety of implements); the substitution itself is field-standard, not a page. The station
-  // route stays; the execution name says which one the kit resolved to
-  // (`strength-grid/grid.ts:EXECUTION_NAME`).
-  // ⚠️ ROUTE ORDER: the dumbbell route leads because `equipmentFitRank` scores by the FIRST route
-  // and it is the one most athletes have; the display name is chosen by the kit, not by this order.
-  'preacher curl': [['dumbbells', 'bench'], ['machine']],
+  // ⛔ STATION ONLY AGAIN (2026-09-24, B5). The concentration-curl home route of 2026-09-10 (seated on the bench,
+  // upper arm on the inner knee — field practice, no page) is gone: on any kit with dumbbells the arms superset's
+  // biceps half is the DUMBBELL CURL (p222 variant, `taxonomy.ts`), which is what a Strong / Hevy lifter picks for
+  // that slot; the preacher curl is his printed movement where the station is owned.
+  'preacher curl': [['machine']],
   // The incline is the position here - a spider curl is chest-down on the incline bench. ⚠️ THE
   // "Incline bench" CHIP IS WHAT GRANTS `incline_bench`; "Bench (flat/adjustable)" grants `bench`
   // only (the 2026-08-29 attempt to read "adjustable" as incline was reverted — see
@@ -891,8 +912,10 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // `strength-equipment-tier.test.ts` ("Bench (flat/adjustable)" IS NOT INCLINE CAPABILITY) is the
   // law.
   'spider curl': [['dumbbells', 'incline_bench'], ['barbell', 'incline_bench']],
-  // ⚠️ DUMBBELLS FIRST — the same 2026-09-24 rule as the skull crusher above.
-  'drag curl': [['dumbbells'], ['barbell']],
+  // ⛔ BARBELL ONLY (2026-09-24, the minimum-kit work order B5, reverting the same day's dumbbell-first route): the
+  // drag curl leaves the dumbbell form. It is offered where the bar is free; on a kit with dumbbells the arms
+  // superset's biceps half is the dumbbell curl, and the bar chip draws on this row wherever it is built.
+  'drag curl': [['barbell']],
 
 };
 
@@ -1058,7 +1081,8 @@ export function barIsTheLoad(
   const reachable = owned ? loadable.filter((r) => r.every((k) => owned.has(k))) : loadable;
   const pool = reachable.length > 0 ? reachable : loadable;
   if (pool.length === 0) return false;
-  const onBar = pool.filter((r) => r.includes('barbell'));
+  // A trap bar is a bar (2026-09-25): the chip and plate math draw, on the trap bar's own weight (`defaultBarKeyFor`).
+  const onBar = pool.filter((r) => r.includes('barbell') || r.includes('trap_bar'));
   if (onBar.length === 0) return false;
   if (onBar.length === pool.length) return true;
   return res.config.primaryRef != null && pool[0].includes('barbell');
@@ -1095,6 +1119,20 @@ export function ownsLoadingImplement(athleteEquipment: string[] | null | undefin
   const owned = athleteEquipmentToKeys(chips);
   for (const k of owned) if (LOADING_KEYS.has(k)) return true;
   return false;
+}
+
+/**
+ * ⛔ THE BAR A BARBELL ROW DEFAULTS TO, BY KEY IN `BAR_TYPES` (2026-09-25, minimum-kit follow-up 5): the trap bar for a
+ * movement whose only bar route is the trap bar (the trap bar deadlift — Strong / Hevy price it on its own bar, not the
+ * 45 lb Olympic bar), the standard bar for every other barbell movement, `null` where the bar is not the load. The
+ * logger seeds a new set's bar from it and the load pricer (`_shared/workload.ts`) prices a blank set with it.
+ */
+export function defaultBarKeyFor(exerciseName: string, unit: 'lb' | 'kg' = 'lb'): string | null {
+  if (barIsTheLoad(exerciseName, null) !== true) return null;
+  const routes = ASSISTANCE_GEAR[foldExerciseName(String(exerciseName ?? ''))] ?? [];
+  const loadable = routes.filter((r) => !isLastResortRoute(r));
+  const trap = loadable.length > 0 && loadable.every((r) => r.includes('trap_bar'));
+  return `${trap ? 'trap' : 'standard'}${unit === 'kg' ? '_kg' : ''}`;
 }
 
 export function canPerform(exerciseName: string, athleteEquipment: string[] | null | undefined): boolean {

@@ -47,6 +47,7 @@ import {
   titleCaseDay,
   type Weekday,
   defaultCompetitionLifts,
+  readDeadliftForm,
   demonstratedRunVolume,
   demonstratedWeeklyMinutes,
   assignSports,
@@ -771,7 +772,13 @@ Deno.serve(async (req: Request) => {
        * figure is never read on this path at all. the archived loading module records that a typed number
        * and a tested one are the same shape on disk, so provenance cannot be asked of the value.
        */
-      const competitionLifts = defaultCompetitionLifts();
+      // ⛔ THE DEADLIFT FORM, CHOSEN ON THE LIFT (2026-09-25): `assistance_picks.viada.deadlift_form`, barbell when absent.
+      const deadliftForm = readDeadliftForm((() => {
+        const ap = (body as Record<string, unknown>).assistance_picks;
+        const raw = ap && typeof ap === 'object' ? (ap as Record<string, unknown>).viada : null;
+        return raw && typeof raw === 'object' ? (raw as Record<string, unknown>).deadlift_form : null;
+      })()) ?? 'barbell';
+      const competitionLifts = defaultCompetitionLifts(deadliftForm);
       // ⛔ ONLY THE LIFTS THIS BLOCK PRESCRIBES FROM. The overhead press is tested and never loaded
       // in this frame (no `push_upper` competition slot would carry a press), so demanding evidence
       // for it would refuse the skip for no benefit to anybody.

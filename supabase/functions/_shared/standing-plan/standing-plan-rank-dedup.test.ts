@@ -193,9 +193,11 @@ Deno.test('⛔ A BODYWEIGHT ATHLETE IS NOT DEMOTED OUT OF THEIR OWN CATALOGUE', 
    * have no weights for would bury every real option they have. `ownsLoadingImplement` is the gate,
    * and it reads the existing chip vocabulary rather than inventing a tier.
    */
-  assertEquals(ownsLoadingImplement(['Pull-up bar']), false);
-  assertEquals(ownsLoadingImplement(['Bands']), false, 'a band was counted as a loading implement');
-  assertEquals(ownsLoadingImplement(['Flat bench', 'Rack']), false, 'a bench was counted as load');
+  // ⛔ EVERY DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24): a bar and dumbbells are in it, so any chip list owns a
+  // loading implement. The case this test guards is now the undeclared athlete alone (below).
+  assertEquals(ownsLoadingImplement(['Pull-up bar']), true);
+  assertEquals(ownsLoadingImplement(['Bands']), true);
+  assertEquals(ownsLoadingImplement(['Flat bench', 'Rack']), true);
   assertEquals(ownsLoadingImplement(['Dumbbells']), true);
   assertEquals(ownsLoadingImplement(['Barbell + plates']), true);
   assertEquals(ownsLoadingImplement(['Commercial gym']), true);
@@ -211,9 +213,11 @@ Deno.test('⛔ A BODYWEIGHT ATHLETE IS NOT DEMOTED OUT OF THEIR OWN CATALOGUE', 
   // first movement they can actually perform. The old pin (`leg extension` for both) was the bug
   // this closes — it fed materialize-plan's week-blind swap and duplicated an athlete's own
   // single-leg pick on a device-verified block.
+  // ⚠️ 2026-09-24: a declared kit is at least the minimum (bench + dumbbells), so the pull-up-bar athlete's head is the
+  // seated calf raise — p223's own, a dumbbell across the knee on the bench — not the bodyweight calf raise.
   for (const [equipment, expectedHead] of [
     [null, 'leg extension'],
-    [['Pull-up bar'], 'calf raise'],
+    [['Pull-up bar'], 'seated calf raise'],
   ] as const) {
     const r = resolveSlot({ intent: 'HYP', category: 'focused', pattern: 'press_lower', equipment: equipment as string[] | null });
     const names = r.options.map((o) => o.name);

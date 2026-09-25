@@ -83,8 +83,13 @@ import { localDateInTz } from './local-date.ts';
 // 30 (2026-09-24): the arms superset never puts both movements on the barbell; a kit with dumbbells does the skull crusher
 //   and the drag curl with dumbbells (`weight_per: 'each'`), and the skull crusher, drag curl and spider curl say what
 //   they are held with (DB Skull Crusher / Barbell Drag Curl) (docs/WORKORDER-arms-superset-implement-2026-09-24.md).
+// 31 (2026-09-24): the minimum kit (barbell + rack + bench + dumbbells + pull-up bar) under every declared kit; no
+//   superset holds two barbell movements; the floor back extension is deleted; the arms pair on a dumbbell kit is
+//   DB Skull Crusher + Dumbbell Curl (drag curl barbell only); the trap bar deadlift only with a trap bar; split squat
+//   reads "each"; the rear delt machine on a dumbbell kit is stored as the rear delt fly
+//   (docs/WORKORDER-minimum-kit-and-accessory-table-2026-09-24.md).
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 30;
+export const PLAN_WRITER_VERSION = 31;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

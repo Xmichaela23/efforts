@@ -16,6 +16,7 @@ import {
   frameAdmitsForPick,
   frameDaysForPick,
   frameMuscleForPick,
+  frameReservesLungeForPick,
   pickOptionLabelInRow,
   pickOptions,
   picksForFrame,
@@ -24,6 +25,7 @@ import {
   type ViadaPickKey,
 } from './accessory-picks.ts';
 import { FRAMES, type FrameId } from './frames.ts';
+import { DEADLIFT_FORM_LABEL, DEFAULT_DEADLIFT_FORM, TESTED_LIFT_NAME, type DeadliftForm } from './working-number.ts';
 import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
 
 export type BuildFocusOption = { name: string; label: string; display: string };
@@ -57,8 +59,28 @@ export type BuildFocusBlock = {
   list_last_join: string;
 };
 
+/**
+ * ⛔ THE DEADLIFT FORM ROW (2026-09-25, minimum-kit follow-up 5): the one lift the athlete chooses a form for, on the
+ * Build focus screen and on Adjust. The label is the lift's catalogue name; the option words are the owner's
+ * (`DEADLIFT_FORM_LABEL`, 2026-09-25).
+ */
+export type DeadliftFormRow = {
+  label: string;
+  options: { value: DeadliftForm; label: string }[];
+  default: DeadliftForm;
+};
+export function deadliftFormRow(): DeadliftFormRow {
+  return {
+    label: TESTED_LIFT_NAME.deadlift,
+    options: (['barbell', 'trap_bar'] as DeadliftForm[]).map((value) => ({ value, label: DEADLIFT_FORM_LABEL[value] })),
+    default: DEFAULT_DEADLIFT_FORM,
+  };
+}
+
 export type SetupBlock = {
   sections: typeof SECTION_COPY;
+  /** The deadlift's form — barbell or trap bar — chosen on the lift (2026-09-25). */
+  deadlift_form: DeadliftFormRow;
   programs: typeof PROGRAM_COPY;
   /** The Run screen's sections, in order (2026-09-23). */
   run_sections: typeof RUN_SECTIONS;
@@ -77,7 +99,7 @@ export function buildFocusBlock(frame: FrameId, equipment: string[] | null): Bui
   };
   const rowFor = (key: ViadaPickKey): BuildFocusRow => {
     const spec = VIADA_PICKS[key];
-    const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame));
+    const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame));
     const all = allSubstituted(opts);
     const days = frameDaysForPick(key, frame);
     const also = days.length === 0
@@ -136,6 +158,7 @@ export function buildFocusBlock(frame: FrameId, equipment: string[] | null): Bui
 export function setupBlock(equipment: string[] | null): SetupBlock {
   return {
     sections: SECTION_COPY,
+    deadlift_form: deadliftFormRow(),
     programs: PROGRAM_COPY,
     run_sections: RUN_SECTIONS,
     section_closed_line: SECTION_CLOSED_LINE,

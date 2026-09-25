@@ -33,11 +33,11 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -62,7 +62,7 @@ WEEK 02  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -81,11 +81,11 @@ WEEK 02  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -110,7 +110,7 @@ WEEK 03  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -129,11 +129,11 @@ WEEK 03  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -158,7 +158,7 @@ WEEK 04  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -177,11 +177,11 @@ WEEK 04  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -206,7 +206,7 @@ WEEK 05  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Surge and Float — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -225,11 +225,11 @@ WEEK 05  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -254,7 +254,7 @@ WEEK 06  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -273,11 +273,11 @@ WEEK 06  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -302,7 +302,7 @@ WEEK 07  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -321,11 +321,11 @@ WEEK 07  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -350,7 +350,7 @@ WEEK 08  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -369,11 +369,11 @@ WEEK 08  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -398,7 +398,7 @@ WEEK 09  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Surge and Float — 36 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -417,11 +417,11 @@ WEEK 09  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -446,7 +446,7 @@ WEEK 10  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -465,11 +465,11 @@ WEEK 10  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -493,7 +493,7 @@ WEEK 11  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -512,11 +512,11 @@ WEEK 11  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -540,7 +540,7 @@ WEEK 12  column=standard
       DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
       HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -559,11 +559,11 @@ WEEK 12  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Kroc Row                       4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
       HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Rear Delt Machine              3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me

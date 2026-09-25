@@ -32,19 +32,19 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Wednesday] run      Short Threshold Repeats — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 53 min
   NOTES
@@ -61,18 +61,18 @@ WEEK 02  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -82,19 +82,19 @@ WEEK 02  column=standard
   [Wednesday] run      Race-Specific Repeats — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 55 min
   NOTES
@@ -110,18 +110,18 @@ WEEK 03  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -131,19 +131,19 @@ WEEK 03  column=standard
   [Wednesday] run      Sub-Threshold Repeats — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 40 min
   NOTES
@@ -159,18 +159,18 @@ WEEK 04  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -180,19 +180,19 @@ WEEK 04  column=standard
   [Wednesday] run      Long Sub-Threshold Repeats — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 52 min
   NOTES
@@ -208,18 +208,18 @@ WEEK 05  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -229,19 +229,19 @@ WEEK 05  column=standard
   [Wednesday] run      Threshold with a Surge — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 44 min
   NOTES
@@ -257,18 +257,18 @@ WEEK 06  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -278,19 +278,19 @@ WEEK 06  column=standard
   [Wednesday] run      Surge into Steady — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 38 min
   NOTES
@@ -306,18 +306,18 @@ WEEK 07  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -327,19 +327,19 @@ WEEK 07  column=standard
   [Wednesday] run      Short Threshold Repeats — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES
@@ -355,18 +355,18 @@ WEEK 08  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -376,19 +376,19 @@ WEEK 08  column=standard
   [Wednesday] run      Race-Specific Repeats — 31 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 59 min
   NOTES
@@ -404,18 +404,18 @@ WEEK 09  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Surge and Float — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -425,19 +425,19 @@ WEEK 09  column=standard
   [Wednesday] run      Sub-Threshold Repeats — 40 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 51 min
   NOTES
@@ -453,18 +453,18 @@ WEEK 10  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Forty-Twenty Repeats — 34 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -474,19 +474,19 @@ WEEK 10  column=standard
   [Wednesday] run      Long Sub-Threshold Repeats — 38 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 48 min
   NOTES
@@ -502,18 +502,18 @@ WEEK 11  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Long Surge and Float — 41 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -523,19 +523,19 @@ WEEK 11  column=standard
   [Wednesday] run      Threshold with a Surge — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 35 min
   NOTES
@@ -551,18 +551,18 @@ WEEK 12  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @               | awaiting_test · how-to
-      DE     Military Press                 4x2-4        @               | RIR 3.5 · how-to
-      HYP    Close Grip Bench Press         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    Plate Raise                    3x6-12       @               | RIR 1 · auto_regulated · how-to
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
   [Monday] run      Descending Ladder — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Hip Thrust                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
@@ -572,19 +572,19 @@ WEEK 12  column=standard
   [Wednesday] run      Surge into Steady — 48 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     Barbell Row                    1x1-5        @               | no_tested_lift · how-to
-      DE     Meadows Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    T-bar Row                      3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Skull Crusher                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Skull Crusher" · how-to
-      HYP    Drag Curl                      3x6-12       @               | RIR 1 · auto_regulated · shown as "Barbell Drag Curl" · how-to
-      HYP    YTW Raise                      3x6-12       @               | RIR 1 · auto_regulated · how-to
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Kroc Row                       3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
-      HYP    Back Extension                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Bulgarian Split Squat          3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES

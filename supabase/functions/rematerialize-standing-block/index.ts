@@ -56,6 +56,10 @@ import {
   TEST_WEEK_INDEX,
   weekLedgersFor,
   blockDescriptionFor,
+  readDeadliftForm,
+  deadliftFormOf,
+  DEADLIFT_FORMS,
+  DEADLIFT_FORM_LABEL,
 } from '../_shared/standing-plan/index.ts';
 import { calculateDurationWorkload, getDefaultIntensityForType, getStepsIntensity } from '../_shared/workload.ts';
 // ⛔ THE ATHLETE'S ENDURANCE SWAPS, READ FROM `plan_adjustments` WHEN THE WEEKS ARE COMPOSED (2026-09-19).
@@ -109,6 +113,9 @@ Deno.serve(async (req: Request) => {
      * new equipment can change which movement a session uses, and that never happens without the athlete asking.
      */
     const useCurrentEquipment = p?.use_current_equipment === true && !isRefresh && !swapTap;
+    // ⛔ THE DEADLIFT FORM FROM ADJUST (2026-09-25, minimum-kit follow-up 5): `deadlift_form: 'barbell' | 'trap_bar'` on an
+    // apply re-names the block's hinge lift (`DEADLIFT_FORMS`) for every row not yet done; the number is not adjusted.
+    const requestedDeadliftForm = !isRefresh && !swapTap ? readDeadliftForm(p?.deadlift_form) : null;
     const willWrite = p?.apply === true || isRefresh || !!swapTap;
     const asOf = typeof p?.as_of === 'string' ? String(p.as_of).slice(0, 10) : null;
 
@@ -149,6 +156,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const weeks = Number(plan.duration_weeks) || 12;
+    // The block's competition lifts, with the form the athlete asked for on this tap (see `requestedDeadliftForm`).
+    const competitionLifts: Record<string, string> = {
+      ...((sp.competition_lifts ?? {}) as Record<string, string>),
+      ...(requestedDeadliftForm ? { hinge_lower: DEADLIFT_FORMS[requestedDeadliftForm] } : {}),
+    };
+    const deadliftForm = deadliftFormOf(competitionLifts);
     // ⛔ THE ATHLETE'S DAY, NOT UTC (2026-09-18): at 6 pm Pacific the evening session is still today's and is
     // rewritten. The same day decides the block week and the retest row's date. `as_of` still wins.
     const today = asOf ?? await athleteToday(supabase, userId);
@@ -169,7 +182,7 @@ Deno.serve(async (req: Request) => {
       // ⛔ ONLY THE LIFTS THE FRAME'S WEEK LOADS (2026-09-13) — `Frame.testedLifts`. No press retest on p278.
       const lifts = (TEST_DAY_LIFTS[retestGroup] ?? []).filter((l) =>
         (FRAMES[sp.frame as keyof typeof FRAMES]?.testedLifts ?? ['bench', 'squat', 'deadlift', 'overheadPress']).includes(l));
-      const names = testWeekLiftNames(sp.competition_lifts ?? {});
+      const names = testWeekLiftNames(competitionLifts);
       const stored = (sp.working_numbers ?? null) as Record<string, Record<string, unknown>> | null;
       const seeds = (sp.seed_one_rep_maxes ?? {}) as Record<string, unknown>;
       const exercises: Record<string, unknown>[] = [];
@@ -265,7 +278,15 @@ Deno.serve(async (req: Request) => {
       strength_exercises: w?.strength_exercises ?? null,
     }));
 
-    const reading = readTestWeek(joined, sp.test_lift_names);
+    // ⛔ READ UNDER BOTH NAMES (2026-09-25): the week-one test as it was logged (`test_lift_names`) and the lift's name
+    // under the current deadlift form, so a form changed mid-block keeps its number and a later retest is found.
+    const currentNames = testWeekLiftNames(competitionLifts);
+    const readNames = Object.fromEntries(
+      (Object.keys(currentNames) as Array<keyof typeof currentNames>).map((lift) => [
+        lift, [...new Set([String((sp.test_lift_names as Record<string, string> | null)?.[lift] ?? ''), currentNames[lift]].filter((n) => n))],
+      ]),
+    ) as Record<string, string[]>;
+    const reading = readTestWeek(joined, readNames);
     /**
      * ⛔ THE NUMBERS ON FILE STAY (D-467, 2026-09-04). A block built on "Use current" carries its working
      * numbers in `config.working_numbers` (cite names the file source). A partial test — one lift missing,
@@ -380,6 +401,9 @@ Deno.serve(async (req: Request) => {
      */
     const nextWeek = currentWeek + 1;
     const deloadOffer = {
+      // The deadlift's form and the words for the two chips (2026-09-25): Adjust prints them, decides nothing.
+      deadlift_form: deadliftForm,
+      deadlift_form_labels: DEADLIFT_FORM_LABEL,
       next_week: nextWeek,
       next_is_deload: taperWeeks.includes(nextWeek),
       can_deload: nextWeek <= weeks,
@@ -391,7 +415,7 @@ Deno.serve(async (req: Request) => {
       frame: sp.frame,
       weeks,
       taperWeeks,
-      competitionLifts: sp.competition_lifts ?? {},
+      competitionLifts,
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},
       /**
@@ -772,6 +796,8 @@ Deno.serve(async (req: Request) => {
             ...sp,
             // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`).
             ...(currentKit ? { athlete_equipment: currentKit } : {}),
+            // The deadlift form the athlete chose becomes the block's own (2026-09-25); the test names as logged stay.
+            ...(requestedDeadliftForm ? { competition_lifts: competitionLifts } : {}),
             taper_weeks: taperWeeks,
             // ⛔ AN EMPTY READ WRITES NO NUMBERS (2026-09-18): an apply before the test keeps what the block had.
             ...(found.length > 0 ? { working_numbers: reading.working, test_read: true } : {}),

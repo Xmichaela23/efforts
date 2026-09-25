@@ -183,14 +183,31 @@ export default function StateAdjustLens({ mainLifts }: {
   // ⛔ WHICH WEEK, AND WHETHER IT CAN — THE BLOCK'S ANSWER (2026-09-15). The screen worked out "next week"
   // as `current + 1`, gated it on `≤ weeks`, and carried its own `|| 12` beside the server's. The dry run
   // returns `next_week`, `next_is_deload` and `can_deload`; this prints them.
-  type Deload = { nextWeek: number; nextIsDeload: boolean; canDeload: boolean; taperWeeks: number[]; line: string | null };
+  // ⛔ THE DEADLIFT FORM (2026-09-25): read off the same dry run (`deadlift_form`, `deadlift_form_labels` — the owner's words);
+  // a tap rebuilds the sessions not yet started with `deadlift_form`, the number untouched.
+  type DeadliftForm = 'barbell' | 'trap_bar';
+  type Deload = { nextWeek: number; nextIsDeload: boolean; canDeload: boolean; taperWeeks: number[]; line: string | null;
+    deadliftForm: DeadliftForm | null; deadliftFormLabels: Record<DeadliftForm, string> | null };
+  const [formBusy, setFormBusy] = useState(false);
   const [deload, setDeload] = useState<Deload | null>(null);
   const [deloadBusy, setDeloadBusy] = useState(false);
   const [deloadNote, setDeloadNote] = useState<string | null>(null);
   const readDeload = (d: any): Deload | null =>
     d?.success && typeof d.next_week === 'number'
-      ? { nextWeek: d.next_week, nextIsDeload: d.next_is_deload === true, canDeload: d.can_deload === true, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [], line: typeof d.deload_line === 'string' ? d.deload_line : null }
+      ? { nextWeek: d.next_week, nextIsDeload: d.next_is_deload === true, canDeload: d.can_deload === true, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [], line: typeof d.deload_line === 'string' ? d.deload_line : null,
+        deadliftForm: d.deadlift_form === 'trap_bar' || d.deadlift_form === 'barbell' ? d.deadlift_form : null,
+        deadliftFormLabels: d.deadlift_form_labels && typeof d.deadlift_form_labels === 'object' ? d.deadlift_form_labels : null }
       : null;
+  const setDeadliftForm = (form: DeadliftForm) => {
+    if (!deload || deload.deadliftForm === form) return;
+    void (async () => {
+      setFormBusy(true); setRebuildNote(null);
+      const result = await rebuildUpcomingSessions({ deadliftForm: form });
+      setRebuildNote(REBUILD_NOTE[result]);
+      if (result === 'rebuilt') setDeload({ ...deload, deadliftForm: form });
+      setFormBusy(false);
+    })();
+  };
   useEffect(() => {
     let cancelled = false;
     void supabase.functions.invoke('rematerialize-standing-block', { body: { apply: false } }).then(({ data }) => {
@@ -417,6 +434,16 @@ export default function StateAdjustLens({ mainLifts }: {
         {/* An action is a button, a choice is a chip (`ui/galaxy-button.tsx`); the same control as Baselines' Strength card. */}
         <GalaxyButton variant="secondary" size="md" fullWidth className="action-bed" disabled={rebuilding} onClick={rebuild}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</GalaxyButton>
         <p className="text-footnote text-label-secondary mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched. Changes made to equipment will be adjusted here for future sessions.</p>
+        {deload?.deadliftForm && deload.deadliftFormLabels ? (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {/* The deadlift's form: the owner's two words as chips; a tap rebuilds the sessions not yet started (2026-09-25). */}
+            {(['barbell', 'trap_bar'] as DeadliftForm[]).map((form) => (
+              <GalaxyButton key={form} shape="chip" variant={deload.deadliftForm === form ? 'primary' : 'secondary'} aria-pressed={deload.deadliftForm === form}
+                className={deload.deadliftForm === form ? 'text-white' : 'text-white/55'} disabled={formBusy || rebuilding}
+                onClick={() => setDeadliftForm(form)}>{deload.deadliftFormLabels![form]}</GalaxyButton>
+            ))}
+          </div>
+        ) : null}
         {rebuildNote && <p className="text-footnote text-label-secondary mt-1.5">{rebuildNote}</p>}
       </>
     ) },

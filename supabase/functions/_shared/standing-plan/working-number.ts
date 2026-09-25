@@ -63,6 +63,27 @@ export const TESTED_LIFT_NAME: Record<TestedLift, string> = {
  *
  * ⚠️ OVERHEAD PRESS HAS NO PATTERN IN THIS FRAME and therefore no override — see `TESTED_LIFT_NAME`.
  */
+/**
+ * ⛔ THE DEADLIFT'S FORM — BARBELL OR TRAP BAR — CHOSEN ON THE LIFT (2026-09-25, minimum-kit follow-up 5, owner's ruling).
+ * Choosing the trap bar makes every row that is "Deadlift" build and log as p219's Trap Bar Deadlift: the tested lift,
+ * the test week, the working number, the ME/DE rotation. The NUMBER is not adjusted (owner, 2026-09-25: "users in the
+ * know will if they swap"); the row's bar is the trap bar's own weight (`defaultBarKeyFor`). FIELD — Strong and Hevy
+ * name the exercise "Deadlift (Barbell)" / "Deadlift (Trap bar)". The labels are the owner's approved words.
+ */
+export type DeadliftForm = 'barbell' | 'trap_bar';
+export const DEADLIFT_FORMS: Record<DeadliftForm, string> = { barbell: 'Deadlift', trap_bar: 'Trap Bar Deadlift' };
+export const DEADLIFT_FORM_LABEL: Record<DeadliftForm, string> = { barbell: 'Barbell', trap_bar: 'Trap bar' };
+export const DEFAULT_DEADLIFT_FORM: DeadliftForm = 'barbell';
+export function readDeadliftForm(raw: unknown): DeadliftForm | null {
+  const s = String(raw ?? '').trim().toLowerCase();
+  return s === 'barbell' || s === 'trap_bar' ? s : null;
+}
+/** The form a block's competition lifts carry (its hinge lift by name); barbell when nothing says otherwise. */
+export function deadliftFormOf(competitionLifts: Partial<Record<string, string>> | null | undefined): DeadliftForm {
+  const name = String(competitionLifts?.hinge_lower ?? '').trim().toLowerCase();
+  return name === DEADLIFT_FORMS.trap_bar.toLowerCase() ? 'trap_bar' : 'barbell';
+}
+
 export function testedLiftName(
   lift: TestedLift,
   competitionName: string | null | undefined,
@@ -432,14 +453,17 @@ export function testSetReplaces(prior: TestSetCandidate | undefined, next: TestS
  */
 export function readTestWeek(
   rows: LoggedWorkoutRowish[] | null | undefined,
-  liftForName: Partial<Record<TestedLift, string>>,
+  // ⛔ ONE NAME OR SEVERAL PER LIFT (2026-09-25): a deadlift form changed mid-block leaves the week-one test logged
+  // under the old name and a retest under the new; both are the same lift's number.
+  liftForName: Partial<Record<TestedLift, string | readonly string[]>>,
 ): TestWeekReading {
   const wanted = new Map<string, TestedLift>();
-  const nameFor = (lift: TestedLift): string => {
-    const name = liftForName?.[lift];
-    return typeof name === 'string' && name.trim() !== '' ? name.trim() : TESTED_LIFT_NAME[lift];
+  const namesFor = (lift: TestedLift): string[] => {
+    const raw = liftForName?.[lift];
+    const list = (Array.isArray(raw) ? raw : [raw]).map((n) => String(n ?? '').trim()).filter((n) => n !== '');
+    return list.length > 0 ? list : [TESTED_LIFT_NAME[lift]];
   };
-  for (const lift of TESTED_LIFTS) wanted.set(nameFor(lift).toLowerCase(), lift);
+  for (const lift of TESTED_LIFTS) for (const n of namesFor(lift)) wanted.set(n.toLowerCase(), lift);
 
   const best = new Map<TestedLift, TestSetCandidate>();
   for (const row of rows ?? []) {

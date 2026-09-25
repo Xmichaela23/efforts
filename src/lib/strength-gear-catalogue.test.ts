@@ -11,7 +11,7 @@
  * Measured before the pass: 160 of 211 untagged, of which 148 reached a declared home gym anyway.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { ASSISTANCE_GEAR, athleteEquipmentToKeys, canPerform, equipmentFitRank } from './strength-gear.ts';
+import { ASSISTANCE_GEAR, athleteEquipmentToKeys, canPerform, equipmentFitRank, MINIMUM_KIT_KEYS } from './strength-gear.ts';
 import { foldExerciseName } from './exercise-config.ts';
 import {
   allGridMovements,
@@ -177,7 +177,7 @@ Deno.test('every route is spelled with a real key', () => {
   const vocabulary = new Set(Object.keys(ASSISTANCE_GEAR).length ? [
     'barbell', 'rack', 'bench', 'incline_bench', 'dumbbells', 'kettlebell', 'cable', 'pull_up_bar',
     'ab_wheel', 'bands', 'box', 'rings', 'machine', 'suspension_trainer', 'stability_ball',
-    'back_extension_bench', 'sled', 'sandbag',
+    'back_extension_bench', 'sled', 'sandbag', 'trap_bar',
   ] : []);
   for (const [name, routes] of Object.entries(ASSISTANCE_GEAR)) {
     assertEquals(foldExerciseName(name), name, `"${name}" is not stored in folded form`);
@@ -199,10 +199,11 @@ Deno.test('⛔ THE BACK EXTENSION BENCH CHIP (D-479) — unlocks p222\'s GHD bac
   // The machine back extension stays on the station: one bench, one row.
   assert(!canPerform('machine back extension', [...home, 'Back extension bench']), 'the machine back extension reached a back extension bench');
   assert(canPerform('machine back extension', ['Commercial gym']), 'the machine back extension was withheld from a commercial gym');
+  // ⛔ A DECLARED KIT IS AT LEAST THE MINIMUM (2026-09-24, `MINIMUM_KIT_KEYS`) — the flat bench is in it. What this
+  // chip must not do is add anything BEYOND the minimum but its own key.
   const alone = athleteEquipmentToKeys(['Back extension bench']);
   assert(alone.has('back_extension_bench'), 'the chip produces no key');
-  assert(!alone.has('bench'), 'the back extension bench chip granted a flat bench');
-  assert(!canPerform('dumbbell bench press', ['Dumbbells', 'Back extension bench']), 'a back extension bench let an athlete bench press');
+  assertEquals([...alone].sort(), [...MINIMUM_KIT_KEYS, 'back_extension_bench'].sort(), 'the back extension bench chip granted more than its own key over the minimum');
 });
 
 Deno.test('⛔ THE SLED CHIP (D-479) — unlocks p226\'s sled push and sled pull, and nothing else', () => {
@@ -212,5 +213,5 @@ Deno.test('⛔ THE SLED CHIP (D-479) — unlocks p226\'s sled push and sled pull
     assert(canPerform(name, [...home, 'Sled']), `"${name}" was withheld from a sled owner`);
     assert(canPerform(name, ['Commercial gym']), `"${name}" was withheld from a commercial gym`);
   }
-  assertEquals([...athleteEquipmentToKeys(['Sled'])], ['sled'], 'the sled chip granted more than a sled');
+  assertEquals([...athleteEquipmentToKeys(['Sled'])].sort(), [...MINIMUM_KIT_KEYS, 'sled'].sort(), 'the sled chip granted more than a sled over the minimum');
 });

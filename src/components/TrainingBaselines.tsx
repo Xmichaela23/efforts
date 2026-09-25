@@ -122,16 +122,23 @@ export const SWIM_EQUIPMENT_OPTIONS: string[] = [
     "Snorkel"
   ];
 
+/**
+ * ⛔ THE MINIMUM KIT IS NOT A CHIP (2026-09-24, `docs/WORKORDER-minimum-kit-and-accessory-table-2026-09-24.md` Part A):
+ * barbell + plates, squat rack / power cage, bench, dumbbells and a pull-up bar are what every strength plan is built
+ * on (`MINIMUM_KIT_KEYS`, `src/lib/strength-gear.ts`), never below it, so the picker names only the EXTRAS. A stored
+ * list from before this date that still names a minimum chip reads the same (minimum ∪ stored); it is not shown as a
+ * chip and needs no migration. "Home gym" with no extras is stored as the marker `HOME_GYM_MARKER`, so a declared
+ * home kit is never an empty list (an empty list means "not asked").
+ */
+export const HOME_GYM_MARKER = 'Home gym';
+/** The line stating the minimum, on sign-up and on the Profile card. Michael's words, approved 2026-09-25. */
+export const EQUIPMENT_MINIMUM_LINE = "You'll need a barbell and plates, a rack, a bench and dumbbells.";
 export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
-    "Barbell + plates",
-    "Dumbbells",
-    "Squat rack / Power cage",
-    "Bench (flat/adjustable)",
     "Incline bench",
-    "Pull-up bar",
     "Kettlebells",
     "Cable machine",
     "Resistance bands",
+    // ⚠️ NO TRAP BAR CHIP (2026-09-25): the trap bar is a form of the deadlift, chosen on the lift (`DEADLIFT_FORMS`).
     // ⛔ ADDED 2026-09-02 (WORKORDER-plyo-screen §3): gates the ladder drills in the plyo family; matched
     // by exact string in the logger's plyo Swap options.
     "Agility ladder",
@@ -1152,8 +1159,10 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
             <GalaxyButton shape="chip" variant={!hasCommercialGym ? 'primary' : 'secondary'} aria-pressed={!hasCommercialGym}
               className={!hasCommercialGym ? 'text-white' : 'text-white/55'}
               style={!hasCommercialGym ? { borderColor: `${getDisciplineColor('strength')}88`, background: `${getDisciplineColor('strength')}22` } : undefined}
-              onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
+              onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [HOME_GYM_MARKER] } })); }}>Home gym</GalaxyButton>
           </div>
+          {/* The minimum every plan is built on; the chips below are extras (Michael's words, 2026-09-25). */}
+          {!hasCommercialGym && <p className="text-footnote text-label-secondary m-0 leading-snug">{EQUIPMENT_MINIMUM_LINE}</p>}
           {!hasCommercialGym && equipmentChips('strength', homeGymEquipmentOptions)}
           <div className="pt-3">
             <GalaxyButton variant="secondary" size="md" fullWidth className="action-bed" disabled={rebuildBusy != null}

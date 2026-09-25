@@ -106,7 +106,7 @@ export function resolveFrame(position: FramePosition): FrameResolution {
 // ── WHAT THE ATHLETE'S COMPETITION LIFTS ARE, BEFORE THERE IS A SCREEN TO ASK ────────────────────
 
 import type { ViadaPattern } from '../strength-grid/index.ts';
-import { TESTED_LIFT_NAME } from './working-number.ts';
+import { DEADLIFT_FORMS, TESTED_LIFT_NAME, type DeadliftForm } from './working-number.ts';
 
 /**
  * ⛔ WITHOUT THESE THE ENTIRE BLOCK PRESCRIBES NOTHING, and that is not a style point.
@@ -128,10 +128,11 @@ import { TESTED_LIFT_NAME } from './working-number.ts';
  * `pull_upper` competition slot, so nothing is lost by leaving it unset and a real weight would be
  * invented by setting it.
  */
-export function defaultCompetitionLifts(): Partial<Record<ViadaPattern, string>> {
+// ⛔ THE DEADLIFT FORM (2026-09-25): the hinge lift is the form the athlete chose on the lift (`DEADLIFT_FORMS`).
+export function defaultCompetitionLifts(deadliftForm: DeadliftForm = 'barbell'): Partial<Record<ViadaPattern, string>> {
   return {
     push_upper: TESTED_LIFT_NAME.bench,
     press_lower: TESTED_LIFT_NAME.squat,
-    hinge_lower: TESTED_LIFT_NAME.deadlift,
+    hinge_lower: DEADLIFT_FORMS[deadliftForm] ?? TESTED_LIFT_NAME.deadlift,
   };
 }

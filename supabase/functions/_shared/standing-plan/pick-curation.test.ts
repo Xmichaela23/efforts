@@ -8,6 +8,7 @@ import {
   pickOptions, pickOptionLabel, pickOptionLabelInRow, allSubstituted,
   frameMuscleForPick, frameAdmitsForPick, picksForFrame,
 } from './accessory-picks.ts';
+import { implementOnKit } from '../strength-grid/grid.ts';
 
 const HOME = [
   'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
@@ -31,6 +32,9 @@ Deno.test('⛔ NO ROW OFFERS ONE MOVEMENT UNDER TWO NAMES', () => {
       for (const n of names) {
         const stripped = n.replace(/^(barbell|dumbbell|db)\s+/, '');
         if (stripped === n) continue;
+        // ⛔ TWO EXECUTIONS THE KIT DOES BOTH WAYS ARE TWO OPTIONS (2026-09-24, minimum-kit work order B1): the barbell
+        // Romanian deadlift and the DB Romanian deadlift on a kit with both — `pickOptions`' `refine`.
+        if (implementOnKit(stripped, kit) === 'barbell' && implementOnKit(n, kit) === 'dumbbells') continue;
         assert(!names.includes(stripped),
           `${k}: offers both "${n}" and "${stripped}" — one movement, two names`);
       }

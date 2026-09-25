@@ -9,7 +9,7 @@ import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { NumberRow } from '@/components/ui/number-row';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
-import { HOME_GYM_EQUIPMENT_OPTIONS } from '@/components/TrainingBaselines';
+import { EQUIPMENT_MINIMUM_LINE, HOME_GYM_EQUIPMENT_OPTIONS, HOME_GYM_MARKER } from '@/components/TrainingBaselines';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -136,7 +136,8 @@ export default function WelcomePage() {
       if (b.units === 'metric' || b.units === 'imperial') setUnits(b.units);
       const st: string[] = Array.isArray(b.equipment?.strength) ? b.equipment.strength : [];
       if (st.includes('Commercial gym')) setGym('commercial');
-      else if (st.length) { setGym('home'); setGear(new Set(st)); }
+      // Extras only (2026-09-24): a stored minimum chip or the marker is not a chip on this screen.
+      else if (st.length) { setGym('home'); setGear(new Set(st.filter((c) => HOME_GYM_EQUIPMENT_OPTIONS.includes(c)))); }
       setLearned(b.learned_fitness ?? null);
       setPn({ ...(b.performanceNumbers ?? {}) });
       if (b.locked_baselines && typeof b.locked_baselines === 'object') setLocked({ ...b.locked_baselines });
@@ -283,12 +284,13 @@ export default function WelcomePage() {
     set((prev) => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
   const toggleGear = toggleIn(setGear);
 
-  const canLeaveSports = gym === 'commercial' || (gym === 'home' && gear.size > 0);
+  // A home gym needs no extras ticked (2026-09-24): the minimum kit is assumed, and the marker declares it.
+  const canLeaveSports = gym === 'commercial' || gym === 'home';
   const blocked = 'Commercial gym, or what you own.';
 
   const sportsPatch = (b: any) => ({
     ...b,
-    equipment: { ...(b.equipment ?? {}), strength: gym === 'commercial' ? ['Commercial gym'] : Array.from(gear) },
+    equipment: { ...(b.equipment ?? {}), strength: gym === 'commercial' ? ['Commercial gym'] : [HOME_GYM_MARKER, ...Array.from(gear)] },
   });
 
   const finishSports = async () => {
@@ -411,6 +413,8 @@ export default function WelcomePage() {
                     <span className="block text-[15px]">Home gym</span>
                   </button>
                 </div>
+                {/* The minimum every plan is built on; the chips are extras (Michael's words, 2026-09-25). */}
+                {gym === 'home' && <p className="m-0 mt-2 mb-2 text-[12px] text-white/55">{EQUIPMENT_MINIMUM_LINE}</p>}
                 {gym === 'home' && chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
                 {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
               </div>

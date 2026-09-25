@@ -41,7 +41,8 @@ Deno.test('⛔⛔ AN ALL ROUNDER ANSWER SURVIVES THE WIRE, AND NO OTHER TABLE\'S
    * ⚠️ THE SUBSTANCE IS ASSERTED, NOT THE SPELLING: what must never happen is the hamstring cell
    * coming back as a movement the athlete did not choose.
    */
-  assertEquals(prefs!.picks.ham_iso, 'hip thrust',
+  // Since 2026-09-25 the barbell hip thrust is the filed option by that name, so the answer is kept as written.
+  assertEquals(prefs!.picks.ham_iso, 'barbell hip thrust',
     '⛔ the athlete\'s hamstring answer was discarded at the wire');
   assert(/hip thrust/i.test(String(prefs!.picks.ham_iso)),
     'the hamstring answer is no longer a hip thrust at all');
