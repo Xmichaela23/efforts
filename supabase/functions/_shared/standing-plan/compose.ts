@@ -977,7 +977,8 @@ export function earnedSetsKey(movement: string, intent: string): string {
 
 /**
  * ⛔ THE ROW'S ONE-TIME LINE, THE SERVER'S WORDS (Michael, 2026-09-25, replaced the same day). The number is the row's
- * new count. Printed on Today's card as it is; nothing else new on screen.
+ * new set count, inside Viada p218's band for the intent (ME 1–3, DE 4–6, SKILL 3–5, HYP 3–4); the words are OURS,
+ * approved — ledger row in docs/STATE-SOURCES.md. Printed on Today's card as it is; nothing else new on screen.
  */
 export const SETS_LINE_UP = (to: number): string =>
   `Up to ${to} sets. You hit the top of the range two sessions in a row.`; // Michael 2026-09-25, approved
