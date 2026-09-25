@@ -77,8 +77,11 @@ import { localDateInTz } from './local-date.ts';
 // 27 (2026-09-20): a day keeps two sessions of one sport (`planned_workouts.day_seq`, `_shared/day-seq.ts`); the rewrite
 //   pairs the composer's first ride with the first ride row, and a swap reaches only the ride it was made on.
 // 28 (2026-09-20): Ladder Drills carries a how-to (the article's "fast feet"), so the rows that name it take it.
+// 29 (2026-09-24): rides build for the road (docs/SPEC-outdoor-rides-2026-09-24.md) — the rotation walks road shapes
+//   unless the slot carries venue:trainer; a ride's easy-spin warm-up carries `lap_button` so Garmin holds it until the
+//   press (docs/WORKORDER-outdoor-ride-matching-2026-09-24.md).
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 28;
+export const PLAN_WRITER_VERSION = 29;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';
