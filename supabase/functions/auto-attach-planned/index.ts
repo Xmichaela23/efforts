@@ -319,7 +319,8 @@ Deno.serve(async (req) => {
             console.error('[auto-attach-planned] compute-workout-analysis trigger error:', e);
             return null;
           })
-          .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+          // A walk has no analyzer (null): nothing to trigger.
+          .then(() => (analyzeFn ? fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }) : null))
           .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error:`, e));
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
@@ -399,7 +400,8 @@ Deno.serve(async (req) => {
               console.error('[auto-attach-planned] compute-workout-analysis trigger error (sync_existing_link):', e);
               return null;
             })
-            .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+            // A walk has no analyzer (null): nothing to trigger.
+          .then(() => (analyzeFn ? fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }) : null))
             .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error (sync_existing_link):`, e));
         } catch (e) {
           console.error('[auto-attach-planned] Trigger error (sync_existing_link):', e);
@@ -880,7 +882,8 @@ Deno.serve(async (req) => {
           console.error('[auto-attach-planned] compute-workout-analysis trigger error (heuristic):', e);
           return null;
         })
-        .then(() => fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+        // A walk has no analyzer (null): nothing to trigger.
+          .then(() => (analyzeFn ? fetch(`${baseUrl}/functions/v1/${analyzeFn}`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }) : null))
         .catch((e) => console.error(`[auto-attach-planned] ${analyzeFn} trigger error (heuristic):`, e));
     } catch (e) {
       console.error('[auto-attach-planned] trigger error (heuristic):', e);

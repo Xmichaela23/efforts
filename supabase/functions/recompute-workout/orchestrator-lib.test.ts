@@ -33,6 +33,8 @@ Deno.test('routing: run/ride/strength/swim/unknown map to the right analyzer', (
   assertEquals(resolveAnalyzeEdgeFn('strength_training'), 'analyze-strength-workout');
   assertEquals(resolveAnalyzeEdgeFn('swim'), 'analyze-swim-workout');
   assertEquals(resolveAnalyzeEdgeFn('mobility'), 'analyze-running-workout'); // default
+  assertEquals(resolveAnalyzeEdgeFn('walk'), null); // no analyzer for a walk (2026-09-26)
+  assertEquals(resolveAnalyzeEdgeFn('hike'), null);
   assertEquals(resolveAnalyzeEdgeFn(null), 'analyze-running-workout');
 });
 

@@ -153,7 +153,8 @@ Deno.serve(withAlarm('recompute-workout', async (req) => {
   }
 
   // ── 5. analyze-{sport} — writes workout_analysis (the field the snapshot reads). Continue on fail.
-  {
+  // A walk has no analyzer (`resolveAnalyzeEdgeFn` → null): the step is skipped, not failed (2026-09-26).
+  if (analyzeFn) {
     const r = await invokeWithRetry(serviceClient, analyzeFn, {
       workout_id,
       force_regenerate_ai_summary: forceRegenerate,

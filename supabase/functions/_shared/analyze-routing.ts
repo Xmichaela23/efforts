@@ -18,9 +18,16 @@
  *     grep -rln "analyze-routing" supabase/functions
  */
 
-/** Same routing as MobileSummary; the default matches mobility / unknown types. */
-export function resolveAnalyzeEdgeFn(workoutType: string | null | undefined): string {
+/**
+ * Same routing as MobileSummary; the default matches mobility / unknown types.
+ * ⛔ A WALK HAS NO ANALYZER (2026-09-26): it was sent to the running analysis by the default, which rejects it
+ * ("Workout type walk is not supported for running analysis"), so every walk's recalculation failed. Null = no
+ * analyzer; callers skip that step. Its totals, zones and load come from the other steps, as Strava and Garmin show
+ * a walk's totals with no run analysis.
+ */
+export function resolveAnalyzeEdgeFn(workoutType: string | null | undefined): string | null {
   const t = (workoutType ?? '').toLowerCase();
+  if (t === 'walk' || t === 'walking' || t === 'hike' || t === 'hiking') return null;
   if (t === 'run' || t === 'running') return 'analyze-running-workout';
   // Provider mappers normalize cycling activities to type='ride' upstream;
   // 'cycling' and 'bike' synonyms previously listed here never fired in production data.
