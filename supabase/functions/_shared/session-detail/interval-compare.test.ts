@@ -55,10 +55,14 @@ Deno.test('pacing word from the coefficient of variation, labels word for word',
   assertEquals(pacingVariability(null), null);
 });
 
+/** A planned range on a row means a plan is attached, so the fixture attaches one: since 2026-09-25 a run or
+ *  ride with no plan attached gets no colour at all (`noVerdict` in build.ts; `unattached-no-verdict.test.ts`). */
+const ATTACHED = { planned_id: 'p1', workout_id: 'w1', endurance_quality: 'followed', strength_quality: null, summary: '' };
+
 function build(type: string, interval: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   return buildSessionDetailV1({
     workoutId: 'w1', workoutDate: '2026-09-10', workoutType: type, workoutName: 'Session',
-    ledgerDay: null, actualSession: null, match: null, plannedSession: null,
+    ledgerDay: null, actualSession: null, match: ATTACHED, plannedSession: null,
     plannedRowRaw: null, completedStrengthExercises: null, bodyweightLb: null, observations: [],
     completedComputed: { overall: {} },
     workoutAnalysis: {

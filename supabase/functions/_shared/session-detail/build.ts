@@ -280,7 +280,7 @@ export type SessionDetailInput = {
    *  field — added for the cycling Performance stat line + TERRAIN row. */
   /** This session's load and the athlete's own recent range for the same sport. Read-only context —
    *  the builder places it in the contract, it does not compute the band. */
-  loadContext?: { workload: number | null; typical_low: number | null; typical_high: number | null; sample_count: number } | null;
+  loadContext?: { workload: number | null } | null;
   weatherTempF?: number | null;
   /** Session start/end temperature (°F) from `workouts.weather_data`. Feeds `formatSessionTemp` so the
    *  RIDE Terrain row speaks the same temperature vocabulary the run does — see the note on that row. */
@@ -426,6 +426,24 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const type = normType(workoutType) as SessionDetailV1['type'];
   const wa = workoutAnalysis || {};
 
+  /**
+   * ⛔ NO PLAN ATTACHED, NO VERDICT (Michael, 2026-09-25 — POLISH-PUNCH-LIST "AN UNATTACHED INTERVAL RIDE
+   * STILL GETS A DRIFT NUMBER"). A run or ride with no planned session attached gets no grade and no
+   * steadiness or drift number on its screens. It still counts toward load, fitness and threshold learning:
+   * those read the analyser's stored fields and `workout_facts`, never this contract.
+   * FIELD: TrainingPeaks shows an unplanned workout grey, with no compliance colour; TrainerRoad does not
+   * score an unstructured outside ride but uses it for fitness and AI FTP Detection.
+   * ⚠️ "ATTACHED" IS THE TEST THIS BUILDER ALREADY HAD — `match.planned_id`, the one behind
+   * `classification.is_unplanned` (D-035): the row's own link, or the week ledger's same-day pairing, minus
+   * a plan the athlete unattached (workout-detail). Not a second test.
+   * ⚠️ WHAT STAYS: distance, time, pace, power, heart-rate averages, elevation, laps, the Workload number,
+   * route history and the plan-free rows (pacing split, grade-adjusted pace, conditions, similar rides).
+   */
+  const hasPlanned = !!match?.planned_id;
+  const noVerdict = !hasPlanned && (type === 'run' || type === 'ride');
+  /** The analyser's performance block as the verdict fields may read it: empty when there is no plan. */
+  const verdictPerf: any = noVerdict ? {} : ((wa as any).performance || {});
+
   /* ────────────────────────────────────────────────────────────────────────────────────────────
    * ⛔ THE ATHLETE'S UNIT, AND THE FORMATTERS THAT USE IT (2026-09-16, Stage 4 session 3).
    *
@@ -464,9 +482,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const plannedComp = (plannedRowRaw as any)?.computed || {};
 
   // ── Execution resolution ───────────────────────────────────────────────────
-  const paceAdherence = fin(perf?.pace_adherence);
-  const powerAdherence = fin(perf?.power_adherence);
-  const durationAdherence = fin(perf?.duration_adherence);
+  const paceAdherence = fin(verdictPerf?.pace_adherence);
+  const powerAdherence = fin(verdictPerf?.power_adherence);
+  const durationAdherence = fin(verdictPerf?.duration_adherence);
 
   let executionScore: number | null = null;
   if (actualSession?.execution_score != null && Number.isFinite(Number(actualSession.execution_score))) {
@@ -487,10 +505,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   }
   // A test has no execution score — never let one leak onto the Performance screen (Q-097/Q-102).
   if (isTest) executionScore = null;
+  // No plan attached, nothing to execute against (`noVerdict`, above).
+  if (noVerdict) executionScore = null;
 
   const assessedAgainst = factPacket?.derived?.execution?.assessed_against ?? null;
-  /** Any link to a planned row — ledger can expose match.planned_id before planned hydrate is present. */
-  const hasPlanned = !!match?.planned_id;
   const planModified = assessedAgainst === 'actual';
   const allZero =
     (executionScore ?? 0) === 0 &&
@@ -740,6 +758,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       ? ((sessionState as any).race as SessionDetailV1['race'])
       : null,
   });
+  // ⛔ NO PLAN ATTACHED: no colour on a row and no percent (`noVerdict`, above). The goal-race comparison is
+  // against the goal, not a plan, and is left as stamped. With no band on any row the off-prescription line
+  // below has nothing to count and says nothing.
+  if (noVerdict) {
+    for (const iv of intervals) {
+      iv.pace_adherence_pct = null;
+      iv.duration_adherence_pct = null;
+      if (iv.executed.band !== undefined) iv.executed.band = null;
+      if (iv.executed.gap_band !== undefined) iv.executed.gap_band = null;
+    }
+  }
 
   let intervalDisplayMode = (() => {
     const m = String(intervalDisplay?.mode || '');
@@ -987,6 +1016,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // block below and the Performance "Aerobic decoupling" row both read this — they
   // cannot diverge. { pct, basis, assessment } from the analyzer's heart_rate_summary.
   const decouplingV1 = (() => {
+    // ⛔ NO PLAN ATTACHED, NO DRIFT (`noVerdict`, above) — not the number, not the "not enough easy riding"
+    // words. The ladder below cannot know what an unattached session was meant to be, and its answer when
+    // nothing is said is "steady", which put a whole-file number on unattached interval rides.
+    if (noVerdict) return null;
     // ⛔ ONE RULE (2026-09-12, Michael: "we need consistent rules across all screens"): `resolveSessionDrift`
     // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
     // power-to-heart-rate ratio, heart rate alone as the fallback. Today's boom line and State's
@@ -1083,6 +1116,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         completedRow ?? null,
         (wa as any)?.bike_fitness_v1?.counts_toward_trend ?? null,
         input.rideEfficiencyRecent ?? null,
+        noVerdict,
       );
 
   /**
@@ -1122,7 +1156,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   }
 
   // ── Adherence narrative ────────────────────────────────────────────────────
-  const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
+  // ⛔ NO PLAN ATTACHED: the analyser's adherence summary is a read against a plan (drift words, pacing
+  // marks, "readiness"), so none of its insights and none of its outlook print (`noVerdict`, above). The
+  // ledger's own "unplanned session" line still does.
+  const techInsights: Array<{ label: string; value: string }> = !noVerdict && Array.isArray(adherenceSummary?.technical_insights)
     ? adherenceSummary.technical_insights
         .filter((t: any) => t?.label && t?.value)
         .map((t: any) => ({ label: String(t.label), value: String(t.value) }))
@@ -1131,6 +1168,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     if (isGoalRaceSession) return null; // goal race has no plan adherence context
     const fromMatch = match?.summary;
     if (typeof fromMatch === 'string' && fromMatch.trim()) return fromMatch.trim();
+    if (noVerdict) return null;
     const outlook = adherenceSummary?.plan_impact?.outlook;
     if (typeof outlook === 'string' && outlook.trim() && outlook !== 'No plan context.') return outlook.trim();
     return null;
@@ -1275,7 +1313,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     } else {
       parts.push(`${lead}.`);
     }
-    if (Number.isFinite(vi) && vi > 0) {
+    // ⛔ "Power held steady" IS A STEADINESS WORD, and it and the flag sentence come off a ride with no plan
+    // attached (`noVerdict`, above). The watts, the minutes and the heart rate stay.
+    if (!noVerdict && Number.isFinite(vi) && vi > 0) {
       // OURS — `cyclingNarrativeFallback` variability index 1.05 or less reads "held steady"; no citation in the repo, kept as found
       parts.push(vi <= 1.05
         ? 'Power held steady the whole way.'
@@ -1284,7 +1324,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg HR ${Math.round(avgHr)} bpm.`);
     // Same exclusion as the Flag row below: the fatigue verdict belongs to State, and appending it to
     // the ride's narrative would put it back on this screen through the other door.
-    const flag = Array.isArray(flagsV1)
+    const flag = !noVerdict && Array.isArray(flagsV1)
       ? flagsV1.find((x: any) => x && typeof x.message === 'string' && x.message.trim()
           && String(x.category || '').toLowerCase() !== 'fatigue')
       : null;
@@ -1339,20 +1379,20 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // The easy-ride governor, passed through from the cycling analyzer. Rendered as its own chip;
       // it is NOT folded into power_adherence, because "you held it easy" and "you hit your watts" are
       // different questions and only one of them was asked of this session.
-      intensity_adherence: fin(perf?.intensity_adherence),
-      volume_ratio_pct: fin(perf?.volume_ratio_pct),
-      easy_under_s: fin(perf?.easy_under_s),
-      easy_total_s: fin(perf?.easy_total_s),
+      intensity_adherence: fin(verdictPerf?.intensity_adherence),
+      volume_ratio_pct: fin(verdictPerf?.volume_ratio_pct),
+      easy_under_s: fin(verdictPerf?.easy_under_s),
+      easy_total_s: fin(verdictPerf?.easy_total_s),
       // ⛔ THE CHIP'S LINE, WRITTEN HERE (2026-09-16) — "22 of 35 min". It rounded both to whole minutes
       // in the render, the same two roundings the Duration chip made one file up.
       easy_line: (() => {
-        const under = sdMinutes(fin(perf?.easy_under_s));
-        const total = sdMinutes(fin(perf?.easy_total_s));
+        const under = sdMinutes(fin(verdictPerf?.easy_under_s));
+        const total = sdMinutes(fin(verdictPerf?.easy_total_s));
         return under != null && total != null && total > 0 ? `${under} of ${total} min` : null;
       })(),
-      easy_ceiling_bpm: fin(perf?.easy_ceiling_bpm),
-      easy_ceiling_anchor: (perf?.easy_ceiling_anchor ?? null) as any,
-      performance_assessment: granular?.performance_assessment ?? null,
+      easy_ceiling_bpm: fin(verdictPerf?.easy_ceiling_bpm),
+      easy_ceiling_anchor: (verdictPerf?.easy_ceiling_anchor ?? null) as any,
+      performance_assessment: noVerdict ? null : (granular?.performance_assessment ?? null),
       /**
        * ⛔ THE ONE LINE THAT SAYS A SESSION CAME IN OFF ITS PRESCRIPTION (2026-09-17, WORKORDER Stage D1) —
        * `off-prescription.ts`, off the bands already stamped on the rows. Null on a session that landed, on one
@@ -1363,9 +1403,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * ⛔ THE LINE UNDER THE EXECUTION NUMBER (2026-09-17, approved words: "4 of 6 reps done" / "4 of 6 intervals done" /
        * "Time in easy HR"). Counted off the same work rows the table prints, "not done" rows included.
        */
-      execution_line: executionLine(perf?.execution_basis, intervals, type === 'ride'),
+      execution_line: executionLine(verdictPerf?.execution_basis, intervals, type === 'ride'),
       assessed_against: assessedAgainst,
-      status_label: sessionState?.glance?.status_label ?? null,
+      status_label: noVerdict ? null : (sessionState?.glance?.status_label ?? null),
       gap_adjusted: !!perf?.gap_adjusted,
       // D-208: strength component attribution (per-component score + skipped exercises w/ role +
       // which component cost the most). Drives the "what moved it" microcopy. Null for endurance.
@@ -1444,7 +1484,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       classified_type_variance_override: Boolean((sessionState as any)?.glance?.classified_type_variance_override),
       // D-035: server-computed unplanned flag. One canonical signal for chips
       // (hide), LLM input (drop prescribed-range), and narrative (UNPLANNED MODE).
-      is_unplanned: !match?.planned_id,
+      is_unplanned: !hasPlanned,
       // D-036: GAP-corrected aerobic decoupling. Sourced from analyzer's
       // workout_analysis.heart_rate_summary (sample-level, warmup-skipped).
       // Null when not computed (interval workout, < 20 min of paced-HR data,
@@ -1453,7 +1493,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // D-264 step-0 receipt: HR drift (bpm) sourced from the FIXED pipeline
       // (buildActualSession → session.hr_drift_bpm), NOT a re-read of workout_analysis —
       // proves the real nested row flows through deployed code end-to-end.
-      hr_drift_bpm: (actualSession as any)?.hr_drift_bpm ?? null,
+      // No drift of any kind on a session with no plan attached (`noVerdict`, above).
+      hr_drift_bpm: noVerdict ? null : ((actualSession as any)?.hr_drift_bpm ?? null),
     },
 
     splits_mi: splitsMi,
@@ -1571,7 +1612,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       if (readinessUnavailable || !readinessSnapshot) return null;
       return packageSessionDetailReadiness(readinessSnapshot);
     })(),
-    session_interpretation: buildSessionInterpretation({
+    // "followed / modified / deviated" is a read against a plan; a run or ride with none carries no read.
+    session_interpretation: noVerdict ? null : buildSessionInterpretation({
       type,
       match,
       plannedSession,
@@ -1968,12 +2010,21 @@ export function buildAnalysisDetailRows(
   bikeCountsTowardTrend: boolean | null = null,
   /** The rider's recent watts per heartbeat, `state_trends_v1.bike.efficiency.recentValue`. */
   rideEfficiencyRecentEf: number | null = null,
+  /**
+   * ⛔ A RUN OR RIDE WITH NO PLAN ATTACHED (2026-09-25, `noVerdict` in `buildSessionDetailV1`). The rows that
+   * judge the session come off: the limiter, the ride's EFFICIENCY row (it compares against steady rides,
+   * and steadiness is unknowable here), every heart-rate drift line, and the concern flags. The pacing
+   * split, grade-adjusted pace, conditions and similar-rides rows stay. Defaults false: a caller that
+   * passes nothing behaves as before. ⚠️ POSITIONAL — see the 2026-08-02 note above.
+   */
+  unattached: boolean = false,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
   const derived = factPacket?.derived;
 
   try {
+    if (unattached) throw new Error('skip: no plan attached');
     const lim = derived?.primary_limiter;
     // Suppress fatigue limiter: it uses mixed-modality load data that can't
     // distinguish a bike ride from a hard run. Show only session-observable limiters.
@@ -2148,7 +2199,7 @@ export function buildAnalysisDetailRows(
 
   // Efficiency (cycling): HR-at-power EF from computed.analysis.efficiency.
   try {
-    if (sport === 'ride') {
+    if (sport === 'ride' && !unattached) {
       const row = formatCyclingEfficiencyRow(comp?.analysis?.efficiency, {
         countsTowardTrend: bikeCountsTowardTrend,
         recentEf: rideEfficiencyRecentEf,
@@ -2281,6 +2332,9 @@ export function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
+    // No plan attached: no heart-rate drift line of any kind — not the percentage, not the bpm, not the
+    // "not read" sentence (`unattached`, above).
+    if (unattached) throw new Error('skip: no plan attached');
     const rawAbsDrift = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
     const paceNormDrift = typeof (derived as any)?.pace_normalized_drift_bpm === 'number'
       ? (derived as any).pace_normalized_drift_bpm : null;
@@ -2466,6 +2520,8 @@ export function buildAnalysisDetailRows(
     // message text, so rewording the flag cannot smuggle it back in.
     // A run analysed before 2026-09-12 still carries an HR-drift flag on an interval session; the rule
     // is one rule, so it is dropped here too until the run is analysed again.
+    // A concern flag judges the session; none print on a run or ride with no plan attached.
+    if (unattached) throw new Error('skip: no plan attached');
     const intervalHere = sport !== 'swim' && shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness);
     const concerns = flagsV1
       .filter((f: any) => String(f?.category || '').toLowerCase() !== 'fatigue')

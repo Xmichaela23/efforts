@@ -20,8 +20,9 @@ const lift = (date: string, extra: Partial<BoomWorkout> = {}): BoomWorkout => ({
 });
 const curve = (o: Record<string, number>) => ({ computed: { power_curve: o } });
 const hr = (n: number) => ({ workout_analysis: { bike_fitness_v1: { hr_at_band: n } } });
-/** The analyser's decoupling — what the Drift tile prints (`../session-detail/drift-pct.ts`). */
-const drift = (pct: number) => ({ workout_analysis: { heart_rate_summary: { decouplingPct: pct } } });
+/** The analyser's decoupling — what the Drift tile prints (`../session-detail/drift-pct.ts`). Attached to a
+ *  planned row: since 2026-09-25 a session with no plan attached gets no drift line at all. */
+const drift = (pct: number) => ({ planned_row: {}, workout_analysis: { heart_rate_summary: { decouplingPct: pct } } });
 /** A session's length: `moving_seconds` for this one, the stored `computed.overall.duration_s_moving` for earlier ones. */
 const mins = (n: number) => ({ moving_seconds: n * 60, computed: { overall: { duration_s_moving: n * 60 } } });
 
@@ -121,7 +122,7 @@ Deno.test('ride 4 — drift under the line, N rides running', () => {
 
 Deno.test('ride 4 — a ride with heart-rate drift only (no decoupling) still reads, as the tile does', () => {
   assertEquals(sessionBoomLine({
-    workout: ride('2026-09-09', { workout_analysis: { hr_drift_v1: { pct: 2.5 } } }),
+    workout: ride('2026-09-09', { planned_row: {}, workout_analysis: { hr_drift_v1: { pct: 2.5 } } }),
     prior: [ride('2026-09-05', { workout_analysis: { hr_drift_v1: { pct: 4.0 } } })],
     blockStartISO: BLOCK,
   }), 'Drift under 5 percent, 2 rides in a row.');
@@ -131,6 +132,15 @@ Deno.test('⛔ ride 4 — 4.96 prints as 5.0 on the tile, so it is not under the
   assertEquals(sessionBoomLine({
     workout: ride('2026-09-09', drift(3.1)),
     prior: [ride('2026-09-05', drift(4.96))],
+    blockStartISO: BLOCK,
+  }), null);
+});
+
+Deno.test('⛔ ride 4 — a ride with no plan attached gets no drift line (Michael, 2026-09-25)', () => {
+  const { planned_row: _attached, ...unattached } = drift(3.1);
+  assertEquals(sessionBoomLine({
+    workout: ride('2026-09-09', unattached),
+    prior: [ride('2026-09-05', drift(4.2)), ride('2026-09-01', drift(2.0))],
     blockStartISO: BLOCK,
   }), null);
 });

@@ -373,7 +373,12 @@ function enduranceLine(input: BoomInput, isRide: boolean): SessionBoomV1 | null 
   }
 
   // 4. Drift under the line for N sessions running.
-  const mineDrift = driftPct(workout);
+  // ⛔ NOT ON A SESSION WITH NO PLAN ATTACHED (Michael, 2026-09-25): a run or ride with no planned session gets
+  // no drift number on its screens, and this line prints one. `planned_row` is the attached planned row
+  // `compute.ts` already reads for rung 1 (off `workouts.planned_id`); null means nothing is attached.
+  // ⚠️ THE EARLIER SESSIONS ARE NOT FILTERED: whether an unattached prior counts in an attached session's
+  // streak is a separate question, left as it was.
+  const mineDrift = workout?.planned_row ? driftPct(workout) : null;
   if (mineDrift != null && mineDrift < DRIFT_LINE_PCT) {
     let streak = 1;
     for (const p of earlier) {

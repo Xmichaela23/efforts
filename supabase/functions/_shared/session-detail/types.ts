@@ -349,16 +349,10 @@ export type SessionDetailV1 = {
    *  intensity taken from whatever signal the sport has (power vs FTP, HR vs threshold HR, swim pace,
    *  else the prescribed intensity). That is why it works on every sport where TSS needs a power meter
    *  or a threshold pace. Same anchor as TSS: 100 = one hour at threshold.
-   *
-   *  `typical_low` / `typical_high` are the athlete's OWN 25th-75th percentile over 90 days of the same
-   *  sport — the middle half, so a single four-hour ride cannot stretch the band. Null below five
-   *  sessions: a range drawn from a handful is a line through noise, and the chip then shows the
-   *  number with no claim about where it sits. */
+
+   *  The "usual" range (the athlete's own middle half) came off 2026-09-25 (Michael): its method was ours. */
   load?: {
     workload: number | null;
-    typical_low: number | null;
-    typical_high: number | null;
-    sample_count: number;
   } | null;
   /** The session was indoors — trainer, treadmill, virtual, or a track that never moved — by the one
    *  predicate every surface asks (`_shared/indoor-session.ts`). The Performance header prints the
@@ -433,6 +427,10 @@ export type SessionDetailV1 = {
      * INSIGHTS interprets the workout on its own terms (HR-to-pace efficiency,
      * terrain via GAP, conditions, route history). Computed as
      * `!plan_context.planned_id` in build.ts.
+     * ⛔ 2026-09-25 (Michael): on a RUN or RIDE this is also the switch that takes every verdict off —
+     * execution and adherence numbers, row colours, drift and steadiness (`decoupling` and `hr_drift_bpm`
+     * are null), the judging analysis rows and flags, `session_interpretation`. Facts stay. `noVerdict`
+     * in build.ts.
      */
     is_unplanned: boolean;
     /**

@@ -52,9 +52,6 @@ interface AdherenceChipsProps {
     };
     load?: {
       workload?: number | null;
-      typical_low?: number | null;
-      typical_high?: number | null;
-      sample_count?: number | null;
     } | null;
     session_interpretation?: SessionInterpretationV1;
   } | null;
@@ -318,19 +315,11 @@ export default function AdherenceChips({
      *   · Easy / Power — did you do it at the intensity asked
      *   · Workload — what it cost you
      *
-     * ⚠️ THE RANGE IS THE POINT. "86" cannot be high or low on its own. This shows the athlete's OWN
-     * middle-half band for the same sport, the way Strava frames Relative Effort and Garmin bands
-     * Training Load — where it SITS among theirs, never a verdict. Below five sessions there is no
-     * band and the chip makes no claim.
+     * The "usual" range under the number came off 2026-09-25 (Michael: "comes off"): the athlete's own middle half
+     * was framed after Strava and Garmin, but the method was ours. The chip prints the number and "What it cost".
      */
     const loadValue = sd.load?.workload != null ? String(sd.load.workload) : null;
-    const loadSubtitle = (() => {
-      const lo = sd.load?.typical_low;
-      const hi = sd.load?.typical_high;
-      if (lo == null || hi == null) return 'What it cost';
-      // Non-breaking space before the range so "typically" can wrap but "68–117" never splits.
-      return lo === hi ? `usual\u00a0${lo}` : `usual\u00a0${lo}–${hi}`;
-    })();
+    const loadSubtitle = 'What it cost';
 
     // ⛔ `fmtDeltaTime` AND `fmtDurAbs` DELETED (2026-09-16, Stage 4 session 3) — both had ZERO call
     // sites. The Duration chip's secondary line is the plan's, not a delta, and has been since D-084.

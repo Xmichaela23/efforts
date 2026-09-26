@@ -3,7 +3,6 @@
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
 import { effortRowText, talkTestRowText } from '../_shared/effort-words.ts';
-import { middleHalf } from '../_shared/middle-half.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
 import { durationWord } from '../_shared/plan-tokens/quality-work.ts';
@@ -304,8 +303,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   7 — Stage 7 session 3 (2026-09-16): the device's distance first (rule 7), one swim distance format, the test card,
  *       the Volume tile and the grade-adjusted pace row in the athlete's unit, one planned-length label. A copy stored at
  *       v6 carries the sample distance and the old words until it rebuilds.
+ *   8 — a run or ride with no plan attached carries no verdict: no execution or adherence number, no row colour, no
+ *       drift or steadiness line, no judging row or flag (2026-09-25, Michael; `noVerdict` in build.ts). A copy stored
+ *       at v7 would keep printing the drift line on an unattached ride until it rebuilt.
  */
-const SESSION_TOTALS_VERSION = 7;
+const SESSION_TOTALS_VERSION = 8;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -1038,46 +1040,12 @@ async function runSessionDetailPipelineAndPersist(
       console.warn('[workout-detail] core_verdicts read failed (non-fatal):', cvErr instanceof Error ? cvErr.message : cvErr);
     }
 
-    // ⛔ "86" CANNOT BE HIGH OR LOW WITHOUT A COMPARISON (2026-08-02, Michael: *"is there a graph or
-    // something to cue if its high or low?"*).
-    //
-    // Strava shows Relative Effort against the athlete's own recent range; Garmin bands Training Load
-    // the same way. Neither calls a session good or bad — they show where it SITS among yours. That is
-    // the version that invents nothing: we do not decide 86 is high, we show that this athlete's rides
-    // run 40-90 and this one sat near the top.
-    //
-    // ⚠️ SAME SPORT, 90 DAYS, COMPLETED ONLY. Comparing a ride to a run makes the range meaningless.
-    // ⚠️ AND IT IS THE MIDDLE HALF, NOT MIN-MAX. One four-hour ride would stretch a min-max band until
-    // every ordinary session looked tiny. The 25th-75th percentile is a standard descriptive summary,
-    // not a tuned threshold — nothing here is fitted to an athlete.
-    let loadContext: { workload: number | null; typical_low: number | null; typical_high: number | null; sample_count: number } | null = null;
-    try {
-      const thisLoad = Number((row as any)?.workload_actual);
-      const since = new Date(new Date(workoutDate + 'T12:00:00Z').getTime() - 90 * 86400000)
-        .toISOString().slice(0, 10);
-      const { data: loadRows } = await supabase
-        .from('workouts')
-        .select('workload_actual')
-        .eq('user_id', userId)
-        .eq('type', row?.type ?? '')
-        .eq('workout_status', 'completed')
-        .gte('date', since)
-        .lte('date', workoutDate);
-      const vals = ((loadRows ?? []) as any[])
-        .map((r) => Number(r?.workload_actual))
-        .filter((v) => Number.isFinite(v) && v > 0);
-      // The athlete's own middle half (`_shared/middle-half.ts`). Below
-      // its minimum the chip shows the number and no range, and says nothing about where it sits.
-      const band = middleHalf(vals);
-      loadContext = {
-        workload: Number.isFinite(thisLoad) && thisLoad > 0 ? Math.round(thisLoad) : null,
-        typical_low: band?.low ?? null,
-        typical_high: band?.high ?? null,
-        sample_count: vals.length,
-      };
-    } catch (e) {
-      console.warn('[session_detail_v1] load context failed (non-fatal):', e instanceof Error ? e.message : e);
-    }
+    // ⛔ THE WORKLOAD ALONE, NO "usual" RANGE (Michael, 2026-09-25: "comes off"). The range was the athlete's own
+    // middle half of 90 days of the same sport, framed after Strava's Relative Effort and Garmin's Training Load
+    // bands — but the method (and its five-session minimum) was ours, and no named app publishes it. The number
+    // is `workouts.workload_actual` (the TSS formula, see `load` in session-detail/types.ts).
+    const thisLoad = Number((row as any)?.workload_actual);
+    const loadContext = { workload: Number.isFinite(thisLoad) && thisLoad > 0 ? Math.round(thisLoad) : null };
 
     sessionDetailV1 = buildSessionDetailV1({
       coreVerdicts,
