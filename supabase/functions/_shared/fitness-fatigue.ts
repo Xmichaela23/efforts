@@ -28,6 +28,19 @@ import { type LoadRow } from './acwr.ts';
 export const FITNESS_TAU_DAYS = 42;
 export const FATIGUE_TAU_DAYS = 7;
 
+/**
+ * One day of TrainingPeaks' Performance Management Chart: that day's fitness and fatigue, and the form
+ * entering it — the same three numbers, rounded the same way, that the card prints for today.
+ */
+export interface FitnessFatigueDay {
+  date: string;
+  fitness: number;
+  fatigue: number;
+  /** Fitness − fatigue at the end of the PREVIOUS day (TSB, prior-day convention), subtracted before the
+   *  one-decimal round, exactly as the card's `form` — so it can sit 0.1 off the two rounded numbers above it. */
+  form: number;
+}
+
 export interface FitnessFatigue {
   /** CTL — 42-day EWMA of daily load, as of asOf. */
   fitness: number | null;
@@ -38,6 +51,14 @@ export interface FitnessFatigue {
   fatigue_prior?: number | null;
   /** TSB — fitness − fatigue ENTERING asOf (freshness). Positive = fresh, negative = fatigued. */
   form: number | null;
+  /**
+   * ⛔ THE CHART'S DAYS (2026-09-25) — present only when the caller asks (`seriesDays`). Each day of the last
+   * `seriesDays` ending asOf, oldest first, starting no earlier than the first logged session (the series is
+   * zero before it, and TrainingPeaks draws nothing there either). Collected by the SAME walk that produces
+   * `fitness` / `fatigue` / `form` above — one load series, one EWMA — so the last day IS the card's reading.
+   * FIELD — TrainingPeaks' Performance Management Chart draws fitness, fatigue and form as lines over time.
+   */
+  series?: FitnessFatigueDay[];
   provenance: {
     method: 'banister_ewma_v1';
     /** ALWAYS false — TrainingPeaks' constants (42 / 7), no per-athlete fit; TrainingPeaks does not fit one either. */
@@ -73,10 +94,11 @@ const NOTE = 'TrainingPeaks PMC: 42/7-day EWMA of daily workload, seeded at zero
 /**
  * Compute Banister fitness/fatigue/form from a daily load series (same LoadRow[] as ACWR).
  * Missing days count as 0 load (rest decays both pools). Returns nulls when there is no load.
+ * `seriesDays` (optional) also returns each day of that many days ending asOf (`series`), from the same walk.
  */
 export function computeFitnessFatigue(
   rows: LoadRow[],
-  opts: { asOfDate: string; tauFitness?: number; tauFatigue?: number },
+  opts: { asOfDate: string; tauFitness?: number; tauFatigue?: number; seriesDays?: number },
 ): FitnessFatigue {
   const tauF = opts.tauFitness ?? FITNESS_TAU_DAYS;
   const tauA = opts.tauFatigue ?? FATIGUE_TAU_DAYS;
@@ -85,8 +107,13 @@ export function computeFitnessFatigue(
     method: 'banister_ewma_v1', calibrated: false, tau_fitness_days: tauF, tau_fatigue_days: tauA,
     stream: 'total', seed: 'zero', days_of_history: days, note: NOTE,
   });
+  // The chart's days are asked for by the caller (the window is the caller's — State's chart window).
+  const seriesDays = Number.isFinite(opts.seriesDays) && (opts.seriesDays as number) > 0 ? Math.floor(opts.seriesDays as number) : 0;
+  const empty = (): FitnessFatigue => ({
+    fitness: null, fatigue: null, form: null, provenance: prov(0), ...(seriesDays > 0 ? { series: [] } : {}),
+  });
 
-  if (!asOf || !Array.isArray(rows)) return { fitness: null, fatigue: null, form: null, provenance: prov(0) };
+  if (!asOf || !Array.isArray(rows)) return empty();
 
   // Sum load per calendar day (up to asOf). Same substrate as ACWR.
   const byDay = new Map<string, number>();
@@ -99,7 +126,12 @@ export function computeFitnessFatigue(
     byDay.set(d, (byDay.get(d) ?? 0) + w);
     if (earliest == null || d < earliest) earliest = d;
   }
-  if (earliest == null) return { fitness: null, fatigue: null, form: null, provenance: prov(0) };
+  if (earliest == null) return empty();
+
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  // The first day the chart keeps: `seriesDays` days ending asOf (asOf included).
+  const seriesFrom = seriesDays > 0 ? addDays(asOf, -(seriesDays - 1)) : null;
+  const series: FitnessFatigueDay[] = [];
 
   // Iterate day-by-day from the earliest load day to asOf (empty days = 0 load, EWMA decays).
   let ctl = 0, atl = 0, ctlPrior = 0, atlPrior = 0;
@@ -108,16 +140,20 @@ export function computeFitnessFatigue(
     const load = byDay.get(day) ?? 0;
     ctl = ctl + (load - ctl) / tauF;
     atl = atl + (load - atl) / tauA;
+    // The chart's day: the same three numbers the return below prints for asOf, for this day.
+    if (seriesFrom != null && day >= seriesFrom) {
+      series.push({ date: day, fitness: r1(ctl), fatigue: r1(atl), form: r1(ctlPrior - atlPrior) });
+    }
     if (day === asOf) break;
   }
 
-  const r1 = (v: number) => Math.round(v * 10) / 10;
   return {
     fitness: r1(ctl),
     fatigue: r1(atl),
     form: r1(ctlPrior - atlPrior),             // freshness entering asOf (TSB, prior-day convention)
     fitness_prior: r1(ctlPrior),
     fatigue_prior: r1(atlPrior),
+    ...(seriesFrom != null ? { series } : {}),
     provenance: prov(daysBetween(earliest, asOf) + 1),
   };
 }

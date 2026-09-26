@@ -5,6 +5,7 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { computeFitnessFatigue, formZone } from './fitness-fatigue.ts';
 import { type LoadRow } from './acwr.ts';
+import { TREND_FIT_MAX_WEEKS } from './state-trend/trend-fit.ts';
 
 const ASOF = '2026-07-09';
 const ymd = (offset: number): string => new Date(Date.UTC(2026, 6, 9) - offset * 86_400_000).toISOString().slice(0, 10);
@@ -93,3 +94,83 @@ Deno.test('one 100-point day from zero → fitness 2.4, fatigue 14.3, form 0 (ye
   assertEquals(r.form, 0);
 });
 
+// ── The chart's days (2026-09-25): the SAME walk as the card, one point per day of the window ────────
+const CHART_DAYS = TREND_FIT_MAX_WEEKS * 7; // the coach's `seriesDays`
+// A long, uneven history (200 days, a weekly pattern that builds) so every day of the window moves.
+const LONG = series((off) => {
+  const dow = off % 7;
+  const build = 1 + (200 - off) / 200;          // older days lighter, recent days heavier
+  if (dow === 0) return Math.round(80 * build);  // long ride
+  if (dow === 2) return Math.round(55 * build);  // run
+  if (dow === 3) return 30;                      // strength
+  if (dow === 5) return Math.round(65 * build);  // ride
+  return 0;
+}, 200);
+
+Deno.test('series: 84 days when the history is longer, oldest first, ending on asOf', () => {
+  const r = computeFitnessFatigue(LONG, { asOfDate: ASOF, seriesDays: CHART_DAYS });
+  const s = r.series!;
+  assertEquals(CHART_DAYS, 84);
+  assertEquals(s.length, 84);
+  assertEquals(s[0].date, ymd(83));
+  assertEquals(s[s.length - 1].date, ASOF);
+  for (let i = 1; i < s.length; i++) {
+    if (!(s[i].date > s[i - 1].date)) throw new Error(`dates out of order at ${i}: ${s[i - 1].date} → ${s[i].date}`);
+  }
+});
+
+Deno.test("series: the last day's fitness, fatigue and form ARE the card's numbers (same call and a call without the series)", () => {
+  const withSeries = computeFitnessFatigue(LONG, { asOfDate: ASOF, seriesDays: CHART_DAYS });
+  const card = computeFitnessFatigue(LONG, { asOfDate: ASOF });
+  const last = withSeries.series![withSeries.series!.length - 1];
+  assertEquals([last.fitness, last.fatigue, last.form], [withSeries.fitness, withSeries.fatigue, withSeries.form]);
+  assertEquals([last.fitness, last.fatigue, last.form], [card.fitness, card.fatigue, card.form]);
+  // Asking for the series changes nothing else the card reads.
+  assertEquals(card.series, undefined);
+  assertEquals([withSeries.fitness_prior, withSeries.fatigue_prior], [card.fitness_prior, card.fatigue_prior]);
+  // The day before is the subtraction the card's form was made from.
+  const prev = withSeries.series![withSeries.series!.length - 2];
+  assertEquals([prev.fitness, prev.fatigue], [card.fitness_prior, card.fatigue_prior]);
+});
+
+Deno.test("series: each day's form is the previous day's fitness − fatigue (to the one-decimal rounding of each number)", () => {
+  const s = computeFitnessFatigue(LONG, { asOfDate: ASOF, seriesDays: CHART_DAYS }).series!;
+  let exact = 0;
+  for (let i = 1; i < s.length; i++) {
+    const diff = s[i - 1].fitness - s[i - 1].fatigue;
+    const gap = Math.abs(s[i].form - diff);
+    // Each stored number is rounded to 0.1 on its own, so the printed difference can sit one step off.
+    if (gap > 0.1 + 1e-9) throw new Error(`day ${s[i].date}: form ${s[i].form} vs ${s[i - 1].fitness} − ${s[i - 1].fatigue} = ${diff}`);
+    if (gap < 1e-9) exact++;
+  }
+  console.log(`[series] form = yesterday's fitness − fatigue exactly on ${exact} of ${s.length - 1} days, within 0.1 on the rest`);
+});
+
+Deno.test('series: every day equals the whole-history computation run as of that day (one walk, no second average)', () => {
+  const s = computeFitnessFatigue(LONG, { asOfDate: ASOF, seriesDays: CHART_DAYS }).series!;
+  for (const p of s) {
+    const asOfDay = computeFitnessFatigue(LONG, { asOfDate: p.date });
+    assertEquals([p.fitness, p.fatigue, p.form], [asOfDay.fitness, asOfDay.fatigue, asOfDay.form], `day ${p.date}`);
+  }
+});
+
+Deno.test('series: a shorter history starts on the first logged day — fewer than 84 points, first form 0', () => {
+  const short = series((off) => (off % 3 === 0 ? 60 : 0), 30); // first logged day = 27 days before asOf
+  const r = computeFitnessFatigue(short, { asOfDate: ASOF, seriesDays: CHART_DAYS });
+  const s = r.series!;
+  assertEquals(s.length, 28);
+  assertEquals(s[0].date, ymd(27));
+  assertEquals(s[0].form, 0);
+  assertEquals(s[s.length - 1].date, ASOF);
+  assertEquals(r.provenance.days_of_history, 28);
+});
+
+Deno.test('series: no load → an empty series when asked, none when not; later rows never enter', () => {
+  assertEquals(computeFitnessFatigue([], { asOfDate: ASOF, seriesDays: CHART_DAYS }).series, []);
+  assertEquals(computeFitnessFatigue([], { asOfDate: ASOF }).series, undefined);
+  const withFuture = [...LONG, { date: '2026-07-12', workload: 500 }];
+  assertEquals(
+    computeFitnessFatigue(withFuture, { asOfDate: ASOF, seriesDays: CHART_DAYS }).series,
+    computeFitnessFatigue(LONG, { asOfDate: ASOF, seriesDays: CHART_DAYS }).series,
+  );
+});

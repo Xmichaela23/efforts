@@ -1,6 +1,7 @@
 import React from 'react';
 import { formZoneColor } from '@/lib/context-utils';
 import { GarminDerivedDataLine } from '@/components/ProviderAttribution';
+import TrendSparkline from '@/components/context/TrendSparkline';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,16 @@ export interface LoadBarData {
       fatigue: { value: string | null; change: string | null; window: string | null };
       form: { value: string | null; change: string | null; window: string | null };
     } | null;
+    /**
+     * ⛔ THE CHART BEHIND THE CHEVRON (coach v218, 2026-09-25) — TrainingPeaks' Performance Management Chart.
+     * `series` is each day of the 12-week chart window, off the same whole-history walk as the three numbers
+     * above (the last day IS the card); `series_caption` is each line's caption, finished — the window's actual
+     * first and last day through the card's own rounding ("fitness over 12 weeks: 42 → 57"); `draw_series` says
+     * there are two days or more to draw. All the server's.
+     */
+    series?: Array<{ date: string; fitness: number; fatigue: number; form: number }> | null;
+    series_caption?: { fitness: string | null; fatigue: string | null; form: string | null } | null;
+    draw_series?: boolean;
   } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
@@ -166,8 +177,48 @@ export function LoadKey({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fa
   );
 }
 
+/**
+ * ⛔ THE LOAD CARD'S CHART (2026-09-25, approved by Michael). The three numbers alone had no context;
+ * TrainingPeaks' Performance Management Chart draws them as lines over time, and this is its layout: fitness
+ * and fatigue as two plain lines on one chart (one scale), form on its own chart directly below. No dots and
+ * no fitted line — the PMC draws the daily values themselves.
+ * ⚠️ NOTHING IS WORKED OUT HERE. The days, the captions and the "is there anything to draw" answer are the
+ * coach's (`series`, `series_caption`, `draw_series`), printed as sent. The captions end on the card's numbers.
+ * ⚠️ TWO EXISTING TOKENS TELL THE LINES APART: fitness in `--label` (white), fatigue in `--label-secondary`,
+ * each named by its word above the chart in the same colour. LOAD is a multi-sport plate, so no sport colour.
+ */
+const FITNESS_COLOR = 'var(--label)';
+const FATIGUE_COLOR = 'var(--label-secondary)';
+
+function LoadChart({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+  const days = Array.isArray(ff.series) ? ff.series : [];
+  const cap = ff.series_caption ?? null;
+  const line = (pick: (d: (typeof days)[number]) => number) => days.map((d) => ({ date: d.date, value: pick(d), recent: true }));
+  const pmcCaptions = [
+    cap?.fitness ? { text: cap.fitness, color: FITNESS_COLOR } : null,
+    cap?.fatigue ? { text: cap.fatigue, color: FATIGUE_COLOR } : null,
+  ].filter((c): c is { text: string; color: string } => c != null);
+  return (
+    <div className="mt-2 flex flex-col">
+      <TrendSparkline
+        title="fitness" title2="fatigue"
+        series={line((d) => d.fitness)} color={FITNESS_COLOR}
+        series2={line((d) => d.fatigue)} color2={FATIGUE_COLOR}
+        dots={false} fit={null} captionLines={pmcCaptions}
+      />
+      <TrendSparkline
+        title="form" series={line((d) => d.form)} color={FITNESS_COLOR}
+        dots={false} fit={null} captionLines={cap?.form ? [{ text: cap.form, color: FITNESS_COLOR }] : null} divider
+      />
+    </div>
+  );
+}
+
 export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
+  // The chart opens the way a trend row does, off a down chevron (collapsed by default); "LOAD" names the control.
+  const [showChart, setShowChart] = React.useState(false);
+  const titleId = React.useId();
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
   // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
   // WHAT THIS REPLACED: the reconciled load word ("balanced" — the app's own reconciler, D-260) and the
@@ -187,6 +238,8 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   // after it are gone too (2026-09-18). The week so far in time per sport — the coach's `week_time_line`, printed
   // as sent; no line when nothing is done yet.
   const weekLine = load.week_time_line ?? null;
+  // The coach says whether there are days to draw (`draw_series`); a payload before v218 has none, and no chevron.
+  const canChart = ff?.draw_series === true && Array.isArray(ff?.series);
 
   // ⛔ FORM IS THE HEADLINE (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md §6, approved by Michael). Form
   // is the number the zone word reads, so it is the Title 1 figure with its word beside it; fitness and fatigue
@@ -199,10 +252,20 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   return (
     <div className="px-3 py-3">
       <div className="px-1 py-1">
-        <span className="readout-label text-footnote font-semibold tracking-[0.08em] uppercase">
-          LOAD{' '}
-          <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary normal-case tracking-normal font-normal text-subhead align-baseline">ⓘ</button>
-        </span>
+        {/* ⛔ THE CHART'S CHEVRON IS AT THE RIGHT END OF THIS TITLE ROW (2026-09-25), never on the readings row, which
+            it would narrow. Everything past "LOAD ⓘ" is the tap, with the trend rows' down chevron, turned when open.
+            The ⓘ stays its own button, unchanged. */}
+        <div className="flex items-center">
+          <span className="readout-label text-footnote font-semibold tracking-[0.08em] uppercase">
+            <span id={titleId}>LOAD</span>{' '}
+            <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary normal-case tracking-normal font-normal text-subhead align-baseline">ⓘ</button>
+          </span>
+          {canChart && (
+            <button type="button" onClick={() => setShowChart((o) => !o)} aria-expanded={showChart} aria-labelledby={titleId} className="flex-1 self-stretch flex items-center justify-end pl-3 bg-transparent border-none cursor-pointer outline-none focus:outline-none">
+              <span className={`text-label text-body leading-none shrink-0 transition-transform ${showChart ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+            </button>
+          )}
+        </div>
         {rd && rd.form.value != null ? (
           /* ⛔ ONE ROW (Michael 2026-09-21: "it takes up too much space", "form can be a little larger"). Form, the
              number the zone word reads, is the biggest figure; fitness and fatigue sit on the same line at the right.
@@ -226,6 +289,7 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
         ) : (
           <div className="mt-2 text-subhead text-label-secondary">no sessions logged yet</div>
         )}
+        {showChart && canChart && ff && <LoadChart ff={ff} />}
         {weekLine && (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-2 leading-snug">
             <span className="text-footnote font-medium text-label-secondary shrink-0">This week</span>

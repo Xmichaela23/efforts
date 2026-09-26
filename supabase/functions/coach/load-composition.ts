@@ -107,3 +107,31 @@ export function formHeadline(form: number | null | undefined): string | null {
   if (form == null || !Number.isFinite(form) || formZone(form) !== 'high risk') return null;
   return `Form −${Math.abs(Math.round(form))} · high risk`;
 }
+
+/**
+ * ⛔ THE LOAD CHART'S CAPTIONS (2026-09-25) — "fitness over 12 weeks: 42 → 57", one per line drawn.
+ * TrainingPeaks' Performance Management Chart draws the daily values themselves, with no fitted line, so each
+ * caption reads the window's ACTUAL first and last day, through the SAME rounders the card prints its readings
+ * with (`whole` for fitness and fatigue, `signed` for form — the coach passes its own). The last number is the
+ * card's number, always.
+ * N is the span as every State chart counts it (`state-trend/trend-fit.ts`: first day to last, in weeks, rounded
+ * up); the 84-day window keeps it at 12 or under.
+ * ⚠️ A ONE-WEEK SPAN (2 to 8 days of history) GETS NO CAPTION: "over 1 week" needs the word "week", which is not
+ * approved. The chart still draws. Fewer than 2 days: no line, no caption.
+ */
+export function loadChartCaptions(
+  days: ReadonlyArray<{ fitness: number; fatigue: number; form: number }>,
+  fmt: { whole: (v: number | null | undefined) => string | null; signed: (v: number | null | undefined) => string | null },
+): { fitness: string | null; fatigue: string | null; form: string | null } {
+  const first = days[0];
+  const last = days[days.length - 1];
+  // FIELD — definition: a week is 7 days; two points are the fewest that make a line.
+  const spanWeeks = days.length >= 2 ? Math.max(1, Math.ceil((days.length - 1) / 7)) : null;
+  const caption = (word: string, from: string | null, to: string | null): string | null =>
+    (spanWeeks != null && spanWeeks > 1 && from != null && to != null ? `${word} over ${spanWeeks} weeks: ${from} → ${to}` : null);
+  return {
+    fitness: caption('fitness', fmt.whole(first?.fitness), fmt.whole(last?.fitness)),
+    fatigue: caption('fatigue', fmt.whole(first?.fatigue), fmt.whole(last?.fatigue)),
+    form: caption('form', fmt.signed(first?.form), fmt.signed(last?.form)),
+  };
+}

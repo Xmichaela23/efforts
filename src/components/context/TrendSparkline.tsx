@@ -39,8 +39,14 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * ⚠️ RANGE SUPPRESSED WHEN THERE IS NO UNIT. The efficiency charts plot an index, so a bare
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
+ * ⛔ FOUR OPTIONS FOR THE LOAD CARD (2026-09-25), EACH OFF BY DEFAULT — every other row renders exactly as
+ * before (checked: the same DOM and the same pixels, before and after). TrainingPeaks' Performance
+ * Management Chart draws fitness and fatigue as two plain lines on one chart, so: `series2` (a second line on
+ * the same scale, same dates point for point — x is placed by index) with `color2` and `title2` (its word,
+ * beside `title`, in its colour); `dots={false}` (a plain line, no dot on any point); `captionLines` (the
+ * server's finished captions, one per line, in the line's colour). No fitted line = pass no `fit`, as before.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, fit = null, trendWord, changeLine = null }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, fit = null, trendWord, changeLine = null, series2 = null, color2, title2, dots = true, captionLines = null }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
@@ -63,8 +69,18 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   trendWord?: string;
   /** The server's change line ("8% lower than 10 weeks ago"), printed in place of "start → end" when present. */
   changeLine?: string | null;
+  /** A second line on the same scale, the same dates as `series` point for point (drawn only when the lengths match). */
+  series2?: Array<{ date: string; value: number }> | null;
+  color2?: string;
+  /** The second line's word, printed beside `title` in `color2`. */
+  title2?: string;
+  /** false = plain lines, no dot on any point. */
+  dots?: boolean;
+  /** The server's finished caption lines, printed under the chart as sent, each in its line's colour. */
+  captionLines?: Array<{ text: string; color?: string }> | null;
 }) {
   const pts = Array.isArray(series) ? series : [];
+  const pts2 = Array.isArray(series2) && series2.length === pts.length ? series2 : [];
   if (pts.length < 2) {
     return pts.length === 1
       ? <span className="basis-full text-caption text-label-secondary">building — 1 {dotNoun} so far; a few more draws the 12-week trend</span>
@@ -74,7 +90,8 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const W = 300, H = 44, PAD_Y = 6, PAD_X = 2;
   // ⚠️ CHART GEOMETRY ONLY — the plotting domain, in pixels. The printed low and high come off the fit
   // below; these two never reach the screen as numbers.
-  const vals = pts.map((p) => p.value);
+  // With a second line, both share the one scale (the PMC draws fitness and fatigue against one axis).
+  const vals = [...pts.map((p) => p.value), ...pts2.map((p) => p.value)];
   const minV = Math.min(...vals), maxV = Math.max(...vals);
   const rawRange = maxV - minV;
   const center = (minV + maxV) / 2 || 1;
@@ -85,6 +102,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   // ⛔ ONE COLOUR (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md): the "recent 6 weeks in
   // colour" split was ours. TrainingPeaks and intervals.icu draw one line, a dot per session.
   const poly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
+  const poly2 = pts2.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
   const last = pts[pts.length - 1];
   // ⛔ THE SPAN, THE BUILDING STATE AND THE RANGE ARE THE SERVER'S (2026-09-15, Stage 4 session 2).
   // This re-derived the week span from the dots' dates, applied an 11-week cut with no source, and took
@@ -118,20 +136,30 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         </span>
       ) : title && (
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-subhead text-label">{title}</span>
+          {title2 ? (
+            <span className="flex items-baseline gap-3">
+              <span className="text-subhead text-label">{title}</span>
+              <span className="text-subhead" style={{ color: color2 }}>{title2}</span>
+            </span>
+          ) : <span className="text-subhead text-label">{title}</span>}
           {rangeLabel && <span className="text-caption tabular-nums text-label-secondary whitespace-nowrap shrink-0">{rangeLabel}</span>}
         </span>
       )}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
+        {/* the second line under the first, so the first reads on top where they cross */}
+        {pts2.length > 0 && <polyline points={poly2} fill="none" stroke={color2 ?? runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
         <polyline points={poly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />
         {/* one dot per session (2026-09-04, Michael): TrainingPeaks and intervals.icu plot each workout as a point
             and draw the line through them — a line through three readings must look like three readings */}
-        {pts.map((p, i) => i < pts.length - 1 && (
+        {dots && pts.map((p, i) => i < pts.length - 1 && (
           <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={runColor} fillOpacity={0.8} />
         ))}
-        <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
+        {dots && <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />}
         {line && <line x1={x(0)} y1={y(line.start)} x2={x(pts.length - 1)} y2={y(line.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
+      {Array.isArray(captionLines) && captionLines.map((c, i) => (
+        <span key={`${i}-${c.text}`} className="text-footnote tabular-nums" style={{ color: c.color ?? 'var(--label)' }}>{c.text}</span>
+      ))}
       {line && changeLine && <span className="text-footnote text-label">{changeLine}</span>}
       {line && !changeLine && (
         <span className="text-footnote text-label">

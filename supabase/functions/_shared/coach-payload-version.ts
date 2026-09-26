@@ -11,4 +11,4 @@
  * 209 deploy. The version history stays beside the import in `coach/index.ts`.
  */
 // OURS — payload version counter, not a training number (`COACH_PAYLOAD_VERSION`)
-export const COACH_PAYLOAD_VERSION = 217;
+export const COACH_PAYLOAD_VERSION = 218;
