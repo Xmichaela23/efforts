@@ -27,6 +27,7 @@ import { weekLedgersFor, type WeekLedgersByWeek } from './week-ledger.ts';
 import type { MeLadderReading } from './me-history.ts';
 import type { ViadaPattern } from '../strength-grid/index.ts';
 import type { ViadaPickKey } from './accessory-picks.ts';
+import { PAIN_TOLERANCE_NOTE, SETS_EARNED_PARAGRAPH, TEST_WEEK_SENTENCE, sourcedNotesFor } from './program-outline.ts';
 
 /** The app's existing phase shape — `strength-primary-plan.ts` writes the same one. */
 export type ArcPhase = { name: string; start_week: number; end_week: number; weeks_in_phase: number };
@@ -261,6 +262,13 @@ export type StandingPlanConfig = {
   /** ⛔ The weight those reps were performed at, per pattern (`barState.atWeight`). Stored beside
    *  `me_last_reps` because the two are ONE reading; a surface must never source them apart. */
   me_at_weight: Partial<Record<ViadaPattern, number>> | null;
+  /**
+   * ⛔ THE SOURCED NOTES THE DESCRIPTION PRINTS, AS A LIST (2026-09-25, `blockSourcedNotes`) — the program outline's
+   * foot reads them. Written with the description: at build here, and by `rematerialize-standing-block` on every
+   * refresh. ⚠️ ABSENT ON A BLOCK NOT REFRESHED SINCE, and the outline then prints none rather than the build-time
+   * `standing_plan_notes`, which can hold words since replaced.
+   */
+  sourced_notes?: string[] | null;
 };
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -411,6 +419,8 @@ export function buildStandingPlanRow(args: {
       me_history: null,
       me_last_reps: null,
       me_at_weight: null,
+      // ⛔ THE DESCRIPTION'S SOURCED NOTES, stored beside it for the program outline (same notes, same filter).
+      sourced_notes: blockSourcedNotes(blocks, args.extraNotes),
     },
     notes,
     /**
@@ -525,29 +535,33 @@ export function weekShapeOf(wk: ComposedWeek | undefined): WeekShape | null {
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four'];
 const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
 
+/**
+ * ⛔ THE BLOCK DESCRIPTION'S p125 NOTE, SET PARAGRAPH AND TEST-WEEK SENTENCE LIVE IN `program-outline.ts` (2026-09-25),
+ * re-exported here so every existing importer is unchanged. The program outline prints the same three strings, and
+ * `get-week` imports that file without dragging the composer in behind it. One copy of each.
+ */
+export { PAIN_TOLERANCE_NOTE, SETS_EARNED_PARAGRAPH, TEST_WEEK_SENTENCE, sourcedNotesFor };
+
+/** ⛔ THE BLOCK'S NOTES, DEDUPED BY TEXT ACROSS THE BLOCK — the list `buildStandingPlanRow` stores and the description reads. */
+function blockNotesOf(blocks: ComposedWeek[], extraNotes: ComposedWeek['notes'] = []): ComposedWeek['notes'] {
+  const seen = new Set<string>();
+  const notes: ComposedWeek['notes'] = [];
+  for (const n of [...extraNotes, ...blocks.flatMap((b) => b.notes)]) {
+    if (seen.has(n.text)) continue;
+    seen.add(n.text);
+    notes.push(n);
+  }
+  return notes;
+}
 
 /**
- * ⛔ p125, reworded (Michael approved the words 2026-09-19); the page: "A higher pain tolerance may be an excellent adaptation for endurance
- * athletes because the ability to manage increasingly uncomfortable sensations during various endurance-dependent
- * events may be directly related to their overall performance in their sport. For strength athletes, however, it may
- * be less clear; a higher tolerance may be of negligible benefit or even counterproductive to longer-term health."
- * ⛔⛔ THE p125 LINE, IN p125's OWN WORDS (pass 6, 2026-09-18, read off p125.jpg). It had been a paraphrase that
- * dropped the page's "may"; pass 4 took it off because p125 was not in the SOURCE doc. The page photo is the
- * book, so it comes back as the page prints it. Said once, on the block description. No second person (the
- * description's voice gate).
+ * ⛔ THE SOURCED NOTES THE DESCRIPTION PRINTS, AS A LIST (2026-09-25) — stored on the block as
+ * `standing_plan.sourced_notes` beside the description, at build and at every refresh, so the program outline prints
+ * exactly the notes the description does. Same notes, same filter (`sourcedNotesFor`).
  */
-export const PAIN_TOLERANCE_NOTE =
-  'Higher pain tolerance may be a very useful adaptation for endurance athletes, since handling growing discomfort in '
-  + 'endurance events may tie directly to how well they perform in their sport. For strength athletes the case is less '
-  + 'clear; higher tolerance may bring little benefit or may even be bad for longer-term health.';
-
-/**
- * ⛔ HOW THE SET COUNTS MOVE, SAID ONCE ON THE BLOCK (Michael's final words, 2026-09-25, approved;
- * `EARNED_SETS_EVERY_ROW_IS_OURS`). Printed as approved; the set ranges and caps are p218's.
- */
-export const SETS_EARNED_PARAGRAPH =
-  'Every exercise starts at the low end of its set range. Two sessions at the top of the rep range add a set, up to '
-  + 'its cap. One session under the range takes one off. The row shows the count.';
+export function blockSourcedNotes(blocks: ComposedWeek[], extraNotes: ComposedWeek['notes'] = []): string[] {
+  return sourcedNotesFor(blockNotesOf(blocks, extraNotes));
+}
 
 /**
  * ⛔ THE PLAN'S OWN DESCRIPTION, OFF A COMPOSED BLOCK — ONE WRITER, TWO CALLERS (2026-09-19). The build
@@ -565,13 +579,7 @@ export function blockDescriptionFor(
   weeks: number,
   extraNotes: ComposedWeek['notes'] = [],
 ): string {
-  const seen = new Set<string>();
-  const notes: ComposedWeek['notes'] = [];
-  for (const n of [...extraNotes, ...blocks.flatMap((b) => b.notes)]) {
-    if (seen.has(n.text)) continue;
-    seen.add(n.text);
-    notes.push(n);
-  }
+  const notes = blockNotesOf(blocks, extraNotes);
   const shape = weekShapeOf(blocks.find((b) => !b.isTestWeek) ?? blocks[0]);
   return describeBlock(Math.max(1, Math.round(weeks)), notes, blocks[0]?.isTestWeek === true, shape);
 }
@@ -599,10 +607,9 @@ function describeBlock(
    * the weights arrive as soon as the two test sessions are logged.
    * ⚠️ MATCHED ACROSS THE WHOLE SOURCE LIST rather than the sliced three, or a block whose test note
    * fell past the cut would print the duplicate again.
+   * ⚠️ THE FILTER AND THE THREE-NOTE CAP ARE `sourcedNotesFor` (program-outline.ts), which the program outline reads too.
    */
-  const allSourced = notes.filter((n) => n.kind === 'source').map((n) => n.text);
-  // OURS — `describeBlock` prints at most three of the block's sourced notes; display cap, no page.
-  const sourced = allSourced.filter((t) => !t.includes('first week is the test')).slice(0, 3);
+  const sourced = sourcedNotesFor(notes);
 
   /**
    * ⚠️ ONE FLAT LIST, JOINED ONCE. A first draft pre-joined the endurance sessions into their own
@@ -636,8 +643,7 @@ function describeBlock(
     // would describe a week the athlete does not have — and week one looks different enough that
     // they would notice and have no way to find out why.
     hasTestWeek
-      ? 'Week one is a test week: two guided sessions set the numbers the rest of the block is built '
-        + 'on. Log those two and the weights fill in from there, including the rest of week one.'
+      ? TEST_WEEK_SENTENCE
       : 'Week one is prescribed from sets already on file, so there is no test week. Weights are on '
         + 'from the first session.',
     SETS_EARNED_PARAGRAPH, // Michael 2026-09-25, approved

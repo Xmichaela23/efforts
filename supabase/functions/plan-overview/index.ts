@@ -16,6 +16,7 @@
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildPlanOverview, planListFields } from '../_shared/plan-overview.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
+import { composeProgramOutline } from '../_shared/standing-plan/program-outline.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +48,8 @@ Deno.serve(async (req) => {
     if (!plan) return json({ success: false, error: 'Plan not found' }, 404);
     const { data: rows, error: rowsErr } = await supabase
       .from('planned_workouts')
-      .select('id,week_number,day_number,date,type,name,tags,duration,total_duration_seconds,computed,intervals,training_plan_id,strength_exercises')
+      // `workout_structure`, `steps_preset` and the two descriptions: what a session's title is read from (the outline).
+      .select('id,week_number,day_number,date,type,name,tags,duration,total_duration_seconds,computed,intervals,training_plan_id,strength_exercises,workout_structure,steps_preset,description,rendered_description')
       .eq('training_plan_id', planId)
       .eq('user_id', userId);
     if (rowsErr) return json({ success: false, error: rowsErr.message }, 500);
@@ -66,10 +68,35 @@ Deno.serve(async (req) => {
     );
     const day_order: Record<string, number> = {};
     for (const r of rows ?? []) { const n = order.get(r); if (r?.id && n != null) day_order[String(r.id)] = n; }
+    const overview = buildPlanOverview({ plan, rows: rows ?? [], asOfIso: asOf });
+    /**
+     * ⛔ THE PROGRAM OUTLINE (2026-09-25, `_shared/standing-plan/program-outline.ts`) — the sheet Info opens on a
+     * standing plan, the same one Today's plan name opens. Null on any other plan, which keeps its old Info.
+     * "This week" is the plan's own rows in its current week.
+     */
+    const program_outline = (() => {
+      try {
+        const week = Number(overview.current_week_index);
+        return composeProgramOutline({
+          planName: plan.name ?? null,
+          standingPlan: plan.config?.standing_plan ?? null,
+          sessionsByWeek: plan.sessions_by_week ?? null,
+          week: Number.isFinite(week) ? week : NaN,
+          weekRows: Number.isFinite(week)
+            ? (rows ?? [])
+              .filter((r) => Number(r?.week_number) === week)
+              .map((r) => ({ ...r, day_order: r?.id ? day_order[String(r.id)] ?? null : null }))
+            : [],
+        });
+      } catch (e) {
+        console.error('[plan-overview] program outline not composed:', e);
+        return null;
+      }
+    })();
     return json({
       success: true,
       plan: { ...plan, ...planListFields(plan, asOf) },
-      overview: { ...buildPlanOverview({ plan, rows: rows ?? [], asOfIso: asOf }), day_order },
+      overview: { ...overview, day_order, program_outline },
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ success: false, error: e.message }, e.status);

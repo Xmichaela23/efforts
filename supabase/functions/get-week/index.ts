@@ -55,6 +55,7 @@ import { intentTitle } from '../_shared/intent-title.ts';
 import { sessionTitle } from '../_shared/session-title.ts';
 import { plyoTitleNote } from '../_shared/standing-plan/plyo.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
+import { composeProgramOutline } from '../_shared/standing-plan/program-outline.ts';
 import { isUnmatchedAgainstPlan } from '../../../src/lib/associate-candidates.ts';
 import { athleteToday, isStandingPlanConfig, queueRefreshIfStale } from '../_shared/plan-refresh.ts';
 const corsHeaders = {
@@ -1570,6 +1571,36 @@ Deno.serve(async (req)=>{
              * day and its formatting. The words here are composed nowhere else.
              */
             weekPosition: weekPosition(currentWeek, durationWeeks),
+            /**
+             * ⛔ THE PROGRAM OUTLINE (2026-09-25, `_shared/standing-plan/program-outline.ts`) — the sheet the plan name
+             * under the date opens. Every word is the server's; null on anything but a standing plan. "This week" is
+             * this plan's own rows in the week being viewed, titled as Today's cards title them.
+             */
+            programOutline: weekLabel.standingPlan
+              ? (() => {
+                  try {
+                    return composeProgramOutline({
+                      planName: planData.name,
+                      standingPlan: config.standing_plan,
+                      sessionsByWeek: planData.sessions_by_week ?? null,
+                      week: currentWeek,
+                      weekRows: (itemsWithAI as any[])
+                        .filter((it) => it?.planned && String(it.planned.training_plan_id ?? '') === String(trainingPlanId))
+                        // ⚠️ `name` and `type` as `toPlannedWorkout` below sets them for Today's card.
+                        .map((it) => ({
+                          ...it.planned,
+                          name: it.planned.name || it.type || '',
+                          type: it.type || it.planned.type || '',
+                          date: it.date ?? it.planned.date ?? null,
+                          day_order: it.day_order ?? null,
+                        })),
+                    });
+                  } catch (e) {
+                    console.error('[get-week] program outline not composed:', e);
+                    return null;
+                  }
+                })()
+              : null,
             notes: notes,
             keyWorkouts: weekSummary.key_workouts || [],
             // Race info from config

@@ -420,7 +420,7 @@ Deno.test('the block description carries the set paragraph once, as approved', (
   const probe = composeBlock({ ...BASE, weeks: 12, taperWeeks: [11, 12] } as never);
   const description = blockDescriptionFor(probe, 12);
   assertEquals(description.split(SETS_EARNED_PARAGRAPH).length - 1, 1, description);
-  assertEquals(SETS_EARNED_PARAGRAPH, 'Every exercise starts at the low end of its set range. Two sessions at the top of the rep range add a set, up to its cap. One session under the range takes one off. The row shows the count.');
+  assertEquals(SETS_EARNED_PARAGRAPH, 'Every exercise starts at the low end of its set range. Two sessions at the top of the rep range add a set, up to its cap. One session under the range takes one off. The working sets under each lift show the count.');
   assertEquals(SETS_LINE_UP(4), 'Up to 4 sets. You hit the top of the range two sessions in a row.');
   assertEquals(SETS_LINE_DOWN(3), 'Back to 3 sets. Last session came in under the range.');
 });

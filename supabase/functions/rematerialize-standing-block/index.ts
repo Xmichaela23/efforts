@@ -56,6 +56,7 @@ import {
   TEST_WEEK_INDEX,
   weekLedgersFor,
   blockDescriptionFor,
+  blockSourcedNotes,
   readDeadliftForm,
   deadliftFormOf,
   DEADLIFT_FORMS,
@@ -864,6 +865,9 @@ Deno.serve(async (req: Request) => {
           ...baseConfig,
           standing_plan: {
             ...sp,
+            // ⛔ THE DESCRIPTION'S SOURCED NOTES, REWRITTEN WITH IT (2026-09-25): same trigger, same `probe`. The program
+            // outline prints these at its foot, so the sheet and the description carry the same notes.
+            ...(isRefresh ? { sourced_notes: blockSourcedNotes(probe) } : {}),
             // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`); the kit it was BUILT
             // with is kept once, apart, for the pick rule (`built_equipment`, 2026-09-25).
             ...(currentKit && !Array.isArray(sp?.built_equipment) && builtKit ? { built_equipment: builtKit } : {}),

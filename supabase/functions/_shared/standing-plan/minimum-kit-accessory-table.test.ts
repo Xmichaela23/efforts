@@ -383,5 +383,5 @@ Deno.test('⛔ PART C — every strength row on the minimum kit is performable o
   }
   assert(rows > 900, `only ${rows} rows`);
   // 32 since 2026-09-25 (sets are earned on every row); this pin follows every bump.
-  assertEquals(PLAN_WRITER_VERSION, 33);
+  assertEquals(PLAN_WRITER_VERSION, 34);
 });

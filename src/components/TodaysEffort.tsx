@@ -41,6 +41,7 @@ import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
+import ProgramOutlineSheet from './ProgramOutlineSheet';
 import { isWatchConnectivityAvailable } from '@/services/watchConnectivity';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel';
@@ -479,6 +480,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Unified lookup - use week range for training plan context, but filter items to active date
   const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext, emptyDayLines, spacingLines } = useWeekUnified(fromISO, toISO);
+  /** The program outline sheet, opened by the plan name under the date (2026-09-25). */
+  const [programOutlineOpen, setProgramOutlineOpen] = useState(false);
   // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
   // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
   // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
@@ -1972,12 +1975,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     "Test" or "Light week"; a race plan's phase. `focus` only for a get-week that
                     predates `weekLabel`. */}
                 {(trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext?.weekLabel : trainingPlanContext?.focus) ? (
-                  <span
-                    className="text-caption font-normal tracking-wide text-center max-w-full"
-                    style={{ color: getDisciplinePhosphorCore('run'), lineHeight: 1.2, marginTop: 1 }}
-                  >
-                    {trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
-                  </span>
+                  /* ⛔ ON A STANDING PLAN THE NAME OPENS THE PROGRAM OUTLINE (2026-09-25) — the server's sheet
+                     (`programOutline`); the line looks the same. A race plan's phase word stays plain text. */
+                  trainingPlanContext?.programOutline ? (
+                    <button
+                      type="button"
+                      aria-haspopup="dialog"
+                      onClick={(e) => { e.stopPropagation(); if (daySwipe.current.movedAny > 8) return; setProgramOutlineOpen(true); }}
+                      className="text-caption font-normal tracking-wide text-center max-w-full bg-transparent p-0"
+                      style={{ color: getDisciplinePhosphorCore('run'), lineHeight: 1.2, marginTop: 1 }}
+                    >
+                      {trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
+                    </button>
+                  ) : (
+                    <span
+                      className="text-caption font-normal tracking-wide text-center max-w-full"
+                      style={{ color: getDisciplinePhosphorCore('run'), lineHeight: 1.2, marginTop: 1 }}
+                    >
+                      {trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
+                    </span>
+                  )
                 ) : null}
               </span>
               {/* ⛔ NO BLOCK LABEL ON A STANDING PLAN — it has no build or peak to name. Race plans keep it. */}
@@ -2583,6 +2600,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       >
         <LogFAB onSelectType={(type) => onAddEffort(type, activeDate)} />
       </div>
+
+      {/* The program outline — opened by the plan name under the date (standing plans only). */}
+      <ProgramOutlineSheet
+        outline={trainingPlanContext?.programOutline ?? null}
+        open={programOutlineOpen}
+        onOpenChange={setProgramOutlineOpen}
+      />
 
       {/* Planned Workout Bottom Sheet */}
       <Drawer

@@ -95,8 +95,11 @@ import { localDateInTz } from './local-date.ts';
 //   Swap sheet is built for the slot, not the movement's own filing; the minimum kit's superset push half is the goblet
 //   squat, the one-leg rows the Bulgarian split squat (gym: single-leg leg press), the quad row banded leg extension or
 //   reverse lunge; the back extension bench chip reads "Back Extension".
+// 34 (2026-09-25): the program outline — the block description's set paragraph ends "The working sets under each lift
+//   show the count.", and the refresh stores the description's sourced notes beside it (`standing_plan.sourced_notes`)
+//   for the outline's foot. No session changes; the bump is what rewrites an existing plan's description and notes.
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 33;
+export const PLAN_WRITER_VERSION = 34;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

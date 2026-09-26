@@ -21,6 +21,7 @@ import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+import ProgramOutlineSheet from './ProgramOutlineSheet';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 // ⛔ THE HEADER'S WORDS ARE THE SERVER'S RULE (2026-09-15, §8.0 #25). This screen reads `planned_workouts`
@@ -214,6 +215,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [adjustmentsUsed, setAdjustmentsUsed] = useState(0);
   const [adjustmentLimit] = useState(3);
   const [showPlanDesc, setShowPlanDesc] = useState(false);
+  /** The program outline sheet — what Info opens on a standing plan (2026-09-25, `overview.program_outline`). */
+  const [programOutlineOpen, setProgramOutlineOpen] = useState(false);
 
   // ⛔ No mount-time baselines load (2026-09-10, audit H-T18): it fed the weekly summaries' structure normalizer, now deleted.
 
@@ -1499,6 +1502,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <ProgramOutlineSheet
+          outline={overview?.program_outline ?? null}
+          open={programOutlineOpen}
+          onOpenChange={setProgramOutlineOpen}
+        />
         <div
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
           style={{ WebkitOverflowScrolling: 'touch' }}
@@ -1535,7 +1543,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             >
               Download
             </button>
-            <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm sm:hidden">
+            {/* ⛔ ON A STANDING PLAN, INFO OPENS THE PROGRAM OUTLINE (2026-09-25) — the sheet Today's plan name opens,
+                sent by `plan-overview`. Any other plan keeps the description toggle. */}
+            <button
+              onClick={() => (overview?.program_outline ? setProgramOutlineOpen(true) : setShowPlanDesc((v:any)=>!v))}
+              aria-haspopup={overview?.program_outline ? 'dialog' : undefined}
+              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm sm:hidden"
+            >
               Info
             </button>
             
