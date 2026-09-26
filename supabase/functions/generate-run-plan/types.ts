@@ -168,11 +168,12 @@ export interface GeneratorParams {
    * duration come from it, and the VDOT below is derived from it rather than from a 5K time.
    */
   easy_pace_sec_per_mi?: number;
-  // E3a — the athlete's learned zone inputs for the shared endurance zone model (SPEC-e3a-nonrace-zones).
-  // Consumed by the non-race (sustainable) prescription; performance_build ignores them (uses effort_paces).
-  lthr?: number;        // learned run lactate-threshold HR (→ Friel %LTHR zones)
-  max_hr?: number;      // observed/seeded max HR (→ Karvonen fallback)
-  resting_hr?: number;  // resting HR (→ Karvonen fallback)
+  // E3a — the athlete's zone inputs (SPEC-e3a-nonrace-zones). Consumed by the non-race (sustainable) prescription;
+  // performance_build ignores them (uses effort_paces).
+  /** The run's heart-rate zones as Baselines prints them (`heartRateZoneSet` rows, Zone 1 first) — 2026-09-26. */
+  hr_zone_rows?: Array<{ name: string; min: number; max: number | null }>;
+  /** The run easy band (`resolveRunEasyHrBand`), in bpm — what the plan prints where its words say easy. */
+  easy_hr_band?: { floor: number; ceiling: number };
   vdot?: number;        // Daniels VDOT (→ pace zones), derived from learned threshold pace
   // E3b — weekly TOTAL time budget (hours). The engine reserves strength off the top
   // (strength_frequency × ~1hr), then sizes endurance from the remainder, split run/ride by run_lean.

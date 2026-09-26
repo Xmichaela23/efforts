@@ -16,9 +16,9 @@
  *     range, the 5K, the swim pace, the heart-rate zone tables, age / height / weight, and the date a
  *     retest lands on.
  *
- * ⚠️ THE THRESHOLD THE EASY BAND IS BUILT FROM is the athlete's typed run threshold heart rate when there
- * is one (`configured_hr_zones.manual_run_lthr`, else `performance_numbers.threshold_heart_rate`); the
- * resolver inside `resolveRunEasyHrBand` still prefers a trusted learned threshold over it.
+ * ⚠️ THE EASY BAND IS HANDED THE STORED ROW WHOLE (2026-09-26), as every other caller now hands it: the threshold
+ * and max come from their owners, so the athlete's `lthr_source` choice and a typed max are seen here too. This built
+ * a one-key object from the typed run threshold, which the run screen's band never saw — two bands for one athlete.
  *
  * ⛔ UNITS ARE PICKED HERE, NEVER ON THE PHONE (guard rule (a), `docs/DESIGN-one-truth-guard.md` §1.3).
  * A lift is stored in pounds everywhere (the 45 lb bar, the 5 lb warm-up step, the nearest-5-lb e1RM),
@@ -228,8 +228,7 @@ export function zonesForBaselinesRow(
   const swimSec = parsePaceClock(pn.swimPace100);
   const swim_pace = swimSec ? { threshold_100: String(pn.swimPace100).trim(), rows: swimPaceBandRows(swimSec) } : null;
 
-  const typedLthr = positive(cfg.manual_run_lthr) ?? positive(pn.threshold_heart_rate);
-  const band = resolveRunEasyHrBand(learned, typedLthr);
+  const band = resolveRunEasyHrBand({ learned_fitness: learned, performance_numbers: pn, configured_hr_zones: cfg });
   const floor = positive(band?.floor);
   const ceiling = positive(band?.ceiling);
   const run_easy_hr = band && band.anchor !== 'none' && floor != null && ceiling != null

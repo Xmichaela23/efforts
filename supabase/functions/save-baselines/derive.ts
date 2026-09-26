@@ -11,11 +11,8 @@
  */
 import { calculateEffortScore, getPacesFromScore, type TrainingPaces } from '../generate-run-plan/effort-score.ts';
 import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '../../../src/lib/resolve-current-5k-pace.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { canonicalizeLiftKey } from '../_shared/state-trend/capacity-resolver.ts';
 import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
-import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
-import { hrZones } from '../_shared/endurance/hr-zones.ts';
 import { acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { acceptLearnedRunThreshold } from '../../../src/lib/resolve-current-run-pace.ts';
 
@@ -203,38 +200,28 @@ export type TypedHeartRate = {
   resting_heart_rate?: number | null;
 };
 
-export type ZoneModel = 'friel' | 'karvonen' | 'needs_resting' | null;
-
 const positive = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-function zoneModel(lthr: number | null, maxHr: number | null, resting: number | null): ZoneModel {
-  if (lthr && lthr > 100) return 'friel';
-  if (maxHr && maxHr > 100 && resting && resting > 30) return 'karvonen';
-  if (maxHr && maxHr > 100) return 'needs_resting';
-  return null;
-}
-
 /**
  * The `configured_hr_zones` object, or null when nothing heart-rate related was typed or changed
- * (the row's zones are then left exactly as they are — Strava's zones included).
+ * (the row is then left exactly as it is).
  *
- * ⛔ THE ZONE TABLE IS `hrZones` (`_shared/endurance/hr-zones.ts`): Friel from the threshold is
- * `frielRunZones`, the table `compute-workout-analysis` bins on, and Karvonen needs a REAL resting
- * heart rate. The phone used to fill a missing resting heart rate with 60; the server does not invent
- * one, so an athlete with a max and no resting heart rate gets no stored zones and the analysis bins on
- * its own max-heart-rate zones instead.
+ * ⛔ WHAT THE ATHLETE TYPED, AND NOTHING DERIVED FROM IT (2026-09-26, Michael: "go"). This also wrote zone arrays
+ * (`zones`, `zones_run`, `zones_ride` — Friel or Karvonen tables), their model names, and one-number
+ * `threshold_heart_rate` / `max_heart_rate` scalars. Nothing reads any of them now: every zone edge is
+ * `heartRateZoneSet` (`_shared/endurance/display-zones.ts`), worked out from the typed and learned numbers at read
+ * time, and the last readers of the stored `zones` — the race band and its stale-strategy hash — read that set too.
  *
- * ⛔ THE ANCHORS GO THROUGH THE RESOLVERS, as the phone's did: a typed number wins, then the learned
- * value the resolver trusts. No age estimate (`allowAgeEstimate: false`).
+ * What stays is what is read: the four typed numbers (the threshold and max-heart-rate owners read them), the resting
+ * heart rate (Baselines' resting row), and `source` — the Strava and watch-file writers check it before they write,
+ * so an athlete's own numbers are never overwritten.
  */
 export function hrZoneConfigForSave(input: {
   typed: TypedHeartRate;
   stored: Record<string, unknown> | null | undefined;
-  learnedFitness: Record<string, unknown> | null | undefined;
-  performanceNumbers: Record<string, unknown> | null | undefined;
   nowIso: string;
 }): Record<string, unknown> | null {
   const stored = input.stored ?? {};
@@ -258,23 +245,7 @@ export function hrZoneConfigForSave(input: {
     restingTyped;
   if (!hasManual && !changed) return null;
 
-  const lf = input.learnedFitness ?? null;
-  const baselinesForHr = {
-    learned_fitness: lf,
-    performance_numbers: input.performanceNumbers ?? null,
-    configured_hr_zones: { manual_run_lthr: m.runLthr, manual_ride_lthr: m.rideLthr },
-  } as never;
-  const runLthr = m.runLthr || resolveCurrentLthr(baselinesForHr, { sport: 'run' }).bpm || null;
-  const rideLthr = m.rideLthr || resolveCurrentLthr(baselinesForHr, { sport: 'ride' }).bpm || null;
-  const runMax = m.runMax || resolveCurrentMaxHr({ learned_fitness: lf } as never, { sport: 'run', allowAgeEstimate: false }).bpm || null;
-  const rideMax = m.rideMax || resolveCurrentMaxHr({ learned_fitness: lf } as never, { sport: 'ride', allowAgeEstimate: false }).bpm || null;
-
-  const primaryLthr = runLthr || rideLthr;
-  const primaryMax = runMax || rideMax;
-  const zonesFor = (lthr: number | null, maxHr: number | null) =>
-    hrZones(lthr, maxHr, resting)?.map((z) => ({ min: z.min, max: z.max }));
-
-  const cfg: Record<string, unknown> = {
+  return {
     source: hasManual ? 'manual' : 'learned',
     custom_zones: hasManual,
     updated_at: input.nowIso,
@@ -282,21 +253,8 @@ export function hrZoneConfigForSave(input: {
     manual_run_lthr: m.runLthr,
     manual_ride_max_hr: m.rideMax,
     manual_ride_lthr: m.rideLthr,
-    // Only when unambiguous: one number cannot speak for two sports (2026-08-20).
-    threshold_heart_rate: (runLthr && rideLthr) ? null : primaryLthr,
-    max_heart_rate: (runMax && rideMax) ? null : primaryMax,
     resting_heart_rate: resting,
-    zones_run_model: zoneModel(runLthr, runMax, resting),
-    zones_ride_model: zoneModel(rideLthr, rideMax, resting),
   };
-  const zones = zonesFor(primaryLthr, primaryMax);
-  const zonesRun = zonesFor(runLthr, runMax);
-  const zonesRide = zonesFor(rideLthr, rideMax);
-  // The shared array stays (Strava writes the same key); the per-sport arrays are what the analysis prefers.
-  if (zones) cfg.zones = zones;
-  if (zonesRun) cfg.zones_run = zonesRun;
-  if (zonesRide) cfg.zones_ride = zonesRide;
-  return cfg;
 }
 
 // ── what the athlete typed, in their own unit ───────────────────────────────────────────────────

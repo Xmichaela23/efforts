@@ -1,4 +1,6 @@
-import { resolveCurrentLthr } from '../../../../src/lib/resolve-current-lthr.ts';
+// ⛔ ONE ZONE TABLE AND ONE EASY RULE (2026-09-26): the run's zone set Baselines prints, and the run easy band.
+import { heartRateZoneSet } from '../endurance/display-zones.ts';
+import { resolveRunEasyHrBand, type EasyHrBaselines } from '../easy-hr.ts';
 import type { DriftExplanation, FactPacketV1, FlagV1, HrZone, WeatherV1, WorkoutSegmentV1 } from './types.ts';
 import {
   classifyTerrain,
@@ -187,34 +189,22 @@ function deriveWeather(workout: any): WeatherV1 | null {
 }
 
 /**
- * ⛔ ANCHORED THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). This read the learned column
- * raw, so it skipped the D-284 sample-count gate: a `run_threshold_hr` written as "88% of observed
- * max (estimated)" carries `sample_count: 0`, is a FORMULA rather than a measurement, and can never
- * anchor a zone band. Five zones were being built off it.
- *
- * ⚠️ THE CALLER PASSES ONLY `learned_fitness` TODAY, so the resolver's typed and configured tiers
- * stay dark here. That is not a regression — those tiers were unreachable before too — and the
- * function name says learned-fitness. Widening it is a separate change with its own caller audit.
+ * ⛔ THE SEGMENT ZONES ARE THE ZONES BASELINES PRINTS (2026-09-26, Michael: "go"). This built its own five zones —
+ * 75 / 85 / 92 / 98% of a threshold resolved from `learned_fitness` alone, a "conservative" table of our own, not Friel's — so
+ * a segment's zone here and the same heart rate's zone on the session's card came from two tables, and a typed run
+ * threshold was invisible. Now the run's `heartRateZoneSet`, handed the whole row: the threshold on Baselines →
+ * Friel's zones; no threshold → % of max; then the age estimate. Labels keep this packet's short form — `Z1` …
+ * `Z4`, then `Z5a` / `Z5b` / `Z5c` (Friel) or `Z5` (% of max) — and the open top zone's ceiling stays 999.
  */
-function buildZonesFromLearnedFitness(learnedFitness: any): HrZone[] | null {
+function buildZonesFromBaselines(baselines: unknown): HrZone[] | null {
   try {
-    const thr = resolveCurrentLthr({ learned_fitness: learnedFitness } as never).bpm
-      ?? coerceNumber(learnedFitness?.runThresholdHr?.value);
-    if (thr == null || !(thr > 0)) return null;
-    // Conservative 5-zone model anchored to threshold HR.
-    // Not perfect, but deterministic and user-specific.
-    // OURS — `buildZonesFromLearnedFitness` zone tops 75 / 85 / 92 / 98% of threshold HR: a "conservative" table, not Friel's, no outside source
-    const z1Max = Math.round(thr * 0.75);
-    const z2Max = Math.round(thr * 0.85);
-    const z3Max = Math.round(thr * 0.92);
-    const z4Max = Math.round(thr * 0.98);
-    return [
-      { label: 'Z1', minBpm: 0, maxBpm: z1Max },
-      { label: 'Z2', minBpm: z1Max + 1, maxBpm: z2Max },
-      { label: 'Z3', minBpm: z2Max + 1, maxBpm: z3Max },
-      { label: 'Z4', minBpm: z3Max + 1, maxBpm: z4Max },
-      { label: 'Z5', minBpm: z4Max + 1, maxBpm: 999 },
-    ];
+    const set = heartRateZoneSet(baselines as never, 'run', { today: new Date().toISOString().slice(0, 10) });
+    if (!set) return null;
+    return set.rows.map((r) => ({
+      label: r.name.replace(/^Zone\s*/i, 'Z'),
+      minBpm: r.min,
+      maxBpm: r.max ?? 999,
+    }));
   } catch {
     return null;
   }
@@ -273,7 +263,12 @@ export async function buildWorkoutFactPacketV1(args: {
   } | null;
   workoutIntent: string | null;
   classifiedTypeOverride?: string | null;
-  learnedFitness: any | null; // from user_baselines.learned_fitness
+  /**
+   * The athlete's `user_baselines` row, WHOLE — `learned_fitness`, `performance_numbers`, `configured_hr_zones`,
+   * `birthday`, `gender` (2026-09-26). The segment zones and the easy band are read from it through their owners; it
+   * was `learned_fitness` alone, so a typed threshold was invisible to this packet.
+   */
+  baselines: EasyHrBaselines & { birthday?: unknown; gender?: unknown };
   /**
    * D-041 Fix D: optional Arc context for phase-aware TREND pool filtering.
    * When provided AND daysSinceLastGoalRace < 60, the trend pool excludes
@@ -286,7 +281,7 @@ export async function buildWorkoutFactPacketV1(args: {
     daysSinceLastGoalRace?: number | null;
   } | null;
 }): Promise<{ factPacket: FactPacketV1; flags: FlagV1[] }> {
-  const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, learnedFitness, arcContext } = args;
+  const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, baselines, arcContext } = args;
 
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
@@ -337,7 +332,10 @@ export async function buildWorkoutFactPacketV1(args: {
   }
   const weather = deriveWeather(workout);
 
-  const zones = buildZonesFromLearnedFitness(learnedFitness) || null;
+  const zones = buildZonesFromBaselines(baselines) || null;
+  // The run easy rule (`_shared/easy-hr.ts`) — the one "is this heartbeat easy" — for the two easy-band reads below:
+  // the easy-run stimulus and the "HR above aerobic" recovery flag. Its ceiling is Zone 2's top on a threshold.
+  const easyCeilingBpm = resolveRunEasyHrBand(baselines).ceiling;
 
   const segments: WorkoutSegmentV1[] = (() => {
     const ints: any[] = Array.isArray(computed?.intervals) ? computed.intervals : [];
@@ -889,6 +887,7 @@ export async function buildWorkoutFactPacketV1(args: {
     segments,
     zones,
     {
+      easy_ceiling_bpm: easyCeilingBpm,
       planned_duration_min:
         execution.assessed_against === 'actual'
           ? (overallDurMin != null ? Math.round(overallDurMin) : null)
@@ -1052,7 +1051,7 @@ export async function buildWorkoutFactPacketV1(args: {
     },
   };
 
-  const flags = generateFlagsV1(factPacket);
+  const flags = generateFlagsV1(factPacket, { easyCeilingBpm });
   return { factPacket, flags };
 }
 

@@ -22,7 +22,8 @@
  * among them — outranked the threshold: one ride was counted on Strava's 110/137/150/164 while the learned ride
  * threshold was 153. The analysis and the Baselines zone table now both take their zones from ONE chain,
  * `heartRateZoneSet` (`_shared/endurance/display-zones.ts`): the threshold on Baselines → % of max → age
- * estimate. The writer below still writes the arrays; nothing in this chain reads them.
+ * estimate. And since the race band and the export read that chain too, the writer stopped writing the arrays and
+ * the one-number scalars (2026-09-26): it stores the typed numbers and nothing derived from them.
  *
  * Run: deno test --allow-read supabase/functions/_shared/per-sport-hr-zones.test.ts
  */
@@ -34,14 +35,17 @@ const baselinesSrc = await Deno.readTextFile(new URL('src/components/TrainingBas
 const writerSrc = await Deno.readTextFile(new URL('supabase/functions/save-baselines/derive.ts', REPO));
 const readoutSrc = await Deno.readTextFile(new URL('supabase/functions/save-baselines/zones.ts', REPO));
 
-Deno.test('the WRITER emits a per-sport zone array for each discipline', () => {
-  assert(/zones_run\b/.test(writerSrc), 'no run zone array is written');
-  assert(/zones_ride\b/.test(writerSrc), 'no ride zone array is written');
-  // And the shared one stays — Strava writes the same key with genuinely sport-agnostic zones.
-  assert(/cfg\.zones\s*=\s*zones\b/.test(writerSrc), 'the legacy shared array stopped being written');
-});
-
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+Deno.test('the WRITER stores what was typed and no zone table or one-number scalar (2026-09-26)', () => {
+  // Nothing reads `zones`, `zones_run`, `zones_ride`, their model names, or the one-number `threshold_heart_rate` /
+  // `max_heart_rate` the writer used to derive: every zone edge is `heartRateZoneSet`, worked out at read time.
+  const writerCode = stripComments(writerSrc);
+  assert(!/zones_run|zones_ride|_model\b|cfg\.zones\s*=/.test(writerCode), 'the writer derives and stores a zone table again');
+  assert(!/threshold_heart_rate\s*:|max_heart_rate\s*:/.test(writerCode), 'the writer stores a one-number threshold or max again');
+  assert(/manual_run_lthr: m\.runLthr/.test(writerCode) && /manual_ride_lthr: m\.rideLthr/.test(writerCode), 'the typed thresholds are no longer stored');
+  assert(/source: hasManual \? 'manual' : 'learned'/.test(writerCode), 'the source the Strava and watch-file writers check is no longer stored');
+});
 
 Deno.test('the READERS read no stored zone table: the analysis and Baselines both ask heartRateZoneSet (2026-09-26)', () => {
   const analysisCode = stripComments(analysisSrc);
@@ -68,33 +72,7 @@ Deno.test('the receipt says WHICH zone set and anchor the session was counted in
   assert(/schema: hrSet\.schema/.test(analysisSrc) && /anchor_bpm: hrSet\.anchor_bpm/.test(analysisSrc), 'the zone set is no longer stored with the bins');
 });
 
-Deno.test('the shared scalar is not written when it would be ambiguous', () => {
-  // ⛔ `threshold_heart_rate` was `runLTHR || rideLTHR` — one number claiming both sports. An athlete
-  // with BOTH now gets null there, so no reader can pick up the wrong sport's anchor by accident;
-  // an athlete with only one still gets it, because then it is unambiguous.
-  assert(
-    /threshold_heart_rate:\s*\(runLthr\s*&&\s*rideLthr\)\s*\?\s*null\s*:\s*primaryLthr/.test(writerSrc),
-    'the shared threshold is being written as if it belonged to both sports again',
-  );
-  assert(
-    /max_heart_rate:\s*\(runMax\s*&&\s*rideMax\)\s*\?\s*null\s*:\s*primaryMax/.test(writerSrc),
-    'the shared max HR is being written as if it belonged to both sports again',
-  );
-});
-
-Deno.test('the WRITER resolves its anchors — it cannot save zones the engine refuses', () => {
-  // ⛔ FOUND ON A REAL SCREEN. Max HR 175, LTHR 158 — and 175 x 0.90 = 157.5 -> 158, which is the
-  // learner's `90% of observed max (estimated)` fallback, sample_count 0. The card called it
-  // "learned". Every server surface now refuses that value, so a raw read would save zones built on
-  // a number the engine will not use.
-  assert(
-    /rideLthr\s*=\s*m\.rideLthr\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'ride'\s*\}\)/.test(writerSrc),
-    'the bike anchor is being read raw by the writer',
-  );
-  assert(
-    /runLthr\s*=\s*m\.runLthr\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'run'\s*\}\)/.test(writerSrc),
-    'the run anchor is being read raw by the writer',
-  );
+Deno.test('the SCREEN reads no raw threshold column', () => {
   const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert(
     !/learnedFitness\?\.(run|ride)_threshold_hr\?\.value/.test(codeOnly),
@@ -132,9 +110,7 @@ Deno.test('the HR inputs show the SAME number the zones are built from', () => {
   assert(/value=\{side\?\.lthr\.value \?\? null\}/.test(baselinesSrc), 'the LTHR input carries its own chain again');
   assert(/value=\{side\?\.max_hr\.value \?\? null\}/.test(baselinesSrc), 'the max HR input carries its own chain again');
   assert(/resolveCurrentLthr\(baselinesLike, \{ sport \}\)/.test(readoutSrc), 'the readout threshold row left the resolver');
-  assert(/resolveCurrentLthr\(baselinesForHr, \{ sport: 'run' \}\)/.test(writerSrc), 'the zone writer left the resolver');
-  assert(/\{ sport, allowAgeEstimate: false \}/.test(readoutSrc), 'the readout max row takes an age estimate the zone writer refuses');
-  assert(/allowAgeEstimate: false/.test(writerSrc), 'the zone writer takes an age estimate');
+  assert(/\{ sport, allowAgeEstimate: false \}/.test(readoutSrc), 'the readout max row takes an age estimate');
   const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert(
     !/value=\{sport\.manual(LTHR|MaxHR)\s*\|\|/.test(codeOnly),

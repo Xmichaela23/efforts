@@ -1,4 +1,6 @@
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+import { maxHrBaselines } from './endurance/display-zones.ts';
 
 /**
  * WAS THIS RIDE ACTUALLY EASY — the heart-rate governor for an easy prescription.
@@ -42,11 +44,6 @@ export type RideEasyCeiling = {
   confidence: string | null;
 };
 
-const num = (v: unknown): number | null => {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) && n > 0 ? n : null;
-};
-
 /**
  * ⛔ THE BIKE ANCHOR NOW HAS AN OWNER (2026-08-20, TRUTH-MAP §5). This read `ride_threshold_hr` raw
  * with its own medium/high test — a private copy of the LTHR resolver's tier 1, minus the D-284
@@ -71,12 +68,19 @@ export function resolveRideEasyCeiling(learnedFitness: any, baselines?: unknown)
   if (lthr && (resolved.source === 'manual' || resolved.source === 'manual-chosen' || lthrConf === 'medium' || lthrConf === 'high')) {
     return { ceiling: Math.round(lthr * RIDE_EASY_CEILING_PCT_LTHR), anchor: 'threshold', confidence: lthrConf || null };
   }
-  const maxHr = num(learnedFitness?.ride_max_hr_observed?.value);
-  if (maxHr) {
+  /**
+   * ⛔ THE MAX THROUGH ITS OWNER (2026-09-26, Michael: "go"). This read `ride_max_hr_observed` raw, so a bike max the
+   * athlete TYPED (`configured_hr_zones.manual_ride_max_hr`) was invisible and a peak stated as measured from zero
+   * samples could set the ceiling. `resolveCurrentMaxHr` over `maxHrBaselines` — the object Baselines' max row and the
+   * zone tables read: typed, else the observed peak. No age estimate.
+   */
+  const cfg = (baselines as { configured_hr_zones?: unknown } | null | undefined)?.configured_hr_zones ?? null;
+  const max = resolveCurrentMaxHr(maxHrBaselines(learnedFitness, cfg), { sport: 'ride', allowAgeEstimate: false });
+  if (max.bpm != null) {
     return {
-      ceiling: Math.round(maxHr * RIDE_EASY_CEILING_PCT_MAXHR),
+      ceiling: Math.round(max.bpm * RIDE_EASY_CEILING_PCT_MAXHR),
       anchor: 'max_hr',
-      confidence: String(learnedFitness?.ride_max_hr_observed?.confidence ?? '') || null,
+      confidence: max.confidence,
     };
   }
   return { ceiling: null, anchor: 'none', confidence: null };

@@ -16,10 +16,11 @@ import {
   runEasyPaceEligible,
   MIN_EASY_PACE_IN_BAND_S,
   MIN_EASY_RUN_MINUTES,
-  runEasyZone3FloorBpm,
+  zone3FloorBpm,
 } from './easy-hr.ts';
 
-const lf = (o: Record<string, unknown>) => o;
+// The band takes the whole `user_baselines` row (2026-09-26); these fixtures are about the learned block.
+const lf = (o: Record<string, unknown>) => ({ learned_fitness: o });
 const metric = (value: number, confidence = 'high') => ({ value, confidence, sample_count: 5 });
 
 // The OLD gate, kept so every fixture can prove what it used to do.
@@ -111,7 +112,7 @@ Deno.test('LAW 3: the basis string names the anchor, so the receipt can be rende
 });
 
 Deno.test('MANUAL: an explicitly-entered threshold HR is honored when nothing is learned', () => {
-  const band = resolveRunEasyHrBand(lf({ run_max_hr_observed: metric(190) }), 160);
+  const band = resolveRunEasyHrBand({ learned_fitness: { run_max_hr_observed: metric(190) }, performance_numbers: { threshold_heart_rate: 160 } });
   assertEquals(band.anchor, 'lthr');            // manual threshold beats the %max bootstrap
   assertEquals(band.ceiling, Math.round(160 * EASY_CEILING_PCT_LTHR));
 });
@@ -122,7 +123,7 @@ Deno.test('THE DEAD PATH: `learned_fitness.running.threshold_hr` is NOT where th
   // the block never ran, and `pace_at_easy_hr` was null on 147 of 147 runs — which starved the D-033
   // reconciler's observed side. This fixture pins the real shape so the dead path cannot come back.
   const realShape = lf({ run_threshold_hr: metric(151, 'medium') });
-  assertEquals((realShape as any).running, undefined);          // the nested path: does not exist
+  assertEquals((realShape.learned_fitness as any).running, undefined); // the nested path: does not exist
   assertEquals(resolveRunEasyHrBand(realShape).anchor, 'lthr'); // the real path: resolves
 });
 
@@ -264,7 +265,7 @@ Deno.test('Q-171 REGRESSION: the analyzer Z3 floor and the easy ceiling cannot d
   // was Zone 2 on Details and NOT easy to the learner. Now the boundary IS the easy ceiling + 1.
   for (const lthr of [140, 145, 150, 151, 155, 160, 165, 170, 175]) {
     const band = resolveRunEasyHrBand(lf({ run_threshold_hr: metric(lthr, 'high') }));
-    const z3 = runEasyZone3FloorBpm(lthr);
+    const z3 = zone3FloorBpm(lthr);
     assertEquals(z3, (band.ceiling as number) + 1, `LTHR ${lthr}: Z3 floor must be one bpm above the easy ceiling`);
     // The invariant that matters: every HR below the Z3 floor (and above the band floor) is EASY, and the
     // first heartbeat of Zone 3 is NOT. No crack, at any LTHR.

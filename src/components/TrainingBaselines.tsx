@@ -303,10 +303,6 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [manualRunLTHR, setManualRunLTHR] = useState<number | null>(null);
   const [manualRideMaxHR, setManualRideMaxHR] = useState<number | null>(null);
   const [manualRideLTHR, setManualRideLTHR] = useState<number | null>(null);
-  const [configuredZonesSource, setConfiguredZonesSource] = useState<string | null>(null);
-  const [garminRestingHR, setGarminRestingHR] = useState<number | null>(null);
-  /** `configured_hr_zones` as the server saved it — the zone arrays the analysis bins on. */
-  const [storedZones, setStoredZones] = useState<Record<string, any> | null>(null);
 
   // Track initial manual HR state for change detection
   const [initialManualHR, setInitialManualHR] = useState('');
@@ -477,11 +473,6 @@ const loadBaselines = async () => {
           const cfg = typeof row.configured_hr_zones === 'string'
             ? JSON.parse(row.configured_hr_zones)
             : row.configured_hr_zones;
-          setConfiguredZonesSource(cfg.source || null);
-          setStoredZones(cfg);
-          if (cfg.resting_heart_rate && Number(cfg.resting_heart_rate) > 30) {
-            setGarminRestingHR(Number(cfg.resting_heart_rate));
-          }
           const rmx = cfg.manual_run_max_hr || null;
           const rlt = cfg.manual_run_lthr || null;
           const cmx = cfg.manual_ride_max_hr || null;
@@ -684,9 +675,9 @@ const persist = async (
      *
      * This block used to resolve each sport's anchors, build Friel or Karvonen zone tables (filling a
      * missing resting heart rate with 60) and write `configured_hr_zones` itself. `save-baselines` now
-     * resolves the anchors through the same resolvers, builds the tables with `hrZones` and saves them;
-     * it keeps the per-sport arrays and the unambiguous-scalar rule this block introduced (2026-08-20).
-     * Resting heart rate is sent only when the athlete typed or cleared it.
+     * stores the typed numbers and nothing derived from them (2026-09-26): every zone edge is
+     * `heartRateZoneSet`, worked out on the server at read time. Resting heart rate is sent only when the
+     * athlete typed or cleared it.
      */
     const heartRate: Record<string, number | null> = {
       manual_run_max_hr: m.runMax,
@@ -696,7 +687,6 @@ const persist = async (
       ...(((hr && hr.resting !== undefined) || customRestingHR) ? { resting_heart_rate: restingOverride } : {}),
     };
     const saved = await saveUserBaselines(dataToSave as any, heartRate, extras);
-    if (saved?.configured_hr_zones) setStoredZones(saved.configured_hr_zones);
     // Every save returns the readout rebuilt from the row it just wrote; paint that rather than ask again.
     applyZones(saved?.zones);
     void refreshZones();

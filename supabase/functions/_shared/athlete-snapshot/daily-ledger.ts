@@ -6,6 +6,8 @@
 // =============================================================================
 
 import { completedMovingSeconds } from '../moving-seconds.ts';
+// ⛔ ONE DRIFT (2026-09-26): `hr_drift_v1` in beats — the coach's easy-run drift and the cardiac trend read this ledger.
+import { hrDriftV1Bpm } from '../hr-drift-halves.ts';
 import { rirOffTarget, rirTargetFor, rirTargetText } from '../strength-grid/intents.ts';
 import type {
   LedgerDay,
@@ -287,10 +289,10 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
     // NEVER written by the analyzer (decoupling % isn't computed at all). The real cardiac
     // signal is HR DRIFT (bpm), stored nested. Read it from where it actually lives.
     decoupling_pct: Number(analysis?.decoupling_pct) || Number(computed?.decoupling_pct) || null, // decoupling % — absent today (Fork B later)
-    hr_drift_bpm: Number(analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm)
-      || Number(analysis?.detailed_analysis?.workout_summary?.hr_drift)
-      || Number(analysis?.heart_rate_summary?.drift_bpm)
-      || null,
+    // ⛔ THE ONE DRIFT, IN BEATS (2026-09-26, Michael: "go"): `hr_drift_v1` — second half's average heart rate minus
+    // the first's, by time, after the warm-up — the drift the Performance screen and State print. This read the
+    // analysers' early-window-vs-late-window `hr_drift_bpm` through three storage paths, and dropped a real 0.
+    hr_drift_bpm: hrDriftV1Bpm(analysis),
     strength_actual: strengthActual,
   };
 }

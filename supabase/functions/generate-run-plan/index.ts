@@ -39,11 +39,12 @@ import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { effectiveStrengthFrequency } from '../shared/strength-system/frequency-policy.ts';
 import { addTimingLogic } from './timing-logic.ts';
-import { resolveCurrentMaxHr, ageEstimateMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
+// ⛔ ONE ZONE TABLE AND ONE EASY RULE (2026-09-26): the run's zone set Baselines prints, and the run easy band.
+import { heartRateZoneSet, type HrZoneRow } from '../_shared/endurance/display-zones.ts';
+import { resolveRunEasyHrBand } from '../_shared/easy-hr.ts';
 // THE run-pace resolver (D-285/D-287) — the pace ladder here reads through it rather than off
 // `learned_fitness`, so this consumer cannot land on a different number from every other surface.
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import {
   calculateEffortScore,
   getPacesFromScore,
@@ -159,14 +160,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // E3a: resolve the athlete's HR/pace zone inputs the SAME WAY the baselines screen does
-    // (TrainingBaselines.tsx:1869-1875) — manual override → learned/observed → age-estimated → none.
+    // E3a: resolve the athlete's HR/pace zone inputs the SAME WAY the baselines screen does — for heart rate, the
+    // very table it prints (`heartRateZoneSet`: threshold → max → age-estimated → none).
     // The plan must use whatever baselines holds (incl. age-estimated zones the screen shows), not only
     // learned. Read-only; consumed only by the non-race (sustainable) prescription — performance_build
     // ignores these (uses effort_paces), so race plans are unaffected. See SPEC-e3a-nonrace-zones.md.
-    let zoneLthr: number | undefined;
-    let zoneMaxHr: number | undefined;
-    let zoneRestingHr: number | undefined;
+    /** The run's heart-rate zones as Baselines prints them (`heartRateZoneSet`), and the run easy band. */
+    let zoneHrRows: HrZoneRow[] | undefined;
+    let zoneEasyHr: { floor: number; ceiling: number } | undefined;
     let zoneVdot: number | undefined;
     /** The athlete's SELECTED easy pace, sec/mi — the anchor for prescribed pace and duration. */
     let zoneEasySecPerMi: number | undefined;
@@ -178,7 +179,7 @@ Deno.serve(async (req: Request) => {
       const { data: ubZones } = await sbZones
         .from('user_baselines')
         // `effort_paces` added 2026-08-19 — the wizard/VDOT tier of the pace resolvers. Same row, no extra query.
-        .select('performance_numbers, learned_fitness, configured_hr_zones, birthday, effort_paces')
+        .select('performance_numbers, learned_fitness, configured_hr_zones, birthday, gender, effort_paces')
         .eq('user_id', request.user_id)
         .maybeSingle();
       const parse = (v: unknown): Record<string, any> => {
@@ -188,44 +189,19 @@ Deno.serve(async (req: Request) => {
       };
       const pn = parse(ubZones?.performance_numbers);
       const lf = parse(ubZones?.learned_fitness);
-      const cfg = parse(ubZones?.configured_hr_zones); // manual overrides / Strava / FIT
       const ep = parse(ubZones?.effort_paces);
-      const num = (v: any): number | undefined => {
-        const n = Number(v?.value ?? v);
-        return Number.isFinite(n) && n > 0 ? n : undefined;
-      };
-      // Age-estimated tier — mirrors getAgeBasedHREstimates (maxHR = 220 − age, LTHR = round(maxHR × 0.88)).
-      let ageMaxHr: number | undefined;
-      let ageLthr: number | undefined;
-      // ⛔ ONE AGE RULE (2026-09-15): `ageFromBirthday`, beside the one age formula. This held its own
-      // copy of the year/month/day walk, the phone held two more, and `user_baselines.age` was a fourth.
-      const age = ageFromBirthday(ubZones?.birthday ? String(ubZones.birthday) : null, new Date().toISOString().slice(0, 10));
-      if (age != null) { ageMaxHr = ageEstimateMaxHr(age); ageLthr = Math.round(ageMaxHr * 0.88); } // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
-      // The resolution chain (manual → learned), via the ONE max-HR resolver; age fallback below.
-      zoneMaxHr = resolveCurrentMaxHr(
-        { athlete_config: cfg, learned_fitness: lf },
-        { sport: 'run', allowAgeEstimate: false },
-      ).bpm ?? ageMaxHr;
       /**
-       * ⛔ THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). This was a private chain —
-       * manual override, then the learned column, then an age formula — and it skipped the two
-       * checks that chain exists to apply:
-       *
-       *   · **the D-284 sample-count gate.** A learned `run_threshold_hr` written as "88% of observed
-       *     max (estimated)" carries `sample_count: 0`. It is a FORMULA, not a measurement, and the
-       *     resolver refuses it at both its learned tiers. This read took it and anchored every HR
-       *     zone in the marathon block on a number measured from nothing.
-       *   · **the athlete's Q-174 choice.** `lthr_source` was invisible here.
-       *
-       * ⚠️ THE AGE FALLBACK STAYS BELOW IT, and stays here rather than moving into the resolver. The
-       * resolver returns null over an estimate by design (Law 2 — it never invents); this file has
-       * always been willing to fall back to 220−age for zone shaping and says so. That is the
-       * caller's call to make, out loud, not a default to bury in a shared owner.
+       * ⛔ THE HEART-RATE TEXT READS THE ONE ZONE TABLE AND THE ONE EASY RULE (2026-09-26, Michael: "go"). This built
+       * its own anchors — the threshold with an age fallback of 0.88 × an age-formula max, a max from the resolver or
+       * the age formula, and a resting heart rate that defaulted to 60 — and handed them to a Friel-or-Karvonen table
+       * of its own. Now the plan prints the zones Baselines prints (`heartRateZoneSet`, handed the row whole: the
+       * threshold → Friel's zones; no threshold → % of max; then the age estimate) and, where its words describe easy
+       * running, the run easy band (`resolveRunEasyHrBand`) — the band every session is judged easy by.
        */
-      zoneLthr = resolveCurrentLthr({
-        learned_fitness: lf, performance_numbers: pn, configured_hr_zones: cfg,
-      } as never).bpm ?? ageLthr;
-      zoneRestingHr = num(pn.restingHeartRate) ?? num(pn.resting_hr) ?? num(cfg.resting_heart_rate) ?? 60;
+      const today = new Date().toISOString().slice(0, 10);
+      zoneHrRows = heartRateZoneSet(ubZones as never, 'run', { today })?.rows ?? undefined;
+      const easyBand = resolveRunEasyHrBand(ubZones as never);
+      if (easyBand.floor != null && easyBand.ceiling != null) zoneEasyHr = { floor: easyBand.floor, ceiling: easyBand.ceiling };
       /**
        * ⛔ THE ATHLETE'S SELECTED EASY PACE OUTRANKS EVERYTHING (2026-08-06, Michael's call).
        *
@@ -269,7 +245,7 @@ Deno.serve(async (req: Request) => {
       } else if (typeof effortScore === 'number' && effortScore > 0) {
         zoneVdot = effortScore;
       }
-      console.log(`[PlanGen] zone inputs (manual→learned→age): lthr=${zoneLthr ?? '-'} maxHR=${zoneMaxHr ?? '-'} restHR=${zoneRestingHr ?? '-'} vdot=${zoneVdot ?? '-'} easy=${zoneEasySecPerMi ?? '-'}s/mi`);
+      console.log(`[PlanGen] zone inputs: hr zones=${zoneHrRows ? zoneHrRows.map((r) => r.max ?? '+').join('/') : '-'} easy hr=${zoneEasyHr ? `${zoneEasyHr.floor}-${zoneEasyHr.ceiling}` : '-'} vdot=${zoneVdot ?? '-'} easy=${zoneEasySecPerMi ?? '-'}s/mi`);
     } catch (zErr) {
       console.warn('[PlanGen] zone-input fetch failed (non-fatal, RPE fallback):', zErr);
     }
@@ -278,9 +254,8 @@ Deno.serve(async (req: Request) => {
     const generatorParams = {
       distance: request.distance,
       fitness: request.fitness,
-      lthr: zoneLthr,
-      max_hr: zoneMaxHr,
-      resting_hr: zoneRestingHr,
+      hr_zone_rows: zoneHrRows,
+      easy_hr_band: zoneEasyHr,
       vdot: zoneVdot,
       easy_pace_sec_per_mi: zoneEasySecPerMi,   // the selection; outranks the VDOT for base pace + durations
       weekly_hours: request.weekly_hours,           // E3b — TOTAL time budget; engine reserves strength, sizes endurance

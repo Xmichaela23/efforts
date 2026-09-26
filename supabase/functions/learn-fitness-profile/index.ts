@@ -1007,9 +1007,12 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
   // Built from what THIS pass just learned (both are in scope: `threshold_hr` at :549-591,
   // `observedMaxHR` at :524) — so the band upgrades to the threshold anchor the moment a hard effort
   // is logged, and bootstraps off %max until then. Same shared definition every other surface uses.
+  // Only this pass's learned values, on purpose: the learner measures from runs; it does not borrow a typed number.
   const runEasyBand = resolveRunEasyHrBand({
-    run_threshold_hr: threshold_hr,
-    run_max_hr_observed: observedMaxHR != null ? { value: observedMaxHR, confidence: 'high' } : null,
+    learned_fitness: {
+      run_threshold_hr: threshold_hr,
+      run_max_hr_observed: observedMaxHR != null ? { value: observedMaxHR, confidence: 'high' } : null,
+    },
   });
   if (runEasyBand.ceiling != null) {
     const easyEfforts = runs.filter(r => {

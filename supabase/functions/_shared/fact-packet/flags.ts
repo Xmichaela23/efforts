@@ -7,7 +7,11 @@ function push(flags: FlagV1[], f: FlagV1) {
   flags.push(f);
 }
 
-export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
+/**
+ * @param opts.easyCeilingBpm the run easy rule's ceiling (`resolveRunEasyHrBand`, 2026-09-26) — "HR above aerobic"
+ *   means a work segment averaged above it. null → no heart-rate reading is claimed either way.
+ */
+export function generateFlagsV1(packet: FactPacketV1, opts?: { easyCeilingBpm?: number | null }): FlagV1[] {
   const flags: FlagV1[] = [];
 
   const segs = packet.facts.segments || [];
@@ -32,12 +36,17 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
         const intent = String((packet as any)?.facts?.plan?.week_intent || '').toLowerCase();
         const workoutType = String(packet.facts.workout_type || '').toLowerCase();
         const isRecovery = intent === 'recovery' || workoutType.includes('recovery') || workoutType.includes('easy');
-        // OURS — `generateFlagsV1` too fast for recovery = > 20 s/mi faster than the range with HR in Z3–Z5: no outside source
+        // OURS — `generateFlagsV1` too fast for recovery = > 20 s/mi faster than the range with HR above the easy ceiling: no outside source
         if (isRecovery && avgDev != null && avgDev < -20) {
           // Only treat "too fast for recovery" as a concern when HR indicates intensity drifted above aerobic.
           // If HR stayed aerobic, faster-than-range can be terrain/fitness-driven rather than "too hard".
-          const zones = work.map((s) => String(s.hr_zone || '')).filter(Boolean);
-          const hasHighZone = zones.some((z) => /^z[3-5]$/i.test(z));
+          // ⛔ ABOVE AEROBIC = ABOVE THE ONE EASY RULE'S CEILING (2026-09-26). It was a segment in Zone 3–5 of the
+          // packet's own five-zone table (75 / 85 / 92 / 98% of threshold, ours), a second easy top.
+          const easyCeiling = coerceNumber(opts?.easyCeilingBpm);
+          const hasHighZone = easyCeiling != null && work.some((s) => {
+            const hr = coerceNumber(s.avg_hr);
+            return hr != null && hr > easyCeiling;
+          });
           if (hasHighZone) {
             push(flags, {
               type: 'concern',

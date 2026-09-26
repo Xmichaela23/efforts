@@ -28,7 +28,6 @@ Deno.test('same date, run then ride: the ride reads the RIDE facts, not the run\
   const ride = idx.get(RIDE_ID)!;
   assertEquals(ride.efficiency, 1.11);
   assertEquals(ride.hr, 134);
-  assertEquals(ride.drift, -7.2);
 });
 
 Deno.test('same date, ride then run: order of rows cannot change the answer', () => {
@@ -50,9 +49,9 @@ Deno.test('a row with neither sport\'s facts, or no workout_id, is skipped', () 
   assertEquals(idx.size, 0);
 });
 
-Deno.test('negative drift is kept; zero or missing heart rate and efficiency read as null', () => {
+Deno.test('zero or missing heart rate and efficiency read as null; no drift copy rides along (2026-09-26)', () => {
   const r = readEnduranceFact({ workout_id: 'y', ride_facts: { hr_drift_pct: -4.4, avg_hr: 0, efficiency_factor: null } })!;
-  assertEquals(r.drift, -4.4);
+  assertEquals('drift' in r, false); // State's drift is `driftReadForPoint` (hr_drift_v1), never this row's copy
   assertEquals(r.hr, null);
   assertEquals(r.efficiency, null);
 });

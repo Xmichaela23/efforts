@@ -80,3 +80,53 @@ export function hrDriftHalvesPct(
     method: 'halves_by_time',
   };
 }
+
+const parseJson = (v: unknown): any => {
+  if (typeof v !== 'string') return v ?? null;
+  try { return JSON.parse(v); } catch { return null; }
+};
+
+/** A stored `hr_drift_v1` as read back: the object when its `pct` is a number, else null. */
+function storedDrift(v: unknown): HrDriftHalves | null {
+  const d = v as HrDriftHalves | null | undefined;
+  return d && typeof d.pct === 'number' && Number.isFinite(d.pct) ? d : null;
+}
+
+/**
+ * ⛔ THE ONE DRIFT, FOR A READER THAT IS NOT THE ANALYSER (2026-09-26, Michael: "go"). `compute-facts` halved the
+ * samples by COUNT with no warm-up skip — a second drift beside this one, and the one the "Bike HR drift trending
+ * higher" signal read. This returns the analyser's stored `hr_drift_v1` whenever the analysis carries the key (the
+ * number the Performance screen prints, null included), else the same measure worked out here from the inputs the
+ * analysers hand it — the samples, the moving time, the planned warm-up. `compute-facts` runs before the analyser
+ * on a first ingest, which is the only time the key is missing on a session analysed since 2026-09-03.
+ */
+export function sessionHrDriftV1(w: {
+  workout_analysis?: unknown;
+  sensor_data?: unknown;
+  computed?: unknown;
+  moving_time?: unknown;
+  duration?: unknown;
+}): HrDriftHalves | null {
+  const wa = parseJson(w?.workout_analysis);
+  if (wa && typeof wa === 'object' && 'hr_drift_v1' in wa) return storedDrift(wa.hr_drift_v1);
+  const sd = parseJson(w?.sensor_data);
+  const samples = Array.isArray(sd?.samples) ? sd.samples : Array.isArray(sd) ? sd : [];
+  const totalS = Number(w?.moving_time ?? w?.duration ?? 0);
+  try {
+    return hrDriftHalvesPct(samples, totalS > 0 && totalS < 1000 ? totalS * 60 : totalS, {
+      skipStartS: warmupSkipSeconds(parseJson(w?.computed)),
+    });
+  } catch { return null; }
+}
+
+/**
+ * The same drift in BEATS — the second half's average heart rate minus the first half's, from `hr_drift_v1` — for the
+ * readers that speak bpm: the coach's weekly drift reads and the daily ledger (2026-09-26). They read the analysers'
+ * early-window-vs-late-window `heart_rate_analysis.hr_drift_bpm`, a second drift. null when the analysis carries no
+ * `hr_drift_v1` (a session analysed before 2026-09-03, or one too short to split).
+ */
+export function hrDriftV1Bpm(workoutAnalysis: unknown): number | null {
+  const d = storedDrift(parseJson(workoutAnalysis)?.hr_drift_v1);
+  if (!d || !Number.isFinite(d.first_avg_hr) || !Number.isFinite(d.second_avg_hr)) return null;
+  return d.second_avg_hr - d.first_avg_hr;
+}

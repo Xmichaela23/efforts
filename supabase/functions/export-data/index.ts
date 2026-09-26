@@ -319,7 +319,12 @@ function profileJson(ub: Row | null, exportedAt: string): string {
       easy_pace: withSource(pn.easyPace),
       resting_hr: fromRow(readout.run.resting_hr),
     },
-    zones: ub?.configured_hr_zones ?? null,
+    // ⛔ THE ZONE TABLES BASELINES PRINTS (2026-09-26, Michael: "go"): each sport's `heartRateZoneSet`, through the
+    // readout above — not the raw `configured_hr_zones` object (Strava's stored table and arrays nothing reads).
+    zones: {
+      run: { rows: readout.run.zones.rows, basis: readout.run.zones.basis || null, estimate: readout.run.zones.estimate },
+      bike: { rows: readout.bike.zones.rows, basis: readout.bike.zones.basis || null, estimate: readout.bike.zones.estimate },
+    },
     effort_paces: ub?.effort_paces ? { value: ub.effort_paces, source: ub.effort_paces_source ?? 'calculated' } : null,
     exported_at: exportedAt,
   };

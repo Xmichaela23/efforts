@@ -88,9 +88,9 @@ type Reason =
   /** The fact has no resolver for THIS sport yet, so there is nowhere to route it. Blocked, not owed. */
   | 'no-owner'
   /**
-   * ⛔ NOT A READ AT ALL — the column name is an OUTPUT KEY. `calculate-workload:554` echoes the
-   * resolved anchors back in a debug payload under the same names it would have read them from. The
-   * lint matches a name, not a direction; listed rather than silenced so the count stays honest.
+   * ⛔ NOT A READ AT ALL — the column name is an OUTPUT KEY. `calculate-workload` echoed the resolved
+   * anchors back in a debug payload under the same names it would have read them from, until 2026-09-26.
+   * The lint matches a name, not a direction; listed rather than silenced so the count stays honest.
    */
   | 'output-key'
   /**
@@ -123,8 +123,8 @@ type Reason =
  * `unreviewed` are work, and the count of them is the honest measure of how far this is from done.
  */
 const LEDGER: Record<string, Reason> = {
-  // Echoes the RESOLVED anchors back in a debug payload; both sports resolve through the owner now.
-  'lthr::supabase/functions/calculate-workload/index.ts': 'output-key',
+  // (2026-09-26) `lthr::calculate-workload` is paid off: its debug payload no longer echoes the per-sport
+  // thresholds under their column names — the one threshold the load used is `threshold_heart_rate`.
   // ── run easy pace ────────────────────────────────────────────────────────
   'run easy pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
   'run easy pace::supabase/functions/generate-combined-plan/index.ts': 'reconciler-input',

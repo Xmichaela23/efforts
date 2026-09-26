@@ -9,14 +9,13 @@ import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 // The zone tables Baselines / Profile print, and the one rule a session's time in zone is counted by.
 import {
   heartRateZoneSet,
-  hrZoneSetFromAnchor,
   hrZoneSport,
   powerZoneRows,
   powerZoneTopsW,
+  sessionHrZoneSet,
   timeInZones,
 } from '../_shared/endurance/display-zones.ts';
 import { cumulativeFlatMeters, cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
@@ -1417,20 +1416,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     if (!hrSet) {
       /**
        * No threshold, no max heart rate and no birthday on file — Baselines prints no zones. The session keeps
-       * the analysis's old last resort, % of max from this session's own numbers: the watch file's max, else
-       * this session's peak ÷ `PEAK_TO_MAX`, else 180. Stored as `max-hr-session`, flagged an estimate.
+       * the analysis's old last resort, % of max from this session's own numbers (`sessionHrZoneSet`, the one copy
+       * the run debrief reads too): the watch file's max, else this session's peak ÷ `PEAK_TO_MAX`, else 180.
        */
-      const hrVals: number[] = [];
-      for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0) hrVals.push(v);
+      let peak: number | null = null;
+      for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0 && (peak == null || v > peak)) peak = v;
       const fitMax = Number.isFinite((w as any)?.default_max_heart_rate) ? Number((w as any).default_max_heart_rate) : null;
-      const sessionMax = resolveCurrentMaxHr({}, {
-        sport,
-        deviceMaxHr: fitMax && fitMax > 100 ? fitMax : null,
-        observedSessionPeak: hrVals.length > 0 ? Math.max(...hrVals) : null,
-        allowAgeEstimate: false,
-      });
-      // OURS — the historical 180 bpm floor when a session carries no max of its own (kept as found)
-      hrSet = hrZoneSetFromAnchor('max-hr-session', sessionMax.bpm ?? 180, zoneSport);
+      hrSet = sessionHrZoneSet(zoneSport, { deviceMaxHr: fitMax, peakBpm: peak });
     }
     const hrSecs = timeInZones(hr_bpm, time_s, hrSet.tops);
     if (hrSecs) {

@@ -2,7 +2,7 @@
 // Run: ~/.deno/bin/deno test --allow-read --no-check supabase/functions/_shared/endurance/endurance-parity.test.ts
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
-import { frielZones, karvonenZones } from './hr-zones.ts';
+import { frielZones } from './hr-zones.ts';
 import { frielRunZones } from '../../../../src/lib/friel-zones.ts';
 import { paceZonesFromVdot } from './pace-zones.ts';
 import { longRunMilesForWeek as sharedLongRun, longRunFloorMiles as sharedFloor, longRunPeakTarget } from './volume.ts';
@@ -27,9 +27,6 @@ Deno.test('PARITY: HR zones — ONE Friel table (D-286): the server zones ARE fr
     const one = frielRunZones(lthr);
     for (let i = 0; i < 5; i++) { assertEquals(zz[i].min, one[i].min); assertEquals(zz[i].max, one[i].max); }
   }
-  const k = karvonenZones(180, 50); // hrr 130
-  assertEquals(k[3].max, Math.round(50 + 130 * 0.90)); // Z4
-  assertEquals(k[4].max, 180);
 });
 
 // ── PARITY 2 — pace zones vs effort-score getPacesFromScore (base/steady/power/speed) ──

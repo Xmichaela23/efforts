@@ -2,11 +2,12 @@
  * HR Zone Distribution Calculator
  * 
  * Calculates time spent in each HR zone.
- * Uses user-defined zones if available, otherwise estimates from max HR.
+ * Uses the athlete's zone set (the zones Baselines prints) when there is one, otherwise the session's own
+ * last resort — the same one the analysis counts every session's time in zone on (`sessionHrZoneSet`).
  */
 
 import { SensorSample, ZoneDistribution, ZoneTime } from './types.ts';
-import { PEAK_TO_MAX } from '../../../../../src/lib/resolve-current-max-hr.ts';
+import { sessionHrZoneSet } from '../../../_shared/endurance/display-zones.ts';
 
 interface HRZones {
   z1Max: number;  // Recovery ceiling
@@ -16,23 +17,16 @@ interface HRZones {
   z5Max: number;  // VO2max ceiling (effectively max HR)
 }
 
-// Default zone percentages of max HR (if no custom zones provided)
-// OURS — `DEFAULT_ZONE_PERCENTAGES` 60/70/80/90/100% of max heart rate when no zones are set; no source in the repo (TRUTH-MAP §8.1 row 20b lists the %HRmax set as no source); kept as found
-const DEFAULT_ZONE_PERCENTAGES = {
-  z1Max: 0.60,  // Recovery: <60% max HR
-  z2Max: 0.70,  // Aerobic: 60-70% max HR
-  z3Max: 0.80,  // Tempo: 70-80% max HR
-  z4Max: 0.90,  // Threshold: 80-90% max HR
-  z5Max: 1.00   // VO2max: 90-100% max HR
-};
-
 /**
  * Calculate zone distribution from HR samples.
+ *
+ * @param deviceMaxHr the watch file's own max heart rate, for the session fallback (see `estimateZonesFromSamples`).
  */
 export function calculateZoneDistribution(
   validHRSamples: SensorSample[],
   customZones?: HRZones,
-  workoutIntent?: string
+  workoutIntent?: string,
+  deviceMaxHr?: number | null,
 ): ZoneDistribution {
   if (validHRSamples.length === 0) {
     return {
@@ -45,7 +39,7 @@ export function calculateZoneDistribution(
   }
   
   // Determine zones to use
-  const zones = customZones || estimateZonesFromSamples(validHRSamples);
+  const zones = customZones || estimateZonesFromSamples(validHRSamples, deviceMaxHr);
   
   // Count time in each zone (assuming ~1 sample/second)
   const zoneCounts = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
@@ -132,26 +126,21 @@ export function calculateZoneDistribution(
 }
 
 /**
- * Estimate HR zones from the workout's HR data.
- * Uses max HR observed + typical zone percentages.
+ * ⛔ THE SESSION'S OWN LAST RESORT IS THE ANALYSIS'S (2026-09-26, Michael: "go"). With no zone set on file (no
+ * threshold, no max heart rate, no birthday), this estimated its own: 60/70/80/90% of a max it took as the session's
+ * peak ÷ 0.95, or 180 when the peak was under 150 — ours, and not the fallback `compute-workout-analysis` counts the
+ * same session on. Now `sessionHrZoneSet` (`_shared/endurance/display-zones.ts`): the watch file's max, else the peak ÷
+ * `PEAK_TO_MAX`, else 180, on the %-of-max table. Its first four zone tops are this debrief's `z1Max`…`z4Max`, the rule
+ * `hrZonesFromBaseline` already applies to the athlete's own set.
  */
-function estimateZonesFromSamples(samples: SensorSample[]): HRZones {
-  const hrValues = samples.map(s => s.heart_rate!);
-  const maxHR = Math.max(...hrValues);
-  
-  // If max HR seems too low (probably didn't hit max), estimate higher.
-  // ONE divisor (PEAK_TO_MAX, resolve-current-max-hr.ts) so this and the compute-workout-analysis
-  // %HRmax path stop producing two different maxes from the same session peak (audit 2026-07-17 #5).
-  // OURS — a session peak under 150 bpm stands in 180 as max; no source (TRUTH-MAP §8.1 row 20b); kept as found
-  const estimatedMaxHR = maxHR < 150 ? 180 : Math.round(maxHR / PEAK_TO_MAX);
-  
-  return {
-    z1Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z1Max),
-    z2Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z2Max),
-    z3Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z3Max),
-    z4Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z4Max),
-    z5Max: Math.round(estimatedMaxHR * DEFAULT_ZONE_PERCENTAGES.z5Max)
-  };
+function estimateZonesFromSamples(samples: SensorSample[], deviceMaxHr?: number | null): HRZones {
+  let peak: number | null = null;
+  for (const s of samples) {
+    const hr = Number(s.heart_rate);
+    if (Number.isFinite(hr) && hr > 0 && (peak == null || hr > peak)) peak = hr;
+  }
+  const tops = sessionHrZoneSet('run', { deviceMaxHr: deviceMaxHr ?? null, peakBpm: peak }).tops;
+  return { z1Max: tops[0], z2Max: tops[1], z3Max: tops[2], z4Max: tops[3], z5Max: 999 };
 }
 
 /**

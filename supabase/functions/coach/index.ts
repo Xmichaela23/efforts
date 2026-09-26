@@ -38,6 +38,8 @@ import { isLowTrustWorkload } from '../_shared/workload.ts';
 import { reconcileLoadStatus } from '../_shared/load-status-reconcile.ts';
 import { resolveCurrentFtp, ftpSourceWord } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+// ⛔ ONE DRIFT (2026-09-26): `hr_drift_v1` — halves by time after the warm-up — in percent, or in beats for the bpm reads.
+import { hrDriftV1Bpm } from '../_shared/hr-drift-halves.ts';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, runThresholdSourceWord, formatRunPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolvePlanPhaseDetailed, phaseNameToWeekIntent, type PhaseSource } from '../_shared/plan-phase.ts';
@@ -1195,19 +1197,15 @@ Deno.serve(async (req) => {
       }
     };
 
+    /**
+     * ⛔ THE ONE DRIFT, IN BEATS (2026-09-26, Michael: "go"). This read the analyser's early-window-vs-late-window
+     * `heart_rate_analysis.hr_drift_bpm` through four storage paths — a second drift beside the one the Performance
+     * screen and State print. Now `hr_drift_v1` (second half's average heart rate minus the first's, by time, after the
+     * warm-up), in beats because every reader of this helper speaks bpm. A run analysed before 2026-09-03 carries none.
+     */
     const driftBpmFromWorkout = (wAny: any): number | null => {
       try {
-        // Prefer analyzer's terrain/weather-adjusted drift (same value the narrative references).
-        // Falls back through older storage paths for pre-migration workouts.
-        const wa = parseJson(wAny?.workout_analysis) || {};
-        const v =
-          wa?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??
-          wa?.heart_rate_summary?.drift_bpm ??
-          wa?.detailed_analysis?.workout_summary?.hr_drift ??
-          wa?.heart_rate_analysis?.hr_drift_bpm ??
-          null;
-        const n = safeNum(v);
-        return n;
+        return hrDriftV1Bpm(wAny?.workout_analysis);
       } catch {
         return null;
       }
@@ -1558,16 +1556,13 @@ Deno.serve(async (req) => {
         const pa = safeNum(wa?.adherence_analysis?.power_adherence);
         if (pa != null) rideAgg[rt].powerAdh.push(pa);
         const facts = wa?.fact_packet_v1?.facts || {};
-        // hr_drift_pct: cycling stores it on ride_facts (compute-facts) but the analyzer
-        // also surfaces it as `hr_drift_bpm + early_avg_hr` on heart_rate_analysis. Compute
-        // the % the same way analyze-cycling-workout's adherence_summary does (Tier 3 item 7).
-        const hra = wa?.granular_analysis?.heart_rate_analysis || {};
-        const driftBpm = safeNum(hra?.hr_drift_bpm);
-        const earlyAvg = safeNum(hra?.early_avg_hr);
+        // ⛔ THE ONE DRIFT (2026-09-26): the ride's `hr_drift_v1.pct` — the number its Performance screen prints. This
+        // divided the analyser's early-window-vs-late-window `hr_drift_bpm` by `early_avg_hr`, a second drift.
         // 2026-09-04: the 90%-FTP "ridden hard" gate is gone (a zone boundary used as a filter — D-372's
         // rule); every ride with a drift read contributes. Drift reports; it does not decide which rides count.
-        if (driftBpm != null && earlyAvg != null && earlyAvg > 0) {
-          rideAgg[rt].driftPct.push((driftBpm / earlyAvg) * 100);
+        const ridePct = safeNum(wa?.hr_drift_v1?.pct);
+        if (ridePct != null) {
+          rideAgg[rt].driftPct.push(ridePct);
         }
         const ifv = safeNum(facts.intensity_factor);
         if (ifv != null) rideAgg[rt].ifs.push(ifv);
@@ -2066,7 +2061,9 @@ Deno.serve(async (req) => {
     // D-lthr-one-anchor (audit 2026-07-17): route the RUN LTHR through the ONE resolver too — learned-first,
     // sample_count-gated, honours the athlete's choice — the SAME bpm the zone bins and easy band use. Was a
     // local learned-only read with no gate. No-learned athlete → typed value, unchanged for the primary user.
-    const lthrForBins = resolveCurrentLthr({ learned_fitness: learnedFitness, performance_numbers: arc.performance_numbers } as any)?.bpm ?? null;
+    // ⛔ THE WHOLE ROW (2026-09-26): the typed run threshold lives in `configured_hr_zones` (fetched above) and was
+    // invisible to the per-domain bins and the easy-run drift gate below.
+    const lthrForBins = resolveCurrentLthr({ learned_fitness: learnedFitness, performance_numbers: arc.performance_numbers, configured_hr_zones: configuredHrZones } as any, { sport: 'run' })?.bpm ?? null;
     const perDomainSessions: SliceSession[] = completedRolling.map((r: any) => ({
       date: String(r?.date),
       type: String(r?.type || ''),
@@ -3826,10 +3823,10 @@ Deno.serve(async (req) => {
         // column's `confidence` judged a value the coach may not even be using: it ignored the
         // athlete's Q-174 choice and the D-284 sample-count gate, so a formula-derived LTHR with
         // `sample_count: 0` could report `high` and clear the thin check.
-        // Only `learned_fitness` is in scope here (`arc.learned_fitness`, :1859) — the same input the
-        // raw read had. The typed/configured tiers stay dark, exactly as before; what is GAINED is the
-        // sample-count gate and one normalisation of the confidence string.
-        const _lthrResolved = resolveCurrentLthr({ learned_fitness: learnedFitness } as never);
+        // ⛔ THE WHOLE ROW (2026-09-26): `performance_numbers` and `configured_hr_zones` too, so the athlete's choice and
+        // a typed threshold reach this read as they reach every other. A typed threshold carries no confidence, so it
+        // reads as thin here — it describes, it never solo-escalates.
+        const _lthrResolved = resolveCurrentLthr({ learned_fitness: learnedFitness, performance_numbers: arc.performance_numbers, configured_hr_zones: configuredHrZones } as never, { sport: 'run' });
         const anchorThin = _lthrResolved.confidence !== 'medium' && _lthrResolved.confidence !== 'high';
         // This week's easy runs → mean HR drift, gate-filtered per-session (intent-easy proxy =
         // below-threshold HR; non-negative drift) BEFORE the mean, so it inherits the gate's honesty.

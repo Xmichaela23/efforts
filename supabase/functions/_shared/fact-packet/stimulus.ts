@@ -44,7 +44,16 @@ export function assessStimulus(
   workoutIntent: string,
   segments: WorkoutSegmentV1[],
   zones: HrZone[] | null,
-  planned: { planned_duration_min?: number | null; interval_count?: number | null } | null
+  planned: {
+    planned_duration_min?: number | null;
+    interval_count?: number | null;
+    /**
+     * The run easy rule's ceiling (`resolveRunEasyHrBand`, 2026-09-26) — the top of an EASY run's target range.
+     * It was the zone table's Zone 2 top, which is the same beat on a threshold and a different one (70% of max,
+     * not the rule's 80%) on a max heart rate: two easy tops for one athlete.
+     */
+    easy_ceiling_bpm?: number | null;
+  } | null
 ): StimulusAssessmentV1 | null {
   const intent = String(workoutIntent || 'unknown').toLowerCase();
   const evidence: string[] = [];
@@ -74,11 +83,13 @@ export function assessStimulus(
   if (intent === 'easy' || intent === 'long_run') {
     if (durationHit && totalDurMin != null) evidence.push(`Duration ${Math.round(totalDurMin)}min${durationTarget ? ` (~${Math.round((totalDurMin / durationTarget) * 100)}% of target)` : ''}`);
 
+    const easyCeiling = coerceNumber(planned?.easy_ceiling_bpm);
     if (zs && zs.length) {
       const z1 = zoneBounds(zs, 'Z1');
       const z2 = zoneBounds(zs, 'Z2');
       const z3 = zoneBounds(zs, 'Z3');
-      const ceiling = intent === 'long_run' ? (z3?.max ?? z2?.max) : (z2?.max ?? z1?.max);
+      // An easy run's top is the one easy rule's; a long run's allows Zone 3, read off the zone table.
+      const ceiling = intent === 'long_run' ? (z3?.max ?? z2?.max) : easyCeiling;
       const floor = z1?.min ?? 0;
       if (ceiling != null && floor != null && ceiling > 0) {
         const pct = pctInHrRange(floor, ceiling);

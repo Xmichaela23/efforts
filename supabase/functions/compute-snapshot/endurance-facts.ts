@@ -29,11 +29,13 @@ export interface EnduranceFactRow {
   ride_facts?: Record<string, any> | null;
 }
 
+/**
+ * ⚠️ NO DRIFT HERE (2026-09-26). This read carried `run_facts / ride_facts.hr_drift_pct` as `drift`, and nothing read
+ * it: every State point takes its drift from `driftReadForPoint` (the Performance screen's rule, `hr_drift_v1`).
+ */
 export interface EnduranceFactRead {
   /** Output per heartbeat, as stored (run: m/s per beat; ride: W per beat). */
   efficiency: number | null;
-  /** Whole-session heart-rate drift %, as stored. May legitimately be NEGATIVE (heart rate fell). */
-  drift: number | null;
   /** Average heart rate, bpm. */
   hr: number | null;
 }
@@ -45,12 +47,9 @@ export function readEnduranceFact(row: EnduranceFactRow | null | undefined): End
   if (!rf && !bf) return null;
   const isRun = !!rf;
   const eff = Number(isRun ? rf!.efficiency_index : bf!.efficiency_factor);
-  const drift = Number(isRun ? rf!.hr_drift_pct : bf!.hr_drift_pct);
   const hr = Number(isRun ? rf!.hr_avg : bf!.avg_hr);
   return {
     efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
-    // ⚠️ Finiteness alone — a `> 0` test would silently drop the sessions where heart rate fell.
-    drift: Number.isFinite(drift) ? drift : null,
     hr: Number.isFinite(hr) && hr > 0 ? hr : null,
   };
 }

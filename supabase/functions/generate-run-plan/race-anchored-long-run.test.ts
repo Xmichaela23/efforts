@@ -10,6 +10,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { SustainableGenerator } from './generators/sustainable.ts';
+import { hrZoneSetFromAnchor } from '../_shared/endurance/display-zones.ts';
 
 type Sess = { name?: string; description?: string; tags?: string[]; duration?: number };
 type Plan = { sessions_by_week: Record<string, Sess[]>; description?: string };
@@ -131,7 +132,7 @@ Deno.test('⛔ THE BLOCK OPENS AT ITS ASSUMED BASE — 25, not the athlete\'s 19
 });
 
 Deno.test('sessions print PACE when a VDOT is on file, and RPE wording when it is not', () => {
-  const withPace = build({ vdot: 38, lthr: 160 });
+  const withPace = build({ vdot: 38, hr_zone_rows: hrZoneSetFromAnchor('friel-run', 160, 'run').rows });
   const d = (withPace.sessions_by_week['1'] ?? []).find((s) => (s.tags ?? []).includes('long_run'))?.description ?? '';
   assert(/\/mi/.test(d), `expected a pace target with a VDOT on file: ${d}`);
   assert(/Z2 aerobic/.test(d), `expected the zone-led wording: ${d}`);

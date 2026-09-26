@@ -67,11 +67,6 @@ export function zone3FloorBpm(lthr: number): number {
   return easyCeilingBpm(lthr) + 1;
 }
 
-/** The floor of the easy band (below = walking / stopped / broken strap). */
-export function easyFloorBpm(lthr: number): number {
-  return Math.round(lthr * EASY_FLOOR_PCT_LTHR);
-}
-
 export interface FrielZone {
   name: 'Z1' | 'Z2' | 'Z3' | 'Z4' | 'Z5';
   label: string;

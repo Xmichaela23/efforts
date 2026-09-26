@@ -46,11 +46,13 @@ const athlete = () => [
 
 Deno.test('THE BAND: an undetected threshold HR does not set the easy ceiling', () => {
   const band = resolveRunEasyHrBand({
-    run_threshold_hr: {
-      value: 146, confidence: 'low', sample_count: 18, is_estimate: true,
-      source: '95th percentile of sustained efforts (no clear threshold data)',
+    learned_fitness: {
+      run_threshold_hr: {
+        value: 146, confidence: 'low', sample_count: 18, is_estimate: true,
+        source: '95th percentile of sustained efforts (no clear threshold data)',
+      },
+      run_max_hr_observed: { value: 174, confidence: 'high', sample_count: 25 },
     },
-    run_max_hr_observed: { value: 174, confidence: 'high', sample_count: 25 },
   } as never);
   assertEquals(band.anchor, 'max_hr', 'an undetected threshold HR still anchored the band');
   assertEquals(band.ceiling, Math.round(174 * 0.80));   // 139 — captures runs at 133-141

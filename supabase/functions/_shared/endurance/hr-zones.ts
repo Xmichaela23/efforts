@@ -1,8 +1,8 @@
-// Shared endurance model — HR zones. LIFTED FAITHFULLY from src/components/TrainingBaselines.tsx
-// (getFrielZones / getKarvonenZones / getHRZones / getZoneModel). Two-copy-with-parity-lock: the
-// client computes these for display; this copy is for server-side plan prescription. The parity test
-// keeps the two in lockstep (a true single-home unify is deferred — client and edge are separate
-// build contexts). Friel %LTHR (Garmin / TrainingPeaks) + Karvonen %HRR. See SPEC-shared-endurance-model.md.
+// Shared endurance model — HR zones. Friel %LTHR, five zones, delegated to the ONE model (`src/lib/friel-zones.ts`).
+// ⛔ ONLY `frielZones` IS LEFT (2026-09-26, Michael: "go"): the Karvonen table and the Friel-or-Karvonen picker
+// (`hrZones`) had two readers — the run plan's heart-rate text and the zone arrays `save-baselines` stored — and both
+// now read the zone table Baselines prints (`endurance/display-zones.ts` `heartRateZoneSet`); `hrZoneModel` had none.
+// `frielZones` still gives `materialize-plan` the easy step's Zone 2 range.
 
 import { frielRunZones } from '../../../../src/lib/friel-zones.ts';
 
@@ -23,33 +23,4 @@ export interface HRZone {
  */
 export function frielZones(lthr: number): HRZone[] {
   return frielRunZones(lthr).map((z) => ({ name: z.name, label: z.label, min: z.min, max: z.max }));
-}
-
-/** Karvonen %HRR model (uses Max HR + Resting HR). */
-export function karvonenZones(maxHR: number, restingHR: number): HRZone[] {
-  const hrr = maxHR - restingHR;
-  const z = (pct: number) => Math.round(restingHR + hrr * pct);
-  return [
-    // FIELD — Karvonen heart-rate reserve formula; OURS — `karvonenZones` 60 / 70 / 80 / 90% HRR band edges, no printed source
-    { name: 'Z1', label: 'Recovery',  min: 0,       max: z(0.60) },
-    { name: 'Z2', label: 'Aerobic',   min: z(0.60), max: z(0.70) },
-    { name: 'Z3', label: 'Tempo',     min: z(0.70), max: z(0.80) },
-    { name: 'Z4', label: 'Threshold', min: z(0.80), max: z(0.90) },
-    { name: 'Z5', label: 'VO2max',    min: z(0.90), max: maxHR },
-  ];
-}
-
-/** Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR) if resting HR known. */
-export function hrZones(lthr: number | null, maxHR: number | null, restingHR: number | null): HRZone[] | null {
-  // OURS — `hrZones` LTHR and max HR must be > 100 bpm, resting HR > 30 bpm: plausibility floors, no outside source
-  if (lthr && lthr > 100) return frielZones(lthr);
-  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return karvonenZones(maxHR, restingHR);
-  return null;
-}
-
-export function hrZoneModel(lthr: number | null, maxHR: number | null, restingHR: number | null): string {
-  if (lthr && lthr > 100) return 'Friel %LTHR';
-  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return 'Karvonen %HRR';
-  if (maxHR && maxHR > 100) return 'needs Resting HR';
-  return '';
 }

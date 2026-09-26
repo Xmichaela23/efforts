@@ -17,6 +17,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { extractWarmupEasy } from "../_shared/run-warmup-easy.ts";
+// ⛔ ONE DRIFT (2026-09-26): `hr_drift_v1`, the analysers' halves-by-time measure, read back or worked out the same way.
+import { sessionHrDriftV1 } from "../_shared/hr-drift-halves.ts";
 import { paceToGAP } from "../_shared/gap.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -28,6 +30,7 @@ import {
   calculateDurationWorkload,
   getStepsIntensity,
   mapRPEToIntensity,
+  sessionLoadThresholdHr,
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
 // ⛔ ONE FORMULA FOR THE WHOLE APP (D-339). The client's baseline test imports this same module, so
@@ -83,6 +86,8 @@ interface WorkoutRow {
   distance: number | null;
   avg_heart_rate: number | null;
   max_heart_rate: number | null;
+  /** The watch file's own threshold (FIT profile) — the LOWEST tier of the threshold owner, never the first. */
+  threshold_heart_rate?: number | null;
   avg_pace: number | null;
   avg_power: number | null;
   max_power: number | null;
@@ -121,6 +126,8 @@ interface PlannedRow {
 interface Baselines {
   performance_numbers: Record<string, any> | null;
   learned_fitness: Record<string, any> | null;
+  /** Where a TYPED run / ride threshold and max live — handed to the owners with the rest of the row (2026-09-26). */
+  configured_hr_zones?: Record<string, any> | null;
   /** ⛔ The BIRTHDAY, not `age` — the stored age column was written once and never refreshed (2026-09-15). */
   birthday: string | null;
 }
@@ -725,7 +732,8 @@ async function upsertTerrainIntelligence(
       avg_pace_s_per_km: segPaceSecPerKm,
       grade_adjusted_pace_s_per_km: gradeAdjusted,
       vam_m_per_h: vam,
-      hr_drift_pct: toNum(runFacts?.hr_drift_pct),
+      // ⛔ No `hr_drift_pct` copy (2026-09-26): nothing reads it off this table (grep of every select); the one drift
+      // is `workout_analysis.hr_drift_v1`. The column stays until a migration drops it.
       effort_score: effortScore,
       confidence_score: matchConfidence,
     });
@@ -815,11 +823,6 @@ async function upsertRouteIntelligence(
       ? Math.round((paceSecPerKm * (avgHr / refHr)) * 10) / 10
       : null,
   );
-  const consistency = (() => {
-    const drift = toNum(runFacts?.hr_drift_pct);
-    if (drift == null) return null;
-    return Math.max(0, Math.min(100, Math.round(100 - Math.abs(drift) * 8)));
-  })();
 
   // Conditions for the heat de-confound (Familiar Routes, docs/DESIGN-familiar-routes.md §4).
   // Read temp/humidity off the workout's weather_data; derive dew point (the heat-stress variable)
@@ -873,11 +876,11 @@ async function upsertRouteIntelligence(
       avg_hr_bpm: avgHr,
       avg_pace_sec_per_km: paceSecPerKm,
       effort_adjusted_pace_sec_per_km: effortAdjusted,
-      decoupling_pct: toNum(runFacts?.hr_drift_pct),
+      // ⛔ No drift copies here (2026-09-26): `decoupling_pct` and `consistency_score` (100 − 8 × |drift|) had no reader
+      // (grep of every select on this table). The columns stay until a migration drops them.
       temp_f: tempF,
       humidity_pct: humidityPct,
       dew_point_f: dewF,
-      consistency_score: consistency,
       improvement_score: improvement,
       confidence_score: Number(matchConfidence.toFixed(4)),
       metadata: {
@@ -1112,22 +1115,11 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
     facts.time_in_zone = timeInZone;
   }
 
-  // HR drift: compare first-half avg HR vs second-half avg HR from sensor data
-  if (w.sensor_data?.samples && Array.isArray(w.sensor_data.samples)) {
-    const hrSamples = w.sensor_data.samples
-      .map((s: any) => s.heartRate ?? s.heart_rate)
-      .filter((hr: any) => typeof hr === "number" && hr > 0);
-    if (hrSamples.length >= 20) {
-      const mid = Math.floor(hrSamples.length / 2);
-      const firstHalf = hrSamples.slice(0, mid);
-      const secondHalf = hrSamples.slice(mid);
-      const avg1 = firstHalf.reduce((a: number, b: number) => a + b, 0) / firstHalf.length;
-      const avg2 = secondHalf.reduce((a: number, b: number) => a + b, 0) / secondHalf.length;
-      if (avg1 > 0) {
-        facts.hr_drift_pct = Math.round(((avg2 - avg1) / avg1) * 1000) / 10;
-      }
-    }
-  }
+  // HR drift — ⛔ THE ONE DRIFT (2026-09-26, Michael: "go"): `hr_drift_v1`, heart rate second half against first by
+  // TIME after the warm-up (`_shared/hr-drift-halves.ts`), the number the Performance screen and State print. This
+  // halved the samples by COUNT with no warm-up skip — a second drift for one run.
+  const runDrift = sessionHrDriftV1(w);
+  if (runDrift) facts.hr_drift_pct = runDrift.pct;
 
   // ── Pace at easy HR (aerobic efficiency proxy) — Q-169 ────────────────────────────────────────
   // THE DEAD LOOKUP THIS FIXES. This block used to read `learned_fitness.running.threshold_hr` — a
@@ -1151,10 +1143,8 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
   // workout — and that number feeds the D-033 reconciler that sets the plan's easy pace. The run now
   // qualifies the WHOLE RUN with the SAME predicate the baseline learner uses, so the reconciler's two
   // sides finally measure one population (`_shared/easy-hr.ts` -> `runEasyPaceEligible`).
-  const easyBand = resolveRunEasyHrBand(
-    baselines?.learned_fitness,
-    baselines?.performance_numbers?.threshold_heart_rate,
-  );
+  // ⛔ THE WHOLE ROW (2026-09-26): a typed run threshold or max is seen here as on every other surface.
+  const easyBand = resolveRunEasyHrBand(baselines);
   const samples: any[] = Array.isArray(w.sensor_data?.samples) ? w.sensor_data.samples : [];
   if (easyBand.ceiling != null && samples.length > 0) {
     const easySamples = samples.filter((s: any) => {
@@ -1201,7 +1191,8 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
     facts.efficiency_index = Math.round((1000 / facts.pace_avg_s_per_km) / facts.hr_avg * 10000) / 100;
   }
 
-  facts.workout_type = classifyRunIntent(w, planned, resolveCurrentLthr({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers } as any)?.bpm ?? null, runScalars.avgHr ?? null);
+  // The grader's threshold: the owner, handed the whole row (2026-09-26) — a typed run threshold was invisible here.
+  facts.workout_type = classifyRunIntent(w, planned, resolveCurrentLthr((baselines ?? null) as any, { sport: 'run' })?.bpm ?? null, runScalars.avgHr ?? null);
 
   // OURS (2026-09-03): the easy read from a hard run's WARM-UP, for a block with no easy runs (All
   // Rounder). Window = the plan's first step when it is a warm-up of >= 6 min; the first 3 min are
@@ -1284,20 +1275,10 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
     facts.time_in_zone = timeInZone;
   }
 
-  // HR drift
-  if (w.sensor_data?.samples && Array.isArray(w.sensor_data.samples)) {
-    const hrSamples = w.sensor_data.samples
-      .map((s: any) => s.heartRate ?? s.heart_rate)
-      .filter((hr: any) => typeof hr === "number" && hr > 0);
-    if (hrSamples.length >= 20) {
-      const mid = Math.floor(hrSamples.length / 2);
-      const avg1 = hrSamples.slice(0, mid).reduce((a: number, b: number) => a + b, 0) / mid;
-      const avg2 = hrSamples.slice(mid).reduce((a: number, b: number) => a + b, 0) / (hrSamples.length - mid);
-      if (avg1 > 0) {
-        facts.hr_drift_pct = Math.round(((avg2 - avg1) / avg1) * 1000) / 10;
-      }
-    }
-  }
+  // HR drift — the one drift, `hr_drift_v1` (see `buildRunFacts`). The "Bike HR drift trending higher" signal
+  // (`longitudinal-signals.ts`) reads this field.
+  const rideDrift = sessionHrDriftV1(w);
+  if (rideDrift) facts.hr_drift_pct = rideDrift.pct;
 
   // Power curve from existing analysis
   if (analysis.power_curve || w.computed?.power_curve) {
@@ -1458,8 +1439,11 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
   const isCardio = type === "run" || type === "ride" || type === "bike" || type === "swim";
   if (isCardio && dur > 0) {
     const lf: any = baselines?.learned_fitness ?? {};
-    const thresholdHr = (type === "run" ? lf?.running?.threshold_hr : lf?.cycling?.threshold_hr)
-      ?? baselines?.performance_numbers?.threshold_heart_rate ?? null;
+    // ⛔ THROUGH THE OWNER (2026-09-26, Michael: "go"). This read `learned_fitness.running.threshold_hr` /
+    // `.cycling.threshold_hr` — paths that have never existed (the dead path Q-169 fixed for the easy band) — so the
+    // fallback load only ever had the legacy typed field. Now the same call the canonical load makes: the whole row,
+    // this session's sport, the watch file's number last.
+    const thresholdHr = sessionLoadThresholdHr(baselines as any, type, w.threshold_heart_rate ?? null);
     const ftp = resolveCurrentFtp(baselines)?.value ?? null;
     const distM = (() => { const d = Number(w.distance); return d > 0 ? (d < 1000 ? d * 1000 : d) : 0; })();
     const paceSecPerKm = dur > 0 && distM > 0 ? (dur * 60) / (distM / 1000) : null;
@@ -1525,7 +1509,7 @@ serve(async (req: Request) => {
       .from("workouts")
       .select(
         "id, user_id, type, date, timestamp, duration, moving_time, elapsed_time, distance, " +
-        "avg_heart_rate, max_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
+        "avg_heart_rate, max_heart_rate, threshold_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
         "avg_cadence, elevation_gain, strength_exercises, mobility_exercises, " +
         "workout_metadata, computed, workout_analysis, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long, weather_data",
       )
@@ -1548,7 +1532,7 @@ serve(async (req: Request) => {
       .from("user_baselines")
       // `weight` + `units` ride along for D1: a calisthenic set is priced at the athlete's own body
       // weight, and `units` is the only thing that says whether that number is pounds or kilograms.
-      .select("performance_numbers, learned_fitness, birthday, weight, units")
+      .select("performance_numbers, learned_fitness, configured_hr_zones, birthday, weight, units")
       .eq("user_id", w.user_id)
       .maybeSingle();
     const baselines = (baselinesRow as Baselines | null) ?? null;

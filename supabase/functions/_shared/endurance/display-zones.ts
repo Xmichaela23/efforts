@@ -36,7 +36,7 @@
  */
 import { resolveCurrentLthr } from '../../../../src/lib/resolve-current-lthr.ts';
 import { ageFromBirthday, resolveCurrentMaxHr } from '../../../../src/lib/resolve-current-max-hr.ts';
-import { Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR, zone3FloorBpm } from '../../../../src/lib/friel-zones.ts';
+import { EASY_CEILING_PCT_LTHR, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR, zone3FloorBpm } from '../../../../src/lib/friel-zones.ts';
 
 // ── counting ────────────────────────────────────────────────────────────────────────────────────
 
@@ -194,6 +194,19 @@ const FRIEL_OPENS_PCT_LTHR: Record<HrZoneSport, { z2: number; z4: number; z5a: n
 };
 
 /**
+ * ⛔ THE SAME TABLE IN WHOLE PERCENTS OF LTHR, for a reader that places a percentage rather than a beat — the
+ * heart-rate TSS estimate in `workload.ts` (2026-09-26: it typed Friel's percentages out a second time). Friel
+ * prints whole percents: Zone 3 opens at the first one above the easy ceiling (89% → 90%, the percent form of "one
+ * beat above Zone 2's top"), and Zone 5b ends on the whole percent before Zone 5c opens (106).
+ */
+export type FrielZoneOpensPct = { z2: number; z3: number; z4: number; z5a: number; z5b: number; z5c: number };
+export function frielZoneOpensPct(sport: HrZoneSport): FrielZoneOpensPct {
+  const o = FRIEL_OPENS_PCT_LTHR[sport];
+  const pct = (f: number) => Math.round(f * 100);
+  return { z2: pct(o.z2), z3: pct(EASY_CEILING_PCT_LTHR) + 1, z4: pct(o.z4), z5a: pct(o.z5a), z5b: pct(o.z5b), z5c: pct(o.z5c) };
+}
+
+/**
  * ⚠️ NUMBERS, NOT NAMES (2026-09-26). The names wanted were "Recovery … Anaerobic Capacity" as TrainingPeaks
  * prints them for Friel's method. Neither TrainingPeaks' article and help pages ("A Quick Guide to Setting
  * Zones", "Zones Calculator Overview") nor Friel's own page prints a name beside these seven zones — his site
@@ -210,7 +223,7 @@ const MAX_HR_OPENS = [0.60, 0.70, 0.80, 0.90] as const;
 export const MAX_HR_ZONE_NAMES = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4', 'Zone 5'] as const;
 
 /** An anchor at or under this is a dropped strap or a typo, not a threshold or a max. */
-// OURS — the plausibility floor `hrZones` (`_shared/endurance/hr-zones.ts`) already applies: > 100 bpm
+// OURS — the plausibility floor the old zone writer (`hrZones`, deleted 2026-09-26) applied: > 100 bpm
 const HR_ANCHOR_FLOOR_BPM = 100;
 
 export type HrZoneRow = {
@@ -283,6 +296,25 @@ export function hrZoneSetFromAnchor(schema: HrZoneSchema, anchorBpm: number, spo
     rows,
     tops: rows.filter((r) => r.max != null).map((r) => r.max as number),
   };
+}
+
+/**
+ * ⛔ A SESSION'S OWN LAST RESORT, ONE COPY (2026-09-26). No threshold, no max heart rate and no birthday on file —
+ * Baselines prints no zones — so the session is counted on % of max from its own numbers: the watch file's max, else
+ * this session's peak ÷ `PEAK_TO_MAX`, else 180. Stored as `max-hr-session`, flagged an estimate. The analysis's bins
+ * (`compute-workout-analysis`) and the run debrief (`analyze-running-workout`) both take it from here; the debrief kept
+ * its own 60/70/80/90% table and its own "peak under 150 → 180" rule until today.
+ */
+export function sessionHrZoneSet(sport: HrZoneSport, session: { deviceMaxHr?: number | null; peakBpm?: number | null }): HrZoneSet {
+  const device = Number(session.deviceMaxHr);
+  const sessionMax = resolveCurrentMaxHr({}, {
+    sport,
+    deviceMaxHr: Number.isFinite(device) && device > HR_ANCHOR_FLOOR_BPM ? device : null,
+    observedSessionPeak: session.peakBpm ?? null,
+    allowAgeEstimate: false,
+  });
+  // OURS — the historical 180 bpm floor when a session carries no max of its own (kept as found)
+  return hrZoneSetFromAnchor('max-hr-session', sessionMax.bpm ?? 180, sport);
 }
 
 const parseJson = (v: unknown): Record<string, unknown> | null => {

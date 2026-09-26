@@ -16,6 +16,7 @@ import {
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { courseHrZones } from '../_shared/course-strategy-build.ts';
 import {
   buildRaceFinishProjectionV1,
   pickRaceFinishProjectionV1ForCourseGoal,
@@ -295,18 +296,13 @@ Deno.serve(async (req) => {
       : (parsePaceToSecPerMi(pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi) ?? fiveKSec);
   const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
 
-  // HR zones not yet in ArcContext — read separately.
+  // HR zones not yet in ArcContext — read separately: the same zone set `course-strategy` hashes (2026-09-26).
   const { data: baseline } = await supabase
     .from('user_baselines')
-    .select('configured_hr_zones')
+    .select('performance_numbers, learned_fitness, configured_hr_zones, birthday, gender')
     .eq('user_id', user.id)
     .maybeSingle();
-  const cz = baseline?.configured_hr_zones as Record<string, unknown> | null;
-  const zonesArr = (cz?.zones as Array<{ min?: number; max?: number | null }>) || [];
-  const hrZonesForHash: Record<string, string> = {};
-  zonesArr.forEach((z, i) => {
-    hrZonesForHash[`z${i + 1}`] = `${z.min ?? ''}-${z.max ?? ''}`;
-  });
+  const { forHash: hrZonesForHash } = courseHrZones(baseline, new Date().toISOString().slice(0, 10));
 
   const { data: recentRuns } = await supabase
     .from('workouts')

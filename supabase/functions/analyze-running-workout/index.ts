@@ -183,7 +183,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         date,
         rpe,
         feeling,
-        intensity_factor
+        intensity_factor,
+        default_max_heart_rate
       `)
       .eq('id', workout_id)
       .single();
@@ -289,6 +290,13 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
      * invisible here. `birthday` and `gender` are read for the age tier.
      */
     let runZoneSet: ReturnType<typeof heartRateZoneSet> = null;
+    /**
+     * ⛔ THE ROW, WHOLE, AND THE ONE EASY RULE READ OFF IT ONCE (2026-09-26, Michael: "go"). The Easy chip, the
+     * steady-run sentence and the verdict's aerobic ceiling each asked for the band with `learned_fitness` and the
+     * legacy `performance_numbers.threshold_heart_rate` only (a typed run threshold invisible), and the verdict read a
+     * second easy top — the zone table's Zone 2 top, which on a max heart rate is 70% of max against the band's 80%.
+     */
+    let userBaselinesRow: any = null;
     let userUnits = 'imperial'; // default
     try {
       const { data: userBaselines } = await supabase
@@ -303,6 +311,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       baselines = userBaselines?.performance_numbers || {};
       effortPaces = (userBaselines as any)?.effort_paces || null;
       learnedFitness = (userBaselines as any)?.learned_fitness || null;
+      userBaselinesRow = userBaselines ?? null;
       runZoneSet = heartRateZoneSet(userBaselines as any, 'run', { today: new Date().toISOString().slice(0, 10) });
       console.log('📊 User baselines found:', baselines);
     } catch (error) {
@@ -1078,6 +1087,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       } : undefined,
       userUnits: userUnits as 'imperial' | 'metric',
       hrZones: hrZonesFromBaseline,
+      // The watch file's own max — the first rung of the session fallback when there is no zone set on file.
+      deviceMaxHr: (workout as any)?.default_max_heart_rate ?? null,
       // Pace adherence from granular analysis (0-1 fraction → 0-100 percentage)
       paceAdherencePct: analysis.overall_adherence != null 
         ? Math.round(analysis.overall_adherence * 100) 
@@ -1438,7 +1449,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     //
     // ⚠️ THE CEILING IS THE RUN'S OWN (`resolveRunEasyHrBand`), not the ride's. Running HR sits 5-10
     // bpm above cycling at the same effort; both files say do not unify them.
-    const runEasyBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
+    const runEasyBand = resolveRunEasyHrBand(userBaselinesRow);
     if (isEasyPrescribedRun(classifiedTypeKey) && runEasyBand.ceiling != null) {
       const easyRead = timeUnderCeiling(
         sensorData.map((sample: any) => sample?.heart_rate),
@@ -1883,10 +1894,11 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     }
 
     // Structured adherence summary (verdict + technical insights + plan impact)
-    // The top of Zone 2 in the run's zone set (2026-09-26) — from a threshold, Friel's 89% of LTHR, the easy
-    // ceiling (`easyCeilingBpm`) this read before; from a max heart rate, that table's Zone 2 top. It read
-    // `configured_hr_zones.zones[1].max` first, Strava's table where one was stored.
-    const aerobicCeilingBpm = runZoneSet?.rows[1]?.max ?? null;
+    // ⛔ THE ONE EASY TOP (2026-09-26, Michael: "go"): the run easy rule's ceiling — the number the Easy chip and the
+    // steady-run sentence on this screen use. It was the zone set's Zone 2 top: the same beat from a threshold (89%
+    // of LTHR), but 70% of max from a max heart rate where the band says 80%, so one run had two easy tops. Before
+    // that it read `configured_hr_zones.zones[1].max`, Strava's table where one was stored.
+    const aerobicCeilingBpm = resolveRunEasyHrBand(userBaselinesRow).ceiling;
 
     const adherenceSummary = generateAdherenceSummary(
       performance as { execution_adherence: number; pace_adherence: number; duration_adherence: number },
@@ -2027,7 +2039,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           : null,
         workoutIntent: (intent as any) || null,
         classifiedTypeOverride: classifiedTypeKey,
-        learnedFitness: learnedFitness || null,
+        // The whole row (2026-09-26): the packet's segment zones and easy band come from their owners, fed this row.
+        baselines: userBaselinesRow,
         arcContext: preFactArc,
       });
       fact_packet_v1 = factPacket;
@@ -2527,7 +2540,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // graded against a prescription it was never given ([D-362]). One gate now, shared with the
         // Easy chip, reading plan intent: `isEasyPrescribedRun`.
         const isSteadyEasyRun = isEasyPrescribedRun(classifiedTypeKey);
-        const easyHrBand = resolveRunEasyHrBand(learnedFitness, (baselines as any)?.threshold_heart_rate);
+        const easyHrBand = resolveRunEasyHrBand(userBaselinesRow);
         const runAvgHr = Number((hrAnalysisResult as any)?.summary?.avgHr);
         const ranHot = (hrAnalysisResult as any)?.drift?.weather?.factor === 'hot';
         const hrJudgeable = isSteadyEasyRun

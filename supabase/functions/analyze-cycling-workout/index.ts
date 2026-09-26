@@ -91,14 +91,6 @@ interface HeartRateZone {
   name: string;
 }
 
-interface HeartRateZones {
-  zone1: HeartRateZone;
-  zone2: HeartRateZone;
-  zone3: HeartRateZone;
-  zone4: HeartRateZone;
-  zone5: HeartRateZone;
-}
-
 interface HeartRateAdherence {
   adherence_percentage: number;
   time_in_zone_s: number;
@@ -348,20 +340,6 @@ function parsePhaseFromTags(tags: string[]): { phase: string | null, week: strin
   }
   
   return { phase, week, totalWeeks };
-}
-
-/**
- * Calculate heart rate zones from max HR
- */
-function calculateHeartRateZones(maxHR: number): HeartRateZones {
-  return {
-    // OURS — `calculateHeartRateZones` 50/60/70/80/90/100% of max heart rate; no source in the repo (TRUTH-MAP §8.1 row 20b); kept as found
-    zone1: { lower: maxHR * 0.50, upper: maxHR * 0.60, name: 'Zone 1' },
-    zone2: { lower: maxHR * 0.60, upper: maxHR * 0.70, name: 'Zone 2' },
-    zone3: { lower: maxHR * 0.70, upper: maxHR * 0.80, name: 'Zone 3' },
-    zone4: { lower: maxHR * 0.80, upper: maxHR * 0.90, name: 'Zone 4' },
-    zone5: { lower: maxHR * 0.90, upper: maxHR * 1.00, name: 'Zone 5' }
-  };
 }
 
 /**
@@ -964,7 +942,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
 /**
  * Analyze heart rate for cycling workouts
  */
-function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): any {
+function analyzeHeartRate(sensorData: any[], intervals: any[]): any {
   const hrSamples = sensorData
     .map(s => s.heart_rate)
     .filter(hr => hr && hr > 0);
@@ -991,27 +969,10 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
     ? Math.round(lateSamples.reduce((sum, hr) => sum + hr, 0) / lateSamples.length)
     : avgHR;
   const hrDrift = lateAvgHR - earlyAvgHR;
-  
-  // Calculate HR zones if maxHR provided. `zoneTime` declared at the function scope
-  // so the return statement below can reference it — was previously `const`-declared
-  // inside the `if (maxHR)` block, which made it block-scoped and threw ReferenceError
-  // at runtime on `zone_time: hrZones ? zoneTime : null` whenever maxHR was truthy.
-  // The error was masked by an upstream try/catch in the handler, producing analyses
-  // missing the zone_time field rather than failing visibly. Found via deno check
-  // surfacing TS2304 'Cannot find name zoneTime'; fix verified by empirical scope test.
-  let hrZones = null;
-  const zoneTime: Record<string, number> = {};
-  if (maxHR) {
-    hrZones = calculateHeartRateZones(maxHR);
-    for (const hr of hrSamples) {
-      if (hr <= hrZones.zone1.upper) zoneTime.zone1 = (zoneTime.zone1 || 0) + 1;
-      else if (hr <= hrZones.zone2.upper) zoneTime.zone2 = (zoneTime.zone2 || 0) + 1;
-      else if (hr <= hrZones.zone3.upper) zoneTime.zone3 = (zoneTime.zone3 || 0) + 1;
-      else if (hr <= hrZones.zone4.upper) zoneTime.zone4 = (zoneTime.zone4 || 0) + 1;
-      else zoneTime.zone5 = (zoneTime.zone5 || 0) + 1;
-    }
-  }
 
+  // (2026-09-26) The %-of-max zones that stood here are gone: their input was `performance_numbers.max_heart_rate`, a
+  // field nothing writes, and nothing read their output. A ride's zones are counted by `compute-workout-analysis` on
+  // the table Baselines prints (`_shared/endurance/display-zones.ts`).
   return {
     available: true,
     average_hr: avgHR,
@@ -1020,8 +981,6 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
     hr_drift_bpm: hrDrift,
     early_avg_hr: earlyAvgHR,
     late_avg_hr: lateAvgHR,
-    hr_zones: hrZones,
-    zone_time: hrZones ? zoneTime : null
   };
 }
 
@@ -1242,7 +1201,6 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
 
     // Get user baselines (for FTP). Tier 3 item 10 also pulls `weight` for the W/kg
     // limiter signal; without it we fall back to the NP-trend path in the limiter.
-    let baselines = {};
     let fullBaselines: any = null; // full row (performance_numbers + learned_fitness) for resolveCurrentFtp
     let userUnits = 'imperial';
     let userWeight: number | null = null;
@@ -1258,7 +1216,6 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       if (userBaselines?.units === 'metric' || userBaselines?.units === 'imperial') {
         userUnits = userBaselines.units;
       }
-      baselines = userBaselines?.performance_numbers || {};
       fullBaselines = userBaselines ?? null;
       userWeight = typeof userBaselines?.weight === 'number' ? userBaselines.weight : null;
     } catch (error) {
@@ -1487,7 +1444,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     const intervalBreakdown = generateIntervalBreakdown(workIntervals, allIntervalsWithPower, sensorData);
 
     // Analyze heart rate
-    const hrAnalysis = analyzeHeartRate(sensorData, intervals, baselines.max_heart_rate);
+    const hrAnalysis = analyzeHeartRate(sensorData, intervals);
 
     // Calculate performance metrics with proper weighting
     // Work intervals get 2x weight (they're the most important part of the workout)

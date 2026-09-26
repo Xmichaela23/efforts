@@ -25,8 +25,6 @@ function estimatePlannedWorkload(
   type: string,
   durationMinutes: number,
   stepsTokens: string[],
-  _maxHR?: number | null,
-  _restingHR?: number | null,
 ): number {
   if (!durationMinutes || durationMinutes <= 0) return 0;
   const intensity = getStepsIntensity(stepsTokens, type) || getDefaultIntensityForType(type) || 0.70;
@@ -354,22 +352,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, inserted: 0, reason: 'no_sessions' }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
     }
 
-    // Fetch athlete HR baselines for TRIMP-based planned workload estimation.
-    // This makes workload_planned use the same formula as workload_actual so
-    // planned vs actual comparisons are meaningful.
-    let athleteMaxHR: number | null = null;
-    let athleteRestingHR: number | null = null;
-    try {
-      const { data: ub } = await supabase
-        .from('user_baselines')
-        .select('performance_numbers,learned_baselines')
-        .eq('user_id', userId)
-        .maybeSingle();
-      const perf = (ub as any)?.performance_numbers || {};
-      const learned = (ub as any)?.learned_baselines || {};
-      athleteMaxHR = Number(learned?.run_max_hr_observed?.value || perf?.maxHeartRate || perf?.max_heart_rate || 0) || null;
-      athleteRestingHR = Number(perf?.restingHeartRate || perf?.resting_heart_rate || 0) || null;
-    } catch { /* non-fatal — workload will fall back to duration-based */ }
+    // (2026-09-26) The heart-rate fetch that stood here is gone: its max and resting heart rate fed the planned-load
+    // estimate's two unused parameters (D-238 retired TRIMP), and it selected `learned_baselines`, a column nothing
+    // else names. The planned load is the prescription's intensity × duration, as the note on the function says.
 
     // Start date: explicit override (import flow) → plan config (generation flow) → next Monday
     let startDate: string = startDateOverride
@@ -509,7 +494,7 @@ Deno.serve(async (req) => {
               computed: null,
               units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
               tags: Array.isArray(s?.tags) ? s.tags : [],
-              workload_planned: halfDur > 0 ? estimatePlannedWorkload('ride', halfDur, bikeTokens, athleteMaxHR, athleteRestingHR) : null,
+              workload_planned: halfDur > 0 ? estimatePlannedWorkload('ride', halfDur, bikeTokens) : null,
             })
           }
           if (runTokens.length) {
@@ -532,14 +517,14 @@ Deno.serve(async (req) => {
               computed: null,
               units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
               tags: Array.isArray(s?.tags) ? s.tags : [],
-              workload_planned: halfDur > 0 ? estimatePlannedWorkload('run', halfDur, runTokens, athleteMaxHR, athleteRestingHR) : null,
+              workload_planned: halfDur > 0 ? estimatePlannedWorkload('run', halfDur, runTokens) : null,
             })
           }
           continue
         }
 
         const estimatedWorkload = durationVal > 0
-          ? estimatePlannedWorkload(mapped || 'run', durationVal, stepsTokens, athleteMaxHR, athleteRestingHR)
+          ? estimatePlannedWorkload(mapped || 'run', durationVal, stepsTokens)
           : null;
 
         const baseRow: any = {
@@ -652,7 +637,7 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from('planned_workouts').insert(rows as any)
       if (error) throw error
       inserted = rows.length
-      console.log(`✅ Inserted ${inserted} planned workouts with TRIMP-based workload_planned (maxHR=${athleteMaxHR}, restHR=${athleteRestingHR})`)
+      console.log(`✅ Inserted ${inserted} planned workouts with workload_planned from the prescription`)
     }
 
     // Materialize steps for the whole plan (server-side expansion)

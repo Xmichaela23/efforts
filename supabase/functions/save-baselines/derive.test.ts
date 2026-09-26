@@ -10,7 +10,6 @@
  * Run: deno test --allow-read --no-check supabase/functions/save-baselines/derive.test.ts
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { frielRunZones } from '../../../src/lib/friel-zones.ts';
 import {
   acceptMeasuredForSave,
   effortFieldsFromFiveKTimeSec,
@@ -67,42 +66,29 @@ Deno.test('the typed 5K clock → fiveK_pace in the athlete\'s unit; a sent five
   assertEquals(effortFieldsForPerformanceNumbers({ fiveK: '22:30' }, NOW)?.effort_source_time, 1350);
 });
 
-Deno.test('typed run threshold → run zones are frielRunZones, the table the analysis bins on', () => {
-  const cfg = hrZoneConfigForSave({ typed: { manual_run_lthr: 160 }, stored: null, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
-  const expected = frielRunZones(160).map((z) => ({ min: z.min, max: z.max }));
-  assertEquals(cfg.zones_run, expected);
-  assertEquals(cfg.zones, expected);
-  assertEquals(cfg.zones_ride, undefined);
-  assertEquals(cfg.threshold_heart_rate, 160);
+Deno.test('ONE ZONE TABLE (2026-09-26): the save keeps what was typed and writes no zone table or one-number scalar', () => {
+  const cfg = hrZoneConfigForSave({ typed: { manual_run_lthr: 160, manual_ride_max_hr: 178, resting_heart_rate: 50 }, stored: null, nowIso: NOW })!;
+  assertEquals(cfg.manual_run_lthr, 160);
+  assertEquals(cfg.manual_ride_max_hr, 178);
+  assertEquals(cfg.resting_heart_rate, 50);
   assertEquals(cfg.source, 'manual');
-  assertEquals(cfg.zones_run_model, 'friel');
+  // Nothing reads these; every zone edge is `heartRateZoneSet`, worked out at read time.
+  for (const k of ['zones', 'zones_run', 'zones_ride', 'zones_run_model', 'zones_ride_model', 'threshold_heart_rate', 'max_heart_rate']) {
+    assertEquals(k in cfg, false, `${k} is written again`);
+  }
 });
 
-Deno.test('both sports anchored → the shared scalar is null, never one sport speaking for both', () => {
-  const cfg = hrZoneConfigForSave({ typed: { manual_run_lthr: 160, manual_ride_lthr: 150 }, stored: null, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
-  assertEquals(cfg.threshold_heart_rate, null);
-  assertEquals(cfg.zones_ride, frielRunZones(150).map((z) => ({ min: z.min, max: z.max })));
-});
-
-Deno.test('max heart rate with a real resting rate → Karvonen; without one → no zones (no invented 60)', () => {
-  const withRest = hrZoneConfigForSave({ typed: { manual_run_max_hr: 185, resting_heart_rate: 50 }, stored: null, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
-  // The phone's Karvonen: resting + (max − resting) × pct.
-  assertEquals(withRest.zones_run, [
-    { min: 0, max: 131 }, { min: 131, max: 145 }, { min: 145, max: 158 }, { min: 158, max: 172 }, { min: 172, max: 185 },
-  ]);
-  assertEquals(withRest.zones_run_model, 'karvonen');
-  const noRest = hrZoneConfigForSave({ typed: { manual_run_max_hr: 185 }, stored: null, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
-  assertEquals(noRest.zones_run, undefined);
+Deno.test('no invented resting heart rate: a max with none typed stores none', () => {
+  const noRest = hrZoneConfigForSave({ typed: { manual_run_max_hr: 185 }, stored: null, nowIso: NOW })!;
   assertEquals(noRest.resting_heart_rate, null);
-  assertEquals(noRest.zones_run_model, 'needs_resting');
 });
 
 Deno.test('nothing typed and nothing changed → null, so the stored zones (Strava\'s included) are left alone', () => {
-  assertEquals(hrZoneConfigForSave({ typed: {}, stored: { source: 'strava', zones: [{ min: 0, max: 120 }] }, learnedFitness: null, performanceNumbers: {}, nowIso: NOW }), null);
+  assertEquals(hrZoneConfigForSave({ typed: {}, stored: { source: 'strava', zones: [{ min: 0, max: 120 }] }, nowIso: NOW }), null);
   // An absent key keeps the stored manual value; a present null clears it.
-  const kept = hrZoneConfigForSave({ typed: { manual_ride_lthr: 150 }, stored: { manual_run_lthr: 160 }, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
+  const kept = hrZoneConfigForSave({ typed: { manual_ride_lthr: 150 }, stored: { manual_run_lthr: 160 }, nowIso: NOW })!;
   assertEquals(kept.manual_run_lthr, 160);
-  const cleared = hrZoneConfigForSave({ typed: { manual_run_lthr: null }, stored: { manual_run_lthr: 160 }, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
+  const cleared = hrZoneConfigForSave({ typed: { manual_run_lthr: null }, stored: { manual_run_lthr: 160 }, nowIso: NOW })!;
   assertEquals(cleared.manual_run_lthr, null);
   assertEquals(cleared.source, 'learned');
 });

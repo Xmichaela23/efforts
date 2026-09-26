@@ -131,6 +131,9 @@ export interface HRAnalysisContext {
   // User settings
   userUnits?: 'metric' | 'imperial';
   
+  /** The watch file's own max heart rate (`workouts.default_max_heart_rate`) — the session fallback's first rung. */
+  deviceMaxHr?: number | null;
+
   // User HR zones (if set)
   hrZones?: {
     z1Max: number;  // Recovery

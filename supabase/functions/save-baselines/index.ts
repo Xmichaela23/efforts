@@ -7,7 +7,8 @@
  * `TrainingBaselines`, the Goals quick calibration, Adjust and the Welcome screen each wrote to
  * `user_baselines` directly, and two of the numbers they wrote were derived on the phone:
  *   · `effort_*` and `performance_numbers.fiveK_pace`, from the 5K;
- *   · `configured_hr_zones` zone tables, from threshold / max / resting heart rate.
+ *   · `configured_hr_zones`: the typed threshold / max / resting heart rates (no zone tables since 2026-09-26 —
+ *     every zone edge is `heartRateZoneSet`, worked out at read time).
  *
  * POST {
  *   baselines?:   user_baselines columns as typed (derived columns in it are ignored),
@@ -310,8 +311,6 @@ Deno.serve(async (req) => {
       zonesCfg = hrZoneConfigForSave({
         typed: heartRate,
         stored: parseJson(existing?.configured_hr_zones) as Record<string, unknown> | null,
-        learnedFitness: parseJson(existing?.learned_fitness) as Record<string, unknown> | null,
-        performanceNumbers: (row.performance_numbers ?? storedPerf) as Record<string, unknown>,
         nowIso,
       });
       if (zonesCfg) row.configured_hr_zones = zonesCfg;

@@ -14,10 +14,9 @@
 // - Designed to be <500ms under normal DB conditions
 // =============================================================================
 
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
-import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ageEstimateMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
+// The comparable-easy-run gate and the helpers it shares with this handler (moved beside it, 2026-09-26).
+import { clamp, isComparableZ2Run, minutesFromWorkout, parseJson } from './z2-gate.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,41 +27,6 @@ const corsHeaders = {
 
 const COMPUTED_VERSION_INT = 1003;
 
-type LearnedMetric = {
-  value: number;
-  confidence?: 'low' | 'medium' | 'high' | number;
-  source?: string;
-  sample_count?: number;
-};
-
-function parseJson<T = any>(val: any): T | null {
-  if (val == null) return null;
-  try {
-    return typeof val === 'string' ? JSON.parse(val) : (val as T);
-  } catch {
-    return val as T;
-  }
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
-
-function confidenceToNumber(conf: LearnedMetric['confidence']): number {
-  if (conf == null) return 0;
-  if (typeof conf === 'number') return clamp(conf, 0, 1);
-  if (conf === 'high') return 0.9;
-  if (conf === 'medium') return 0.65;
-  if (conf === 'low') return 0.4;
-  return 0;
-}
-
-function minutesFromWorkout(durationMin: any, movingMin: any): number | null {
-  const d = Number(durationMin);
-  const m = Number(movingMin);
-  const v = Number.isFinite(m) && m > 0 ? m : Number.isFinite(d) && d > 0 ? d : NaN;
-  return Number.isFinite(v) && v > 0 ? v : null;
-}
 
 function normalizeLiftName(nameRaw: any): 'Squat' | 'Bench Press' | 'Deadlift' | 'Overhead Press' | null {
   const n = String(nameRaw || '').toLowerCase();
@@ -102,215 +66,6 @@ function estimate1Rm(weight: number, reps: number, avgRir: number | null): numbe
   const epley = weight * (1 + reps / 30);
   const rirFactor = avgRir != null ? (1 + avgRir / 10) : 1;
   return epley * rirFactor;
-}
-
-function getWorkoutTextHints(workout: any): string {
-  const name = String(workout?.name || '');
-  const meta = parseJson<any>(workout?.workout_metadata) || {};
-  const tags = Array.isArray(meta?.tags) ? meta.tags.join(' ') : '';
-  const desc = String(meta?.description || meta?.notes || '');
-  const detected = String(
-    workout?.computed?.analysis?.workout_type_detected ||
-      workout?.computed?.workout_type_detected ||
-      ''
-  );
-  return `${name} ${tags} ${desc} ${detected}`.toLowerCase();
-}
-
-function parseEasyPaceMmSsPerMiToSecPerKm(val: any): number | null {
-  if (val == null) return null;
-  const s = String(val).trim();
-  const m = s.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  const mm = Number(m[1]);
-  const ss = Number(m[2]);
-  if (!Number.isFinite(mm) || !Number.isFinite(ss) || ss < 0 || ss >= 60) return null;
-  const secPerMi = mm * 60 + ss;
-  return secPerMi / 1.60934;
-}
-
-function isComparableZ2Run(
-  workout: any,
-  learnedFitness: any,
-  userAge: number | null,
-  perfNumbers: any
-): {
-  ok: boolean;
-  reason: string;
-  z2: { lower: number; upper: number; source: string } | null;
-  confidence: number;
-  debug: Record<string, any>;
-} {
-  const hints = getWorkoutTextHints(workout);
-  if (hints.includes('interval')) return { ok: false, reason: 'tagged_interval', z2: null, confidence: 0, debug: { hints } };
-  if (hints.includes('tempo')) return { ok: false, reason: 'tagged_tempo', z2: null, confidence: 0, debug: { hints } };
-  if (hints.includes('race')) return { ok: false, reason: 'tagged_race', z2: null, confidence: 0, debug: { hints } };
-
-  const minutes = minutesFromWorkout(workout?.duration, workout?.moving_time);
-  // Slightly looser by default, then we rely on pace/HR gates.
-  if (minutes == null) return { ok: false, reason: 'missing_duration', z2: null, confidence: 0, debug: { hints } };
-  if (minutes < 30) return { ok: false, reason: 'too_short', z2: null, confidence: 0, debug: { hints, minutes } };
-  // >90 minutes is handled as a "long run" lane elsewhere
-
-  const avgHr = Number(workout?.avg_heart_rate);
-  if (!Number.isFinite(avgHr)) return { ok: false, reason: 'missing_hr', z2: null, confidence: 0, debug: { hints, minutes } };
-  if (avgHr < 80 || avgHr > 220) return { ok: false, reason: 'hr_out_of_range', z2: null, confidence: 0, debug: { hints, minutes, avgHr } };
-
-  // Intensity factor gate (if present in computed or calculated metrics)
-  const computed = parseJson<any>(workout?.computed) || {};
-  const if1 = Number(computed?.intensity_factor ?? computed?.overall?.intensity_factor ?? computed?.metrics?.intensity_factor);
-  // Note: IF can be noisy for runs; we keep the gate but emit a debug reason.
-  if (Number.isFinite(if1) && if1 > 0.85) return { ok: false, reason: 'high_intensity_factor', z2: null, confidence: 0, debug: { hints, minutes, avgHr, if1 } };
-
-  // Z2 range determination (prefer learned baselines, fallback to derived)
-  const lf = typeof learnedFitness === 'string' ? parseJson<any>(learnedFitness) : learnedFitness;
-  const easyHrMetric: LearnedMetric | null = lf?.run_easy_hr ?? null;
-  const easyHrConf = confidenceToNumber(easyHrMetric?.confidence);
-  /**
-   * ⛔ THROUGH THE ONE LTHR RESOLVER (2026-08-19, TRUTH-MAP §5). The raw read skipped the D-284
-   * sample-count gate — a `run_threshold_hr` written as "88% of observed max (estimated)" carries
-   * `sample_count: 0`, is a formula rather than a measurement, and must never anchor a Z2 band —
-   * and it ignored the athlete's Q-174 choice.
-   */
-  const thresholdResolved = resolveCurrentLthr({
-    learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: null,
-  } as never);
-  const thresholdHrMetric: LearnedMetric | null =
-    thresholdResolved.bpm != null
-      ? ({ value: thresholdResolved.bpm, confidence: thresholdResolved.confidence ?? undefined } as LearnedMetric)
-      : null;
-  const thresholdHrConf = confidenceToNumber(thresholdHrMetric?.confidence);
-
-  let z2Lower: number;
-  let z2Upper: number;
-  let conf: number;
-  let source = 'age';
-
-  if (easyHrMetric?.value) {
-    // If learned confidence is low, widen the band instead of discarding (hot days / hills).
-    const center = Number(easyHrMetric.value);
-    const band = easyHrConf >= 0.5 ? 0.06 : 0.10;
-    z2Lower = center * (1 - band);
-    z2Upper = center * (1 + band);
-    conf = Math.max(0.35, easyHrConf);
-    source = 'learned_easy_hr';
-  } else if (thresholdHrMetric?.value) {
-    // Derive easy/Z2 center from threshold HR (~82–85% of threshold for many runners).
-    const thr = Number(thresholdHrMetric.value);
-    const center = thr * 0.83;
-    z2Lower = center * 0.92;
-    z2Upper = center * 1.10;
-    conf = Math.max(0.35, thresholdHrConf);
-    source = 'derived_from_threshold_hr';
-  } else {
-    const age = userAge != null ? clamp(userAge, 10, 95) : 35;
-    const maxHr = ageEstimateMaxHr(age); // ONE formula (Tanaka), was 220 − age (audit 2026-07-17 #5)
-    z2Lower = maxHr * 0.65;
-    z2Upper = maxHr * 0.75;
-    conf = 0.35;
-    source = 'age';
-  }
-
-  // Optional pace gate using manual easy pace baseline (reduces false negatives when HR is noisy)
-  const avgPace = Number(workout?.avg_pace); // sec/km
-  const lf2 = lf;
-  /**
-   * ⛔ THROUGH THE ONE EASY-PACE RESOLVER (2026-08-19). This was a private two-tier chain — learned
-   * above a 0.35 confidence bar, else the typed value — which is the resolver's chain with a
-   * different bar and without the athlete's Q-174 choice. An athlete who said "use my number" had it
-   * overridden here by a low-confidence learned pace.
-   *
-   * ⚠️ The resolver is sec/MILE; this gate works in sec/KM (it compares against `workout.avg_pace`).
-   * Converted once, here.
-   */
-  // ⛔ D-478 (2026-09-15): "does this run's pace look easy for THIS athlete" asks for a MEASUREMENT — the learner's
-  // easy pace (`resolveMeasuredEasyPaceSecPerMi`, medium/high confidence) — not the prescribed range off threshold.
-  const measuredEasyMi = resolveMeasuredEasyPaceSecPerMi({
-    learned_fitness: lf2, performance_numbers: perfNumbers,
-  } as never);
-  const baselineEasySecPerKm = measuredEasyMi != null
-    ? measuredEasyMi / 1.60934
-    : parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
-  if (!Number.isFinite(avgPace) || !(avgPace > 0)) {
-    // If HR matches our easy range, we can still accept and store pace as missing (but aerobic efficiency can't be computed).
-    // For comparability gating, treat missing pace as non-comparable to keep the metric clean.
-    return { ok: false, reason: 'missing_pace', z2: { lower: z2Lower, upper: z2Upper, source }, confidence: conf, debug: { hints, minutes, avgHr, if1, z2Lower, z2Upper, source } };
-  }
-
-  const paceLooksEasy =
-    Number.isFinite(avgPace) &&
-    avgPace > 120 &&
-    avgPace < 900 &&
-    baselineEasySecPerKm != null &&
-    // within +25% slower to -10% faster than baseline easy pace
-    avgPace >= baselineEasySecPerKm * 0.90 &&
-    avgPace <= baselineEasySecPerKm * 1.25;
-
-  const hrLooksEasy = avgHr >= z2Lower && avgHr <= z2Upper;
-
-  // Accept if HR fits OR pace fits and HR isn't clearly hard (cap at ~92% threshold if known)
-  let hrHardCap: number | null = null;
-  if (thresholdHrMetric?.value) hrHardCap = Number(thresholdHrMetric.value) * 0.92;
-
-  const notClearlyHard = hrHardCap == null ? avgHr <= z2Upper * 1.08 : avgHr <= hrHardCap;
-
-  const ok = hrLooksEasy || (paceLooksEasy && notClearlyHard);
-  if (!ok) {
-    const reason =
-      !notClearlyHard ? 'too_hard' :
-      !hrLooksEasy && paceLooksEasy ? 'hr_outside_easy_band' :
-      'pace_or_hr_not_easy';
-    return {
-      ok: false,
-      reason,
-      z2: { lower: z2Lower, upper: z2Upper, source },
-      confidence: conf,
-      debug: {
-        hints,
-        minutes,
-        avgHr,
-        avgPace,
-        if1: Number.isFinite(if1) ? if1 : null,
-        z2Lower,
-        z2Upper,
-        source,
-        baselineEasySecPerKm,
-        paceLooksEasy,
-        hrLooksEasy,
-        hrHardCap,
-        notClearlyHard,
-        // The debug receipt reports what was actually USED, and now says where it came from —
-        // `source` is the resolver's tier, so a typed pace can no longer be logged as a learned one.
-        learned_easy_pace_sec_per_km: measuredEasyMi != null ? measuredEasyMi / 1.60934 : null,
-        learned_easy_pace_conf: null, // D-478: the measured value is medium/high only; no raw read past the resolver
-        easy_pace_source: measuredEasyMi != null ? 'learned' : null,
-      },
-    };
-  }
-  return {
-    ok: true,
-    reason: 'ok',
-    z2: { lower: z2Lower, upper: z2Upper, source },
-    confidence: conf,
-    debug: {
-      hints,
-      minutes,
-      avgHr,
-      avgPace,
-      if1: Number.isFinite(if1) ? if1 : null,
-      z2Lower,
-      z2Upper,
-      source,
-      baselineEasySecPerKm,
-      paceLooksEasy,
-      hrLooksEasy,
-      hrHardCap,
-      notClearlyHard,
-      learned_easy_pace_sec_per_km: measuredEasyMi != null ? measuredEasyMi / 1.60934 : null,
-      learned_easy_pace_conf: null, // D-478: the measured value is medium/high only; no raw read past the resolver
-      easy_pace_source: measuredEasyMi != null ? 'learned' : null,
-    },
-  };
 }
 
 Deno.serve(async (req) => {
@@ -366,19 +121,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ⛔ THE WHOLE ROW (2026-09-26): `configured_hr_zones` is where a typed run threshold or max lives. The birthday
+    // is no longer read — it fed only the age-formula tier of the old easy band, which the one easy rule does not have.
     const { data: baseline } = await supabase
       .from('user_baselines')
-      .select('birthday,learned_fitness,performance_numbers')
+      .select('learned_fitness,performance_numbers,configured_hr_zones')
       .eq('user_id', (w as any)?.user_id)
       .maybeSingle();
-
-    /**
-     * ⛔ THE BIRTHDAY IS THE FACT (2026-09-15). `user_baselines.age` was written once by the phone and
-     * never refreshed, so it read a year stale after a birthday. One rule: `ageFromBirthday`.
-     */
-    const userAge = ageFromBirthday((baseline as { birthday?: string | null } | null)?.birthday ?? null, new Date().toISOString().slice(0, 10));
-    const learnedFitness = baseline?.learned_fitness ? parseJson<any>(baseline.learned_fitness) : null;
-    const perfNumbers = baseline?.performance_numbers ? parseJson<any>(baseline.performance_numbers) : null;
 
     const adaptation: any = {
       data_quality: 'poor',
@@ -410,7 +159,7 @@ Deno.serve(async (req) => {
           adaptation.confidence = 0.2;
         }
       } else {
-        const gate = isComparableZ2Run(w, learnedFitness, userAge, perfNumbers);
+        const gate = isComparableZ2Run(w, baseline ?? null);
 
         if (gate.ok && Number.isFinite(avgPace) && avgPace > 120 && avgPace < 900 && Number.isFinite(avgHr) && avgHr > 80 && avgHr < 220) {
           const aerobicEfficiency = avgPace / avgHr;

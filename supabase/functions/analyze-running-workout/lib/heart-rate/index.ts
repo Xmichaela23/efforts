@@ -92,7 +92,7 @@ export function analyzeHeartRate(
   console.log('💓 [HR ANALYSIS] Workout type (final):', workoutType);
   
   // Calculate zone distribution (always done)
-  const zones = calculateZoneDistribution(validHRSamples, context.hrZones, context.plannedWorkout?.intent);
+  const zones = calculateZoneDistribution(validHRSamples, context.hrZones, context.plannedWorkout?.intent, context.deviceMaxHr ?? null);
   
   // Route to appropriate analysis based on workout type
   let result: HRAnalysisResult;

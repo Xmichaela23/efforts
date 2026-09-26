@@ -1399,7 +1399,7 @@ serve(async (req: Request) => {
          * 62 ft of climb under a 958 ft ride. The read itself (as stored, never re-derived) lives in
          * `./endurance-facts.ts` with the fixture that pins a run and a ride on one date.
          */
-        const endFactByWorkout = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
+        const endFactByWorkout = new Map<string, { efficiency: number | null; hr: number | null }>();
         const keyDates = new Set<string>();
         try {
           const { data: factRows } = await supabase

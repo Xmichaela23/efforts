@@ -48,12 +48,10 @@
 // 0.90 in TrainingBaselines) — so a 135 bpm run was "Zone 2" on the athlete's screen and "not easy" to this
 // learner. Re-exported here so every existing importer keeps working unchanged.
 export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
-import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
+import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm } from '../../../src/lib/friel-zones.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
-/** Friel Z3 floor — kept as a named export for existing importers; delegates to the ONE model (D-286). */
-export function runEasyZone3FloorBpm(lthr: number): number {
-  return zone3FloorBpm(lthr);
-}
+import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+import { maxHrBaselines } from './endurance/display-zones.ts';
 /** Cold-start bootstrap: the field's aerobic ceiling is 80% of max — NOT the 75% that starved this. */
 // FIELD — MyProCoach and Garmin top the aerobic band at 80% of max (see header)
 export const EASY_CEILING_PCT_MAXHR = 0.80;
@@ -80,49 +78,43 @@ const UNKNOWN: EasyHrBand = {
   basis: 'no threshold HR and no observed max HR — easy cannot be judged',
 };
 
-function readMetric(lf: Record<string, unknown> | null | undefined, key: string): { value: number; confidence: 'high' | 'medium' | 'low' | null } | null {
-  const raw = (lf as any)?.[key];
-  if (raw == null) return null;
-  const v = typeof raw === 'object' ? Number((raw as any).value) : Number(raw);
-  if (!Number.isFinite(v) || !(v > 0)) return null;
-  // LAW 2 — an INVENTED number may not become an anchor (Q-171). `learn-fitness-profile` has a last-resort
-  // branch that writes `run_threshold_hr` as "88% of observed max (estimated)" with **sample_count: 0** —
-  // a formula applied to another estimate (and observed-max is a one-way ratchet, so a single strap
-  // artefact poisons it permanently). Accepting that as the LTHR anchor makes the band ANNOUNCE
-  // "Friel Z2 — at or below 89% of your threshold HR" over a number nobody measured, and it is not even
-  // conservative: 0.89 x 0.88 = 78% of max ceiling, 0.70 x 0.88 = 62% floor — TIGHTER and LOWER than the
-  // honest %max bootstrap (65-80%), i.e. it drifts straight back toward the Q-169 starvation while
-  // claiming to be the cure for it. So: a metric that explicitly declares ZERO samples is not a
-  // measurement and cannot anchor. We fall through to the bootstrap, which at least says it is one.
-  //
-  // `sample_count: 0` is REJECTED. `sample_count` ABSENT is accepted — absent means "not stated" (the
-  // in-pass synthetic band built inside learn-fitness-profile passes no count), not "measured nothing".
-  // The 95th-percentile fallback (low confidence, sample_count >= 3) SURVIVES: it is a weak measurement,
-  // not an invention, and the distinction this gate draws is measured-vs-invented, not strong-vs-weak.
-  if (typeof raw === 'object' && (raw as any).sample_count === 0) return null;
-  const c = typeof raw === 'object' ? String((raw as any).confidence ?? '') : '';
-  return { value: v, confidence: (c === 'high' || c === 'medium' || c === 'low') ? c : null };
-}
+/** The `user_baselines` row the band is read from — handed over WHOLE (see `resolveRunEasyHrBand`). */
+export type EasyHrBaselines = {
+  learned_fitness?: unknown;
+  performance_numbers?: unknown;
+  configured_hr_zones?: unknown;
+} | null | undefined;
+
+const parseJson = (v: unknown): Record<string, unknown> | null => {
+  if (v == null) return null;
+  if (typeof v !== 'string') return v as Record<string, unknown>;
+  try { return JSON.parse(v); } catch { return null; }
+};
 
 /**
  * The one definition. Threshold-first, %max bootstrap, honest null.
  *
- * @param learnedFitness `user_baselines.learned_fitness` (keys are TOP-LEVEL: `run_threshold_hr`,
- *   `run_max_hr_observed`). NOTE: `learned_fitness.running.threshold_hr` does NOT exist — reading that
- *   nested path is the dead lookup that starved `compute-facts.pace_at_easy_hr` on 147 of 147 runs.
- * @param manualThresholdHr optional override (`performance_numbers.threshold_heart_rate`).
+ * ⛔ THE WHOLE ROW, NOT THE LEARNED BLOCK (2026-09-26, Michael: "go"). Callers handed this `learned_fitness` plus,
+ * at most, the legacy `performance_numbers.threshold_heart_rate` — so a run threshold the athlete TYPED
+ * (`configured_hr_zones.manual_run_lthr`) and their `lthr_source` choice were invisible here, and Baselines (which
+ * passed the typed number) and the run screen could print two easy bands for one athlete. Both anchors now come from
+ * their owners, fed the same row every surface feeds them:
+ *   · the threshold — `resolveCurrentLthr` (its sample-count / `is_estimate` gate refuses an invented number: Law 2,
+ *     Q-171 — "88% of observed max (estimated)" never anchors this band);
+ *   · the max, for the bootstrap — `resolveCurrentMaxHr` over `maxHrBaselines`: a TYPED max is seen, else the
+ *     observed peak (a stated `sample_count: 0` is not a measurement). No age estimate: a formula is not a
+ *     measurement either, and this band has always answered null before inventing one.
+ *
+ * NOTE: `learned_fitness.running.threshold_hr` does NOT exist — reading that nested path is the dead lookup that
+ * starved `compute-facts.pace_at_easy_hr` on 147 of 147 runs. The owners read the real top-level keys.
  */
-export function resolveRunEasyHrBand(
-  learnedFitness: Record<string, unknown> | null | undefined,
-  manualThresholdHr?: number | null,
-): EasyHrBand {
-  // D-lthr-one-anchor (audit 2026-07-17): the LTHR resolution + the sample_count:0 gate that used to
-  // live in `readMetric` above now come from the ONE resolver — the same bpm every surface reads.
-  // The %max bootstrap below is unchanged (it is this band's own cold-start, not an LTHR source).
-  const lthr = resolveCurrentLthr({
-    learned_fitness: learnedFitness as any,
-    performance_numbers: { threshold_heart_rate: manualThresholdHr ?? null },
-  });
+export function resolveRunEasyHrBand(baselines: EasyHrBaselines): EasyHrBand {
+  const learned = parseJson(baselines?.learned_fitness);
+  const cfg = parseJson(baselines?.configured_hr_zones);
+  const lthr = resolveCurrentLthr(
+    { learned_fitness: learned, performance_numbers: parseJson(baselines?.performance_numbers), configured_hr_zones: cfg } as never,
+    { sport: 'run' },
+  );
 
   if (lthr.bpm != null) {
     return {
@@ -135,15 +127,16 @@ export function resolveRunEasyHrBand(
   }
 
   // Bootstrap. Available on day one; upgraded the moment a threshold effort is logged.
-  const max = readMetric(learnedFitness, 'run_max_hr_observed');
-  if (max) {
+  const max = resolveCurrentMaxHr(maxHrBaselines(learned, cfg), { sport: 'run', allowAgeEstimate: false });
+  if (max.bpm != null) {
     return {
-      ceiling: Math.round(max.value * EASY_CEILING_PCT_MAXHR),
-      floor: Math.round(max.value * EASY_FLOOR_PCT_MAXHR),
+      ceiling: Math.round(max.bpm * EASY_CEILING_PCT_MAXHR),
+      floor: Math.round(max.bpm * EASY_FLOOR_PCT_MAXHR),
       anchor: 'max_hr',
-      // Never better than 'low': an observed max is a ratchet, not a measurement (Law 3).
+      // Never better than 'low': an observed max is a ratchet, not a measurement, and a typed one is an
+      // assertion, not a threshold (Law 3).
       confidence: 'low',
-      basis: `estimated — ${Math.round(EASY_FLOOR_PCT_MAXHR * 100)}-${Math.round(EASY_CEILING_PCT_MAXHR * 100)}% of your observed max HR (${Math.round(max.value)} bpm); firms up once a threshold effort is logged`,
+      basis: `estimated — ${Math.round(EASY_FLOOR_PCT_MAXHR * 100)}-${Math.round(EASY_CEILING_PCT_MAXHR * 100)}% of your ${max.source === 'manual' ? '' : 'observed '}max HR (${Math.round(max.bpm)} bpm); firms up once a threshold effort is logged`,
     };
   }
 

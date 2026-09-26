@@ -24,6 +24,9 @@ import { barWeightForType, DEFAULT_BAR_LB } from '../../../src/lib/bar-types.ts'
 import { canonicalize } from './canonicalize.ts';
 import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
 import { barIsTheLoad, defaultBarKeyFor } from '../../../src/lib/strength-gear.ts';
+// Friel's zone percentages — the one copy, beside the zone table Baselines prints (2026-09-26).
+import { frielZoneOpensPct, hrZoneSport } from './endurance/display-zones.ts';
+import { resolveCurrentLthr, type BaselinesLike } from '../../../src/lib/resolve-current-lthr.ts';
 
 /** ⛔ The fallback bar for a barbell movement whose set never named one — `BAR_TYPES.standard`, the
  *  same 45 the plan writer floors warm-ups at and the same default Strong and Hevy ship. */
@@ -636,22 +639,52 @@ export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
   // Z5b 103-106, Z5c >106; bike: Z1 <81, Z2 81-89, Z3 90-93, Z4 94-99, Z5a-c as run) and Friel's
   // "Estimating TSS" table of TSS per hour by zone (Z1 low 10 / high 20, Z2 low 40 / high 50, Z3 60,
   // Z4-5a 70, Z5b low 80 / high 90, Z5c 100). Intensity = sqrt(TSS/hr ÷ 100).
+  // ⛔ THE PERCENTAGES ARE THE ZONE TABLE'S (2026-09-26): `frielZoneOpensPct` in `endurance/display-zones.ts`, the
+  // table Baselines prints and every session is counted in. They were typed out here a second time.
   // OURS, declared (STATE-NUMBERS.md): the table's low/high halves of Z1, Z2 and Z5b are split at the
   // zone's midpoint — Friel does not print the split point.
   if ((type === 'run' || isRide) && inp.avgHr && inp.thresholdHr) {
     const pct = (inp.avgHr / inp.thresholdHr) * 100;
-    const z1Hi = type === 'run' ? 85 : 81;
+    const z = frielZoneOpensPct(isRide ? 'ride' : 'run');
+    const z5bTop = z.z5c - 1;                                         // Z5b's last whole percent
     let tssPerHour: number;
-    if (pct < z1Hi) tssPerHour = pct < (z1Hi - 5) ? 10 : 20;          // Z1 low / high (split 5 pts under the ceiling)
-    else if (pct < 90) tssPerHour = pct < (z1Hi + 90) / 2 ? 40 : 50;  // Z2 low / high at the midpoint
-    else if (pct < (type === 'run' ? 95 : 94)) tssPerHour = 60;       // Z3
-    else if (pct < 103) tssPerHour = 70;                              // Z4 + Z5a
-    else if (pct <= 106) tssPerHour = pct < 104.5 ? 80 : 90;          // Z5b low / high at the midpoint
+    if (pct < z.z2) tssPerHour = pct < (z.z2 - 5) ? 10 : 20;          // Z1 low / high (split 5 pts under the ceiling)
+    else if (pct < z.z3) tssPerHour = pct < (z.z2 + z.z3) / 2 ? 40 : 50; // Z2 low / high at the midpoint
+    else if (pct < z.z4) tssPerHour = 60;                             // Z3
+    else if (pct < z.z5b) tssPerHour = 70;                            // Z4 + Z5a
+    else if (pct <= z5bTop) tssPerHour = pct < (z.z5b + z5bTop) / 2 ? 80 : 90; // Z5b low / high at the midpoint
     else tssPerHour = 100;                                            // Z5c
     return Math.round(Math.sqrt(tssPerHour / 100) * 1000) / 1000;
   }
 
   return 0; // no output signal → caller falls through to sRPE / duration default
+}
+
+/**
+ * ⛔ THE THRESHOLD A SESSION'S HEART-RATE LOAD IS READ AGAINST (2026-09-26, Michael: "go"). One call for the
+ * canonical load (`calculate-workload`) and its fallback (`compute-facts`): the owner (`resolveCurrentLthr`), handed
+ * the whole `user_baselines` row so a typed threshold is seen, for the session's sport (a ride reads the bike's
+ * threshold, everything else the run's — `hrZoneSport`, the rule the zone tables use), with the watch file's own
+ * `workouts.threshold_heart_rate` LAST — the owner's lowest tier, provenance unknown. `calculate-workload` used to
+ * take the watch file's number first, and `compute-facts` read a nested path that has never existed.
+ */
+export function sessionLoadThresholdHr(
+  baselines: BaselinesLike,
+  workoutType: unknown,
+  deviceThresholdHr?: number | string | null,
+): number | null {
+  const parse = (v: unknown) => {
+    if (typeof v !== 'string') return v;
+    try { return JSON.parse(v); } catch { return null; }
+  };
+  // Always an object: with no baselines row at all the watch file's number is still the answer (the owner returns
+  // nothing for a missing row before it reaches its device tier).
+  const row = {
+    learned_fitness: parse(baselines?.learned_fitness) ?? null,
+    performance_numbers: parse(baselines?.performance_numbers) ?? null,
+    configured_hr_zones: parse(baselines?.configured_hr_zones) ?? null,
+  } as BaselinesLike;
+  return resolveCurrentLthr(row, { sport: hrZoneSport(workoutType), deviceThresholdHr: deviceThresholdHr ?? null }).bpm;
 }
 
 // ---------------------------------------------------------------------------

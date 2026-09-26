@@ -12,8 +12,9 @@
  *      already uses; swim legs are one even group.
  *   3. Pace band = ±2.5% around the group's pace. OURS — a band wide enough to read as a range on a
  *      watch, narrow enough that its mid-point still adds up to the finish time (docs/STATE-SOURCES.md).
- *   4. Heart-rate band by race distance from the athlete's configured zones (Friel: marathon Z3, half
- *      Z4, 10K Z4–5, 5K Z5); when no zones are configured, %maxHR ranges (OURS, ledger row).
+ *   4. Heart-rate band by race distance from the athlete's zones — the zone table Baselines prints
+ *      (`courseHrZones` → `heartRateZoneSet`, 2026-09-26): marathon Zone 3, half Zone 4, 10K and 5K the fifth
+ *      zone (Friel's 5a from a threshold); with no zones at all, %maxHR ranges (OURS, ledger row).
  *   5. Effort zone and cue are fixed sentences keyed to terrain and position on the course. Fuel note
  *      keyed to the projected finish: 30–60 g carbohydrate/h for 1–2.5 h efforts, 60–90 g/h beyond
  *      (Jeukendrup 2014, Sports Med 44:S25; ACSM/AND/DC 2016 position stand), attached to the group that
@@ -22,6 +23,7 @@
 import { metabolicCostPerMeter } from './gap.ts';
 import type { GeometrySegment } from './course-segmentation.ts';
 import type { DisplayGroup } from './course-strategy-helpers.ts';
+import { heartRateZoneSet } from './endurance/display-zones.ts';
 
 const MI_M = 1609.344;
 const FLAT_COST = metabolicCostPerMeter(0);
@@ -30,6 +32,26 @@ export type StrategyLeg = 'swim' | 'bike' | 'run' | 'full';
 
 export type HrZoneBand = { min?: number | null; max?: number | null };
 
+/**
+ * ⛔ THE RACE BAND READS THE ZONES BASELINES PRINTS (2026-09-26, Michael: "go"). The band and the stale-strategy hash
+ * read `configured_hr_zones.zones` — Strava's automatic table where one was stored (220 − age), else a table
+ * `save-baselines` wrote beside the one the app counts sessions in. Now the run's `heartRateZoneSet`, handed the whole
+ * `user_baselines` row: the threshold on Baselines → Friel's seven zones; no threshold → % of max; then the age
+ * estimate. `course-strategy` and `course-detail` both call this, so the hash each builds comes from one table.
+ */
+export function courseHrZones(
+  row: { performance_numbers?: unknown; learned_fitness?: unknown; configured_hr_zones?: unknown; birthday?: unknown; gender?: unknown } | null | undefined,
+  today: string,
+): { zones: HrZoneBand[]; forHash: Record<string, string> } {
+  const set = heartRateZoneSet(row, 'run', { today });
+  const zones: HrZoneBand[] = (set?.rows ?? []).map((r) => ({ min: r.min, max: r.max }));
+  const forHash: Record<string, string> = {};
+  zones.forEach((z, i) => {
+    forHash[`z${i + 1}`] = `${z.min ?? ''}-${z.max ?? ''}`;
+  });
+  return { zones, forHash };
+}
+
 export type BuildCourseStrategyInput = {
   geometry: GeometrySegment[];
   /** Course distance in miles (row distance, else the goal's nominal distance). */
@@ -37,7 +59,7 @@ export type BuildCourseStrategyInput = {
   /** Anchor finish time for THIS leg, in seconds (terrain-adjusted where the caller did that). */
   legTargetSec: number;
   leg: StrategyLeg;
-  /** Athlete's configured HR zones, Z1..Zn ascending; empty when not configured. */
+  /** The athlete's heart-rate zones (`courseHrZones`), Zone 1..n ascending; empty when there are none. */
   hrZones: HrZoneBand[];
   maxHr: number | null;
 };
@@ -145,8 +167,8 @@ function groupGradePct(grp: GeometrySegment[]): number {
 type HrBand = { low: number; high: number } | null;
 
 /**
- * Race heart-rate band by distance. With configured zones (Z1..Zn ascending): marathon Z3, half Z4,
- * ≤10K the top zone available (Friel run zones by %LTHR). Without zones, %maxHR (OURS):
+ * Race heart-rate band by distance. With zones (Zone 1..n ascending, `courseHrZones`): marathon Zone 3, half Zone 4,
+ * ≤10K the fifth zone (Friel's 5a from a threshold; the open top zone from a max). Without zones, %maxHR (OURS):
  * marathon 80–88, half 85–92, 10K 88–94, 5K 92–97.
  */
 export function raceHrBand(distanceMi: number, zones: HrZoneBand[], maxHr: number | null): HrBand {

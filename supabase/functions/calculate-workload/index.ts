@@ -37,9 +37,9 @@ import {
   resolveCardioIntensity,
   calculateDurationWorkload,
   classifyWorkloadMethod,
+  sessionLoadThresholdHr,
 } from '../_shared/workload.ts'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts'
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts'
 
 interface WorkoutData {
@@ -69,7 +69,6 @@ interface WorkoutData {
   avg_heart_rate?: number; // bpm
   functional_threshold_power?: number; // watts (for cycling intensity zones)
   threshold_heart_rate?: number; // bpm (LTHR, for HR-vs-threshold intensity + zones)
-  max_heart_rate?: number; // bpm (sensor max; zones)
   workout_metadata?: any; // Unified metadata: { session_rpe?, notes?, readiness? }
   /** The post-workout rating for run/ride/swim. ⚠️ The popup writes THIS column for cardio, not workout_metadata.session_rpe. */
   rpe?: number | null;
@@ -270,57 +269,36 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
     }
 
-    // Fetch user's FTP, threshold HR, max HR, resting HR from user_baselines (including learned_fitness)
+    // Fetch user's FTP and the whole baselines row the heart-rate threshold is resolved from
     let bodyweightLb: number | null = null;
     let userFtp: number | null = null;
-    let userThresholdHr: number | null = null;
-    let runThresholdHr: number | null = null;
-    // D-lthr-one-anchor (audit 2026-07-17): captured to resolve the RUN threshold through the ONE resolver
-    // after both baseline blocks (learned + manual live in sibling blocks below).
     let lthrLearnedObj: any = null;
     let lthrPerfObj: any = null;
-    let rideThresholdHr: number | null = null;
-    let runMaxHr: number | null = null;
-    let rideMaxHr: number | null = null;
+    /**
+     * ⛔ THE WHOLE ROW (2026-09-26, Michael: "go"). The threshold is resolved from `learned_fitness`,
+     * `performance_numbers` AND `configured_hr_zones` — the last is where a typed run or ride threshold lives, and this
+     * select did not fetch it, so the athlete's own number was invisible to load. The max heart rate this block also
+     * read (learned peaks, `performance_numbers.max_heart_rate`) fed nothing since D-238 retired TRIMP; deleted.
+     */
+    let baselineRow: any = null;
     if (userId) {
       try {
         const { data: baseline } = await supabaseClient
           .from('user_baselines')
           // D1: `weight` + `units` price the athlete's bodyweight sets. Same row, no extra query.
-          .select('performance_numbers, learned_fitness, weight, units')
+          .select('performance_numbers, learned_fitness, configured_hr_zones, weight, units')
           .eq('user_id', userId)
           .maybeSingle();
-        
+        baselineRow = baseline ?? null;
+
         bodyweightLb = resolveBodyweightLb(baseline as any);
 
-        // Priority 1: Use learned_fitness thresholds (more accurate, data-driven)
         if (baseline?.learned_fitness) {
-          const learned = typeof baseline.learned_fitness === 'string' 
-            ? JSON.parse(baseline.learned_fitness) 
+          lthrLearnedObj = typeof baseline.learned_fitness === 'string'
+            ? JSON.parse(baseline.learned_fitness)
             : baseline.learned_fitness;
-          
-          lthrLearnedObj = learned;
-          // ⛔ THE RUN THRESHOLD READ IS DELETED (2026-08-19). It assigned `runThresholdHr` here and
-          // `:312` overwrote it unconditionally with the resolver's answer, so this line's only effect
-          // was to make the file look like it held two opinions about one anchor. The ride and max
-          // reads below are untouched — they have no resolver (run-only) and are the real work of
-          // this block.
-          
-          // Run max HR from learned data (for TRIMP)
-          if (learned?.run_max_hr_observed?.value) {
-            runMaxHr = Number(learned.run_max_hr_observed.value);
-          }
-          
-          // The ride threshold is resolved below, beside the run one — see the resolver block.
-          
-          // Ride max HR from learned data (for TRIMP)
-          if (learned?.ride_max_hr_observed?.value) {
-            rideMaxHr = Number(learned.ride_max_hr_observed.value);
-          }
-          
         }
 
-        // Priority 2: Use manual performance_numbers (fallback)
         if (baseline?.performance_numbers) {
           const perfNumbers = typeof baseline.performance_numbers === 'string'
             ? JSON.parse(baseline.performance_numbers)
@@ -328,9 +306,6 @@ serve(async (req) => {
           // FTP resolved via shared precedence helper: learned (≥medium confidence) wins,
           // else manual, else learned-low. Permissive — workload computation benefits
           // from any non-null FTP. See src/lib/resolve-current-ftp.ts for full semantics.
-          // `lthrLearnedObj`, not `learned` — that binding is block-scoped to the learned_fitness block above.
-          // Referencing it here threw at runtime, the enclosing `catch {}` swallowed it, and userFtp stayed
-          // null: every ride fell to the heart-rate rung (found 2026-09-04, user_ftp: null in the response).
           const ftpResolved = resolveCurrentFtp({
             learned_fitness: lthrLearnedObj,
             performance_numbers: perfNumbers,
@@ -338,45 +313,16 @@ serve(async (req) => {
           if (ftpResolved.value) {
             userFtp = ftpResolved.value;
           }
-          
           lthrPerfObj = perfNumbers;
-          // Manual threshold HR as fallback
-          if (perfNumbers?.thresholdHeartRate || perfNumbers?.threshold_heart_rate) {
-            userThresholdHr = Number(perfNumbers.thresholdHeartRate || perfNumbers.threshold_heart_rate);
-          }
-          
-          // Manual max HR (fallback for TRIMP)
-          if (!runMaxHr && (perfNumbers?.maxHeartRate || perfNumbers?.max_heart_rate)) {
-            runMaxHr = Number(perfNumbers.maxHeartRate || perfNumbers.max_heart_rate);
-            rideMaxHr = runMaxHr; // Use same for ride if not learned
-          }
         }
       } catch {}
     }
-
-    // D-lthr-one-anchor (audit 2026-07-17): resolve the RUN threshold HR through the ONE resolver
-    // (learned-first, sample_count-gated, honours the athlete's choice) — the SAME bpm the zone bins,
-    // easy band and coach use. Unconditional: it must also NULL OUT a zero-sample learned LTHR the old
-    // ungated read would have accepted. The device-first reconciliation below still wins with the
-    // workout's own threshold_heart_rate column. Byte-identical for a learned athlete with >0 samples.
-    runThresholdHr = resolveCurrentLthr({ learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj }).bpm;
-    /**
-     * ⛔ AND THE BIKE, AS OF 2026-08-20. `resolveCurrentLthr` was RUN-ONLY, so the ride anchor was
-     * still the raw `ride_threshold_hr` read above: no sample-count gate, so a formula-derived bike
-     * threshold ("88% of observed max") could anchor the TRIMP ladder, and no sight of the athlete's
-     * typed `manual_ride_lthr`. Placed HERE rather than at the raw read because both inputs are only
-     * assembled by this point.
-     */
-    rideThresholdHr = resolveCurrentLthr(
-      { learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj },
-      { sport: 'ride' },
-    ).bpm;
 
     // If workout_data not provided, fetch full workout data
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, distance, avg_pace, avg_power, normalized_power, computed, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
+        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, distance, avg_pace, avg_power, normalized_power, computed, avg_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
         .eq('id', workout_id)
         .single()
       
@@ -448,24 +394,21 @@ serve(async (req) => {
       }
     }
     
-    // Inject user's FTP and threshold HR into workout data if not already present
-    // This allows power/HR-based intensity calculation for Strava/Garmin imports
-    // Use sport-specific learned thresholds when available
+    // Inject user's FTP into workout data if not already present
+    // This allows power-based intensity calculation for Strava/Garmin imports
     if (userFtp && !finalWorkoutData.functional_threshold_power) {
       finalWorkoutData.functional_threshold_power = userFtp;
     }
     
-    // Inject sport-specific threshold HR
-    const workoutType = finalWorkoutData.type?.toLowerCase() || '';
-    if (!finalWorkoutData.threshold_heart_rate) {
-      if ((workoutType === 'run') && runThresholdHr) {
-        finalWorkoutData.threshold_heart_rate = runThresholdHr;
-      } else if ((workoutType === 'ride' || workoutType === 'bike') && rideThresholdHr) {
-        finalWorkoutData.threshold_heart_rate = rideThresholdHr;
-      } else if (userThresholdHr) {
-        finalWorkoutData.threshold_heart_rate = userThresholdHr;
-      }
-    }
+    /**
+     * ⛔ THE THRESHOLD IS THE OWNER'S, AND THE WATCH FILE'S NUMBER IS ITS LAST TIER (2026-09-26, Michael: "go").
+     * This kept the workout's own `threshold_heart_rate` (a FIT file's profile value) FIRST and only asked the resolver
+     * when it was empty — the opposite of the owner's order, where that number is the lowest tier (provenance
+     * unknown). `sessionLoadThresholdHr` asks the owner with the whole row, for this session's sport, with the watch
+     * file's number handed in as that last tier; `compute-facts`' fallback load makes the same call.
+     */
+    finalWorkoutData.threshold_heart_rate =
+      sessionLoadThresholdHr(baselineRow, finalWorkoutData.type, finalWorkoutData.threshold_heart_rate) ?? undefined;
     
     // rTSS / sTSS thresholds (TrainingPeaks): the run's functional threshold pace and the swim's CSS, from the
     // same baselines the FTP and LTHR came from — one resolver each, never a local read.
@@ -477,17 +420,6 @@ serve(async (req) => {
       if (Number.isFinite(css) && css > 0) finalWorkoutData.css_sec_per_100m = css;
     } catch { /* thresholds are optional; the resolver falls to the next rung */ }
 
-    // Inject max HR for TRIMP calculation (sport-specific)
-    if (!finalWorkoutData.max_heart_rate) {
-      if ((workoutType === 'run') && runMaxHr) {
-        finalWorkoutData.max_heart_rate = runMaxHr;
-      } else if ((workoutType === 'ride' || workoutType === 'bike') && rideMaxHr) {
-        finalWorkoutData.max_heart_rate = rideMaxHr;
-      } else if (runMaxHr) {
-        finalWorkoutData.max_heart_rate = runMaxHr;
-      }
-    }
-    
     // Parse workout_metadata if it's a string (JSONB from database)
     let parsedMetadata: any = {};
     if (workoutMetadata) {
@@ -610,14 +542,9 @@ serve(async (req) => {
         workload_difference: plannedWorkload !== null ? workload - plannedWorkload : null,
         // Debug info for workload calculation
         user_ftp: userFtp,
-        run_threshold_hr: runThresholdHr,
-        ride_threshold_hr: rideThresholdHr,
-        run_max_hr: runMaxHr,
-        ride_max_hr: rideMaxHr,
         avg_power: finalWorkoutData?.avg_power,
         avg_heart_rate: finalWorkoutData?.avg_heart_rate,
         threshold_heart_rate: finalWorkoutData?.threshold_heart_rate,
-        max_heart_rate: finalWorkoutData?.max_heart_rate,
         workload_method: workloadMethodClassified,
         workload_estimated: workloadEstimated
       }),
