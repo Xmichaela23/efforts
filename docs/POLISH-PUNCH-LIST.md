@@ -52,14 +52,13 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
-## AWAITING MICHAEL (2026-09-25, D-485…D-490 — all PUSHED through `fc89664d9`, every importer DEPLOYED, phone build has every client change; NOT all seen on the phone)
+## AWAITING MICHAEL (2026-09-25, D-485…D-490 — PUSHED through `fc89664d9`, DEPLOYED; three of five VERIFIED on his phone 2026-09-25)
 
-- **Keypad:** the row being typed into stays in view above the panel; dragging the panel down closes without saving.
-- **Back Extension:** after one more Profile → Rebuild upcoming sessions, Tuesday's and Friday's superset reads
-  Back Extension, and its Swap sheet lists Back Extension first under Braced.
-- **Earned sets:** the week a count moves, the card shows "Up to 4 sets…" once; the block description has the paragraph.
-- **Run laps:** the 25 Sep run reads warm-up · lunges · Cossack squats · five 6:00 in range · four rests · cool-down.
-- **Rides:** Tuesday 29 Sep's ride reaches the Edge with "Until Lap Press" on the warm-up.
+- [x] **Keypad:** row stays in view; drag-down closes without saving. VERIFIED on his phone 2026-09-25.
+- [x] **Back Extension:** after the rebuild, in the superset and first in Swap. VERIFIED on his phone 2026-09-25.
+- **Earned sets:** the week a count moves, the card shows "Up to 4 sets…" once. Needs two sessions of logging first.
+- [x] **Run laps:** the 25 Sep run reads correctly. VERIFIED on his phone 2026-09-25.
+- **Rides:** Tuesday 29 Sep's ride on the Edge shows "Until Lap Press" on the warm-up. He checks Tuesday.
 
 ## QUEUED (2026-09-25, waiting on Michael's go) — THE PLATES PILL AND THE PLATE LINE
 

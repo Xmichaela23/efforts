@@ -20,7 +20,8 @@
 > - Sets are earned on every row, with approved card and block copy; swaps match by exact name (D-489).
 > - Run laps by order; the Swap sheet built for the slot; new gear reaches the plan on an equipment rebuild (D-490).
 >
-> **Still unverified:** everything in AWAITING MICHAEL. The Back Extension change on his block needs one more
+> **Still unverified:** earned sets (needs two logged sessions) and the Edge warm-up (Tuesday 29 Sep). Keypad, Back
+> Extension and run laps VERIFIED on his phone 2026-09-25. Was: the Back Extension change on his block needed one more
 > Profile → Rebuild upcoming sessions after `fc89664d9` (the earlier rebuild wrote rows with no slot stamps and
 > overwrote the built kit; both fixed in that commit).
 >
