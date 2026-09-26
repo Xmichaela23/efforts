@@ -277,6 +277,10 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
   // ⛔ A TIMED STEP PRINTS ITS TIME (2026-09-16): `distanceDerived` is the distance materialize-plan worked out from
   // time × pace; the page prescribes the time, so a 4:00 rep read "0.38 mi" here.
   if (isRun) {
+    // A step the page prints without a clock (a drill, p233's "3 sets of 20m walking lunges") has no time or distance
+    // to print — the "20m" in its words is not one — so its row carries the page's own words (2026-09-25, the first
+    // time such a step took a lap on a run).
+    if (st?.lap_button === true && typeof st?.label === 'string' && st.label.trim()) return st.label.trim();
     const meters = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
     const seconds = deriveSecondsFromPlannedStep(st);
     
@@ -378,7 +382,8 @@ const ALIGN = {
    * OURS — `order_lap_floor_frac` 0.5: a watch lap under HALF the shortest planned step cannot be any step, so it
    * is not counted when the laps are paired to the steps by order (2026-09-17). A recorded lap runs a second or
    * two short of the step it is (a 60-second jog lands at 59); nothing lands at half. Ledger row in
-   * docs/STATE-SOURCES.md.
+   * docs/STATE-SOURCES.md. Read the other way since 2026-09-25 (`layoutLapsByOrder`): a work step's lap lasts
+   * between half and twice the step, as the effort finder's `len_frac` says of a stretch.
    */
   order_lap_floor_frac: 0.5,
   /**
@@ -1233,6 +1238,10 @@ Deno.serve(async (req) => {
       // (`source-rules.ts` RIDE_* wrappers, `lap_button`), so a 20:00 lap against the row's 12:30 IS the step. Any
       // lap-button step on a ride takes its lap the same way. Rides only; a run's rungs are unchanged.
       if (sport === 'ride' && (role === 'warmup' || st?.lap_button === true)) return true;
+      // ⛔ A RUN'S LAP-BUTTON STEP TAKES ITS LAP THE SAME WAY (2026-09-25, Michael's 5 × 6:00: the p233 box's two drills
+      // went to the watch as lap-button steps, so Lap 2 (0:14) and Lap 3 (0:23) were the drills pressed through — and a
+      // step with no clock fitted nothing, so the whole-plan match failed on them). The ride line above is unchanged.
+      if ((sport === 'run' || sport === 'walk') && st?.lap_button === true) return true;
       if (targetM && st?.type !== 'time') {
         if (sport === 'run') {
           const tol = targetM <= 1000 ? ALIGN.tol.run.dist_short_m : targetM * ALIGN.tol.run.dist_long_pc;
@@ -1647,6 +1656,11 @@ Deno.serve(async (req) => {
      *     3-second work tolerance rejected every rep and nothing was judged). Laps shorter than the shortest planned
      *     step are dropped — no step is that short, so such a lap cannot be one; if the rest number exactly the steps,
      *     lap i IS step i. Mode `laps-in-order`; judged like `laps-paired`.
+     *   · ⛔ AND THE ORDER IS TRIED BEFORE THE PAIRING (2026-09-25, Michael's 5 × 6:00 — see `layoutLapsByOrder`):
+     *     thirteen laps on thirteen steps, one for one, read as three paired reps, eight bare "Lap N" rows and two
+     *     "6:00 not done", because 5:56 and 5:29 missed the 3-second tolerance and the pairing fired first. Now the
+     *     laps are walked onto the steps in order, short strays and a cut-short tail allowed, and the tolerance only
+     *     decides which short laps are the strays. The pairing is what remains for laps that will not lay out in order.
      *   · With no rep paired and no order match the rows read "Lap 1…N" with no plan, no range, no colour, and no
      *     "not done" rows; the analyzer scores Execution on duration only.
      * ⚠️ OURS — "structured": the plan has two or more work steps. A steady planned run keeps the existing path,
@@ -1724,83 +1738,201 @@ Deno.serve(async (req) => {
             const [a, b] = lapWins[i];
             return { ...placed[i].L, dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
           };
-          const stepForLap = new Map<number, any>();
-          const unpairedWork: any[] = [];
-          let nextLap = 0;
-          for (const st of plannedSteps.filter((x: any) => stepRole(x) === 'work')) {
-            let k = nextLap;
-            while (k < lapWins.length && (!stepLapWithinTolerance(st, measuredLap(k)) || lapIsWalkForStep(st, measuredLap(k)))) k++;
-            if (k < lapWins.length) { stepForLap.set(k, st); nextLap = k + 1; } else unpairedWork.push(st);
-          }
-          snapped = lapWins.map(([a, b], i) => {
-            const n = placed[i].L.number;
-            const st = stepForLap.get(i);
-            if (st) return { ...execIntervalFromWindow(st, a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
-            const row = execFromIdx(rows, a, b, 'lap', 'lap');
-            return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
-          });
-          if (stepForLap.size > 0) {
-            for (const stNM of unpairedWork) {
-              snapped.push({
-                planned_step_id: stNM?.id ?? null,
-                planned_label: formatPlannedLabel(stNM, sport),
-                kind: stNM?.type || stNM?.kind || null,
-                role: 'work',
-                planned: {
-                  duration_s: deriveSecondsFromPlannedStep(stNM),
-                  distance_m: deriveMetersFromPlannedStep(stNM),
-                  target_pace_s_per_mi: derivePlannedPaceSecPerMi(stNM),
-                },
-                executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
-                pass_state: 'skip',
-                not_done: true,
-                not_matched: true,
-                sample_idx_start: null,
-                sample_idx_end: null,
-              });
-            }
-            snapMode = 'laps-paired';
-          } else {
-            /**
-             * ⛔ WHEN NOTHING FITS THE TOLERANCE BUT THE LAPS ARE THE STEPS, PAIR THEM IN ORDER (2026-09-17,
-             * WORKORDER Stage B1). Michael's 2026-09-16 run: the watch was sent 0.41 mi distance steps by the
-             * pre-493fecc7 export, so its six work laps ran 198–211 s against 240 s steps. `ALIGN.tol.run.time_work_s`
-             * is 3 s, so every rep missed by 29–42 s, NOT ONE REP PAIRED, and the session read Execution 95 from
-             * time alone with no rep judged. The order was right on every row; only the tolerance said no.
-             *
-             * So: drop any lap too short to be a step at all — his watch left an 8-second, 13-metre stray at the
-             * end. ⚠️ THE FLOOR IS HALF THE SHORTEST STEP, NOT THE STEP (`ALIGN.order_lap_floor_frac`, OURS,
-             * ledgered). A first cut used the step itself and this rung never fired on the very run it was written
-             * for: his 60-second jogs recorded as 59 seconds, so every one of them was thrown away with the stray.
-             * A recorded lap runs a second or two short of its step; nothing runs at half of it. If the laps that remain then number
-             * exactly the planned steps, lap i is step i. The work steps' laps are judged against their range; every
-             * other lap prints as before. Mode `laps-in-order`; the analyzer scores it like `laps-paired`.
-             *
-             * ⚠️ NO NEW NUMBER. The floor is "shorter than the shortest planned step", not a constant, and the
-             * count test is equality — a lap more or less and this rung does not fire.
-             */
+          /**
+           * ⛔ ORDER IS THE EVIDENCE; THE TOLERANCE IS THE TIEBREAK (2026-09-25, Michael's 5 × 6:00 @ 88% / 1:00 @ VT1, p234).
+           * Watch laps 10:00 · 0:14 · 0:23 · 6:00 · 0:57 · 6:00 · 0:24 · 6:00 · 0:50 · 5:56 · 1:00 · 5:29 · 7:07 — thirteen
+           * laps on thirteen steps, one for one: the 10-minute jog, the p233 box's two drills (lap-button steps, pressed
+           * through in 14 and 23 seconds), 5 × 6:00 with 1:00 between, the 8-minute jog. The pairing rung fired first: three
+           * reps fitted the 3-second tolerance, 5:56 and 5:29 did not, so from Lap 10 on every row read "Lap N", no rest
+           * carried its name, and two "6:00 not done" rows sat under a run that had done all five. The count rung never
+           * fired: its floor (half the shortest step, 30 s) threw the 0:24 rest away with the two drill laps, and ten laps
+           * did not number thirteen steps.
+           *   · The laps are walked onto the steps from the front, in order. A lap takes the next step, or — only when it
+           *     is under the floor — is a stray press ("Lap N"). No step is skipped, except a lap-button step, which the
+           *     athlete may never have pressed for; the steps left when the laps run out are "not done" (the 2026-09-03
+           *     cut-short rule), as is a lap-button step no lap sat on.
+           *   · Of every such layout the one with the most laps inside their step's tolerance wins — the tolerance decides
+           *     only which short laps are the strays; then the fewest strays, then the fewest skipped steps; on a tie the
+           *     earlier lap is the step and the later one the stray (the second of two quick presses is the accident).
+           *   · A work step never takes a lap at walking pace (`lapIsWalkForStep`), nor one under half or over twice its
+           *     own length — ⚠️ OURS, the floor's fraction read the other way (`ALIGN.order_lap_floor_frac`, ledgered), the
+           *     effort finder's `len_frac` rule on a lap. Without it the 2026-09-16 run, whose watch joined the last rep
+           *     and the cool-down into one 12-minute lap, would lay that lap on the rep; it stays `laps-paired`, as ruled.
+           *   · The layout is the rows when every step got a lap or a skip (the 2026-09-17 count rule, generalised: the
+           *     strays are chosen, not just the laps under the floor), or when the tail is absent and at least one lap
+           *     fits its step by the tolerance — the one-fit threshold that puts a run into `laps-paired` today. A layout
+           *     with no fit and steps missing is no evidence, and the run reads as before.
+           *   · A lap-button step takes whatever lap sits in its place and counts as no fit: it has no length.
+           *   Mode `laps-in-order`; judged like `laps-paired`. Runs and walks only — a ride's rungs are the 2026-09-24
+           *   build, byte for byte.
+           * ⚠️ NO NEW NUMBER: the floor, the tolerances and the one-fit threshold are the existing ones.
+           */
+          const layoutLapsByOrder = (): any[] | null => {
+            const n = lapWins.length, m = plannedSteps.length;
+            if (n < 2 || m < 2) return null;
+            const frac = ALIGN.order_lap_floor_frac;
             const shortestStepSec = plannedSteps
               .map((st: any) => deriveSecondsFromPlannedStep(st))
-              .filter((s: number) => Number.isFinite(s) && s > 0)
+              .filter((sec: number | null) => Number.isFinite(sec) && (sec as number) > 0)
               .reduce((a: number, b: number) => Math.min(a, b), Infinity);
-            const floor = shortestStepSec * ALIGN.order_lap_floor_frac;
-            const keep = Number.isFinite(shortestStepSec)
-              ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= floor)
-              : [];
-            if (keep.length === plannedSteps.length && keep.length >= 2
-              && !keep.some((lapIdx, at) => lapIsWalkForStep(plannedSteps[at], measuredLap(lapIdx)))) {
-              snapped = lapWins.map(([a, b], i) => {
-                const n = placed[i].L.number;
-                const at = keep.indexOf(i);
-                if (at < 0) {
-                  const row = execFromIdx(rows, a, b, 'lap', 'lap');
-                  return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
-                }
-                return { ...execIntervalFromWindow(plannedSteps[at], a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
-              });
-              snapMode = 'laps-in-order';
+            const floor = Number.isFinite(shortestStepSec) ? shortestStepSec * frac : 0;
+            const lap = lapWins.map((_, i) => measuredLap(i));
+            const isLapButton = (j: number) => plannedSteps[j]?.lap_button === true;
+            const canTake = (i: number, j: number): boolean => {
+              const st = plannedSteps[j];
+              if (stepRole(st) !== 'work') return true;
+              if (lapIsWalkForStep(st, lap[i])) return false;
+              const sec = deriveSecondsFromPlannedStep(st);
+              return !(sec && sec > 0 && (lap[i].time_s < sec * frac || lap[i].time_s > sec / frac));
+            };
+            const fits = (i: number, j: number): number => (!isLapButton(j) && stepLapWithinTolerance(plannedSteps[j], lap[i])) ? 1 : 0;
+            // One number orders the layouts: fits first, then laps laid (fewer strays), then steps not skipped.
+            const B = m + 1, A = (n + 1) * B;
+            // best[i][j]: the best layout of the first i laps on the first j steps; -Infinity = none. how: 1 lap i took
+            // step j, 2 lap i is a stray, 3 step j was skipped.
+            const best: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(-Infinity));
+            const how: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+            best[0][0] = 0;
+            for (let j = 1; j <= m; j++) if (isLapButton(j - 1) && best[0][j - 1] > -Infinity) { best[0][j] = best[0][j - 1] - 1; how[0][j] = 3; }
+            for (let i = 1; i <= n; i++) {
+              for (let j = 0; j <= m; j++) {
+                let b = -Infinity, h = 0;
+                if (j >= 1 && best[i - 1][j - 1] > -Infinity && canTake(i - 1, j - 1)) { b = best[i - 1][j - 1] + fits(i - 1, j - 1) * A + B; h = 1; }
+                // A tie goes to the stray: the earlier lap keeps the step.
+                if (lap[i - 1].time_s < floor && best[i - 1][j] > -Infinity && best[i - 1][j] >= b) { b = best[i - 1][j]; h = 2; }
+                if (j >= 1 && isLapButton(j - 1) && best[i][j - 1] > -Infinity && best[i][j - 1] - 1 > b) { b = best[i][j - 1] - 1; h = 3; }
+                best[i][j] = b; how[i][j] = h;
+              }
+            }
+            let jStar = -1;
+            for (let j = 0; j <= m; j++) if (best[n][j] > -Infinity && (jStar < 0 || best[n][j] >= best[n][jStar])) jStar = j;
+            if (jStar < 0) return null;
+            // Walk the layout back from its end, then read it forwards.
+            const steps: Array<{ h: number; i: number; j: number }> = [];
+            for (let i = n, j = jStar; i > 0 || j > 0;) {
+              const h = how[i][j];
+              if (h === 1) { steps.push({ h, i: i - 1, j: j - 1 }); i--; j--; }
+              else if (h === 2) { steps.push({ h, i: i - 1, j: -1 }); i--; }
+              else if (h === 3) { steps.push({ h, i: -1, j: j - 1 }); j--; }
+              else return null;
+            }
+            steps.reverse();
+            const laid = steps.filter((x) => x.h === 1);
+            const fitCount = laid.reduce((acc, x) => acc + fits(x.i, x.j), 0);
+            if (laid.length < 2) return null;
+            if (jStar < m && fitCount < 1) return null;
+            const notDoneRow = (stND: any) => ({
+              planned_step_id: stND?.id ?? null,
+              planned_label: formatPlannedLabel(stND, sport),
+              kind: stND?.type || stND?.kind || null,
+              role: stepRole(stND),
+              planned: {
+                duration_s: deriveSecondsFromPlannedStep(stND),
+                distance_m: deriveMetersFromPlannedStep(stND),
+                target_pace_s_per_mi: derivePlannedPaceSecPerMi(stND),
+              },
+              executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
+              pass_state: 'skip',
+              not_done: true,
+              sample_idx_start: null,
+              sample_idx_end: null,
+            });
+            const laidOut: any[] = steps.map(({ h, i, j }) => {
+              if (h === 3) return notDoneRow(plannedSteps[j]);
+              const [a, b] = lapWins[i];
+              const num = placed[i].L.number;
+              if (h === 2) {
+                const row = execFromIdx(rows, a, b, 'lap', 'lap');
+                return { ...row, planned_label: `Lap ${num}`, kind: 'lap', lap_number: num, sample_idx_start: a, sample_idx_end: b };
+              }
+              return { ...execIntervalFromWindow(plannedSteps[j], a, b), lap_number: num, sample_idx_start: a, sample_idx_end: b };
+            });
+            for (const stND of plannedSteps.slice(jStar)) laidOut.push(notDoneRow(stND));
+            return laidOut;
+          };
+          const ordered = (sport === 'run' || sport === 'walk') ? layoutLapsByOrder() : null;
+          if (ordered) {
+            snapped = ordered;
+            snapMode = 'laps-in-order';
+          } else {
+            const stepForLap = new Map<number, any>();
+            const unpairedWork: any[] = [];
+            let nextLap = 0;
+            for (const st of plannedSteps.filter((x: any) => stepRole(x) === 'work')) {
+              let k = nextLap;
+              while (k < lapWins.length && (!stepLapWithinTolerance(st, measuredLap(k)) || lapIsWalkForStep(st, measuredLap(k)))) k++;
+              if (k < lapWins.length) { stepForLap.set(k, st); nextLap = k + 1; } else unpairedWork.push(st);
+            }
+            snapped = lapWins.map(([a, b], i) => {
+              const n = placed[i].L.number;
+              const st = stepForLap.get(i);
+              if (st) return { ...execIntervalFromWindow(st, a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
+              const row = execFromIdx(rows, a, b, 'lap', 'lap');
+              return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
+            });
+            if (stepForLap.size > 0) {
+              for (const stNM of unpairedWork) {
+                snapped.push({
+                  planned_step_id: stNM?.id ?? null,
+                  planned_label: formatPlannedLabel(stNM, sport),
+                  kind: stNM?.type || stNM?.kind || null,
+                  role: 'work',
+                  planned: {
+                    duration_s: deriveSecondsFromPlannedStep(stNM),
+                    distance_m: deriveMetersFromPlannedStep(stNM),
+                    target_pace_s_per_mi: derivePlannedPaceSecPerMi(stNM),
+                  },
+                  executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
+                  pass_state: 'skip',
+                  not_done: true,
+                  not_matched: true,
+                  sample_idx_start: null,
+                  sample_idx_end: null,
+                });
+              }
+              snapMode = 'laps-paired';
             } else {
-              snapMode = 'laps-unmatched';
+              /**
+               * ⛔ WHEN NOTHING FITS THE TOLERANCE BUT THE LAPS ARE THE STEPS, PAIR THEM IN ORDER (2026-09-17,
+               * WORKORDER Stage B1). Michael's 2026-09-16 run: the watch was sent 0.41 mi distance steps by the
+               * pre-493fecc7 export, so its six work laps ran 198–211 s against 240 s steps. `ALIGN.tol.run.time_work_s`
+               * is 3 s, so every rep missed by 29–42 s, NOT ONE REP PAIRED, and the session read Execution 95 from
+               * time alone with no rep judged. The order was right on every row; only the tolerance said no.
+               *
+               * So: drop any lap too short to be a step at all — his watch left an 8-second, 13-metre stray at the
+               * end. ⚠️ THE FLOOR IS HALF THE SHORTEST STEP, NOT THE STEP (`ALIGN.order_lap_floor_frac`, OURS,
+               * ledgered). A first cut used the step itself and this rung never fired on the very run it was written
+               * for: his 60-second jogs recorded as 59 seconds, so every one of them was thrown away with the stray.
+               * A recorded lap runs a second or two short of its step; nothing runs at half of it. If the laps that remain then number
+               * exactly the planned steps, lap i is step i. The work steps' laps are judged against their range; every
+               * other lap prints as before. Mode `laps-in-order`; the analyzer scores it like `laps-paired`.
+               *
+               * ⚠️ NO NEW NUMBER. The floor is "shorter than the shortest planned step", not a constant, and the
+               * count test is equality — a lap more or less and this rung does not fire.
+               */
+              const shortestStepSec = plannedSteps
+                .map((st: any) => deriveSecondsFromPlannedStep(st))
+                .filter((s: number) => Number.isFinite(s) && s > 0)
+                .reduce((a: number, b: number) => Math.min(a, b), Infinity);
+              const floor = shortestStepSec * ALIGN.order_lap_floor_frac;
+              const keep = Number.isFinite(shortestStepSec)
+                ? lapWins.map((_, i) => i).filter((i) => measuredLap(i).time_s >= floor)
+                : [];
+              if (keep.length === plannedSteps.length && keep.length >= 2
+                && !keep.some((lapIdx, at) => lapIsWalkForStep(plannedSteps[at], measuredLap(lapIdx)))) {
+                snapped = lapWins.map(([a, b], i) => {
+                  const n = placed[i].L.number;
+                  const at = keep.indexOf(i);
+                  if (at < 0) {
+                    const row = execFromIdx(rows, a, b, 'lap', 'lap');
+                    return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
+                  }
+                  return { ...execIntervalFromWindow(plannedSteps[at], a, b), lap_number: n, sample_idx_start: a, sample_idx_end: b };
+                });
+                snapMode = 'laps-in-order';
+              } else {
+                snapMode = 'laps-unmatched';
+              }
             }
           }
         }

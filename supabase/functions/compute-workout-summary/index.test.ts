@@ -428,3 +428,101 @@ Deno.test('walk · 14 laps on the steps → laps-matched (the walk sport takes t
   const r = await compute('walk-laps-matched', workout('walk', segs, lapsAt(boundsOf(segs))), plan);
   assertEquals(r.computed.alignment_mode, 'laps-matched');
 });
+
+// ── runs: the laps walked onto the steps in order (2026-09-25, Michael's 5 × 6:00) ──────────────────────────────
+/**
+ * The p233-234 level 2 near-threshold run as materialize-plan saves it: the p233 box's 10-minute easy jog and its two
+ * drills (lap-button steps: no clock, the athlete ends them with the press), 5 × 6:00 @ 88% with 1:00 @ VT1 between
+ * (four rests: between rounds only), the box's 8-minute easy jog. Thirteen steps.
+ */
+function fiveBySixRun(opts: { drills?: boolean } = { drills: true }) {
+  const steps: Record<string, unknown>[] = [
+    { id: 'w0', kind: 'warmup', duration_s: 600, label: '10-minute easy jog', page_label: true, watch_target: 'none' },
+  ];
+  if (opts.drills !== false) {
+    steps.push({ id: 'w1', kind: 'warmup', label: '3 sets of 20m walking lunges', page_label: true, watch_target: 'none', lap_button: true });
+    steps.push({ id: 'w2', kind: 'warmup', label: '2 sets of 10 (per side) Cossack squats', page_label: true, watch_target: 'none', lap_button: true });
+  }
+  for (let k = 1; k <= 5; k += 1) {
+    steps.push({ id: `wk${k}`, kind: 'work', seconds: 360, distanceMeters: 887, distanceDerived: true, pace_range: { lower: 588, upper: 718 } });
+    if (k < 5) steps.push({ id: `rk${k}`, kind: 'recovery', seconds: 60, pace_range: { lower: 700, upper: 840 } });
+  }
+  steps.push({ id: 'c0', kind: 'cooldown', duration_s: 480, label: '8-minute easy jog', page_label: true, watch_target: 'none' });
+  return { id: opts.drills === false ? 'p-5x6-no-drills' : 'p-5x6', intervals: null, tags: ['family:run_near_threshold'], computed: { normalization_version: 'v3', steps, total_duration_seconds: 2280 } };
+}
+const mps = (paceSecPerMi: number) => 1609.34 / paceSecPerMi;
+/** Michael's 2026-09-25 laps: 10:00 · 0:14 · 0:23 · 6:00 · 0:57 · 6:00 · 0:24 · 6:00 · 0:50 · 5:56 · 1:00 · 5:29 · 7:07. */
+const OWNER_SEGS: Seg[] = [
+  { sec: 600, mps: mps(750), hr: 135 }, { sec: 14, mps: 1.0, hr: 130 }, { sec: 23, mps: 1.0, hr: 128 },
+  { sec: 360, mps: mps(661), hr: 160 }, { sec: 57, mps: mps(810), hr: 150 },
+  { sec: 360, mps: mps(613), hr: 165 }, { sec: 24, mps: mps(810), hr: 152 },
+  { sec: 360, mps: mps(639), hr: 166 }, { sec: 50, mps: mps(810), hr: 153 },
+  { sec: 356, mps: mps(636), hr: 167 }, { sec: 60, mps: mps(810), hr: 154 },
+  { sec: 329, mps: mps(625), hr: 168 }, { sec: 427, mps: mps(760), hr: 145 },
+];
+const labels = (c: any) => (c.intervals as any[]).map((r) => r.planned_label);
+
+Deno.test('run · 13 laps on 13 steps, two reps off the tolerance (5:56, 5:29) → laps-in-order, every row named, nothing not done', async () => {
+  const r = await compute('run-5x6-in-order', workout('run', OWNER_SEGS, lapsAt(boundsOf(OWNER_SEGS))), fiveBySixRun());
+  assertEquals(r.computed.alignment_mode, 'laps-in-order');
+  assertEquals(r.computed.intervals.length, 13);
+  assertEquals(r.computed.steps_not_done, 0);
+  assertEquals(labels(r.computed), [
+    '10:00', '3 sets of 20m walking lunges', '2 sets of 10 (per side) Cossack squats',
+    '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '8:00',
+  ]);
+  const work = workRows(r.computed);
+  assertEquals(work.length, 5);
+  assertEquals(work.map((w) => w.executed.duration_s), [360, 360, 360, 356, 329]);
+  assertEquals(work.map((w) => w.executed.avg_pace_s_per_mi), [661, 613, 639, 636, 625]);
+  work.forEach((w, i) => assert(w.executed.in_range_s >= w.executed.duration_s - 1, `rep ${i + 1}: ${w.executed.in_range_s} s of ${w.executed.duration_s} in range`));
+  assertEquals((r.computed.intervals as any[]).filter((x) => x.role === 'recovery').map((x) => x.executed.duration_s), [57, 24, 50, 60]);
+  assertEquals(r.computed.intervals[12].role, 'cooldown');
+  assertEquals((r.computed.intervals as any[]).map((x) => x.lap_number), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+});
+
+Deno.test('run · the same laps against the plan without the drill steps → the 0:14 and 0:23 are strays ("Lap 2", "Lap 3"), the 0:24 is still the rest', async () => {
+  const r = await compute('run-5x6-strays', workout('run', OWNER_SEGS, lapsAt(boundsOf(OWNER_SEGS))), fiveBySixRun({ drills: false }));
+  assertEquals(r.computed.alignment_mode, 'laps-in-order');
+  assertEquals(r.computed.intervals.length, 13);
+  assertEquals(r.computed.steps_not_done, 0);
+  assertEquals(labels(r.computed), ['10:00', 'Lap 2', 'Lap 3', '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '8:00']);
+  assertEquals(workRows(r.computed).map((w) => w.executed.duration_s), [360, 360, 360, 356, 329]);
+});
+
+Deno.test('run · stopped after rep 3 of 5, reps 4 s off the tolerance → laps-in-order lays out 3, the rest not done', async () => {
+  const segs: Seg[] = [
+    { sec: 600, mps: mps(750), hr: 135 }, { sec: 14, mps: 1.0, hr: 130 }, { sec: 23, mps: 1.0, hr: 128 },
+    { sec: 356, mps: mps(661), hr: 160 }, { sec: 60, mps: mps(810), hr: 150 },
+    { sec: 356, mps: mps(613), hr: 165 }, { sec: 60, mps: mps(810), hr: 152 },
+    { sec: 356, mps: mps(639), hr: 166 },
+  ];
+  const r = await compute('run-5x6-cut-short', workout('run', segs, lapsAt(boundsOf(segs))), fiveBySixRun());
+  assertEquals(r.computed.alignment_mode, 'laps-in-order');
+  assertEquals(r.computed.intervals.length, 13);
+  assertEquals(r.computed.steps_not_done, 5);
+  assertEquals(labels(r.computed), [
+    '10:00', '3 sets of 20m walking lunges', '2 sets of 10 (per side) Cossack squats',
+    '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '1:00', '6:00', '8:00',
+  ]);
+  assertEquals((r.computed.intervals as any[]).filter((x) => x.not_done).map((x) => x.planned_step_id), ['rk3', 'wk4', 'rk4', 'wk5', 'c0']);
+  // The recording ends with the third rep, so its last lap has no sample after it: 355 of 356 (the file's window convention).
+  assertEquals(workRows(r.computed).filter((w) => !w.not_done).map((w) => w.executed.duration_s), [356, 356, 355]);
+});
+
+Deno.test('run · the drills done inside the warm-up (no press for them) → the two lap-button steps are skipped, the reps still land', async () => {
+  const segs: Seg[] = [
+    { sec: 600, mps: mps(750), hr: 135 },
+    { sec: 356, mps: mps(661), hr: 160 }, { sec: 60, mps: mps(810), hr: 150 },
+    { sec: 356, mps: mps(613), hr: 165 }, { sec: 24, mps: mps(810), hr: 152 },
+    { sec: 356, mps: mps(639), hr: 166 }, { sec: 50, mps: mps(810), hr: 153 },
+    { sec: 356, mps: mps(636), hr: 167 }, { sec: 60, mps: mps(810), hr: 154 },
+    { sec: 329, mps: mps(625), hr: 168 }, { sec: 427, mps: mps(760), hr: 145 },
+  ];
+  const r = await compute('run-5x6-no-drill-press', workout('run', segs, lapsAt(boundsOf(segs))), fiveBySixRun());
+  assertEquals(r.computed.alignment_mode, 'laps-in-order');
+  assertEquals(r.computed.intervals.length, 13);
+  assertEquals((r.computed.intervals as any[]).filter((x) => x.not_done).map((x) => x.planned_step_id), ['w1', 'w2']);
+  assertEquals(workRows(r.computed).map((w) => w.executed.duration_s), [356, 356, 356, 356, 329]);
+});
+
