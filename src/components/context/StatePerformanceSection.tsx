@@ -1467,14 +1467,18 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* ⛔ A CHEVRON THAT OPENS A ROW IS AN AFFORDANCE, NOT DECORATION (rule 5) — it was
                     white/45, near-invisible, and the only signal these rows open at all. */}
                 {/* a clear cue that the row opens (Michael 2026-09-03): a proper chevron that turns when open */}
-                {/* down = opens in place (iOS/Material accordion); a right chevron would promise another screen */}
+                {/* ⛔ RIGHT WHEN CLOSED, DOWN WHEN OPEN (Michael, 2026-09-26: a down chevron beside "Deadlift 180" or
+                    "efficiency factor 1.01" can read as the number going down). Apple's in-place disclosure — SwiftUI's
+                    DisclosureGroup, the outline disclosure triangle — points right while its content is hidden and turns
+                    down when it shows; it opens in place, unlike a list row's fixed right chevron, which goes to another
+                    screen. Was: down, turning up when open (2026-09-03). */}
                 {reordering ? (
                   <span className="flex flex-col shrink-0 self-center gap-1">
                     <span role="button" aria-label={`move ${card.discipline} up`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, -1); }} className="px-2 py-0.5 text-label text-subhead leading-none">▲</span>
                     <span role="button" aria-label={`move ${card.discipline} down`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, 1); }} className="px-2 py-0.5 text-label text-subhead leading-none">▼</span>
                   </span>
                 ) : (
-                  <span className={`text-label text-body leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+                  <span className={`text-label text-body leading-none shrink-0 self-center transition-transform ${open ? '' : '-rotate-90'}`} aria-hidden="true">⌄</span>
                 )}
               </button>
               {open && <div className="px-3 pb-2">{inner}</div>}
