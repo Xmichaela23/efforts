@@ -275,6 +275,8 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'cable upright row': F('braced', 'pull_upper', 'printed', 'p221'),
   'hack squat': F('braced', 'press_lower', 'printed', 'p221'),
   'leg press': F('braced', 'press_lower', 'printed', 'p221'),
+  // p275: "rotate the braced asymmetrical movements with secondary asymmetrical" — the braced push lower done one leg at a time.
+  'single leg leg press': F('braced', 'press_lower', 'variant', 'p221 — leg press, one leg (p275 braced asymmetrical)'),
   'lever squat': F('braced', 'press_lower', 'printed', 'p221'),
   'reverse hyperextension': F('braced', 'hinge_lower', 'printed', 'p222 — reverse hyperextension (machine)'),
   'ghd back extension': F('braced', 'hinge_lower', 'printed', 'p222'),

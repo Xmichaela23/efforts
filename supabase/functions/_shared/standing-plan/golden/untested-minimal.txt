@@ -43,9 +43,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 53 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -71,7 +71,7 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -93,9 +93,9 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 55 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -120,7 +120,7 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -142,9 +142,9 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 40 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -169,7 +169,7 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -191,9 +191,9 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 52 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -218,7 +218,7 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -240,9 +240,9 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -267,7 +267,7 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -289,9 +289,9 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 38 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -316,7 +316,7 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -338,9 +338,9 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -365,7 +365,7 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -387,9 +387,9 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 59 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -414,7 +414,7 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -436,9 +436,9 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 51 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -463,7 +463,7 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -485,9 +485,9 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 48 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -512,7 +512,7 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -534,9 +534,9 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 35 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -561,7 +561,7 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -583,9 +583,9 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      HYP    Reverse Lunge                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.

@@ -583,6 +583,8 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ── BRACED / FIXED-STATION ──────────────────────────────────────────────────────────────────────
   // The motivating case for the `machine` key, named in the vocabulary note above.
   'leg press': [['machine']],
+  // p221's leg press one leg at a time — p275's braced asymmetrical on a kit that owns the station (2026-09-25).
+  'single leg leg press': [['machine']],
   'ab machine crunch': [['machine']],
   'lat pull down': [['cable'], ['bands']],
   'explosive lat pull down': [['cable'], ['bands']],
@@ -850,6 +852,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
    * ⛔ `machine back extension` STAYS MACHINE-ONLY. Routing it on the same bench put two rows for one
    * execution in the picker ("Back Extension / Back Extension", clash check 2026-09-16).
    * `ghd sit up` and `roman chair sit up` stay in `PRESCRIPTION_EXCLUDED` — neither is printed.
+   * ⛔ THE ROW'S NAME FOLLOWS THE ROUTE (2026-09-25): p222 prints "machine back extension" and the GHD back
+   * extension; the home form is the 45-degree bench, and on the bench route the row reads "Back Extension"
+   * (`grid.ts EXECUTION_NAME`); with the station, "GHD Back Extension". Stored name `ghd back extension` on both.
    */
   'ghd back extension': [['back_extension_bench'], ['machine']],
   'machine back extension': [['machine']],

@@ -16,7 +16,6 @@ import {
   frameAdmitsForPick,
   frameDaysForPick,
   frameMuscleForPick,
-  frameReservesLungeForPick,
   pickOptionLabelInRow,
   pickOptions,
   picksForFrame,
@@ -99,7 +98,7 @@ export function buildFocusBlock(frame: FrameId, equipment: string[] | null): Bui
   };
   const rowFor = (key: ViadaPickKey): BuildFocusRow => {
     const spec = VIADA_PICKS[key];
-    const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame));
+    const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame));
     const all = allSubstituted(opts);
     const days = frameDaysForPick(key, frame);
     const also = days.length === 0

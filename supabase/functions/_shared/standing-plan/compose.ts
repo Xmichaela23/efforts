@@ -23,7 +23,8 @@ import {
   type Level,
 } from '../endurance-library/index.ts';
 import { bandRouteName, displayFormatOnKit, executionHowTo, executionMovement, executionName, implementOnKit,
-  isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot, type ViadaIntent, type ViadaPattern, rirBandFor } from '../strength-grid/index.ts';
+  isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot, type ViadaCategory, type ViadaIntent, type ViadaPattern, rirBandFor,
+  builderReaches } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
@@ -53,7 +54,6 @@ import {
   focusedArmFit,
   onTheBar,
   frameHasArmsSuperset,
-  isLungeFamily,
   picksForFrame,
 } from './accessory-picks.ts';
 import {
@@ -282,6 +282,18 @@ export type StrengthExercise = {
   /** The p246 table row verbatim (pattern-swapped on even weeks) — the deterministic record of
    *  which book cell authored this row. Display surfaces must not render it. */
   source_row?: string;
+  /**
+   * ⛔ THE SLOT'S CELL AS DATA (2026-09-25): the level and pattern the row fills, the week's rotation applied
+   * (`patternForWeek`). The Swap sheet is built for this cell (`swap-groups.ts`), not for the cell the held movement is
+   * filed in — a braced hinge row holding p220's bench reverse hyper (filed secondary) offered only secondary hinges
+   * and never p222's back extension once the kit reached it. Never rendered; materialize-plan carries both.
+   */
+  slot_category?: ViadaCategory;
+  slot_pattern?: ViadaPattern;
+  /** The slot's pick key and the frame (2026-09-25), where the slot has a picker: the Swap sheet is the same
+   *  `pickOptions` union the composer and the picking screen use for it (muscle, admitted movements, widening). */
+  slot_key?: ViadaPickKey;
+  slot_frame?: FrameId;
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
   /**
@@ -1624,19 +1636,8 @@ function exerciseForSlot(
     const free = resolved.options.filter((o) => !reservedForAnother(o.name));
     if (free.length > 0) resolved.options = free;
   }
-  /**
-   * ⛔ ONE LUNGE PER DAY (2026-09-25, follow-up 2, `LUNGE_FAMILY`, owner's ruling): a day whose asymmetrical row holds the
-   * lunge gives its other rows a non-lunge option — the quad row beside p274 day 5's reverse lunge is the Zercher squat
-   * (p220), not a second lunge. The picker reserves the same way (`frameReservesLungeForPick`). Unless nothing else is.
-   */
-  const dayHoldsLunge = !slot.asymmetrical
-    && frameDay != null
-    && (FRAMES[args.frame].columns[args.column] ?? []).find((d) => d.day === frameDay)?.strength
-      .some((s) => s.asymmetrical === true) === true;
-  if (dayHoldsLunge) {
-    const other = resolved.options.filter((o) => !isLungeFamily(o.name));
-    if (other.length > 0) resolved.options = other;
-  }
+  // ⛔ THE ONE-LUNGE-PER-DAY FILTER THAT STOOD HERE (2026-09-25, follow-up 2) IS GONE the same day, owner's ruling: a Bulgarian
+  // split squat and a reverse lunge on one leg day is normal (`accessory-picks.ts`).
 
   /**
    * ⛔⛔⛔ HIS MOVEMENTS OUTRANK SUBSTITUTES, AT EVERY KIT (Michael, 2026-08-30). The page's own list
@@ -1753,8 +1754,13 @@ function exerciseForSlot(
       // `front squat` first, which lives in the primary pool, not here; ranking its later entries would
       // move that row off its printed Zercher squat onto a goblet squat.
       const alsoHis = new Set((VIADA_PICKS[slotKey].alsoHis ?? []).map((n) => canonicalize(n)));
-      const subLeadFirst = canonicalize((VIADA_PICKS[slotKey].subLeadWith ?? [])[0] ?? '');
-      const subLeadHeld = subLeadFirst !== '' && resolved.options.some((o) => canonicalize(o.name) === subLeadFirst);
+      // ⛔ THE FIRST STAND-IN THE KIT REACHES, not the first named (2026-09-25): the quad row opens on the banded leg
+      // extension where the kit has bands and on the reverse lunge where it does not (`quad_iso.subLeadWith`); a week
+      // built with no pick saved has to agree with that default on either kit, so the rank reads the first entry the
+      // cell actually holds. Before this the second entry was never read and the row fell to catalogue order.
+      const subLeadFirst = (VIADA_PICKS[slotKey].subLeadWith ?? []).map((n) => canonicalize(n))
+        .find((k) => resolved.options.some((o) => canonicalize(o.name) === k)) ?? '';
+      const subLeadHeld = subLeadFirst !== '';
       const subLeadRank = (name: string): number => (subLeadHeld && canonicalize(name) === subLeadFirst ? 0 : 1);
       // ⛔ THE CARRY ROW OPENS ON ITS FIRST PRINTED MOVEMENT (D-479, 2026-09-16): a sled owner's week built with
       // no pick saved keeps Farmer's Carry, the picker's default, instead of the sled winning on equipment fit.
@@ -2037,6 +2043,10 @@ function exerciseForSlot(
         // surface returns `name · words` before reading it, so no kind word or cue prints.
         slot_intent: slot.intent,
         source_row: noteForWeek(slot, args.week),
+        slot_category: slot.category,
+        slot_pattern: pattern,
+        ...(slotKey ? { slot_key: slotKey } : {}),
+        slot_frame: args.frame,
       },
       movement,
       sets: 1,
@@ -2164,6 +2174,10 @@ function exerciseForSlot(
         ...(rirBandFor(slot.intent) ? { target_rir_band: rirBandFor(slot.intent)! } : {}), // p218's band
         slot_intent: slot.intent,
         source_row: noteForWeek(slot, args.week),
+        slot_category: slot.category,
+        slot_pattern: pattern,
+        ...(slotKey ? { slot_key: slotKey } : {}),
+        slot_frame: args.frame,
         ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
       // 2026-09-03 (Michael: supersets are the book's layout, p274): both rows of a printed superset share one
       // mark, so the card prints them as a pair and the logger lays them out as one block.
@@ -2338,6 +2352,10 @@ function exerciseForSlot(
       ],
       slot_intent: slot.intent,
       source_row: noteForWeek(slot, args.week),
+      slot_category: slot.category,
+      slot_pattern: pattern,
+      ...(slotKey ? { slot_key: slotKey } : {}),
+      slot_frame: args.frame,
       // 2026-09-03 (Michael: supersets are the book's layout, p274): both rows of a printed superset share one
       // mark, so the card prints them as a pair and the logger lays them out as one block.
       ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
@@ -2850,6 +2868,26 @@ function rowSwapOptions(
       .map((n) => ({ name: n, display: movementLabel(n) }));
     if (opts.length === 0) return {};
     return { swap_options: [...opts, { name: movement, display: movementLabel(movement) }] };
+  }
+  /**
+   * ⛔ THE ASYMMETRICAL ROW'S OWN LIST (2026-09-25): it has no pick key, so until this date it carried no `swap_options`
+   * and the Swap sheet showed the cell's printed movements only — on a gym, the leg press, hack squat and lever squat
+   * beside a Single Leg Leg Press row, no lunge. The frame's `prefer` names the row's rotation (p275: the braced
+   * asymmetrical rotates with the secondary asymmetrical — the Bulgarian split squat, the lunges); the ones the kit
+   * reaches lead the list, the cell's own options follow. The phone sends the names back as the sheet's `admits`.
+   */
+  if (!slotKey && slot.asymmetrical && (slot.prefer ?? []).length > 0) {
+    const cell = resolveSlot({ category: slot.category, pattern: slot.pattern, intent: slot.intent, equipment: equipment ?? null })
+      .options.map((o) => o.name);
+    const seen = new Set<string>();
+    const opts: { name: string; display: string }[] = [];
+    for (const n of [...(slot.prefer ?? []).filter((p) => builderReaches(p, equipment ?? null)), ...cell]) {
+      const k = canonicalize(n);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      opts.push({ name: n, display: movementLabel(n) });
+    }
+    return opts.length > 0 ? { swap_options: opts } : {};
   }
   if (!slotKey) return {};
   // The whole list, the row's own movement included: after a swap the athlete may want it back

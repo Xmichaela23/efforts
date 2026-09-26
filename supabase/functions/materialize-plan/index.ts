@@ -2940,6 +2940,12 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            // ⛔ AND THE SLOT'S CELL (2026-09-25): the Swap sheet is built for the cell the row fills (`swap-groups.ts`),
+            // and this whitelist is where it would die. Belongs to the slot, like the swap list, so it survives a swap.
+            ...(typeof (ex as any)?.slot_category === 'string' && (ex as any).slot_category ? { slot_category: (ex as any).slot_category } : {}),
+            ...(typeof (ex as any)?.slot_pattern === 'string' && (ex as any).slot_pattern ? { slot_pattern: (ex as any).slot_pattern } : {}),
+            ...(typeof (ex as any)?.slot_key === 'string' && (ex as any).slot_key ? { slot_key: (ex as any).slot_key } : {}),
+            ...(typeof (ex as any)?.slot_frame === 'string' && (ex as any).slot_frame ? { slot_frame: (ex as any).slot_frame } : {}),
             ...(((ex as any)?.target_rir_band && typeof (ex as any).target_rir_band === 'object') ? { target_rir_band: (ex as any).target_rir_band } : {}), // p218's reserve band
             // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
             // stamp passes through; a row no composer wrote gets the same rule's numbers here.
@@ -3376,6 +3382,12 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            // ⛔ AND THE SLOT'S CELL (2026-09-25): the Swap sheet is built for the cell the row fills (`swap-groups.ts`),
+            // and this whitelist is where it would die. Belongs to the slot, like the swap list, so it survives a swap.
+            ...(typeof (ex as any)?.slot_category === 'string' && (ex as any).slot_category ? { slot_category: (ex as any).slot_category } : {}),
+            ...(typeof (ex as any)?.slot_pattern === 'string' && (ex as any).slot_pattern ? { slot_pattern: (ex as any).slot_pattern } : {}),
+            ...(typeof (ex as any)?.slot_key === 'string' && (ex as any).slot_key ? { slot_key: (ex as any).slot_key } : {}),
+            ...(typeof (ex as any)?.slot_frame === 'string' && (ex as any).slot_frame ? { slot_frame: (ex as any).slot_frame } : {}),
             ...(((ex as any)?.target_rir_band && typeof (ex as any).target_rir_band === 'object') ? { target_rir_band: (ex as any).target_rir_band } : {}), // p218's reserve band
             // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
             // stamp passes through; a row no composer wrote gets the same rule's numbers here.

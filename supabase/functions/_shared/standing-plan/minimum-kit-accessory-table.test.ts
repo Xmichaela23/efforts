@@ -107,9 +107,9 @@ Deno.test('⛔ B1 — no superset ever holds two barbell movements, on either ki
   }
   assert(pairs >= 100, `only ${pairs} supersets seen`);
   // The lower superset on the minimum kit: the bench reverse hyper (p220, on the bench with a dumbbell) beside the
-  // front squat (p219) — a dumbbell hinge and a barbell squat.
+  // goblet squat (2026-09-25 ruling: no re-racking inside a superset) — two dumbbell movements, no bar.
   const ar = block('all_rounder', MIN).filter((b) => b.week === 2 && /braced hinge/i.test(String(b.row.source_row)));
-  assertEquals(ar.map((b) => shown(b.row)), ['Weighted Reverse Hyper', 'Front Squat', 'Weighted Reverse Hyper', 'Front Squat']);
+  assertEquals(ar.map((b) => shown(b.row)), ['Weighted Reverse Hyper', 'Goblet Squat', 'Weighted Reverse Hyper', 'Goblet Squat']);
   // And the picker offers the DB Romanian deadlift for the hinge half.
   const hinge = pickOptions('braced_hinge', MIN, 'hamstrings', ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper']).map((o) => o.name);
   assert(hinge.includes('db romanian deadlift'), `braced hinge on the minimum offers ${hinge.join(', ')}`);
@@ -212,31 +212,61 @@ Deno.test('⛔ B5 — the drag curl is barbell only and the preacher curl statio
   assertEquals(gymPull[0], 'preacher curl');
 });
 
-Deno.test('⛔ follow-up 2 — one lunge-pattern movement per day: the quad row beside the asymmetrical row is not a second lunge', () => {
-  const lunge = /lunge|split squat/i;
-  for (const frame of ['all_rounder', 'hyp_5k'] as const) for (const kit of [MIN, GYM]) {
-    const days = new Map<string, Built[]>();
-    for (const b of block(frame, kit)) days.set(`${b.week}|${b.day}`, [...(days.get(`${b.week}|${b.day}`) ?? []), b]);
-    for (const [k, rows] of days) {
-      const lunges = rows.filter((b) => lunge.test(b.row.name));
-      assert(lunges.length <= 1, `${frame} @ ${kit.join('+')} ${k}: ${lunges.map((b) => shown(b.row)).join(' + ')}`);
-    }
-  }
-  // p274 day 5 on the minimum kit: p223's quad list needs the station; the goblet squat leads by the owner's ruling
-  // (2026-09-25), one dumbbell, no bar; the Zercher squat (p220 printed) stays offered behind it.
-  const fri = block('all_rounder', MIN).filter((b) => b.week === 2 && b.day === 'Friday').map((b) => shown(b.row));
-  assertEquals(fri, ['Back Squat', 'Weighted Reverse Hyper', 'Front Squat', 'Goblet Squat', 'Reverse Lunge']);
+Deno.test('⛔ follow-up 2 (re-ruled 2026-09-25) — the superset\'s push half is the goblet squat; the quad row is the banded leg extension with bands, else the reverse lunge; the asymmetrical row is the Bulgarian split squat', () => {
+  // p274 day 5 on the minimum kit: the front squat needs re-racking inside a superset, the goblet squat does not; the
+  // front squat (p219) stays in the picker. The quad row is p223's leg extension in its band form where the kit has
+  // bands, else p220's reverse lunge; the braced push (asymmetrical) row is the Bulgarian split squat (rear foot on the
+  // bench, the home form of a braced single-leg push). Two lunge-pattern movements on one leg day is normal.
+  // hyp_5k's Friday also carries p244's secondary hinge (Romanian Deadlift) between the squat and the superset.
+  const accessories = (frame: string, rows: string[]) => frame === 'hyp_5k' ? rows.filter((n) => n !== 'Romanian Deadlift') : rows;
   for (const frame of ['all_rounder', 'hyp_5k'] as const) {
+    const fri = accessories(frame, block(frame, MIN).filter((b) => b.week === 2 && b.day === 'Friday').map((b) => shown(b.row)));
+    assertEquals(fri, ['Back Squat', 'Weighted Reverse Hyper', 'Goblet Squat', 'Reverse Lunge', 'Bulgarian Split Squat'], frame);
+    const friBands = accessories(frame, block(frame, [...MIN, 'Resistance bands']).filter((b) => b.week === 2 && b.day === 'Friday').map((b) => shown(b.row)));
+    assertEquals(friBands, ['Back Squat', 'Weighted Reverse Hyper', 'Goblet Squat', 'Banded Leg Extension', 'Bulgarian Split Squat'], frame);
+    const friBench = accessories(frame, block(frame, [...MIN, 'Back extension bench']).filter((b) => b.week === 2 && b.day === 'Friday').map((b) => shown(b.row)));
+    assertEquals(friBench, ['Back Squat', 'Back Extension', 'Goblet Squat', 'Reverse Lunge', 'Bulgarian Split Squat'], frame);
     const quad = block(frame, MIN).find((b) => b.week === 2 && /focused quadriceps/i.test(String(b.row.source_row)))!.row;
-    assertEquals(shown(quad), 'Goblet Squat', frame);
-    assertEquals(barIsTheLoad(quad.name, MIN), false, 'the goblet squat drew a bar');
-    assertEquals(usesTwoDumbbellsOnKit(quad.name, MIN), false, 'one dumbbell, one total');
+    assertEquals(barIsTheLoad(quad.name, MIN), false, 'the lunge drew a bar');
+    assertEquals(usesTwoDumbbellsOnKit(quad.name, MIN), true, 'a dumbbell in each hand');
   }
-  const quadOpts = pickOptions('quad_iso', MIN, 'quadriceps', null, true).map((o) => o.name);
-  assertEquals(quadOpts[0], 'goblet squat');
-  assert(quadOpts.includes('zercher squat'), 'the Zercher squat left the picker');
-  assert(pickOptions('quad_iso', MIN, 'quadriceps', null, true).every((o) => !lunge.test(o.name)), 'the reserved row still offers a lunge');
-  assert(pickOptions('quad_iso', MIN, 'quadriceps', null, false).some((o) => lunge.test(o.name)), 'the unreserved list lost its lunges');
+  const push = pickOptions('braced_leg', MIN, 'quadriceps', null).map((o) => o.name);
+  assertEquals(push[0], 'goblet squat');
+  assert(push.includes('front squat') && push.includes('zercher squat'), push.join(', '));
+  assertEquals(pickOptions('quad_iso', MIN, 'quadriceps', null).map((o) => o.name)[0], 'reverse lunge');
+  assertEquals(pickOptions('quad_iso', [...MIN, 'Resistance bands'], 'quadriceps', null).map((o) => o.name)[0], 'banded leg extension');
+  // Nothing of the one-lunge rule remains.
+  const src = Deno.readTextFileSync(new URL('./accessory-picks.ts', import.meta.url));
+  assert(!/export (const LUNGE_FAMILY|function isLungeFamily|function frameReservesLungeForPick)/.test(src));
+});
+
+Deno.test('⛔ follow-up 8 — the braced push (asymmetrical) rows: the single-leg leg press on a kit that owns the station, the Bulgarian split squat on the minimum kit', () => {
+  // p221's braced push lower (hack squat, leg press, lever squat) done single-leg — p275's braced asymmetrical, the
+  // lunge / split squat its permitted rotation. Both rows (day 2 DE, day 5 SKILL), both frames, every week.
+  for (const frame of ['all_rounder', 'hyp_5k'] as const) {
+    const gym = block(frame, GYM).filter((b) => /asymmetrical/i.test(String(b.row.source_row)));
+    assert(gym.length >= 20, `${frame}: only ${gym.length} asymmetrical rows`);
+    for (const b of gym) assertEquals(shown(b.row), 'Single Leg Leg Press', `${frame} w${b.week} ${b.day}`);
+    assert(gym.some((b) => /DE/.test(String(b.row.slot_intent))) && gym.some((b) => /SKILL/.test(String(b.row.slot_intent))));
+    // The minimum kit: the Bulgarian split squat on both rows (owner's ruling, 2026-09-25), the reverse lunge behind it.
+    const min = block(frame, MIN).filter((b) => /asymmetrical/i.test(String(b.row.source_row)) && b.week === 2).map((b) => shown(b.row));
+    assertEquals(min, ['Bulgarian Split Squat', 'Bulgarian Split Squat'], frame);
+    const minRow = block(frame, MIN).find((b) => /asymmetrical/i.test(String(b.row.source_row)) && b.week === 2)!.row;
+    const minSheet = swapGroupsFor(minRow.name, MIN, null, { category: 'braced', pattern: 'press_lower' }, (minRow.swap_options ?? []).map((o) => o.name));
+    assert(minSheet.flatMap((g) => g.options.map((o) => o.name)).includes('reverse lunge'));
+    // The lunges stay behind it in the Swap sheet on the gym.
+    const row = gym.find((b) => b.week === 2)!.row;
+    const sheet = swapGroupsFor(row.name, GYM, null, { category: 'braced', pattern: 'press_lower' }, (row.swap_options ?? []).map((o) => o.name));
+    const names = sheet.flatMap((g) => g.options.map((o) => o.name));
+    assert(names.includes('reverse lunge') && names.includes('bulgarian split squat') && !names.includes('single leg leg press'), names.join(', '));
+  }
+  // The catalogue: per side, one total, the station's route, filed as p221's leg press one leg at a time.
+  assertEquals(resolveExerciseConfig('Single-Leg Leg Press').matchedKey, 'single leg leg press');
+  assertEquals(resolveExerciseConfig('single leg leg press').config?.isUnilateral, true);
+  assertEquals(resolveExerciseConfig('single leg leg press').config?.displayFormat, 'total');
+  assertEquals(canPerform('single leg leg press', MIN), false);
+  assertEquals(canPerform('single leg leg press', GYM), true);
+  assertEquals(filingOf('single leg leg press')?.cite.startsWith('p221'), true);
 });
 
 Deno.test('⛔ follow-up 3 — p218\'s barbell row takes the DE secondary pull where the pull-up took the ME row', () => {
@@ -268,6 +298,35 @@ Deno.test('⛔ follow-up 6 — the three two-dumbbell rows are filed per hand; t
   assertEquals(resolveExerciseConfig('gorilla row').config?.ratioIsTotal, true);
   assertEquals(displayFormatOnKit('gorilla row', MIN), 'perHand');
   for (const n of ['Skull Crusher', 'Arnold Press', 'Gorilla Row']) assertEquals(usesTwoDumbbellsOnKit(n, MIN), true, n);
+});
+
+Deno.test('⛔ follow-up 7 — the back extension is named for the bench the kit resolves to; stored as the GHD movement on both', () => {
+  const BENCH = [...MIN, 'Back extension bench'];
+  // The chip adds the bench key and nothing else — not `incline_bench`, not the station.
+  assertEquals([...athleteEquipmentToKeys(BENCH)].sort(), [...MINIMUM_KIT_KEYS, 'back_extension_bench'].sort());
+  // The row: the braced hinge slot on the bench kit builds p222's GHD back extension and shows the bench name.
+  const rows = block('all_rounder', BENCH).filter((b) => canonicalize(b.row.name) === 'ghd_back_extension');
+  assert(rows.length >= 20, `only ${rows.length} back extension rows on the bench kit`);
+  for (const b of rows) {
+    assertEquals(shown(b.row), 'Back Extension', `${b.session} w${b.week}`);
+    assertEquals(canonicalize(b.row.name), 'ghd_back_extension');
+    assertEquals(resolveExerciseConfig(b.row.name).matchedKey, 'ghd back extension');
+    assertEquals((b.row as { weight_per?: string }).weight_per, undefined, 'one total, as the config says');
+    // The slot's cell rides on the row (2026-09-25): the Swap sheet is built for it.
+    assertEquals([(b.row as { slot_category?: string }).slot_category, (b.row as { slot_pattern?: string }).slot_pattern], ['braced', 'hinge_lower']);
+  }
+  assertEquals(displayFormatOnKit('ghd back extension', BENCH), 'bodyweight');
+  assertEquals(implementOnKit('ghd back extension', BENCH), null, 'the bench loads nothing');
+  // The picker and the Swap sheet print the same name.
+  const pick = pickOptions('braced_hinge', BENCH, 'hamstrings', ['ghd back extension']).find((o) => o.name === 'ghd back extension');
+  assertEquals(pick?.display, 'Back Extension');
+  const sheet = swapGroupsFor('weighted reverse hyper', BENCH, null, { category: 'braced', pattern: 'hinge_lower' });
+  assertEquals(sheet[0]?.options.find((o) => o.name === 'ghd back extension')?.display, 'Back Extension');
+  // A commercial gym owns the station: "GHD Back Extension", as before.
+  assertEquals(executionName('ghd back extension', GYM), 'ghd back extension');
+  assertEquals(implementOnKit('ghd back extension', GYM), 'machine');
+  const gym = swapGroupsFor('reverse hyperextension', GYM, null, { category: 'braced', pattern: 'hinge_lower' });
+  assertEquals(gym[0]?.options.find((o) => o.name === 'ghd back extension')?.display, 'GHD Back Extension');
 });
 
 Deno.test('⛔ B6 — the split squat logs per hand on a dumbbell kit', () => {
@@ -324,5 +383,5 @@ Deno.test('⛔ PART C — every strength row on the minimum kit is performable o
   }
   assert(rows > 900, `only ${rows} rows`);
   // 32 since 2026-09-25 (sets are earned on every row); this pin follows every bump.
-  assertEquals(PLAN_WRITER_VERSION, 32);
+  assertEquals(PLAN_WRITER_VERSION, 33);
 });

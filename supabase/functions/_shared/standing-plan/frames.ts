@@ -867,7 +867,14 @@ const HYP_5K_STANDARD: FrameDay[] = [
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
       // p245: "Each lower body day finishes with a braced DE or skill asymmetrical push movement" — split squats among them.
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
+      // ⛔ THE SINGLE-LEG LEG PRESS FIRST WHERE THE KIT OWNS THE STATION (2026-09-25, owner): p221's braced push lower is
+      // the hack squat, leg press and lever squat, and p275 reads the asymmetrical slot as one of those done single-leg,
+      // the lunge / split squat being the permitted rotation ("rotate the braced asymmetrical movements with secondary
+      // asymmetrical"). `prefer` takes the first the kit reaches: the leg press one leg at a time on a gym; on the minimum
+      // kit the BULGARIAN SPLIT SQUAT on both rows (owner's ruling, 2026-09-25: rear foot on the bench is the home form of
+      // a braced single-leg push), the reverse lunge behind it. The same four rows on the All Rounder (standard and taper
+      // columns, `ALL_ROUNDER_STANDARD` / `ALL_ROUNDER_TAPER`); hyp_half keeps its older order.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge'] }),  // Viada p244
     ],
     endurance: [],
   },
@@ -898,7 +905,7 @@ const HYP_5K_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),  // Viada p244
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: Braced hinge/braced lower push superset', { muscle: 'quadriceps' }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Focused quadriceps', { muscle: 'quadriceps' }),  // Viada p244
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),  // Viada p244
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge', 'walking lunge'] }),  // Viada p244
     ],
     endurance: [],
   },
@@ -937,7 +944,7 @@ const HYP_5K_TAPER: FrameDay[] = [
         muscle: 'hamstrings',
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),  // Viada p244
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge'] }),  // Viada p244
     ],
     endurance: [],
   },
@@ -964,7 +971,7 @@ const HYP_5K_TAPER: FrameDay[] = [
       S('SKILL', 'competition', 'primary', 'press_lower', '1 x SKILL: Secondary push'),  // Viada p244
       S('HYP', 'accessory', 'secondary', 'hinge_lower', '1 x HYP: Secondary hinge', { alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'] }),  // Viada p244
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: Focused quadriceps', { muscle: 'quadriceps' }),  // Viada p244
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),  // Viada p244
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: Braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge', 'walking lunge'] }),  // Viada p244
     ],
     endurance: [],
   },
@@ -1243,9 +1250,10 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
         muscle: 'hamstrings',
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
-      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
-      // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),
+      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. 2026-09-25 (owner): the single-leg leg press
+      // where the kit owns the station (p221 done one leg at a time), else the Bulgarian split squat on both rows — see the
+      // note on HYP_5K_STANDARD day 2.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge'] }),
     ],
     endurance: [E('ride_anaerobic', 1, 'Cyc AnA (level 1)', { role: 'hard' })],
   },
@@ -1298,7 +1306,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge', 'walking lunge'] }),
     ],
     endurance: [],
   },
@@ -1361,9 +1369,10 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
         muscle: 'hamstrings',
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'barbell hip thrust'],
       }),
-      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
-      // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),
+      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. 2026-09-25 (owner): the single-leg leg press
+      // where the kit owns the station (p221 done one leg at a time), else the Bulgarian split squat on both rows — see the
+      // note on HYP_5K_STANDARD day 2.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge'] }),
     ],
     endurance: [],
   },
@@ -1401,7 +1410,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       // p274 day 5, taper column: row text verbatim
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['single leg leg press', 'bulgarian split squat', 'reverse lunge', 'walking lunge'] }),
     ],
     endurance: [],
   },

@@ -60,6 +60,8 @@ import {
   deadliftFormOf,
   DEADLIFT_FORMS,
   DEADLIFT_FORM_LABEL,
+  picksOnNewKit,
+  accessoryPicksAfter,
 } from '../_shared/standing-plan/index.ts';
 import { calculateDurationWorkload, getDefaultIntensityForType, getStepsIntensity } from '../_shared/workload.ts';
 // ⛔ THE ATHLETE'S ENDURANCE SWAPS, READ FROM `plan_adjustments` WHEN THE WEEKS ARE COMPOSED (2026-09-19).
@@ -384,6 +386,33 @@ Deno.serve(async (req: Request) => {
       ? sp.slot_picks as Record<string, string>
       : null;
     const blockDial = Array.isArray(sp.dial) ? sp.dial as string[] : null;
+    /**
+     * ⛔ THE NEW GEAR REACHES THE PLAN (owner, live, 2026-09-25: "it's not budging"). On the equipment rebuild only, a
+     * stored pick that was the picking screen's defaulted STAND-IN on the kit the block was built with gives way to
+     * the cell's printed movement on the current kit; a hand pick stays (`equipment-rebuild-picks.ts`, the rule and
+     * the ledger row). The restate pairs the changed slot's rows by `source_row` and rewrites them as a changed
+     * movement from today on. The moved picks become the block's own below, beside the kit.
+     */
+    const builtKit: string[] | null = Array.isArray(sp?.athlete_equipment)
+      ? sp.athlete_equipment as string[]
+      : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment as string[] : null);
+    const rebuiltPicks = useCurrentEquipment && currentKit && blockSlotPicks
+      ? picksOnNewKit({
+        stored: blockSlotPicks as never,
+        chosenKeys: Array.isArray(sp.slot_picks_chosen) ? (sp.slot_picks_chosen as unknown[]).map(String) : null,
+        builtKit,
+        currentKit,
+        dial: blockDial,
+        frame: sp.frame as FrameId,
+      })
+      : null;
+    const picksMoved = !!rebuiltPicks && rebuiltPicks.changed.length > 0;
+    const slotPicksNow = picksMoved ? rebuiltPicks!.picks as Record<string, string> : blockSlotPicks;
+    const accessoryPicksNow = picksMoved ? accessoryPicksAfter(blockPicks, rebuiltPicks!.changed) : blockPicks;
+    if (picksMoved) {
+      console.log(`[restate] equipment rebuild moved ${rebuiltPicks!.changed.length} pick(s): `
+        + rebuiltPicks!.changed.map((c) => `${c.key}: ${c.from} → ${c.to}`).join('; '));
+    }
 
     // ⛔ THE DELOAD WEEK IS A TOOL THE ATHLETE DEPLOYS (2026-09-05, Michael: "build the deload week and put it
     // here"). The book rejects overreach-to-deload (p120) and offers the TAPER/DELOAD column of p274 as something
@@ -490,8 +519,8 @@ Deno.serve(async (req: Request) => {
       // to restate — `readTestWeek` finds no week-one test sets and this function abstains above —
       // but carrying the flag keeps the re-composition identical to the block that was built.
       skipTestWeek: sp.test_skipped === true,
-      ...(blockPicks ? { accessoryPicks: blockPicks } : {}),
-      ...(blockSlotPicks ? { slotPicks: blockSlotPicks } : {}),
+      ...(accessoryPicksNow ? { accessoryPicks: accessoryPicksNow } : {}),
+      ...(slotPicksNow ? { slotPicks: slotPicksNow } : {}),
       ...(blockDial ? { dial: blockDial } : {}),
       roundTo: 5,
     };
@@ -832,6 +861,8 @@ Deno.serve(async (req: Request) => {
             ...sp,
             // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`).
             ...(currentKit ? { athlete_equipment: currentKit } : {}),
+            // …and the picks the new kit moved (2026-09-25, `picksOnNewKit`): the next refresh composes the same week.
+            ...(picksMoved ? { slot_picks: slotPicksNow, accessory_picks: accessoryPicksNow } : {}),
             // The deadlift form the athlete chose becomes the block's own (2026-09-25); the test names as logged stay.
             ...(requestedDeadliftForm ? { competition_lifts: competitionLifts } : {}),
             taper_weeks: taperWeeks,

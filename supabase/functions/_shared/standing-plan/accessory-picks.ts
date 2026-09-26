@@ -814,15 +814,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * machine" was written before the band route existed and is superseded by this line.
      */
     /**
-     * ⛔ THE GOBLET SQUAT LEADS THE STAND-INS (owner's ruling, 2026-09-25): on the minimum kit's focused-quadriceps row —
-     * where p223's list is all station work and the one-lunge rule (`LUNGE_FAMILY`) keeps the lunges on the asymmetrical
-     * row — the row builds the goblet squat (one dumbbell at the chest, one total, no bar). FIELD — the goblet squat is
-     * the standard free-weight quad accessory where there is no leg extension (Hevy, Strong, Outlift list it as the
-     * leg-extension alternative). The Zercher squat is p220 printed and stays offered behind it in the picker and the
-     * Swap list. OURS — a variant chosen over a printed movement by ruling; ledger row docs/STATE-SOURCES.md
-     * (2026-09-25). The banded leg extension (the 2026-09-11 like-for-like) follows for a bands owner.
+     * ⛔ THE BANDED LEG EXTENSION WHERE THE KIT HAS BANDS, ELSE THE REVERSE LUNGE (owner's ruling off his live plan,
+     * 2026-09-25, replacing the same morning's goblet-squat ruling). p223 prints the leg extension; the band form is its
+     * like-for-like (single-joint knee extension, the 2026-09-11 note above) and reaches any athlete with bands. With no
+     * bands the row is p220's reverse lunge. Never the Bulgarian split squat: on the minimum kit that is the day's braced
+     * push (asymmetrical) row (`frames.ts prefer`), and a slot's pick is reserved for its own slot. The goblet squat now
+     * leads the superset's push half (`braced_leg`) instead. OURS — the choice; ledger row docs/STATE-SOURCES.md.
      */
-    subLeadWith: ['goblet squat', 'banded leg extension'],
+    subLeadWith: ['banded leg extension', 'reverse lunge'],
     servesChips: [],
   },
   /**
@@ -988,8 +987,12 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * book's own nearest is the Zercher squat (p220, secondary press lower); the field's are the
      * front and goblet squat (Outlift, Hevy). A lunge is the asymmetrical row's shape, not this one's,
      * which is how the same week came to carry three lunges.
+     * ⛔ THE GOBLET SQUAT LEADS (owner's ruling off his live plan, 2026-09-25): this row is the push half of p274's
+     * braced hinge / braced lower push SUPERSET, and a front squat needs re-racking inside a superset; the goblet squat
+     * (one dumbbell at the chest) does not. The front squat (p219 printed) stays offered behind it in the picker and the
+     * Swap list. OURS — ledger row docs/STATE-SOURCES.md (2026-09-25).
      */
-    subLeadWith: ['front squat', 'goblet squat', 'zercher squat'],
+    subLeadWith: ['goblet squat', 'front squat', 'zercher squat'],
     /**
      * ⛔ OFF THIS ROW (Michael, 2026-09-11, reviewing the dropdown): the explosive step-up is a
      * power drill, not volume work; the lateral lunge is sideways, adductor work. The single-leg
@@ -1378,32 +1381,9 @@ export function pickReachesFrame(
  * reconcile; a frame that ever printed two different muscles for one cell would need a per-day
  * answer and this is where that would go.
  */
-/**
- * ⛔ ONE LUNGE-PATTERN MOVEMENT PER DAY (2026-09-25, minimum-kit follow-up 2, owner's ruling). The lunge, the reverse and
- * walking lunge, the split squat and the Bulgarian split squat count as one family; a day whose SKILL / asymmetrical
- * row already holds one gives its other rows a non-lunge option. OURS — the page prints the rows, not the pairing.
- * Ledger: docs/STATE-SOURCES.md (2026-09-25).
- */
-export const LUNGE_FAMILY: readonly string[] = [
-  'lunge', 'lunges', 'reverse lunge', 'walking lunge', 'barbell walking lunge', 'dumbbell walking lunge',
-  'split squat', 'bulgarian split squat', 'lateral lunge', 'bodyweight lunges',
-];
-const LUNGE_KEYS = new Set(LUNGE_FAMILY.map((n) => canonicalize(n)));
-export function isLungeFamily(name: string): boolean {
-  return LUNGE_KEYS.has(canonicalize(String(name ?? '')));
-}
-/** Does this pick's cell sit on a day whose asymmetrical row takes the lunge? (Its own row is never asymmetrical.) */
-export function frameReservesLungeForPick(key: ViadaPickKey, frame: FrameId, column: ColumnKind = 'standard'): boolean {
-  const spec = VIADA_PICKS[key];
-  if (!spec.slot) return false;
-  for (const day of FRAMES[frame]?.columns[column] ?? []) {
-    if (specDayOn(spec.slot, frame) != null && day.day !== specDayOn(spec.slot, frame)) continue;
-    const here = day.strength.some((sl) => sl.role === 'accessory' && sl.category === spec.slot!.category
-      && sl.pattern === spec.slot!.pattern && sl.intent === (spec.slot!.intent ?? 'HYP') && sl.asymmetrical !== true);
-    if (here && day.strength.some((sl) => sl.asymmetrical === true)) return true;
-  }
-  return false;
-}
+// ⛔ THE ONE-LUNGE-PER-DAY RULE OF 2026-09-25 IS GONE (owner's ruling, the same day): a Bulgarian split squat and a reverse
+// lunge on one leg day is normal. `LUNGE_FAMILY`, `frameReservesLungeForPick` and the picker's reserve argument are deleted,
+// with their tests and ledger row. Nothing of it is kept.
 
 export function frameAdmitsForPick(
   key: ViadaPickKey,
@@ -1505,7 +1485,7 @@ export function picksForFrame(
    */
   return reachable.filter((k) => VIADA_PICKS[k].slot == null
     || pickOptions(k, equipment, frameMuscleForPick(k, frame, column),
-      frameAdmitsForPick(k, frame, column), frameReservesLungeForPick(k, frame, column)).length >= 1);
+      frameAdmitsForPick(k, frame, column)).length >= 1);
 }
 
 /**
@@ -1731,10 +1711,13 @@ export function pickOptions(
    */
   alsoAdmits?: string[] | null,
   /**
-   * ⛔ ONE LUNGE PER DAY (2026-09-25, follow-up 2, `frameReservesLungeForPick`): when the day's asymmetrical row holds the
-   * lunge, this row offers no lunge-family movement — unless nothing else is reachable.
+   * ⛔ EVERY STEP OF THE WIDENING, NOT THE FIRST THAT ANSWERS (2026-09-25, the Swap sheet). The picker and the
+   * composer stop at the first step that reaches a same-muscle movement — on a kit with bands the focused quad row
+   * finds the banded leg extension in its own category and never reaches the goblet squat and the lunges the next
+   * step holds. The Swap sheet asks for the whole union so the athlete sees every quad movement the plan could
+   * pick on this kit; the rank (lead, admitted, sub-lead, then penalties) orders it. The default is unchanged.
    */
-  reserveLunge = false,
+  widenAll = false,
 ): PickOption[] {
   const spec = VIADA_PICKS[key];
   const cellIntent = spec.slot?.intent ?? 'HYP';
@@ -1991,6 +1974,7 @@ export function pickOptions(
         ownCategory ? [ownCategory] : [],
         (['secondary', 'braced', 'focused'] as ViadaCategory[]).filter((c) => c !== ownCategory),
       ];
+      const union: GridMovement[] = [];
       for (const step of stepped) {
         if (step.length === 0) continue;
         const pooled: GridMovement[] = [];
@@ -2016,16 +2000,16 @@ export function pickOptions(
         const subs = refine(dedupeByCanonical([...pooled, ...admittedPool])
           .filter((m) => !excluded.has(canonicalize(m.name)))
           .filter((m) => onMuscle(m.name)));
-        if (subs.length > 0) return { list: subs, substituted: true };
+        if (subs.length > 0 && !widenAll) return { list: subs, substituted: true };
+        union.push(...subs);
       }
-      return { list: [], substituted: true };
+      return { list: dedupeByCanonical(union), substituted: true };
     })()
     // ⚠️ A ROW THAT NAMES NO MUSCLE STILL TAKES THE MOVEMENTS IT ADMITS BY NAME (2026-09-13). Inert on every
     // row that admits nothing, which was every muscle-less row before.
     : { list: refine(dedupeByCanonical([...pool, ...admittedPool.filter((m) => !excluded.has(canonicalize(m.name)))])), substituted: false };
 
-  const lunged = reserveLunge ? narrowed.list.filter((m) => !isLungeFamily(m.name)) : narrowed.list;
-  return (lunged.length > 0 ? lunged : narrowed.list)
+  return narrowed.list
     .map((m, i) => ({ m, i, r: rank(m) }))
     .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
     .map(({ m }) => ({
@@ -2098,7 +2082,7 @@ export function defaultPickFor(
   // ⛔ AN OPT-IN ROW HAS NO DEFAULT. Empty is the answer, and a caller must treat it as "nothing
   // added" rather than as a missing value to fill in.
   if (VIADA_PICKS[key].optIn === true) return '';
-  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame));
+  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame));
   if (opts.length === 0) return '';
   const wanted = musclesForChips(dial.filter((c) => VIADA_PICKS[key].servesChips.includes(c)));
   if (wanted.size > 0) {
@@ -2161,7 +2145,7 @@ export function defaultViadaPicks(
     const first = defaultPickFor(key, equipment, dial, frame);
     let chosen = first;
     if (clash(first)) {
-      const alt = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame))
+      const alt = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
         .map((o) => o.name)
         .find((n) => !clash(n));
       // ⚠️ NO ALTERNATIVE MEANS KEEP THE DEFAULT. A cell whose every option is already used today has
@@ -2584,7 +2568,7 @@ export function normalizeViadaPrefs(
      * p274's hamstring cell at a home kit, so every answer to that row failed and was overwritten.
      */
     const offered = pickOptions(
-      key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame), frameReservesLungeForPick(key, frame),
+      key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame),
     );
     const exact = stored !== '' && offered.find((o) => canonicalize(o.name) === canonicalize(stored));
     /**

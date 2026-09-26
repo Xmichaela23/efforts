@@ -45,7 +45,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 90 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -71,7 +71,7 @@ WEEK 02  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -93,7 +93,7 @@ WEEK 02  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -119,7 +119,7 @@ WEEK 03  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -141,7 +141,7 @@ WEEK 03  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -167,7 +167,7 @@ WEEK 04  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -189,7 +189,7 @@ WEEK 04  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -215,7 +215,7 @@ WEEK 05  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -237,7 +237,7 @@ WEEK 05  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -263,7 +263,7 @@ WEEK 06  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -285,7 +285,7 @@ WEEK 06  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -311,7 +311,7 @@ WEEK 07  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -333,7 +333,7 @@ WEEK 07  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -359,7 +359,7 @@ WEEK 08  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -381,7 +381,7 @@ WEEK 08  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -407,7 +407,7 @@ WEEK 09  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -429,7 +429,7 @@ WEEK 09  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -455,7 +455,7 @@ WEEK 10  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -477,7 +477,7 @@ WEEK 10  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 82 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -502,7 +502,7 @@ WEEK 11  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -524,7 +524,7 @@ WEEK 11  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -549,7 +549,7 @@ WEEK 12  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Machine Hip Thrust             3x6-12       @               | RIR 1 · auto_regulated · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+      DE     Single Leg Leg Press           4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo
@@ -571,7 +571,7 @@ WEEK 12  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Press                      3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Extension                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Single Leg Leg Press           3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 87 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.

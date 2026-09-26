@@ -883,6 +883,20 @@ Deno.serve(async (req: Request) => {
         // and returns that table's defaults in place of the athlete's answers. See its own note.
         frameId,
       );
+      /**
+       * ⛔ WHICH PICKS WERE THE ATHLETE'S (2026-09-25): the keys the picking screen sent — it sends only the rows the
+       * athlete changed — as far as `normalizeViadaPrefs` kept them. Stored as `slot_picks_chosen` so the equipment
+       * rebuild can tell a hand pick from a defaulted stand-in (`_shared/standing-plan/equipment-rebuild-picks.ts`).
+       * An empty list is a fact (every row was the default); null means no `viada` block was sent.
+       */
+      const slotPicksChosen = (() => {
+        if (!viadaPrefs) return null;
+        const ap = (body as Record<string, unknown>).assistance_picks;
+        const raw = ap && typeof ap === 'object' ? (ap as Record<string, unknown>).viada : null;
+        const sent = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>).picks : null;
+        if (!sent || typeof sent !== 'object') return [];
+        return Object.keys(sent as Record<string, unknown>).filter((k) => k in viadaPrefs.picks && String((sent as Record<string, unknown>)[k] ?? '').trim());
+      })();
       const accessoryPicks = (() => {
         // ⛔ THE STANDING PLAN'S OWN PICKS, FLATTENED FOR THE FLOOR. The slot picks reach their
         // cells through `slotPicks`; this list is what carries the core pick and the Dial
@@ -1039,6 +1053,7 @@ Deno.serve(async (req: Request) => {
           swimEasySessions: Math.min(2, Math.max(0, Math.round(Number(swim_easy_sessions) || 0))),
           roundTo: 5,
         },
+        slotPicksChosen,
         weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,
         // ⛔ NO SCHEDULED TAPER — p120. The deload column is a tool you deploy (a race two weeks
         // out, p247), never a recovery week on a timer. This block has no race in it.

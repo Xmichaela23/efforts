@@ -250,6 +250,12 @@ interface LoggedExercise {
   rir_tracked?: boolean;
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
   slot_intent?: string; // Standing-plan slot intent as data ('ME'|'DE'|'SKILL'|'HYP'), 2026-08-26
+  /** The slot's cell as the composer stamped it (2026-09-25); sent to `swap-list` so the sheet is built for the slot
+   *  the row fills, not for the cell the held movement is filed in. Absent on typed and legacy rows. */
+  slot_category?: string;
+  slot_pattern?: string;
+  slot_key?: string;
+  slot_frame?: string;
   /** 2026-09-03: rows of one printed superset (p274) share this mark; the logger lays them out as one block. */
   superset_group?: string;
   /** 2026-09-10 (audit H-S07): the server's rest after a work set / a warm-up set, and the line beside the countdown. */
@@ -777,6 +783,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           rows: [{
             name: slot,
             now: ex.name !== slot ? ex.name : undefined,
+            // The slot's cell (2026-09-25): the sheet is that cell first. Absent on a typed or legacy row.
+            cell: ex.slot_category
+              ? { category: ex.slot_category, pattern: ex.slot_pattern ?? null, key: ex.slot_key ?? null, frame: ex.slot_frame ?? null }
+              : undefined,
+            // The slot's own pick list, as the composer stamped it — the frame's admitted movements ride to the sheet.
+            admits: Array.isArray(ex.swap_options) ? ex.swap_options.map((o) => o.name) : undefined,
           }],
         },
       });
@@ -2248,6 +2260,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // The composer's slot intent, as data (2026-08-26). New rows carry it; rows
             // materialized before then fall back to the notes regex in the cue detection.
             slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
+            slot_category: typeof s?.slot_category === 'string' && s.slot_category ? s.slot_category : undefined,
+            slot_pattern: typeof s?.slot_pattern === 'string' && s.slot_pattern ? s.slot_pattern : undefined,
+            slot_key: typeof s?.slot_key === 'string' && s.slot_key ? s.slot_key : undefined,
+            slot_frame: typeof s?.slot_frame === 'string' && s.slot_frame ? s.slot_frame : undefined,
             superset_group: typeof s?.superset_group === 'string' && s.superset_group ? s.superset_group : undefined,
             ...restFieldsOf(s), // 2026-09-10, H-S07: the server's rest numbers and cue
             ...loggerStampsOf(s), // 2026-09-18: the server's reserve words and numbers and intent line

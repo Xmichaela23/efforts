@@ -91,8 +91,12 @@ import { localDateInTz } from './local-date.ts';
 // 32 (2026-09-25): sets are earned on every row, not only the heavy lift — DE, SKILL and HYP climb their p218 band on the
 //   same ladder, keyed by movement; the row carries a one-time line the week its count moves (`sets_line`); the block
 //   description gets the set paragraph (docs/WORKORDER-earned-sets-every-row-2026-09-25.md).
+// 33 (2026-09-25): every frame row carries its slot (`slot_category` / `slot_pattern` / `slot_key` / `slot_frame`) so the
+//   Swap sheet is built for the slot, not the movement's own filing; the minimum kit's superset push half is the goblet
+//   squat, the one-leg rows the Bulgarian split squat (gym: single-leg leg press), the quad row banded leg extension or
+//   reverse lunge; the back extension bench chip reads "Back Extension".
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 32;
+export const PLAN_WRITER_VERSION = 33;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

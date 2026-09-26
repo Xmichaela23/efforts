@@ -43,9 +43,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 90 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -69,7 +69,7 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 190x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -91,9 +91,9 @@ WEEK 02  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 91 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -117,7 +117,7 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 190x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -139,9 +139,9 @@ WEEK 03  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 85 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -165,7 +165,7 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -187,9 +187,9 @@ WEEK 04  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 89 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -213,7 +213,7 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -235,9 +235,9 @@ WEEK 05  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -261,7 +261,7 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -283,9 +283,9 @@ WEEK 06  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 80 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -309,7 +309,7 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -331,9 +331,9 @@ WEEK 07  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 78 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -357,7 +357,7 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -379,9 +379,9 @@ WEEK 08  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 98 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -405,7 +405,7 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -427,9 +427,9 @@ WEEK 09  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 97 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
@@ -453,7 +453,7 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 200x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Progressive Repeats — 65 min
@@ -475,9 +475,9 @@ WEEK 10  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 82 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -500,7 +500,7 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 200x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     One-to-One Repeats — 33 min
@@ -522,9 +522,9 @@ WEEK 11  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -547,7 +547,7 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 200x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
   [Tuesday] ride     Surge, Sustain, Surge — 46 min
@@ -569,9 +569,9 @@ WEEK 12  column=standard
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
       HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Zercher Squat                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Reverse Lunge                  3x3-5        @               | RIR 3.5 · per_side · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
   [Saturday] run      Long Run — 87 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.

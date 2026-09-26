@@ -184,6 +184,13 @@ export type StandingPlanConfig = {
    * exactly as it did — absent is the old behaviour by construction.
    */
   slot_picks: Partial<Record<ViadaPickKey, string>> | null;
+  /**
+   * ⛔ WHICH OF `slot_picks` THE ATHLETE SET BY HAND (2026-09-25): the keys the picking screen sent, the rest being its
+   * defaults. The equipment rebuild lets a defaulted stand-in give way to the cell's printed movement on the new kit
+   * and keeps a hand pick (`equipment-rebuild-picks.ts`). Absent on a block built before this date, which the rebuild
+   * reads by comparing each pick with the default on the kit it was built with.
+   */
+  slot_picks_chosen?: string[] | null;
   dial: string[] | null;
   /**
    * ⛔ THE EQUIPMENT THE BLOCK WAS COMPOSED AGAINST (2026-08-24). Same law as `sport_mix`,
@@ -266,6 +273,8 @@ const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satu
  */
 export function buildStandingPlanRow(args: {
   compose: Omit<ComposeArgs, 'week' | 'column'>;
+  /** The pick keys the athlete set by hand (`slot_picks_chosen`, 2026-09-25); absent = not recorded. */
+  slotPicksChosen?: string[] | null;
   weeks: number;
   /** ⛔ DEPLOYED, NEVER SCHEDULED — see `NO_SCHEDULED_DELOAD_CITE`. Empty on a block with no race. */
   taperWeeks?: number[];
@@ -377,6 +386,8 @@ export function buildStandingPlanRow(args: {
       slot_picks: Object.keys(args.compose.slotPicks ?? {}).length > 0
         ? { ...args.compose.slotPicks }
         : null,
+      // The keys the athlete set by hand (2026-09-25) — see the field. Only written when the build recorded them.
+      ...(Array.isArray(args.slotPicksChosen) ? { slot_picks_chosen: [...args.slotPicksChosen] } : {}),
       dial: (args.compose.dial ?? []).length > 0
         ? [...(args.compose.dial as string[])]
         : null,

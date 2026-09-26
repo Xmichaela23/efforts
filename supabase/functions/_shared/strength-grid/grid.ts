@@ -693,6 +693,14 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
    * use. Shown only when the bench route resolved; a gym member who owns the station reads "GHD Back Extension".
    * Name approved by Michael 2026-09-16 night. It shares the floor version's name above; the clash check (every
    * frame, pick and six kits) found no list that holds both.
+   * ⛔ THE SHOWN NAME FOLLOWS THE IMPLEMENT THE KIT RESOLVES TO (re-stated 2026-09-25, owner's kit): p222 prints
+   * "machine back extension" and the GHD back extension under braced hinge lower; the owner's chip is a 45-degree
+   * back extension bench, not a GHD, so on the `back_extension_bench` route (`strength-gear.ts`) the row reads
+   * "Back Extension" — FIELD: Strong and Hevy list "Back Extension" / "Hyperextension" as the bench exercise and
+   * "GHD" separately. Station owned (a commercial gym): "GHD Back Extension", `hasStation` above. The stored name
+   * stays `ghd back extension` on both — the same movement on a different bench, so history keys as before (the
+   * 2026-09-24 stored-name rule, `executionMovement`, is for a DIFFERENT movement). Read by `shownNameOnKit`, so
+   * the row, the Swap sheet and the picker print one name (`minimum-kit-accessory-table.test.ts`, follow-up 7).
    */
   'ghd back extension': 'Back Extension',
   /**
@@ -941,6 +949,9 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Barbell Standing Leg Calf Raise" — https://exrx.net/WeightExercises/Gastrocnemius/BBStandingCalfRaise' },
   'front squat': { text: 'Set the bar in a rack at upper chest height and rest it on the front of your shoulders. Cross your arms and put your hands on top of the bar, upper arms parallel to the floor. Squat down, bending your hips back and your knees forward, until your thighs are just past parallel. Stand back up until your legs are straight.',
     source: 'ExRx, "Barbell Front Squat" — https://exrx.net/WeightExercises/GluteusMaximus/BBFrontSquat' },
+  // ⚠️ ONE ENTRY FOR BOTH ROUTES (checked 2026-09-25): the approved words name a hip pad, ankle pads and a hinge at the
+  // hip, and the ledger sourced them from the 45-degree bench (Healthline, Fitness Volt) and the GHD (LiveLeanTV, REP)
+  // alike. A route split would be new copy — Michael's yes first.
   'ghd back extension': { text: 'Set the hip pad just below your hip bones. Hook your ankles under the ankle pads. Cross your arms over your chest. Bend at the hips and lower your chest toward the floor. Raise your torso until your body is in a straight line. Do not arch past a straight line at the top.',
     source: 'FIELD — Healthline, LiveLeanTV, Fitness Volt, REP Fitness; ledger row "GHD back extension on a back extension bench" in docs/STATE-SOURCES.md' },
   'glute bridge': { text: 'Lie on your back with your knees bent and your feet flat on the floor, hip-width apart. Push through your heels and lift your hips until your body is in a straight line from knees to shoulders. Lower your hips back to the floor.',
@@ -1035,6 +1046,9 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<HowTo>> = {
     source: 'ExRx, "Lever Leg Extension" — https://exrx.net/WeightExercises/Quadriceps/LVLegExtension' },
   'leg press': { text: 'Sit in the machine with your back against the pad and your feet about shoulder-width apart on the platform. Release the handles and lower the platform until your knees are bent at about 90 degrees, then push it back up without locking your knees. Keep your lower back on the pad.',
     source: 'ExRx, "Lever 45° Leg Press" — https://exrx.net/WeightExercises/GluteusMaximus/LV45LegPress' },
+  // ⚠️ NEW COPY (2026-09-25): the single-leg leg press's words, the source's — Michael's yes before they ship.
+  'single leg leg press': { text: 'Sit in the machine with your back against the pad and one foot on the platform, about in line with your hip; rest the other foot on the floor or hold it off the platform. Release the handles and lower the platform until that knee is bent at about 90 degrees, then push it back up without locking the knee. Do all reps on one leg, then the other.',
+    source: 'ExRx, "Sled 45° Single Leg Press" — https://exrx.net/WeightExercises/GluteusMaximus/SL45SingleLegPress' },
   'lever squat': { text: 'Stand under the machine\'s shoulder pads with your feet about shoulder-width apart. Release the handle and squat down until your thighs are at least parallel to the platform, then push back up. Keep your back against the pads.',
     source: 'ExRx, "Lever Squat" — https://exrx.net/WeightExercises/GluteusMaximus/LVSquat' },
   'light db row': { text: 'Put one knee and the same-side hand on a flat bench, back flat, and hold a dumbbell in the other hand with the arm hanging straight. Pull the dumbbell to your hip, then lower it until your arm is straight. Do all reps on one arm, then the other.',

@@ -216,6 +216,17 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false
   },
+  // ⛔ p221's LEG PRESS PERFORMED ONE LEG AT A TIME (2026-09-25, owner): p275's "braced asymmetrical" is a braced push
+  // lower movement done single-leg, and on a kit that owns the leg press the "Braced push (asymmetrical)" rows build
+  // this, with the lunges behind it (`frames.ts prefer`). Per side, one total (the stack). Unpriced, like every
+  // accessory — no ratio of ours.
+  'single leg leg press': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: true
+  },
   
   // Leg Extension: Isolation, much lower load
   'leg extension': {
@@ -2707,6 +2718,8 @@ export const SAME_MOVEMENT: Record<string, string> = {
   // 2026-09-24 (B2): the floor version under a loaded bar is deleted; "Back Extension" is the bench movement.
   "back extension": "ghd back extension",
   "barbell back squat": "back squat",
+  "single-leg leg press": "single leg leg press",
+  "single leg press": "single leg leg press",
   "barbell bench press": "bench press",
   "barbell rows": "barbell row",
   "bench": "bench press",
