@@ -48,9 +48,12 @@ import { resolveRunEasyHrBand } from '../_shared/easy-hr.ts';
 import { resolveStrengthCapacity, type CanonicalLiftKey } from '../_shared/state-trend/capacity-resolver.ts';
 import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
 import {
+  heartRateZoneSet,
+  maxHrBaselines,
   parsePaceClock,
   powerZoneRows,
   swimPaceBandRows,
+  type HrZoneSet,
   type PowerZoneRow,
   type SwimPaceBandRow,
 } from '../_shared/endurance/display-zones.ts';
@@ -103,10 +106,12 @@ export type ZoneTableRow = { name: string; range: string };
 
 export type ZoneTable = {
   rows: ZoneTableRow[];
-  /** `from your threshold heart rate` / `from your max and resting heart rate`; '' when unknown. */
+  /** `from your threshold heart rate`; '' for zones from a max heart rate (the words await Michael). */
   basis: string;
-  /** Printed in place of the table when there are no stored zones. */
+  /** Printed in place of the table when there are no zones. */
   empty: string;
+  /** True when the zones come from an age estimate of max heart rate. Nothing prints it yet (the words await Michael). */
+  estimate: boolean;
 };
 
 export type LiftReadoutRow = { key: CanonicalLiftKey; label: string; row: BaselineReadoutRow };
@@ -235,7 +240,12 @@ export function zonesForBaselinesRow(
     power,
     swim_pace,
     run_easy_hr,
-    readout: buildReadout({ pn, learned, cfg, locked, metric, today, row, ftpResolved }),
+    readout: buildReadout({
+      pn, learned, cfg, locked, metric, today, row, ftpResolved,
+      // ⛔ THE ZONE TABLES ARE THE SETS A SESSION IS COUNTED IN (2026-09-26): `heartRateZoneSet`, handed the stored
+      // row whole — the same call `compute-workout-analysis` makes for every session's time in zone.
+      hrSets: { run: heartRateZoneSet(row, 'run', { today }), ride: heartRateZoneSet(row, 'ride', { today }) },
+    }),
   };
 }
 
@@ -251,35 +261,36 @@ const LIFTS: Array<{ key: CanonicalLiftKey; label: string; learnedKey: string | 
 
 /**
  * ⛔ THE ZONE TABLE IS THE SERVER'S (2026-09-10) and so are its row names and its ranges (2026-09-15).
- * The stored arrays are the ones `compute-workout-analysis` bins every workout on; the open bottom and
- * the open top are written the way the swim bands already write theirs ("1:57 and slower"), because
- * `{min}–{max}` printed the Z5 row as "176– bpm" with nothing after the dash.
+ *
+ * ⛔ AND IT IS THE TABLE A SESSION IS COUNTED IN (2026-09-26, Michael). The rows are `heartRateZoneSet`'s
+ * (`_shared/endurance/display-zones.ts`): Friel's seven zones from the threshold shown above the table, else
+ * % of max heart rate. It printed `configured_hr_zones.zones_*` — Strava's automatic table where one was stored,
+ * which the analysis also counted by ahead of the threshold. No stored zone array is read now.
+ *
+ * The basis line says where the zones came from: the threshold, a max heart rate, or an age estimate of one
+ * (words approved by Michael 2026-09-26).
  */
-const ZONE_ROW_NAMES = ['Z1 Recovery', 'Z2 Aerobic', 'Z3 Tempo', 'Z4 Threshold', 'Z5 VO2max'];
-
-const ZONE_MODEL_WORDS: Record<string, string> = {
-  friel: 'from your threshold heart rate',
-  karvonen: 'from your max and resting heart rate',
-  needs_resting: 'needs resting heart rate',
+const ZONE_BASIS_WORDS: Record<HrZoneSet['schema'], string> = {
+  'friel-run': 'from your threshold heart rate',
+  'friel-ride': 'from your threshold heart rate',
+  // Michael approved the words 2026-09-26.
+  'max-hr': 'from your max heart rate',
+  'max-hr-age': 'estimated from your age',
+  // never reaches this screen: the analysis's per-session fallback
+  'max-hr-session': '',
 };
 
-const ZONES_EMPTY = 'Heart-rate zones need a threshold heart rate, or a max and a resting heart rate.';
+// Michael approved 2026-09-26: resting heart rate is no longer read, and a birthday gives the age estimate.
+const ZONES_EMPTY = 'Heart-rate zones need a threshold heart rate, a max heart rate, or your birthday.';
 
-function zoneTable(zones: unknown, model: unknown): ZoneTable {
-  const arr = Array.isArray(zones) ? zones as Array<{ min?: unknown; max?: unknown }> : [];
-  const basis = ZONE_MODEL_WORDS[String(model)] ?? '';
-  const rows: ZoneTableRow[] = arr.map((z, i) => {
-    const name = ZONE_ROW_NAMES[i] ?? `Z${i + 1}`;
-    const min = Number(z?.min);
-    const max = z?.max == null ? null : Number(z.max);
-    const hasMin = Number.isFinite(min) && min > 0;
-    const hasMax = max != null && Number.isFinite(max);
-    if (!hasMin && hasMax) return { name, range: `${Math.round(max!)} bpm and under` };
-    if (hasMin && !hasMax) return { name, range: `${Math.round(min)} bpm and up` };
-    if (!hasMin && !hasMax) return { name, range: '' };
-    return { name, range: `${Math.round(min)}–${Math.round(max!)} bpm` };
-  });
-  return { rows, basis, empty: ZONES_EMPTY };
+function zoneTable(set: HrZoneSet | null): ZoneTable {
+  if (!set) return { rows: [], basis: '', empty: ZONES_EMPTY, estimate: false };
+  return {
+    rows: set.rows.map((r) => ({ name: r.name, range: r.range })),
+    basis: ZONE_BASIS_WORDS[set.schema] ?? '',
+    empty: ZONES_EMPTY,
+    estimate: set.estimate,
+  };
 }
 
 function buildReadout(args: {
@@ -291,6 +302,7 @@ function buildReadout(args: {
   today: string;
   row: { birthday?: unknown; gender?: unknown; updated_at?: unknown; height?: unknown; weight?: unknown } | null | undefined;
   ftpResolved: ReturnType<typeof resolveCurrentFtp>;
+  hrSets: { run: HrZoneSet | null; ride: HrZoneSet | null };
 }): BaselinesReadout {
   const { pn, learned, cfg, locked, metric, today, ftpResolved } = args;
   const baselinesLike = { learned_fitness: learned, performance_numbers: pn, configured_hr_zones: cfg } as never;
@@ -374,6 +386,10 @@ function buildReadout(args: {
    * one screen could reach a tier the other could not. There is one input now, and it is this row.
    * ⛔ NO AGE ESTIMATE ON THE MAX (§8.0 #24) — `allowAgeEstimate: false` is the same call the zone
    * build makes (`derive.ts`), so the screen can no longer show a max the zone build refuses.
+   * ⛔ THE MAX ROW READS WHAT THE ZONES READ (2026-09-26): `maxHrBaselines` — the typed max and the learned
+   * peak, not `configured_hr_zones.max_heart_rate` (for a Strava connection, the top of Strava's own zone 4,
+   * shown here as "auto · observed in rides"). With no threshold, the zone table below is built from this
+   * number; with no number here either, it is built from an age estimate the row does not print.
    */
   const typedResting = positive(pn.restingHeartRate);
   const watchResting = positive(cfg.resting_heart_rate);
@@ -402,10 +418,7 @@ function buildReadout(args: {
     };
 
     const manualMax = positive(isRun ? cfg.manual_run_max_hr : cfg.manual_ride_max_hr);
-    const max = resolveCurrentMaxHr(
-      { learned_fitness: learned, configured_hr_zones: cfg, athlete_config: cfg } as never,
-      { sport, allowAgeEstimate: false },
-    );
+    const max = resolveCurrentMaxHr(maxHrBaselines(learned, cfg), { sport, allowAgeEstimate: false });
     const maxRow: BaselineReadoutRow = max.bpm != null
       ? {
         value: `${Math.round(max.bpm)} bpm · ${manualMax != null ? 'your number' : 'auto'}`,
@@ -419,9 +432,7 @@ function buildReadout(args: {
         `Not on file yet. Your hardest logged ${isRun ? 'run' : 'ride'} sets it, once one is recorded with a heart-rate strap.`,
       );
 
-    const zones = isRun ? (cfg.zones_run ?? cfg.zones) : (cfg.zones_ride ?? cfg.zones);
-    const model = isRun ? cfg.zones_run_model : cfg.zones_ride_model;
-    return { lthr: lthrRow, max_hr: maxRow, zones: zoneTable(zones, model) };
+    return { lthr: lthrRow, max_hr: maxRow, zones: zoneTable(args.hrSets[sport]) };
   };
   const runHr = hrFor('run');
   const bikeHr = hrFor('ride');

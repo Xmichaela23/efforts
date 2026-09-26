@@ -1,79 +1,40 @@
-import React, { useMemo } from "react";
-// No chart imports needed - using table only
+import React from "react";
+// ⛔ ONE ZONE CARD (2026-09-26): drawn through `ZoneCard`, the power card's look — no monospace numbers.
+import ZoneCard, { ZONE_COLORS } from "./ZoneCard";
 
 /**
- * Heart Rate Zone Chart — Running-first
+ * Heart-rate zones card
  * -------------------------------------------------------------
- * Drop-in, single-file React component (Tailwind + shadcn/ui + Recharts).
+ * Prints a session's heart-rate zones as the server wrote them (`display_metrics.zones.hr`, workout-detail):
+ * each bin's time, its share, its name ("Zone 5a") and its range ("158–163 bpm"), and the time with a
+ * heart-rate reading ("with heart rate").
  *
- * What it shows
- *  - Stacked bar: distribution of time in zones
- *  - Donut: % share of time
- *  - Table + summary (duration, avg HR, max HR)
- *
- * How zones are chosen (priority order)
- *  1) If `zones` prop is provided (array of {name, min, max}), use it.
- *  2) Else if `useReserve=true` and `restHR` present → Karvonen (HRR) zones.
- *  3) Else → Estimate HRmax from age/sex/formula and apply **running** bands.
- *     - Default estimator: Tanaka (208 − 0.7×age); for female with formula "auto" → Gulati.
- *
- * Usage
- *  <HRZoneChart
- *    samples={[{ t: 0, hr: 118 }, { t: 1, hr: 121 }, ...]} // seconds from start
- *    age={38}
- *    sex="female"
- *    useReserve={false}      // set true to use HRR if restHR provided
- *    restHR={55}
- *    zonePreset="run"       // running defaults (Z1..Z5)
- *    title="Run HR Zones"
- *  />
- *
- *  // Or pass precomputed durations instead of samples:
- *  <HRZoneChart zoneDurationsSeconds={[600, 900, 700, 300, 120]} />
+ * ⛔ THE CARD NAMES NO ZONE AND WORKS OUT NO EDGE (2026-09-26, Michael). The zones are the ones the session was
+ * counted in — Friel's zones from the threshold heart rate on Baselines, else % of max heart rate — named and
+ * ranged by `_shared/endurance/display-zones.ts`, the same rows the Baselines zone table prints. This file
+ * named every zone "Zone N" and printed `{min}-{max} bpm` over whatever table it was handed, and carried its own
+ * max-heart-rate formulas (Tanaka / Gulati / Fox / Karvonen) that no caller used.
  */
 
-export type HRSample = { t: number; hr: number | null };
-export type ZoneDef = { name: string; min: number; max: number };
-
-export interface HRZoneChartProps {
-  samples?: HRSample[];              // time-ordered; t in seconds from start
-  zoneDurationsSeconds?: number[];   // per-zone seconds [Z1..Z5]
-  /** 2026-09-16: each bin's share of the window (0–1), written on the server beside the bins. */
-  zoneShares?: number[];
-  /** The "Duration" the server wrote (the device's elapsed time); the chart's own bin sum only when absent. */
-  durationDisplay?: string;
-  zones?: ZoneDef[];                 // explicit bpm zones (overrides everything)
-
-  // Auto-zone helpers
-  age?: number;                      // used to estimate HRmax if hrMax not supplied
-  sex?: "male" | "female" | "other"; // for HRmax formula selection
-  hrMax?: number;                    // explicit HRmax; overrides age-based estimate
-  restHR?: number;                   // resting HR for Karvonen/HRR
-  useReserve?: boolean;              // true → use Karvonen (requires restHR)
-  hrMaxFormula?: "auto" | "tanaka" | "fox" | "gellish" | "gulati";
-  zonePreset?: "run" | "default";   // running bands vs classic %HRmax
-
-  // Workout summary (when using zoneDurationsSeconds without samples)
-  avgHr?: number;
-  maxHr?: number;
-
-  // UI
-  colors?: string[];
-  title?: string;
+export interface HRZoneBin {
+  i: number;
+  /** Seconds in the zone. */
+  t_s: number;
+  /** This bin's share of the time with a reading (0–1), written on the server. */
+  share?: number;
+  /** The zone's name and range, written on the server. */
+  name?: string | null;
+  range?: string | null;
 }
 
-const DEFAULT_COLORS = [
-  "#10b981", // Z1 - emerald-500
-  "#84cc16", // Z2 - lime-500
-  "#f59e0b", // Z3 - amber-500
-  "#ef4444", // Z4 - red-500
-  "#991b1b", // Z5 - red-800
-];
-
-// Classic %HRmax bands (50–60, 60–70, 70–80, 80–90, 90–100)
-const DEFAULT_BANDS = [0.50, 0.60, 0.70, 0.80, 0.90, 1.001];
-// Running-oriented bands (% of HRmax or %HRR): 60–70, 70–80, 80–87, 87–93, 93–100
-const RUN_BANDS = [0.60, 0.70, 0.80, 0.87, 0.93, 1.001];
+export interface HRZoneChartProps {
+  zoneBins?: HRZoneBin[];
+  /** The time with a heart-rate reading, as the server wrote it. */
+  totalDisplay?: string | null;
+  avgHr?: number;
+  maxHr?: number;
+  title?: string;
+}
 
 const pctFmt = (x: number) => `${(x * 100).toFixed(0)}%`;
 const fmtTime = (sec: number) => {
@@ -85,209 +46,34 @@ const fmtTime = (sec: number) => {
 };
 
 const HRZoneChart: React.FC<HRZoneChartProps> = ({
-  samples = [],
-  zoneDurationsSeconds,
-  zoneShares,
-  durationDisplay,
-  zones,
-  age,
-  sex = "male",
-  hrMax,
-  restHR,
-  useReserve = false,
-  hrMaxFormula = "auto",
-  zonePreset = "run",
-  avgHr: providedAvgHr,
-  maxHr: providedMaxHr,
-  colors = DEFAULT_COLORS,
-  title = "Heart Rate Zones",
+  zoneBins,
+  totalDisplay,
+  avgHr,
+  maxHr,
+  title = "Heart rate zones",
 }) => {
-  // 1) Determine zones
-  const { zoneDefs, hrMax: effectiveHrMax, restHr: effectiveRestHr } = useMemo(() => {
-    // If explicit zones provided, use them
-    if (zones && zones.length > 0) {
-      return { zoneDefs: zones, hrMax: 0, restHr: 0 };
-    }
-
-    // Estimate HRmax if not provided
-    let estimatedHrMax = hrMax;
-    if (!estimatedHrMax && age) {
-      if (hrMaxFormula === "auto" && sex === "female") {
-        // Gulati formula for females: 206 - 0.88 * age
-        estimatedHrMax = 206 - 0.88 * age;
-      } else if (hrMaxFormula === "tanaka" || hrMaxFormula === "auto") {
-        // Tanaka formula: 208 - 0.7 * age
-        estimatedHrMax = 208 - 0.7 * age;
-      } else if (hrMaxFormula === "fox") {
-        estimatedHrMax = 220 - age;
-      } else if (hrMaxFormula === "gellish") {
-        estimatedHrMax = 207 - 0.7 * age;
-      } else if (hrMaxFormula === "gulati") {
-        estimatedHrMax = sex === "female" ? 206 - 0.88 * age : 220 - age;
-      }
-    }
-
-    const effectiveHrMax = estimatedHrMax || 180; // fallback
-    const effectiveRestHr = restHR || 60; // fallback
-
-    // Choose bands based on preset
-    const bands = zonePreset === "run" ? RUN_BANDS : DEFAULT_BANDS;
-    
-    // Generate zone definitions
-    const zoneDefs: ZoneDef[] = bands.slice(0, -1).map((band, i) => {
-      const min = i === 0 ? 0 : bands[i - 1];
-      const max = band;
-      
-      let minBpm: number, maxBpm: number;
-      
-      if (useReserve && restHR) {
-        // Karvonen/HRR method
-        const hrr = effectiveHrMax - effectiveRestHr;
-        minBpm = effectiveRestHr + min * hrr;
-        maxBpm = effectiveRestHr + max * hrr;
-      } else {
-        // %HRmax method
-        minBpm = min * effectiveHrMax;
-        maxBpm = max * effectiveHrMax;
-      }
-      
-      return {
-        name: `Zone ${i + 1}`,
-        min: Math.round(minBpm),
-        max: Math.round(maxBpm),
-      };
-    });
-
-    return { zoneDefs, hrMax: effectiveHrMax, restHr: effectiveRestHr };
-  }, [zones, age, sex, hrMax, restHR, useReserve, hrMaxFormula, zonePreset]);
-
-  // 2) Process samples or use provided durations
-  const { zoneData, totalTime, avgHr, maxHr } = useMemo(() => {
-    if (zoneDurationsSeconds && zoneDurationsSeconds.length > 0) {
-      // ⛔ THE SHARE OF EACH BIN IS THE SERVER'S (2026-09-16, Stage 4 session 3) — `zoneShares`, written
-      // beside the bins in `display_metrics.zones`. This divided each bin by the sum in the render.
-      // The total stays a sum of the same bins: it is the chart's own scale, not a printed number.
-      const total = zoneDurationsSeconds.reduce((a, b) => a + b, 0);
-      // Include ALL zones (even with 0 duration) so the chart shows all zones
-      const zoneData = zoneDurationsSeconds.map((duration, i) => ({
-        zone: zoneDefs[i]?.name || `Zone ${i + 1}`,
-        duration,
-        percentage: zoneShares?.[i] ?? 0,
-        color: colors[i % colors.length],
-        zoneIndex: i, // Store original index for zoneDefs lookup
-      }));
-      
-      return { zoneData, totalTime: total, avgHr: providedAvgHr ?? 0, maxHr: providedMaxHr ?? 0 };
-    }
-
-    // Process samples
-    if (!samples.length) {
-      return { zoneData: [], totalTime: 0, avgHr: 0, maxHr: 0 };
-    }
-
-    // Count time in each zone
-    const zoneCounts = new Array(zoneDefs.length).fill(0);
-    let totalHr = 0;
-    let hrCount = 0;
-    let maxHr = 0;
-
-    samples.forEach(sample => {
-      if (sample.hr && sample.hr > 0) {
-        totalHr += sample.hr;
-        hrCount++;
-        maxHr = Math.max(maxHr, sample.hr);
-        
-        // Find which zone this HR falls into
-        for (let i = 0; i < zoneDefs.length; i++) {
-          const zone = zoneDefs[i];
-          if (sample.hr >= zone.min && sample.hr < zone.max) {
-            zoneCounts[i]++;
-            break;
-          }
-        }
-      }
-    });
-
-    const totalTime = samples.length; // assuming 1 sample per second
-    const avgHr = hrCount > 0 ? totalHr / hrCount : 0;
-
-    const zoneData = zoneCounts.map((count, i) => ({
-      zone: zoneDefs[i].name,
-      duration: count,
-      percentage: totalTime > 0 ? count / totalTime : 0,
-      color: colors[i % colors.length],
-      zoneIndex: i, // Store original index for zoneDefs lookup
-    }));
-
-    return { zoneData, totalTime, avgHr, maxHr };
-  }, [samples, zoneDurationsSeconds, zoneDefs, colors]);
-
-  const monospaceStyle = {
-    fontFamily: "'Courier New', 'Monaco', 'SF Mono', monospace",
-    letterSpacing: '0.02em'
-  };
-
-  if (zoneData.length === 0) {
-    return (
-      <div className="w-full p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-        <h3 className="text-base font-light text-white mb-3">{title}</h3>
-        <p className="text-white/50 text-center py-8 font-light">No heart rate data available</p>
-      </div>
-    );
+  if (!zoneBins || zoneBins.length === 0) {
+    return <ZoneCard title={title} stats={[]} rows={[]} empty="No heart rate data available" />;
   }
 
   return (
-    <div className="w-full p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-      <h3 className="text-base font-light text-white mb-4">{title}</h3>
-      <div className="space-y-6">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{durationDisplay ?? fmtTime(totalTime)}</div>
-            <div className="text-xs text-white/70 font-light">Duration</div>
-          </div>
-          <div>
-            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{Math.round(avgHr)}</div>
-            <div className="text-xs text-white/70 font-light">Avg HR</div>
-          </div>
-          <div>
-            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{Math.round(maxHr)}</div>
-            <div className="text-xs text-white/70 font-light">Max HR</div>
-          </div>
-        </div>
-
-        <div className="border-t border-white/10"></div>
-
-        {/* Zone Table */}
-        <div>
-          <h3 className="text-xs font-light mb-2 text-white/70">Zone Details</h3>
-          <div className="space-y-1">
-            {zoneData.filter(z => z.duration > 0).map((zone) => {
-              const zoneDef = zoneDefs[(zone as any).zoneIndex];
-              const bpmRange = zoneDef ? `${zoneDef.min}-${zoneDef.max}` : '';
-              return (
-                <div key={zone.zone} className="flex items-center justify-between p-2 rounded-lg border border-white/10 bg-white/[0.02]">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: zone.color }}
-                    />
-                    <span className="text-sm font-light text-white">{zone.zone}</span>
-                    <span className="text-xs text-white/70 font-light" style={monospaceStyle}>
-                      {bpmRange} bpm
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-light text-white" style={monospaceStyle}>{fmtTime(zone.duration)}</div>
-                    <div className="text-xs text-white/60 font-light" style={monospaceStyle}>{pctFmt(zone.percentage)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+    <ZoneCard
+      title={title}
+      stats={[
+        { value: totalDisplay || "—", label: "with heart rate" },
+        { value: avgHr ? String(Math.round(avgHr)) : "—", label: "Avg HR" },
+        { value: maxHr ? String(Math.round(maxHr)) : "—", label: "Max HR" },
+      ]}
+      // A zone the session never reached prints no row, as before.
+      rows={zoneBins.filter((b) => (Number(b.t_s) || 0) > 0).map((b) => ({
+        key: `zone-${b.i}`,
+        color: ZONE_COLORS[b.i] ?? ZONE_COLORS[ZONE_COLORS.length - 1],
+        name: typeof b.name === "string" && b.name ? b.name : null,
+        range: typeof b.range === "string" && b.range ? b.range : null,
+        time: fmtTime(Number(b.t_s) || 0),
+        share: pctFmt(Number(b.share) || 0),
+      }))}
+    />
   );
 };
 

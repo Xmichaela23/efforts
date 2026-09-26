@@ -14,6 +14,7 @@ import { GarminDerivedDataLine } from './ProviderAttribution';
 import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
 import { formatDuration } from '@/utils/workoutFormatting';
 import AppleHealthSwimEnrichment from './AppleHealthSwimEnrichment';
+import SessionZoneCards from './SessionZoneCards';
 
 // Step 4b — this session's DISCIPLINE spine verdict, read from session_detail_v1.discipline_trend
 // (which workout-detail reads from athlete_snapshot.state_trends_v1 — the SAME cache the STATE
@@ -54,12 +55,33 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
   );
 }
 
+/**
+ * ⛔ A RIDE'S TIMES (2026-09-26, Michael: "Garmin's three times, under Garmin's names, on every screen that shows a
+ * ride's time"). `session_detail_v1.times` — Time, Moving Time, Elapsed Time, whichever the ride's source sent, the
+ * same rows the Details tab prints from `display_metrics.times`; composed once on the server
+ * (`_shared/session-detail/session-times.ts`) and printed here as sent. Same type as the tiles above.
+ */
+function SessionTimes({ rows }: { rows: Array<{ key: string; label: string; display: string }> }) {
+  return (
+    <div className="flex items-start justify-around w-full px-3 mb-3">
+      {rows.map((r) => (
+        <div key={r.key} className="flex flex-col items-center px-1 min-w-0">
+          <div className="readout-num text-body whitespace-nowrap">{r.display}</div>
+          <div className="readout-label text-caption uppercase text-center whitespace-nowrap">{r.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
   session_detail_v1?: Record<string, any> | null;
   /** True while `scope=session_detail` workout-detail request is in flight */
   sessionDetailLoading?: boolean;
+  /** 2026-09-26: the heart-rate and power zone cards, moved from Details — true for the sessions Details drew them for. */
+  showZones?: boolean;
 };
 
 /**
@@ -74,7 +96,7 @@ function recomputeLine(bodyText: string): string {
   return 'Analysis failed: the server did not answer.';
 }
 
-export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence, showZones }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   /**
    * docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the four tiles (workload, execution,
    * duration, drift) are DERIVED from the session's device data, so the tab carries Garmin's
@@ -100,7 +122,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       typeMaybe === 'swim' || typeMaybe === 'swimming'
     );
     if (!allowCompletedOnly) {
-      return (<div className="text-subhead text-label-secondary">No planned session to compare.</div>);
+      // A walk has no plan read, but Details drew its heart-rate zones; they came here with the rest (2026-09-26).
+      return (
+        <>
+          <div className="text-subhead text-label-secondary">No planned session to compare.</div>
+          {showZones && completed ? <SessionZoneCards workoutData={completed} /> : null}
+        </>
+      );
     }
   }
 
@@ -337,6 +365,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race || type === 'swim'}
       />
+      {/* THE RIDE'S TIMES (2026-09-26) — under the tiles and above the Garmin line; the source's own numbers. A copy of
+          the session saved on the workout carries none (the rows are sent, never saved), so the Details reply's
+          `display_metrics.times` — the same rows from the same row — stands in until this tab's own reply lands. */}
+      {(() => {
+        const rows = Array.isArray((sd as any)?.times) ? (sd as any).times : (completed as any)?.display_metrics?.times;
+        return Array.isArray(rows) && rows.length > 0 ? <SessionTimes rows={rows} /> : null;
+      })()}
       {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, under the tiles.
           Not inside a tooltip or a collapsed section. */}
       {garminDerived ? <GarminDerivedDataLine className="px-3 pb-1" /> : null}
@@ -405,6 +440,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           {(sd as any)?.effort_row && <Reading label="Effort" text={(sd as any).effort_row} />}
         </div>
       )}
+      {/* ZONES (2026-09-26, Michael): the heart-rate and power zone cards, moved from Details — under the
+          session's own numbers and readings, above Next. */}
+      {showZones && completed ? <SessionZoneCards workoutData={completed} /> : null}
       {/* NEXT sits last, after the interval table (Michael, 2026-09-07). */}
       {(sd as any)?.next_session && (
         <div className="px-3 py-3 border-t border-white/[0.055]"><NextUp session={(sd as any).next_session} /></div>

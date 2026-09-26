@@ -39,10 +39,11 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, frielRunZones } from '../_shared/easy-hr.ts';
+import { resolveRunEasyHrBand, isEasyPrescribedRun } from '../_shared/easy-hr.ts';
 import { movingSecondsUnderCeiling, timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
 import { paceRangeBand, STOPPED_SLOWER_THAN_S_PER_MI } from '../_shared/run-pace.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+// The one heart-rate zone chain: the zones Baselines prints and compute-workout-analysis counts every session in.
+import { heartRateZoneSet } from '../_shared/endurance/display-zones.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -280,12 +281,19 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     let baselines: any = {};
     let effortPaces: any = null;
     let learnedFitness: any = null;
-    let configuredHrZones: any = null;
+    /**
+     * ⛔ THE RUN'S HEART-RATE ZONES ARE THE ONES BASELINES PRINTS (2026-09-26, Michael). `heartRateZoneSet`
+     * (`_shared/endurance/display-zones.ts`), handed this row whole: the run threshold on Baselines → % of max →
+     * an age estimate. This analyser read `configured_hr_zones.zones` first — Strava's automatic table where one
+     * was stored — and then a threshold resolved from `learned_fitness` alone, so a typed run threshold was
+     * invisible here. `birthday` and `gender` are read for the age tier.
+     */
+    let runZoneSet: ReturnType<typeof heartRateZoneSet> = null;
     let userUnits = 'imperial'; // default
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, units, effort_paces, learned_fitness, configured_hr_zones')
+        .select('performance_numbers, units, effort_paces, learned_fitness, configured_hr_zones, birthday, gender')
         .eq('user_id', workout.user_id)
         .single();
       
@@ -295,7 +303,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       baselines = userBaselines?.performance_numbers || {};
       effortPaces = (userBaselines as any)?.effort_paces || null;
       learnedFitness = (userBaselines as any)?.learned_fitness || null;
-      configuredHrZones = (userBaselines as any)?.configured_hr_zones || null;
+      runZoneSet = heartRateZoneSet(userBaselines as any, 'run', { today: new Date().toISOString().slice(0, 10) });
       console.log('📊 User baselines found:', baselines);
     } catch (error) {
       console.log('⚠️ No user baselines found, using defaults');
@@ -908,50 +916,19 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       }
     }
     
-    // Provide user-specific HR zones — use configured_hr_zones (same source as Training Baselines)
-    // so debrief zone references match exactly what every other surface shows.
-    // Fall back to Friel %LTHR computed from learned threshold HR if no configured zones.
+    // The athlete's heart-rate zones for the debrief — the run's zone set above, the rows Baselines prints.
+    /**
+     * ⛔ THE FIRST FOUR ZONE TOPS OF THE ONE SET (2026-09-26). This debrief counts five zones, `hr <= zNMax`, the
+     * same rule the set's rows are printed by. Friel's zones 1–4 are its first four rows (the tops `frielRunZones`
+     * gave here before) and its Zone 5 is 5a, 5b and 5c together; from a max heart rate, the five zones are the
+     * set's own. No set (no threshold, no max, no birthday) → undefined, and the debrief estimates from the
+     * session's own peak as it did.
+     */
     const hrZonesFromBaseline = (() => {
-      try {
-        // Priority 1: configured_hr_zones (what Training Baselines and coach display)
-        const czArr = (configuredHrZones as any)?.zones as Array<{ min?: number; max?: number | null }> | undefined;
-        if (Array.isArray(czArr) && czArr.length >= 4) {
-          // zones[0]=Z1, [1]=Z2, [2]=Z3, [3]=Z4, [4]=Z5
-          /**
-           * ⛔ EACH ZONE ENDS ONE BEAT BELOW THE NEXT ZONE'S FLOOR (2026-09-17, clean-up batch item 10). The four
-           * writers store a zone's top two ways: Friel from Baselines (`save-baselines` → `frielRunZones`) as the
-           * beat below the next floor; Karvonen (`hrZones`), Strava (`strava-token-exchange`) and a FIT file
-           * (`save-imported-workout`) as the next floor itself. Zone 1 took a beat off and zones 2–4 did not, so each
-           * was one beat wrong for one of the two shapes. The floors agree in both, so the ceiling is read off them.
-           */
-          const get = (i: number) => czArr[i];
-          const topOf = (i: number) => {
-            const nextFloor = Number(get(i + 1)?.min);
-            return Number.isFinite(nextFloor) && nextFloor > 0 ? nextFloor - 1 : Number(get(i)?.max ?? 0);
-          };
-          const z1Max = topOf(0);
-          const z2Max = topOf(1);
-          const z3Max = topOf(2);
-          const z4Max = topOf(3);
-          if (z1Max > 0 && z2Max > z1Max && z3Max > z2Max && z4Max > z3Max) {
-            return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
-          }
-        }
-        // Priority 2: the CANONICAL Friel %LTHR model (friel-zones.ts) from the resolved threshold —
-        // the SAME boundaries the facts bins, the Baselines screen, and the easy band use. Was a local
-        // non-Friel table (0.75/0.85/0.92/0.98) that produced a SECOND, differently-binned distribution
-        // surfacing next to the facts. audit 2026-07-17. LTHR via the one resolver (learned-first, gated).
-        const thr = resolveCurrentLthr({ learned_fitness: learnedFitness as any }).bpm;
-        if (thr == null || thr <= 0) return undefined;
-        // ⛔ THE ONE TABLE, READ — not a copy of its percentages (WORKORDER §3b, 2026-09-16). The copy that
-        // stood here put each zone's top on the next zone's first beat (Z1 top 85%, Z3 top 95%, Z4 top
-        // 105%), one beat above `frielRunZones`, whose tops are the beat BELOW the next zone's floor.
-        // The bins are `hr <= zNMax`, so the table's `max` is the ceiling exactly.
-        const [fz1, fz2, fz3, fz4] = frielRunZones(thr);
-        return { z1Max: fz1.max!, z2Max: fz2.max!, z3Max: fz3.max!, z4Max: fz4.max!, z5Max: 999 };
-      } catch {
-        return undefined;
-      }
+      const tops = (runZoneSet?.rows ?? []).slice(0, 4).map((r) => r.max);
+      if (tops.length < 4 || tops.some((t) => t == null || !Number.isFinite(t))) return undefined;
+      const [z1Max, z2Max, z3Max, z4Max] = tops as number[];
+      return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
     })();
 
     // SINGLE SOURCE OF TRUTH: workout type key for interpretation.
@@ -1906,22 +1883,10 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     }
 
     // Structured adherence summary (verdict + technical insights + plan impact)
-    const aerobicCeilingBpm = (() => {
-      try {
-        // Use configured Z2 max if available (same source as Training Baselines)
-        const czArr = (configuredHrZones as any)?.zones as Array<{ max?: number | null }> | undefined;
-        if (Array.isArray(czArr) && czArr.length >= 2) {
-          const z2Max = Number(czArr[1]?.max ?? 0);
-          if (z2Max > 0) return z2Max;
-        }
-        // Canonical easy ceiling (0.89·LTHR, friel-zones.ts) via the one resolver — NOT a local 0.85.
-        const thr = resolveCurrentLthr({ learned_fitness: learnedFitness as any }).bpm;
-        if (thr == null || thr <= 0) return null;
-        return easyCeilingBpm(thr);
-      } catch {
-        return null;
-      }
-    })();
+    // The top of Zone 2 in the run's zone set (2026-09-26) — from a threshold, Friel's 89% of LTHR, the easy
+    // ceiling (`easyCeilingBpm`) this read before; from a max heart rate, that table's Zone 2 top. It read
+    // `configured_hr_zones.zones[1].max` first, Strava's table where one was stored.
+    const aerobicCeilingBpm = runZoneSet?.rows[1]?.max ?? null;
 
     const adherenceSummary = generateAdherenceSummary(
       performance as { execution_adherence: number; pace_adherence: number; duration_adherence: number },

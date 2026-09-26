@@ -762,6 +762,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const cardStyle = getCardStyle();
   const cardClass = getCardClass();
   const hasCardStyle = isMobility || isStrength;
+  /** The sessions the Details tab draws its endurance view for — and, since 2026-09-26, the ones Performance
+   *  draws the heart-rate and power zone cards for (moved from Details; one test, so the two cannot differ). */
+  const hasEnduranceDetails = workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk';
 
   // Get workout type and sport color for gradient
   const workoutTypeForGradient = getWorkoutType();
@@ -1598,6 +1601,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   completed={isCompleted ? completedData : null}
                   session_detail_v1={sessionDetailV1}
                   sessionDetailLoading={!!sessionDetailLoading}
+                  showZones={isCompleted && hasEnduranceDetails}
                 />
               </div>
             </div>
@@ -1610,7 +1614,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 {isCompleted ? (
                   <div>
                       {/* Delete control removed per product decision */}
-                      {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
+                      {hasEnduranceDetails ? (
                         <div>
                           <CompletedTab 
                             workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}

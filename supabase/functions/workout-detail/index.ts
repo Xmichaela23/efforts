@@ -15,6 +15,8 @@ import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
 import { resolveRunScalars } from '../_shared/run/run-scalars.ts';
 import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
+// The name and range on each zone bin — the tables Baselines / Profile print from (2026-09-26).
+import { hrZoneBinText, powerZoneBinText } from '../_shared/endurance/display-zones.ts';
 import { disciplineOf } from '../_shared/state-trend/index.ts';
 import {
   fetchActivePlanId,
@@ -39,6 +41,8 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE MOVING TIME PER FINISHED SESSION (2026-09-10, audit H-D10) — the rule get-week stamps too.
 import { completedMovingSeconds, providerElapsedSeconds } from '../_shared/moving-seconds.ts';
+// A session's Time / Moving Time / Elapsed Time as its source sent them — one composition, both tabs (2026-09-26).
+import { sessionTimeRows, wantsStoredStreamTail, type SessionTimeRow } from '../_shared/session-detail/session-times.ts';
 // ⛔ THE GOOD-NEWS LINE (2026-09-10, audit H-T14) — stored by recompute-workout, passed through here.
 import type { SessionBoomV1 } from '../_shared/session-boom/types.ts';
 // The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
@@ -223,7 +227,7 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
 /** Strip response-only keys; they must never appear in persisted workout_analysis.session_detail_v1. */
 function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null | undefined): Record<string, unknown> {
   if (!sd || typeof sd !== 'object') return (sd ?? {}) as Record<string, unknown>;
-  const { stale: _s, stale_reason: _r, effort_row: _e, talk_test_row: _t, ...rest } = sd as Record<string, unknown>;
+  const { stale: _s, stale_reason: _r, effort_row: _e, talk_test_row: _t, times: _tm, ...rest } = sd as Record<string, unknown>;
   return rest as Record<string, unknown>;
 }
 
@@ -318,6 +322,8 @@ type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_mis
 function enrichSessionDetailForResponse(
   rowSd: any,
   sessionDetailV1: any | null,
+  /** The session's time rows (`sessionTimesForRow`), composed once per answer; absent → composed from the row alone. */
+  times?: SessionTimeRow[] | null,
 ): any {
   // ⛔ THE GOOD-NEWS LINE (audit H-T14) — the one `recompute-workout` stored on the row, attached here on
   // EVERY answer, the cached copy included, and never persisted inside `session_detail_v1`. A copy
@@ -336,6 +342,10 @@ function enrichSessionDetailForResponse(
     if (typeof rowMeta === 'string') { try { rowMeta = JSON.parse(rowMeta); } catch { rowMeta = null; } }
     base.talk_test_row = base?.talk_test_applies === true ? talkTestRowText(rowMeta?.talk_test) : null;
   } catch { /* rows are optional */ }
+  // ⛔ THE SESSION'S TIMES, ON EVERY ANSWER (2026-09-26, `_shared/session-detail/session-times.ts`) — the rows Details
+  // prints from `display_metrics.times`, composed from the same row, so the two tabs cannot print different times.
+  // Read from the row like the rows above, never saved into the copy: a cached copy carries none to go stale.
+  try { base.times = times !== undefined ? times : sessionTimeRows(rowSd); } catch { base.times = null; }
   const rowPlanned = rowSd?.planned_id != null && String(rowSd.planned_id).trim() !== '' ? String(rowSd.planned_id) : '';
   const sdPlanned = base?.plan_context?.planned_id != null && String(base.plan_context.planned_id).trim() !== ''
     ? String(base.plan_context.planned_id)
@@ -359,6 +369,27 @@ function enrichSessionDetailForResponse(
     return { ...base, boom, stale, stale_reason };
   }
   return { ...base, boom, stale: false };
+}
+
+/**
+ * ⛔ THE SESSION'S TIME ROWS, ONCE PER ANSWER (2026-09-26, `_shared/session-detail/session-times.ts`), for both tabs.
+ * A Garmin ride, run or walk saved before its three times were kept reads its Moving Time and Elapsed Time from
+ * Garmin's own counters at the last stored sample. Only that one sample is fetched: `sensor_data->-1` (the stream's
+ * last element when it is stored as a list) and `sensor_data->samples->-1` (when stored under `samples`) — PostgREST
+ * reads a negative JSON array index as counting from the end (its select parser takes an optional '-' on an index
+ * since v9, `pJIdx`; PostgreSQL's `->` does the same). No sample, or a failed read: those two rows are left out.
+ */
+async function sessionTimesForRow(supabase: any, row: any): Promise<SessionTimeRow[] | null> {
+  let tail: unknown = null;
+  if (wantsStoredStreamTail(row) && row?.id) {
+    try {
+      let q = supabase.from('workouts').select('tail:sensor_data->-1,samples_tail:sensor_data->samples->-1').eq('id', row.id);
+      if (row?.user_id) q = q.eq('user_id', row.user_id);
+      const { data, error } = await q.maybeSingle();
+      if (!error) tail = (data as any)?.tail ?? (data as any)?.samples_tail ?? null;
+    } catch { tail = null; }
+  }
+  try { return sessionTimeRows(row, tail); } catch { return null; }
 }
 
 /** `computed.session_boom_v1`, or null. `computed` can arrive as a JSON string. */
@@ -1691,6 +1722,8 @@ Deno.serve(async (req) => {
       // recording's samples in the render.
       'weather_data','avg_swim_cadence',
       'avg_speed','max_speed','max_pace','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
+      // A FIT file's own timer and elapsed seconds — Time and Elapsed Time on a ride (`session-times.ts`, 2026-09-26).
+      'total_timer_time','total_elapsed_time',
       'start_position_lat','start_position_long','timestamp',
       'strength_exercises','mobility_exercises','refined_type',
       // Source tracking for display
@@ -1748,6 +1781,8 @@ Deno.serve(async (req) => {
       }
 
       const analysisSd = parseAnalysisFromWorkoutRow(rowSd);
+      // The session's time rows, sent with either answer below (2026-09-26, `sessionTimesForRow`).
+      const timesSd = await sessionTimesForRow(supabase, rowSd);
       if (!forceRefresh && !isSessionDetailStale(rowSd, analysisSd)) {
         const sd = analysisSd.session_detail_v1 as any;
         console.log('[workout-detail] session_detail fast path: serving persisted session_detail_v1');
@@ -1757,7 +1792,7 @@ Deno.serve(async (req) => {
           sd && typeof sd === 'object'
             ? stripResponseOnlySessionDetailFields({ ...sd } as Record<string, unknown>)
             : sd;
-        const enriched = enrichSessionDetailForResponse(rowSd, sdForResponse);
+        const enriched = enrichSessionDetailForResponse(rowSd, sdForResponse, timesSd);
         const outFast: Record<string, unknown> = {
           session_detail_v1: enriched,
           processing_complete: pcFast,
@@ -1787,7 +1822,7 @@ Deno.serve(async (req) => {
         dSd,
       );
       const out: Record<string, unknown> = { processing_complete: pcSd, _cache_hit: false };
-      out.session_detail_v1 = enrichSessionDetailForResponse(rowSd, sdV1);
+      out.session_detail_v1 = enrichSessionDetailForResponse(rowSd, sdV1, timesSd);
       if (latMs != null && latMs >= SNAPSHOT_LATENCY_WARN_MS) out.snapshot_latency_ms = latMs;
       const headersOut: Record<string, string> = {
         ...corsHeaders,
@@ -2134,14 +2169,23 @@ Deno.serve(async (req) => {
         });
       };
       const z = d?.computed?.analysis?.zones;
-      const hr = withShare(z?.hr?.bins);
-      const power = withShare(z?.power?.bins);
+      // ⛔ EACH BIN'S NAME AND RANGE ARE WRITTEN HERE TOO (power 2026-09-26 morning, heart rate 2026-09-26) —
+      // `name` and `range` from the tables Baselines / Profile print (`_shared/endurance/display-zones.ts`), for
+      // the zone set the session was counted in. Both cards named their zones themselves: the power card's open
+      // top bin read "252-0 W", the heart-rate card printed "Zone 1 … Zone 5" over whatever table it was handed.
+      // Display over stored bins, like the share: no session is analysed again for it.
+      const hrText = hrZoneBinText(z?.hr);
+      const hr = withShare(z?.hr?.bins)?.map((b, i) => (hrText[i] ? { ...b, ...hrText[i] } : b)) ?? null;
+      const powerText = powerZoneBinText(z?.power);
+      const power = withShare(z?.power?.bins)?.map((b, i) => (powerText[i] ? { ...b, ...powerText[i] } : b)) ?? null;
       if (!hr && !power) return null;
+      const totalS = (bins: Array<Record<string, unknown>>) => bins.reduce((a, b) => a + (Number(b.t_s) || 0), 0);
       return {
-        // `duration_display` — the chart's "Duration" is the device's elapsed time (rule 7), the same seconds as the
-        // Elapsed tile; the bins sum one sample interval short of it (Stage 7 session 3).
-        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0), duration_display: elapsedS != null && elapsedS > 0 ? durationClock(elapsedS) : null } } : {}),
-        ...(power ? { power: { ...(z?.power ?? {}), bins: power, total_s: power.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
+        // ⛔ `total_display` — each card's time is the time WITH A READING, the sum of its own bins, printed
+        // "with heart rate" / "with power" (Michael, 2026-09-26). The heart-rate card printed the device's
+        // elapsed time as "Duration" (`duration_display`, gone), which the bins never summed to.
+        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: totalS(hr), total_display: durationClock(totalS(hr)) } } : {}),
+        ...(power ? { power: { ...(z?.power ?? {}), bins: power, total_s: totalS(power), total_display: durationClock(totalS(power)) } } : {}),
       };
     })();
 
@@ -2218,14 +2262,31 @@ Deno.serve(async (req) => {
         return dmFmt.distanceNumber(runMax * kDist, dmMetric ? 2 : 1) as number;
       });
       const elevLine = arr('elevation_m');
+      /**
+       * ⛔ THE CLIMB READOUT PRINTS ONLY TOTALS THE SOURCE SENT (2026-09-26, Michael: "show the source's numbers under
+       * its names; never fill a missing one with our own"). A series built since then carries `climb_totals` and has
+       * no line for a total the source did not send (`display-series.ts`); one saved before it drew both lines
+       * always, so its gain and descent print only when the row holds the source's own total. A Strava session sends
+       * no descent (Strava API reference, DetailedActivity), so its strip reads "+gain" alone, as Strava's page does.
+       * ⚠️ A Garmin session saved before its descent was kept reads no descent until it is analysed again; the new
+       * series ends on Garmin's Total Descent from the stored payload.
+       */
+      const builtUnderRule = !!sr && typeof sr.climb_totals === 'object' && sr.climb_totals !== null;
+      const sentTotal = (k: 'elevation_gain' | 'elevation_loss'): boolean => {
+        let m: any = (row as { metrics?: unknown })?.metrics;
+        if (typeof m === 'string') { try { m = JSON.parse(m); } catch { m = null; } }
+        return finite((row as Record<string, unknown>)?.[k]) != null || finite(m?.[k]) != null;
+      };
+      const showGain = builtUnderRule || sentTotal('elevation_gain');
+      const showLoss = builtUnderRule || sentTotal('elevation_loss');
       return {
         distance,
         pace_s: perPoint('pace_display_s_per_km', (v) => dmFmt.paceSecondsPerUnit(v)),
         // A point with no altitude read "0" on the chart, and still does.
         elevation: dist.map((_, i) => dmFmt.elevationNumber(finite(elevLine[i]) ?? 0) as number),
         vam: perPoint('vam_m_per_h', (v) => dmFmt.elevationNumber(v)),
-        gain: perPoint('elevation_gain_cum_m', (v) => dmFmt.elevationNumber(v)),
-        loss: perPoint('elevation_loss_cum_m', (v) => dmFmt.elevationNumber(v)),
+        gain: showGain ? perPoint('elevation_gain_cum_m', (v) => dmFmt.elevationNumber(v)) : [],
+        loss: showLoss ? perPoint('elevation_loss_cum_m', (v) => dmFmt.elevationNumber(v)) : [],
         units: {
           distance: dmFmt.distanceUnit,
           distance_dp: dmMetric ? 2 : 1,
@@ -2238,8 +2299,16 @@ Deno.serve(async (req) => {
     // The VAM pill's "(avg)": `computed.overall.avg_vam` (m/h) in the athlete's unit, whole.
     const _avgVam = d?.computed?.overall?.avg_vam;
     const avg_vam_display = _avgVam != null && Number.isFinite(Number(_avgVam)) ? dmFmt.elevationNumber(_avgVam) : null;
+    // The session's time rows, composed once for this answer: Details prints them here, Performance below.
+    const timesRows = await sessionTimesForRow(supabase, row);
 
     (detail as any).display_metrics = { gap_pace_s_per_km,
+      // ⛔ THE SESSION'S TIMES (2026-09-26, `_shared/session-detail/session-times.ts`) — Time / Moving Time / Elapsed
+      // Time, as the source sent them, under Garmin Connect's names. Details' time tiles and the map's "(total)" time
+      // print these; Performance prints the same rows (`session_detail_v1.times`, `enrichSessionDetailForResponse`).
+      // Null on anything but a ride, run or walk; empty when the source sent no times (the tiles then print what they
+      // did before).
+      times: timesRows,
       // ⛔ EVERY LINE BELOW IS ALREADY IN THE ATHLETE'S UNIT (2026-09-16) — the screen prints them.
       unit_system: dmMetric ? 'metric' : 'imperial',
       // A swim reads whole yards / metres on both lines, the athlete's unit, the one swim format (Stage 7 session 3).
@@ -2322,7 +2391,7 @@ Deno.serve(async (req) => {
       processing_complete: processingComplete,
     };
     if (rawSd) {
-      responsePayload.session_detail_v1 = enrichSessionDetailForResponse(row, rawSd);
+      responsePayload.session_detail_v1 = enrichSessionDetailForResponse(row, rawSd, timesRows);
     }
     if (snapshot_latency_ms != null && snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
       responsePayload.snapshot_latency_ms = snapshot_latency_ms;

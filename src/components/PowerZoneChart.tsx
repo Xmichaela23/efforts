@@ -1,6 +1,4 @@
 import React, { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   PieChart,
   Pie,
@@ -8,61 +6,43 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import ZoneCard, { ZONE_COLORS } from "./ZoneCard";
 
 /**
  * Power Zone Chart
  * -------------------------------------------------------------
  * Displays power distribution across zones for cycling workouts.
- * Uses server-computed zone data from workoutData.computed.analysis.zones.power
+ * Uses server-computed zone data from `display_metrics.zones.power` (workout-detail), each bin as
+ * compute-workout-analysis cut it, with its share, name and range written beside it on the server.
  *
- * Zone data structure from server:
- * {
- *   bins: [
- *     { i: 0, t_s: 600, min: 50, max: 120 },
- *     { i: 1, t_s: 900, min: 120, max: 180 },
- *     ...
- *   ],
- *   schema: 'ftp-based'
- * }
+ * ⛔ THE ZONE NAMES AND RANGES ARE THE SERVER'S (2026-09-26) — `name` ("Z7 Neuromuscular") and `range`
+ * ("> 252W") on each bin, from `_shared/endurance/display-zones.ts`, the table Profile prints. This file kept
+ * a seven-name list of its own ("Z6+ Neuromuscular") and printed `{min}-{max} W`, so the open top bin, whose
+ * `max` is stored as null, read "252-0 W". A bin with no words from the server prints none.
+ * The legacy `zoneDurationsSeconds` / `zoneRanges` props went with the list: nothing passed them.
+ *
+ * ⛔ THE TIME "WITH POWER" IS THE SERVER'S TOO (2026-09-26) — `totalDisplay`, the sum of the bins written by
+ * workout-detail (`total_display`). This card added the bins up and formatted the sum itself.
  */
 
 interface PowerZoneBin {
   i: number;  // Zone index (0-6)
   t_s: number;  // Duration in seconds
-  min: number;  // Zone min power (W)
-  max: number;  // Zone max power (W)
   /** 2026-09-16: this bin's share of the window (0–1), written on the server beside the bin. */
   share?: number;
+  /** 2026-09-26: the level's name and range, written on the server beside the bin. */
+  name?: string | null;
+  range?: string | null;
 }
 
 interface PowerZoneChartProps {
-  zoneBins?: PowerZoneBin[];  // Server bins with i, t_s, min, max fields
-  zoneDurationsSeconds?: number[];  // Legacy: Array of seconds spent in each zone (deprecated)
+  zoneBins?: PowerZoneBin[];  // Server bins with i, t_s, share, name, range
+  /** The time with a power reading, as the server wrote it. */
+  totalDisplay?: string | null;
   avgPower?: number;
   maxPower?: number;
-  zoneRanges?: { min: number; max: number }[];  // Legacy: Optional zone ranges (deprecated)
   title?: string;
 }
-
-const POWER_ZONE_LABELS = [
-  "Z1 Active Recovery",
-  "Z2 Endurance",
-  "Z3 Tempo",
-  "Z4 Threshold",
-  "Z5 VO2 Max",
-  "Z6 Anaerobic",
-  "Z6+ Neuromuscular",
-];
-
-const POWER_ZONE_COLORS = [
-  "#10b981", // Z1 - emerald-500
-  "#84cc16", // Z2 - lime-500
-  "#f59e0b", // Z3 - amber-500
-  "#ef4444", // Z4 - red-500
-  "#991b1b", // Z5 - red-800
-  "#7c2d12", // Z6 - red-950
-  "#581c87", // Z6+ - purple-900
-];
 
 const pctFmt = (x: number) => `${(x * 100).toFixed(0)}%`;
 const fmtTime = (sec: number) => {
@@ -75,93 +55,47 @@ const fmtTime = (sec: number) => {
 
 const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
   zoneBins,
-  zoneDurationsSeconds,  // Legacy support
+  totalDisplay,
   avgPower,
   maxPower,
-  zoneRanges,  // Legacy support
-  title = "Power Distribution",
+  title = "Power zones",
 }) => {
-  const { zoneData, totalTime } = useMemo(() => {
-    // Use new bins format if available (preferred)
+  const zoneData = useMemo(() => {
     if (zoneBins && zoneBins.length > 0) {
       // ⛔ THE SHARE IS THE SERVER'S (2026-09-16) — `share` on each bin. This divided by the sum here.
-      // The total stays a sum of the same bins: it is the chart's scale, not a printed number.
-      const total = zoneBins.reduce((sum, bin) => sum + (Number(bin.t_s) || 0), 0);
-      
+
       // Create array for all 7 zones (0-6), filling in missing ones with 0 duration
       const allZones = Array.from({ length: 7 }, (_, i) => {
         const bin = zoneBins.find(b => Number(b.i) === i);
         return {
           zoneIndex: i,
-          zone: POWER_ZONE_LABELS[i] || `Zone ${i + 1}`,
+          zone: typeof bin?.name === "string" && bin.name ? bin.name : null,
+          range: typeof bin?.range === "string" && bin.range ? bin.range : null,
           duration: bin ? (Number(bin.t_s) || 0) : 0,
           percentage: bin ? (Number((bin as { share?: unknown }).share) || 0) : 0,
-          color: POWER_ZONE_COLORS[i] || POWER_ZONE_COLORS[POWER_ZONE_COLORS.length - 1],
-          range: bin ? { min: Number(bin.min) || 0, max: Number(bin.max) || 0 } : undefined,
+          color: ZONE_COLORS[i] || ZONE_COLORS[ZONE_COLORS.length - 1],
         };
       });
-      
-      return { zoneData: allZones, totalTime: total };
-    }
-    
-    // Legacy support: use zoneDurationsSeconds array
-    if (zoneDurationsSeconds && zoneDurationsSeconds.length > 0) {
-      const total = zoneDurationsSeconds.reduce((a, b) => a + b, 0);
-      
-      // Create array for all zones, filling in missing ones with 0 duration
-      const allZones = Array.from({ length: Math.max(zoneDurationsSeconds.length, 7) }, (_, i) => ({
-        zoneIndex: i,
-        zone: POWER_ZONE_LABELS[i] || `Zone ${i + 1}`,
-        duration: zoneDurationsSeconds[i] || 0,
-        percentage: total > 0 ? ((zoneDurationsSeconds[i] || 0) / total) : 0,
-        color: POWER_ZONE_COLORS[i % POWER_ZONE_COLORS.length],
-        range: zoneRanges?.[i],
-      }));
-      
-      return { zoneData: allZones, totalTime: total };
+
+      return allZones;
     }
 
-    return { zoneData: [], totalTime: 0 };
-  }, [zoneBins, zoneDurationsSeconds, zoneRanges]);
+    return [];
+  }, [zoneBins]);
 
   if (zoneData.length === 0) {
-    return (
-      <Card className="w-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">No power data available</p>
-        </CardContent>
-      </Card>
-    );
+    return <ZoneCard title={title} stats={[]} rows={[]} empty="No power data available" />;
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold">{fmtTime(totalTime)}</div>
-            <div className="text-sm text-muted-foreground">with power</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold">{avgPower ? Math.round(avgPower) : "—"}</div>
-            <div className="text-sm text-muted-foreground">Avg Power</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold">{maxPower ? Math.round(maxPower) : "—"}</div>
-            <div className="text-sm text-muted-foreground">Max Power</div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Pie Chart */}
+    <ZoneCard
+      title={title}
+      stats={[
+        { value: totalDisplay || "—", label: "with power" },
+        { value: avgPower ? String(Math.round(avgPower)) : "—", label: "Avg Power" },
+        { value: maxPower ? String(Math.round(maxPower)) : "—", label: "Max Power" },
+      ]}
+      chart={
         <div>
           <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
           <ResponsiveContainer width="100%" height={240}>
@@ -175,7 +109,7 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
                 outerRadius={72}
                 label={({ percentage }) => pctFmt(percentage)}
               >
-                {zoneData.filter(z => z.duration > 0).map((entry, index) => (
+                {zoneData.filter(z => z.duration > 0).map((entry) => (
                   <Cell key={`cell-${entry.zoneIndex}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -183,37 +117,17 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
             </PieChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Zone Table */}
-        <div>
-          <h3 className="text-sm font-medium mb-3">Zone Details</h3>
-          <div className="space-y-2">
-            {zoneData.map((zone) => (
-              <div key={zone.zone} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-4 h-4 rounded-full" 
-                    style={{ backgroundColor: zone.color }}
-                  />
-                  <span className="font-medium">{zone.zone}</span>
-                  {zone.range && (
-                    <span className="text-sm text-muted-foreground">
-                      {zone.range.min}-{zone.range.max} W
-                    </span>
-                  )}
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">{fmtTime(zone.duration)}</div>
-                  <div className="text-sm text-muted-foreground">{pctFmt(zone.percentage)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      }
+      rows={zoneData.map((zone) => ({
+        key: `zone-${zone.zoneIndex}`,
+        color: zone.color,
+        name: zone.zone,
+        range: zone.range,
+        time: fmtTime(zone.duration),
+        share: pctFmt(zone.percentage),
+      }))}
+    />
   );
 };
 
 export default PowerZoneChart;
-

@@ -7,6 +7,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import { gapSecPerMiBetween, metersBetween as runMetersBetween, movingSecondsBetween as runMovingSecondsBetween, paceSecPerMi as runPaceSecPerMi, runGrades } from '../_shared/run-pace.ts';
 import { enqueueJob } from '../_shared/jobs.ts';
+import { garminActivityTotals, garminTimeMetrics } from '../_shared/garmin/activity-totals.ts';
 const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY'));
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -859,6 +860,16 @@ async function mapGarminToWorkout(activity, userId) {
     if (summary?.poolLengthInMeters != null) merged.pool_length = Number(summary.poolLengthInMeters);
     return merged;
   })();
+  // ⛔ GARMIN'S OWN TOTALS (2026-09-26, `_shared/garmin/activity-totals.ts`): the timer, moving and clock totals and
+  // the descent, as Garmin sent them — Garmin's samples first (`raw_data.samples`), else the stored copies.
+  const garminTotals = (() => {
+    const sd = enrichedData?.sensor_data ?? activity?.sensor_data ?? null;
+    const storedSamples = Array.isArray(sd) ? sd : (Array.isArray(sd?.samples) ? sd.samples : null);
+    const rawSamples = Array.isArray(enrichedData?.raw_data?.samples) && enrichedData.raw_data.samples.length > 0
+      ? enrichedData.raw_data.samples : storedSamples;
+    // The webhook's own copy of the summary's timer total stands in when the stored payload was not found.
+    return garminActivityTotals({ durationInSeconds: activity?.duration_seconds, ...(computeInput?.summary || {}) }, rawSamples);
+  })();
   // Generate a nice workout name (async to support reverse geocoding)
   const generateWorkoutName = async () => {
     // If activity has a custom name, use it (unless it's a raw activity_type)
@@ -989,7 +1000,14 @@ async function mapGarminToWorkout(activity, userId) {
     max_heart_rate: Number.isFinite(activity.max_heart_rate) ? Math.round(activity.max_heart_rate) : null,
     avg_speed: activity.avg_speed_mps != null ? Number((activity.avg_speed_mps * 3.6).toFixed(2)) : null,
     max_speed: activity.max_speed_mps != null ? Number((activity.max_speed_mps * 3.6).toFixed(2)) : null,
-    elevation_gain: Number.isFinite(activity.elevation_gain_meters) ? Math.round(activity.elevation_gain_meters) : null,
+    // ⛔ GARMIN'S TOTAL ASCENT AND TOTAL DESCENT, BOTH (2026-09-26, Michael: "save and show the device's descent").
+    // The descent was never saved, so the Details strip printed our own sum over the smoothed altitude line
+    // (-1,747 ft against Garmin's -1,903 ft on the 2026-09-19 ride). compute-workout-analysis ends the chart's
+    // running climb on these two (`display-series.ts cumulativeClimb`). Summary figures, `activity-totals.ts`.
+    elevation_gain: Number.isFinite(activity.elevation_gain_meters) ? Math.round(activity.elevation_gain_meters)
+      : (garminTotals.ascent_m != null ? Math.round(garminTotals.ascent_m) : null),
+    elevation_loss: Number.isFinite(activity.elevation_loss_meters) ? Math.round(activity.elevation_loss_meters)
+      : (garminTotals.descent_m != null ? Math.round(garminTotals.descent_m) : null),
     calories: Number.isFinite(activity.calories) ? Math.round(activity.calories) : null,
     provider_sport: activity.activity_type || null,
     // Additional common metrics if provided - prioritize enriched data from garmin_activities
@@ -1146,22 +1164,37 @@ async function mapGarminToWorkout(activity, userId) {
     metrics: (()=>{
       try {
         const out: any = {};
-        // Second-precision time fields from provider summary
-        const elapsedS = Number(computeInput?.summary?.durationInSeconds);
-        const timerS = Number(computeInput?.summary?.timerDurationInSeconds);
-        const movingS = Number(computeInput?.summary?.movingDurationInSeconds);
-        if (Number.isFinite(elapsedS) && elapsedS > 0) {
-          out.total_elapsed_time_seconds = Math.round(elapsedS);
-          out.total_elapsed_time = Math.floor(elapsedS / 60);
-        }
-        // Prefer explicit moving-duration seconds when present (more accurate than minutes scalar)
-        if (Number.isFinite(movingS) && movingS > 0) {
-          out.moving_time_seconds = Math.round(movingS);
-          out.moving_time = Math.floor(movingS / 60);
-        }
-        if (Number.isFinite(timerS) && timerS > 0) {
-          out.total_timer_time_seconds = Math.round(timerS);
-          out.total_timer_time = Math.floor(timerS / 60);
+        /**
+         * ⛔ A RIDE'S, RUN'S OR WALK'S THREE TIMES ARE GARMIN'S TIMER, MOVING AND CLOCK TOTALS (2026-09-26, Michael:
+         * "Garmin's three times, under Garmin's names"; `_shared/garmin/activity-totals.ts`). The summary mapping below
+         * files the summary's `durationInSeconds` — Garmin's TIMER total — as the elapsed time, and looks for a moving
+         * and a timer total in the summary, where Garmin sends neither; a session kept one time under the wrong name
+         * and lost the other two. The keys are the ones every reader already takes as the provider's own seconds:
+         * `moving_time_seconds` (`_shared/moving-seconds.ts` rung 2, compute-workout-summary, the run pace),
+         * `total_elapsed_time_seconds` (`providerElapsedSeconds`), `total_timer_time_seconds`.
+         * `_shared/session-detail/session-times.ts` prints them on Details and Performance.
+         * ⚠️ A SWIM OR A LIFT keeps the summary mapping below: a swim's pool time is its own card's rule (D-163 / D-182).
+         */
+        if (type === 'ride' || type === 'run' || type === 'walk') {
+          Object.assign(out, garminTimeMetrics(garminTotals));
+        } else {
+          // Second-precision time fields from provider summary
+          const elapsedS = Number(computeInput?.summary?.durationInSeconds);
+          const timerS = Number(computeInput?.summary?.timerDurationInSeconds);
+          const movingS = Number(computeInput?.summary?.movingDurationInSeconds);
+          if (Number.isFinite(elapsedS) && elapsedS > 0) {
+            out.total_elapsed_time_seconds = Math.round(elapsedS);
+            out.total_elapsed_time = Math.floor(elapsedS / 60);
+          }
+          // Prefer explicit moving-duration seconds when present (more accurate than minutes scalar)
+          if (Number.isFinite(movingS) && movingS > 0) {
+            out.moving_time_seconds = Math.round(movingS);
+            out.moving_time = Math.floor(movingS / 60);
+          }
+          if (Number.isFinite(timerS) && timerS > 0) {
+            out.total_timer_time_seconds = Math.round(timerS);
+            out.total_timer_time = Math.floor(timerS / 60);
+          }
         }
         // Training effect fields
         const aerobic = activity.aerobic_training_effect ?? activity.total_training_effect ?? activity.aerobicTrainingEffect ?? null;

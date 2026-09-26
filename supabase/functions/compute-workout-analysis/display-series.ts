@@ -20,7 +20,8 @@ export const PACE_WINDOW_S = 60;
 export const PACE_MIN_SPAN_M = 10;
 /** OURS — heart rate averaged over the 15 seconds centred on the sample. Nothing is trimmed: a real peak stays. */
 export const HR_WINDOW_S = 15;
-/** OURS — cadence averaged over the 30 seconds centred on the sample. Gaps stay gaps; nothing is filled. */
+/** OURS — a run's cadence averaged over the 30 seconds centred on the sample. Gaps stay gaps; nothing is filled.
+ *  A ride's cadence line is not averaged at all (`rideCadenceLine`, 2026-09-26). */
 export const CADENCE_WINDOW_S = 30;
 /** OURS — power averaged over the 30 seconds centred on the sample. Coasting zeros count (the ride fill writes them). */
 export const POWER_WINDOW_S = 30;
@@ -95,6 +96,25 @@ export function centredTimeMean(values: Num[], time_s: number[], windowS: number
     if (c > 0) out[i] = round((sum[hi[i] + 1] - sum[lo[i]]) / c, decimals);
   }
   return out;
+}
+
+/**
+ * ⛔ A RIDE'S CADENCE LINE: THE READINGS AS RECORDED, COASTING AT 0 (2026-09-26, Michael).
+ *
+ * Garmin records 0 rpm when the rider coasts (1,713 of the 8,124 samples on the 2026-09-19 ride), and
+ * garmin-webhook-activities stores each 0 as an empty reading. The old line averaged the pedalling seconds around
+ * each point over 30 s, so a short coast vanished and a long one became a gap the phone drew at 0 — the same
+ * coasting drawn two ways. Here every empty reading on a ride that recorded cadence at all is drawn at 0, the way
+ * Garmin recorded it, and nothing is averaged: no published source gives a smoothing for a cadence chart (searched
+ * Strava's cadence help pages, TrainingPeaks' WKO cadence article, TrainingPeaks and Garmin support — ride audit
+ * 2026-09-26). A ride without a cadence sensor stores no line, as before.
+ * ⚠️ THE AVERAGE CADENCE IS NOT THIS LINE. The tile prints the device's pedalling-only average (Garmin's default,
+ * Edge 1040 manual, "Data Averaging for Cadence or Power": "The default setting excludes zero values that occur
+ * when you are not pedaling").
+ */
+export function rideCadenceLine(cadence: Num[]): Num[] {
+  if (!cadence.some(fin)) return [];
+  return cadence.map((v) => (fin(v) ? v : 0));
 }
 
 /** Seconds per km over the PACE_WINDOW_S centred on each sample. */
@@ -209,14 +229,23 @@ export function buildDisplaySeries(inp: DisplaySeriesInput): Record<string, Num[
     // Rides plot speed (`speed_mps`); pace is for everything else.
     pace_display_s_per_km: isRide ? [] : orEmpty(paceSeries(time_s, distance_m)),
     hr_display_bpm: orEmpty(centredTimeMean(inp.hr_bpm, time_s, HR_WINDOW_S)),
-    cadence_display: orEmpty(centredTimeMean(inp.cadence, time_s, CADENCE_WINDOW_S)),
+    // A ride draws its readings with coasting at 0 (`rideCadenceLine`); a run keeps its 30 s mean.
+    cadence_display: isRide ? rideCadenceLine(inp.cadence) : orEmpty(centredTimeMean(inp.cadence, time_s, CADENCE_WINDOW_S)),
     power_display_w: orEmpty(centredTimeMean(inp.power_w, time_s, POWER_WINDOW_S)),
     grade_display_pct: indoor ? [] : orEmpty(gradeSeries(distance_m, elevation_m)),
     vam_m_per_h: indoor ? [] : orEmpty(vamSeries(time_s, elevation_m)),
-    elevation_gain_cum_m: climb.gain,
-    elevation_loss_cum_m: climb.loss,
+    // ⛔ A CLIMB LINE ONLY WHERE THE SOURCE SENT THE TOTAL (2026-09-26, Michael: "show the source's numbers under its
+    // names; never fill a missing one with our own"). Garmin sends Total Ascent and Total Descent, a FIT file
+    // `total_ascent` / `total_descent`; Strava sends `total_elevation_gain` and no descent (Strava API reference,
+    // DetailedActivity: no field for one). A total the source did not send gets no line, so the Details strip prints
+    // "+gain" alone on a Strava session instead of our own sum over the smoothed altitude as its descent.
+    elevation_gain_cum_m: fin(inp.total_gain_m) ? climb.gain : [],
+    elevation_loss_cum_m: fin(inp.total_loss_m) ? climb.loss : [],
   };
 }
+
+/** The recorded totals the two climb lines end on, as the source sent them (metres); null = none sent, no line. */
+export type ClimbTotals = { gain_m: number | null; loss_m: number | null };
 
 /**
  * Every array of the same length as `time_s`, thinned together at one uniform stride to at most
@@ -243,14 +272,20 @@ export function thinSeries<T extends Record<string, unknown>>(series: T, maxPts 
  * reads (get-week, useWorkouts) never touch it; workout-detail sends it as `display_metrics.series`.
  * `computed.analysis.series` keeps the full recording for the analysers and is never read for a chart.
  */
-export function buildDisplaySeriesColumn(inp: DisplaySeriesInput): Record<string, Num[]> {
-  const full: Record<string, Num[]> = {
+export function buildDisplaySeriesColumn(inp: DisplaySeriesInput): Record<string, Num[] | ClimbTotals> {
+  const full: Record<string, Num[] | ClimbTotals> = {
     time_s: inp.time_s,
     distance_m: inp.distance_m,
     elevation_m: orEmpty(inp.elevation_m),
     speed_mps: inp.isRide ? orEmpty(inp.speed_mps ?? []) : [],
     power_watts: orEmpty(inp.power_w),
     ...buildDisplaySeries(inp),
+    // ⛔ WRITTEN WITH THE LINES (2026-09-26): workout-detail reads it to tell a series built under the rule above from
+    // one saved before it, whose climb lines were drawn whether or not the source sent a total.
+    climb_totals: {
+      gain_m: fin(inp.total_gain_m) ? inp.total_gain_m : null,
+      loss_m: fin(inp.total_loss_m) ? inp.total_loss_m : null,
+    },
   };
   return thinSeries(full);
 }

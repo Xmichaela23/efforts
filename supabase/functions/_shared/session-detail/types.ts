@@ -150,6 +150,12 @@ export type SessionDetailV1 = {
   effort_row?: string | null;
   /** Response-only (workout-detail enrich): the talk test answer against what was planned. Never persisted. */
   talk_test_row?: string | null;
+  /**
+   * Response-only (workout-detail enrich, 2026-09-26): a ride's Time / Moving Time / Elapsed Time as its source sent
+   * them, under Garmin Connect's names — the same rows as the Details tab's `display_metrics.times`
+   * (`./session-times.ts`). Null on anything but a ride; empty when the source sent none. Never persisted.
+   */
+  times?: import('./session-times.ts').SessionTimeRow[] | null;
 
   plan_context: {
     planned_id: string | null;

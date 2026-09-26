@@ -93,6 +93,50 @@ Deno.test('indoors: no grade and no VAM; a ride has no pace; a missing sensor st
   assertEquals(out.hr_display_bpm[60], 140);
 });
 
+Deno.test('a climb line only where the source sent the total: a Strava ride (gain, no descent) stores no descent line', () => {
+  const t = secs(400);
+  const d = t.map((i) => i * 8);
+  const e = d.map((x) => 100 + 20 * Math.sin(x / 400));
+  const strava: any = buildDisplaySeriesColumn({
+    time_s: t, distance_m: d, elevation_m: e, speed_mps: t.map(() => 8), hr_bpm: t.map(() => 140),
+    cadence: t.map(() => 85), power_w: t.map(() => null), isRide: true, indoor: false,
+    total_gain_m: 120, total_loss_m: null,
+  });
+  assertEquals(strava.elevation_gain_cum_m.length, 400);
+  assertEquals(strava.elevation_gain_cum_m[399], 120);
+  assertEquals(strava.elevation_loss_cum_m, []);
+  assertEquals(strava.climb_totals, { gain_m: 120, loss_m: null });
+  // A source with neither total (typed by hand, recorded on the phone) gets neither line.
+  const none: any = buildDisplaySeriesColumn({
+    time_s: t, distance_m: d, elevation_m: e, hr_bpm: t.map(() => 140), cadence: t.map(() => null),
+    power_w: t.map(() => null), isRide: false, indoor: false,
+  });
+  assertEquals([none.elevation_gain_cum_m, none.elevation_loss_cum_m], [[], []]);
+  assertEquals(none.climb_totals, { gain_m: null, loss_m: null });
+});
+
+Deno.test("a ride's cadence line: the readings as recorded, a coast the import emptied at 0, nothing averaged", () => {
+  const t = secs(60);
+  // Pedalling 80–82 rpm, a 10 s coast stored empty (seconds 20–29), one explicit 0 at second 40.
+  const cad = t.map((i) => (i >= 20 && i < 30 ? null : i === 40 ? 0 : 80 + (i % 3)));
+  const ride = buildDisplaySeries({
+    time_s: t, distance_m: t.map((i) => i * 8), elevation_m: t.map(() => 50), hr_bpm: t.map(() => 140),
+    cadence: cad, power_w: t.map(() => 150), isRide: true, indoor: false,
+  });
+  assertEquals(ride.cadence_display.length, 60);
+  assertEquals(ride.cadence_display.slice(20, 30).every((v) => v === 0), true);
+  assertEquals(ride.cadence_display[40], 0);
+  // Unaveraged: each point is its own second's reading.
+  assertEquals(ride.cadence_display[10], 81);
+  assertEquals(ride.cadence_display[11], 82);
+  // A run keeps its 30 s mean over the readings, gaps skipped.
+  const run = buildDisplaySeries({
+    time_s: t, distance_m: t.map((i) => i * 3), elevation_m: t.map(() => 50), hr_bpm: t.map(() => 140),
+    cadence: cad, power_w: t.map(() => null), isRide: false, indoor: false,
+  });
+  assertEquals(run.cadence_display[25] !== 0, true);
+});
+
 Deno.test('thinning: a long recording keeps at most 600 points, first and last, every line at one stride', () => {
   const n = 14_000;
   const t = secs(n);
@@ -123,13 +167,15 @@ Deno.test('the display_series column: axes, elevation, speed on a ride, raw powe
   const t = secs(n);
   const d = t.map((i) => i * 8);
   const e = t.map((i) => 50 + i * 0.1);
-  const out = buildDisplaySeriesColumn({
+  const out: any = buildDisplaySeriesColumn({
     time_s: t, distance_m: d, elevation_m: e, speed_mps: t.map(() => 8), hr_bpm: t.map(() => 140),
     cadence: t.map(() => 90), power_w: t.map(() => 200), isRide: true, indoor: false,
+    total_gain_m: 300, total_loss_m: 0,
   });
   for (const k of ['time_s', 'distance_m', 'elevation_m', 'speed_mps', 'power_watts', 'hr_display_bpm', 'cadence_display', 'power_display_w', 'grade_display_pct', 'vam_m_per_h', 'elevation_gain_cum_m', 'elevation_loss_cum_m']) {
     assertEquals(out[k].length, DISPLAY_SERIES_MAX_POINTS, k);
   }
+  assertEquals(out.climb_totals, { gain_m: 300, loss_m: 0 });
   assertEquals(out.pace_display_s_per_km, []); // a ride plots speed
   assertEquals(out.time_s[DISPLAY_SERIES_MAX_POINTS - 1], n - 1);
   // A run stores no speed line.

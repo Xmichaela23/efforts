@@ -113,7 +113,10 @@
         "src/components/RescheduleValidationPopup.tsx",
         "src/components/UnifiedWorkoutView.tsx",
         "src/components/context/ViadaWeekCard.tsx",
-        "src/lib/derive-workout-title.ts"
+        "src/lib/derive-workout-title.ts",
+        "src/components/PowerZoneChart.tsx",
+        "src/components/SessionZoneCards.tsx",
+        "src/components/ZoneCard.tsx"
       ],
       "rule7": [
         "supabase/functions/_shared/strength-grid/intents.ts",
@@ -481,6 +484,14 @@
         "field": "strength row.weight_per (materialize-plan, swap-list)",
         "words": [
           "}/hand`"
+        ]
+      },
+      {
+        "field": "workout-detail display_metrics.zones.power.bins[].name / .range (display-zones powerZoneBinText)",
+        "words": [
+          "POWER_ZONE_LABELS",
+          "Neuromuscular",
+          "Active Recovery"
         ]
       }
     ]

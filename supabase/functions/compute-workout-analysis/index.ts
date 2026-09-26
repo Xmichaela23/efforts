@@ -9,10 +9,16 @@ import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
-import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
-import { runEasyZone3FloorBpm, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR } from '../_shared/easy-hr.ts';
+// The zone tables Baselines / Profile print, and the one rule a session's time in zone is counted by.
+import {
+  heartRateZoneSet,
+  hrZoneSetFromAnchor,
+  hrZoneSport,
+  powerZoneRows,
+  powerZoneTopsW,
+  timeInZones,
+} from '../_shared/endurance/display-zones.ts';
 import { cumulativeFlatMeters, cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { isIndoorSession } from '../_shared/indoor-session.ts';
 import { buildDisplaySeriesColumn } from './display-series.ts';
@@ -842,24 +848,25 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
 
     const sport = String(w.type || 'run').toLowerCase();
     
-    // Fetch user FTP, learned fitness, and configured HR zones from user_baselines
+    // Fetch user FTP and the baselines row the heart-rate zones are worked out from
     let userFtp: number | null = null;
-    let userMaxHR: number | null = null;
-    // Q-169: the learned LTHR (Friel anchor). Null -> the %HRmax fallback below.
-    // ⛔ `learnedLthr` DELETED 2026-08-20 — nothing assigned it once the bike moved onto the resolver,
-    // so its only remaining use was as an always-null third fallback in the ride chain.
-    let configuredHrZones: any = null;
-    // D-lthr-one-anchor (audit 2026-07-17): the Priority-2 LTHR for zone bins, resolved ONCE from the
-    // baselines below, so it can't diverge from the easy band. Computed inside the baseline block (where
-    // the JSONB cols are in scope) and read at the zone-schema chain. null → falls through to %HRmax.
-    let priorityTwoLthr: number | null = null;
+    /**
+     * ⛔ THE BASELINES ROW, WHOLE, FOR THE HEART-RATE ZONES (2026-09-26, Michael). The zone block hands it to
+     * `heartRateZoneSet` (`_shared/endurance/display-zones.ts`), the one chain Baselines prints its zone table
+     * from: the threshold on Baselines → % of max heart rate → an age estimate. What stood here was this file's
+     * own chain — Strava's (or any stored) zone table first, then the resolved threshold with the workout's
+     * device threshold under it, then a max heart rate that read Strava's inferred max before the learned one.
+     * `birthday` and `gender` are read for the age tier.
+     */
+    let baselineRow: any = null;
     try {
       if (w.user_id) {
         const { data: baseline } = await supabase
           .from('user_baselines')
-          .select('performance_numbers, learned_fitness, configured_hr_zones')
+          .select('performance_numbers, learned_fitness, configured_hr_zones, birthday, gender')
           .eq('user_id', w.user_id)
           .maybeSingle();
+        baselineRow = baseline ?? null;
         console.log('[FTP] Baseline data:', baseline);
         // D-085: route FTP through the shared resolver
         // (src/lib/resolve-current-ftp.ts) instead of reading
@@ -892,62 +899,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             console.log('[FTP] Resolved FTP:', userFtp, 'source:', ftpResolved.source);
           }
         }
-        if (lf) {
-          const isRideSport = sport.includes('ride') || sport.includes('bike') || sport.includes('cycling');
-          const sportMaxHr = isRideSport ? lf?.ride_max_hr_observed : lf?.run_max_hr_observed;
-          if (sportMaxHr?.value && Number.isFinite(Number(sportMaxHr.value))) {
-            userMaxHR = Number(sportMaxHr.value);
-            console.log('[HR ZONES] Max HR from learned_fitness:', userMaxHR);
-          }
-          // Q-169 — THE LEARNED LTHR WAS NEVER READ HERE. This block already pulled learned MAX HR out
-          // of `learned_fitness`, but the zone-schema chain below only looked for threshold HR in
-          // `configured_hr_zones` and the workout's own `threshold_heart_rate` column. Both are null for
-          // a Strava/Garmin-imported athlete, so every workout silently fell through to the %HRmax
-          // fallback — even for an athlete whose LTHR the app had ALREADY LEARNED and was ALREADY
-          // RENDERING on the Baselines screen as "Friel %LTHR".
-          //
-          // Measured consequence (user 45d122e7, LTHR 151 / max 174): zones bound at 60/70/80/90% of max
-          // -> Z3 = 122-139, Z4 = 139-157. His easy RPE-3 runs at 133-141 bpm were binned as TEMPO and
-          // THRESHOLD. A 1-hour easy run read as "54% Z3 / 44% Z4". Downstream: intensity_distribution
-          // reported 7-20% easy and labelled him "high-intensity dominant" (he is well-polarized), and
-          // session-load's `enduranceIntensityFromZones` scored the run pHard=0.44 -> the "hard" 1.2x
-          // modifier instead of the 0.5x recovery one. Under the correct Friel zones (Z2 128-136,
-          // Z3 136-143) the same run is aerobic.
-          //
-          // `calculate-workload:378` ALREADY does this correctly (it hydrates threshold_heart_rate from
-          // learned_fitness before inferring intensity), which is why the ACWR/load ladder was never
-          // poisoned. This is the same read, forty lines away, in the file that forgot it.
-          // ⛔ THE `learnedLthr` PRE-READ IS DELETED (2026-08-20). It narrowed to the bike on
-          // 2026-08-19 because the resolver was run-only; the resolver covers the bike now, and the
-          // ride branch below asks it directly. What stood here was an ungated raw read whose only
-          // remaining job was to be the third fallback of a chain whose first rung already answers it.
-        }
-        if (baseline?.configured_hr_zones) {
-          configuredHrZones = typeof baseline.configured_hr_zones === 'string'
-            ? JSON.parse(baseline.configured_hr_zones)
-            : baseline.configured_hr_zones;
-          console.log('[HR ZONES] Configured zones from', configuredHrZones?.source, ':', JSON.stringify(configuredHrZones?.zones?.length ?? 0), 'zones');
-        }
-        // Resolve the LTHR once, through the ONE resolver (learned-first, sample_count-gated) — the
-        // SAME bpm the easy band uses. Per sport as of 2026-08-20: the bike is no longer a private chain.
-        {
-          const isRide = sport.includes('ride') || sport.includes('bike') || sport.includes('cycling');
-          // ⛔ THE BIKE GOES THROUGH THE SAME RESOLVER NOW (2026-08-20) — it was run-only, which is
-          // why this branch carried its own chain. `configured_hr_zones.threshold_heart_rate` is
-          // dropped from it: `TrainingBaselines:702` computes that as `runLTHR || rideLTHR`, so on a
-          // RIDE it is most likely the run's number, and running HR sits 5-10 bpm above cycling at the
-          // same effort. The device column stays as the per-workout fallback.
-          priorityTwoLthr = isRide
-            ? (resolveCurrentLthr(
-                 { learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: configuredHrZones },
-                 { sport: 'ride' },
-               ).bpm
-                || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null))
-            : resolveCurrentLthr(
-                { learned_fitness: lf, performance_numbers: perfNumbers, configured_hr_zones: configuredHrZones },
-                { deviceThresholdHr: (w as any)?.threshold_heart_rate },
-              ).bpm;
-        }
+        // Q-169 (the learned threshold never reached the zones — an easy run read "54% Z3 / 44% Z4") and the
+        // per-sport threshold (2026-08-20) are both carried by `heartRateZoneSet` now: it asks
+        // `resolveCurrentLthr` per sport, the same call the Baselines threshold row makes.
       }
     } catch (e) {
       console.error('[FTP/HR] Error fetching baselines:', e);
@@ -1361,7 +1315,10 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
         isRide,
         indoor: isIndoorSession(w),
         total_gain_m: recordedM(w.elevation_gain ?? w.metrics?.elevation_gain),
-        total_loss_m: recordedM(w.elevation_loss ?? w.metrics?.elevation_loss),
+        // ⛔ GARMIN'S TOTAL DESCENT WHEN THE ROW HAS NONE (2026-09-26). ingest-activity never saved it before today,
+        // but the stored Garmin payload has it (`summary.totalElevationLossInMeters`), so re-analysing a past ride is
+        // enough for its loss line to end on Garmin's descent instead of our own sum over the smoothed altitude.
+        total_loss_m: recordedM(w.elevation_loss ?? w.metrics?.elevation_loss ?? parseJson(ga?.raw_data)?.summary?.totalElevationLossInMeters),
       })
     : null;
 
@@ -1445,186 +1402,47 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
-  // Zones histograms (auto-range for HR, FTP-based for power)
+  /**
+   * ⛔ TIME IN ZONE — THE ONE TABLE PER METRIC, COUNTED BY THE ONE RULE (2026-09-26, Michael).
+   * Both tables and the counting rule live in `_shared/endurance/display-zones.ts`, which Baselines / Profile
+   * print from, so a session's zones and the athlete's zone table cannot differ. Each bin stores the zone's
+   * whole beats / watts as printed (`min`..`max`, the top zone's `max` null) and the zone set it came from,
+   * so `workout-detail` writes the card's names and ranges from the same table without analysing again.
+   * Seven Friel bins reach `compute-facts` as `time_in_zone` z1–z7 (was z1–z5).
+   */
   try {
-    // Auto-range bins for HR (works well with natural HR ranges)
-    const binsFor = (values: (number|null)[], times: number[], n: number) => {
-      const vals: number[] = [];
-      for (let i=0;i<values.length;i++) if (typeof values[i] === 'number' && Number.isFinite(values[i] as number)) vals.push(values[i] as number);
-      if (vals.length < 10) return null;
-      const min = Math.min(...vals), max = Math.max(...vals);
-      if (!(max>min)) return null;
-      const step = (max - min) / n;
-      const bins = new Array(n).fill(0);
-      for (let i=1;i<times.length && i<values.length;i++) {
-        const v = values[i];
-        if (typeof v !== 'number' || !Number.isFinite(v)) continue;
-        const dt = Math.max(0, times[i] - times[i-1]);
-        let idx = Math.floor((v - min) / step);
-        if (idx >= n) idx = n - 1;
-        if (idx < 0) idx = 0;
-        bins[idx] += dt;
-      }
-      return { bins: bins.map((t_s:number, i:number)=>({ i, t_s, min: Math.round(min + i*step), max: Math.round(min + (i+1)*step) })), schema: 'auto-range' };
-    };
-    
-    // FTP-based bins for power (uses custom boundaries)
-    const binsForBoundaries = (values: (number|null)[], times: number[], boundaries: number[]) => {
-      const vals: number[] = [];
-      for (let i=0;i<values.length;i++) if (typeof values[i] === 'number' && Number.isFinite(values[i] as number)) vals.push(values[i] as number);
-      if (vals.length < 10) return null;
-      
-      const bins = new Array(boundaries.length - 1).fill(0);
-      for (let i=1;i<times.length && i<values.length;i++) {
-        const v = values[i];
-        if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) continue;
-        const dt = Math.max(0, times[i] - times[i-1]);
-        
-        // Find which zone this value falls into
-        let zoneIdx = -1;
-        for (let z=0; z<boundaries.length-1; z++) {
-          if (v >= boundaries[z] && v < boundaries[z+1]) {
-            zoneIdx = z;
-            break;
-          }
-        }
-        // Handle edge case: value equals max boundary
-        if (zoneIdx === -1 && v >= boundaries[boundaries.length-2]) {
-          zoneIdx = boundaries.length - 2;
-        }
-        
-        if (zoneIdx >= 0 && zoneIdx < bins.length) {
-          bins[zoneIdx] += dt;
-        }
-      }
-      
-      return { 
-        bins: bins.map((t_s:number, i:number)=>({ 
-          i, 
-          t_s, 
-          min: Math.round(boundaries[i]), 
-          max: i === bins.length-1 ? Math.round(boundaries[i+1]) : Math.round(boundaries[i+1]) 
-        })), 
-        schema: 'ftp-based' 
-      };
-    };
-    
-    // HR zones: preference hierarchy
-    //   1. Athlete-configured zone boundaries (Strava or FIT-derived)
-    //   2. LTHR-based Friel zones (from FIT threshold_heart_rate)
-    //   3. Learned max HR from workout history
-    //   4. Observed max in this workout / 0.95
-    //   5. Fallback: 180 bpm
-    let hrZoneBoundaries: number[] | null = null;
-    let hrZoneSchema = 'fallback';
-
-    /**
-     * Priority 1: Athlete-configured zone boundaries from Strava or FIT.
-     *
-     * ⛔ PER SPORT FIRST (2026-08-20). This read ONE `zones` array for every discipline, and
-     * `TrainingBaselines` built that array from `runLTHR || rideLTHR` — run preferred. So a RIDE was
-     * binned against the athlete's RUNNING zones, at priority 1, above every resolver below. Cycling
-     * heart rate sits 5-10 bpm under running at the same effort, so each ride landed a zone too easy:
-     * threshold work counted as tempo, and the time-in-zone the 80/20 read rests on was wrong.
-     *
-     * ⚠️ `zones` REMAINS THE FALLBACK, deliberately. Strava writes that key with genuinely
-     * sport-agnostic zones (its model has one set per athlete), and rows written before today carry
-     * only it. Preferring the sport-specific array when one exists costs nothing and changes nothing
-     * for an athlete who has none.
-     */
-    // ⚠️ `sport` (:919) is the function-scope one; the `isRideSport` up at :972 lives inside the
-    // baselines block and is NOT visible here. This file is `@ts-nocheck`, so the typechecker would
-    // not have caught the reference — derived locally on purpose.
-    const zoneIsRide = /ride|bike|cycl/.test(sport);
-    const sportZones = zoneIsRide
-      ? (configuredHrZones?.zones_ride ?? configuredHrZones?.zones)
-      : (configuredHrZones?.zones_run ?? configuredHrZones?.zones);
-    if (sportZones && Array.isArray(sportZones) && sportZones.length >= 3) {
-      const zones = sportZones;
-      // Map variable-length athlete zones to boundaries array: [min0, max0/min1, max1/min2, ..., lastMax]
-      const boundaries: number[] = [zones[0].min ?? 0];
-      for (const z of zones) {
-        const max = z.max;
-        if (max == null || max <= 0) {
-          // Open-ended top zone: cap at a high value
-          const prevMax = boundaries[boundaries.length - 1];
-          boundaries.push(Math.max(prevMax + 20, 220));
-        } else {
-          boundaries.push(Number(max));
-        }
-      }
-      if (boundaries.length >= 4) {
-        hrZoneBoundaries = boundaries;
-        const whichArray = zoneIsRide
-          ? (configuredHrZones?.zones_ride ? 'zones_ride' : 'zones')
-          : (configuredHrZones?.zones_run ? 'zones_run' : 'zones');
-        hrZoneSchema = `configured:${configuredHrZones.source ?? 'unknown'}:${whichArray}`;
-        console.log('[HR ZONES] Using athlete-configured zones from', configuredHrZones.source, whichArray, ':', hrZoneBoundaries);
-      }
-    }
-
-    // Priority 2: LTHR from configured_hr_zones or workout (Friel 5-zone model)
-    if (!hrZoneBoundaries) {
-      // Q-169's intent — an athlete whose LTHR the app LEARNED must not silently fall through to
-      // %HRmax zones that contradict the Friel zones their own Baselines screen shows — is now carried
-      // by the resolver itself rather than by a third fallback bolted onto this chain.
-      // D-lthr-one-anchor (audit 2026-07-17), extended 2026-08-20: resolved ONCE above
-      // (`priorityTwoLthr`) through the ONE resolver, for BOTH sports. The bike's private chain is gone.
-      const lthr = priorityTwoLthr;
-      if (lthr && lthr > 100) {
-        // Q-171 — the Z2/Z3 boundary is sourced from the ONE easy band (`_shared/easy-hr.ts`), not a second
-        // hardcoded 0.90. They shipped 40 min apart and rounded independently (134 vs 136 at LTHR 151), so a
-        // 135 bpm run binned Zone 2 here while the easy-pace learner called it hard. Deriving the floor from
-        // the easy ceiling makes "easy" === "Zone 1 or 2" by construction — they can no longer drift.
-        hrZoneBoundaries = [
-          0,
-          Math.round(lthr * Z2_FLOOR_PCT_LTHR),
-          runEasyZone3FloorBpm(lthr),
-          Math.round(lthr * Z4_FLOOR_PCT_LTHR),
-          Math.round(lthr * Z5_FLOOR_PCT_LTHR), // the ONE table's seams (friel-zones.ts), not copies
-          Math.round(lthr * 1.15),
-        ];
-        hrZoneSchema = 'lthr-friel';
-        console.log('[HR ZONES] Using LTHR-based Friel zones, LTHR:', lthr);
-      }
-    }
-
-    // Priority 3-5: Max HR based (%HRmax standard zones)
-    if (!hrZoneBoundaries) {
-      // ONE max-HR resolver (audit 2026-07-17 #5): configured → learned → device FIT → this-session
-      // peak ÷ the single PEAK_TO_MAX divisor. `userMaxHR` already carries the sport learned peak; pass it
-      // as the learned tier via configured_hr_zones so the resolver's precedence is authoritative here too.
+    // ── heart rate: the threshold on Baselines → % of max → an age estimate (`heartRateZoneSet`) ──
+    const zoneSport = hrZoneSport(sport);
+    let hrSet = heartRateZoneSet(baselineRow, zoneSport, { today: new Date().toISOString().slice(0, 10) });
+    if (!hrSet) {
+      /**
+       * No threshold, no max heart rate and no birthday on file — Baselines prints no zones. The session keeps
+       * the analysis's old last resort, % of max from this session's own numbers: the watch file's max, else
+       * this session's peak ÷ `PEAK_TO_MAX`, else 180. Stored as `max-hr-session`, flagged an estimate.
+       */
       const hrVals: number[] = [];
       for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0) hrVals.push(v);
       const fitMax = Number.isFinite((w as any)?.default_max_heart_rate) ? Number((w as any).default_max_heart_rate) : null;
-      const resolvedMax = resolveCurrentMaxHr(
-        { configured_hr_zones: { max_heart_rate: configuredHrZones?.max_heart_rate ?? userMaxHR ?? null } },
-        {
-          sport,
-          deviceMaxHr: fitMax && fitMax > 100 ? fitMax : null,
-          observedSessionPeak: hrVals.length > 0 ? Math.max(...hrVals) : null,
-          allowAgeEstimate: false, // no age in scope here — keep the historical 180 floor below
-        },
-      );
-      const effectiveMaxHR = resolvedMax.bpm ?? 180;
-      hrZoneBoundaries = [
-        0,
-        Math.round(effectiveMaxHR * 0.60),
-        Math.round(effectiveMaxHR * 0.70),
-        Math.round(effectiveMaxHR * 0.80),
-        Math.round(effectiveMaxHR * 0.90),
-        Math.ceil(effectiveMaxHR * 1.01),
-      ];
-      hrZoneSchema = userMaxHR ? 'learned-hrmax' : 'estimated-hrmax';
-      console.log('[HR ZONES] Using %HRmax zones, max HR:', effectiveMaxHR, '(schema:', hrZoneSchema, ')');
+      const sessionMax = resolveCurrentMaxHr({}, {
+        sport,
+        deviceMaxHr: fitMax && fitMax > 100 ? fitMax : null,
+        observedSessionPeak: hrVals.length > 0 ? Math.max(...hrVals) : null,
+        allowAgeEstimate: false,
+      });
+      // OURS — the historical 180 bpm floor when a session carries no max of its own (kept as found)
+      hrSet = hrZoneSetFromAnchor('max-hr-session', sessionMax.bpm ?? 180, zoneSport);
+    }
+    const hrSecs = timeInZones(hr_bpm, time_s, hrSet.tops);
+    if (hrSecs) {
+      analysis.zones.hr = {
+        bins: hrSet.rows.map((r, i) => ({ i, t_s: hrSecs[i], min: r.min, max: r.max })),
+        schema: hrSet.schema,
+        anchor_bpm: hrSet.anchor_bpm,
+        estimate: hrSet.estimate,
+      } as any;
+      console.log('[HR ZONES]', hrSet.schema, 'from', hrSet.anchor_bpm, 'bpm');
     }
 
-    const hrZones = binsForBoundaries(hr_bpm, time_s, hrZoneBoundaries);
-    if (hrZones) {
-      (hrZones as any).schema = hrZoneSchema;
-      analysis.zones.hr = hrZones as any;
-    }
-    
     // #5 null-honest: power zones require a REAL FTP. No FTP → NO fabricated zones. Was `userFtp || 200`,
     // which computed every FTP-less rider's zone distribution off a made-up 200 W — honest absence beats a
     // fake number. With no FTP, power zones are simply absent; the ride's actual effort still shows via HR
@@ -1632,11 +1450,17 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     const ftpForZones = (typeof userFtp === 'number' && userFtp > 0) ? userFtp : null;
     if (ftpForZones) {
       console.log('[POWER ZONES] Using FTP:', ftpForZones);
-      // ⛔ ONE POWER TABLE (2026-09-10, audit H-B05): Coggan's seven levels, the same edges Profile's rows
-      // print from — `_shared/endurance/display-zones.ts`. Same numbers as the inline array it replaced.
-      const powerZoneBoundaries = powerZoneBoundariesFor(ftpForZones);
-      const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
-      if (pwrZones) analysis.zones.power = pwrZones as any;
+      // ⛔ ONE POWER TABLE (2026-09-10, audit H-B05; one closure 2026-09-26): Coggan's seven levels, each
+      // level's top included in it — the rows Profile prints (`powerZoneRows`) and the tops counted by.
+      const levels = powerZoneRows(ftpForZones);
+      const pwrSecs = timeInZones(power_watts, time_s, powerZoneTopsW(ftpForZones));
+      if (pwrSecs) {
+        analysis.zones.power = {
+          bins: levels.map((r, i) => ({ i, t_s: pwrSecs[i], min: r.low_w, max: r.high_w })),
+          schema: 'ftp-based',
+          ftp_w: ftpForZones,
+        } as any;
+      }
     }
   } catch {}
 

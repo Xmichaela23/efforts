@@ -18,6 +18,12 @@
  * in scope at that point in the file (the first draft did exactly that — `isRideSport` is declared
  * inside the baselines block and the zone code runs 600 lines later, which `@ts-nocheck` hid).
  *
+ * ⛔ AND THE READERS STOPPED READING THEM (2026-09-26, Michael). The stored arrays — Strava's automatic table
+ * among them — outranked the threshold: one ride was counted on Strava's 110/137/150/164 while the learned ride
+ * threshold was 153. The analysis and the Baselines zone table now both take their zones from ONE chain,
+ * `heartRateZoneSet` (`_shared/endurance/display-zones.ts`): the threshold on Baselines → % of max → age
+ * estimate. The writer below still writes the arrays; nothing in this chain reads them.
+ *
  * Run: deno test --allow-read supabase/functions/_shared/per-sport-hr-zones.test.ts
  */
 import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
@@ -35,24 +41,31 @@ Deno.test('the WRITER emits a per-sport zone array for each discipline', () => {
   assert(/cfg\.zones\s*=\s*zones\b/.test(writerSrc), 'the legacy shared array stopped being written');
 });
 
-Deno.test('the READER prefers the sport-specific array', () => {
-  assert(/zones_ride\s*\?\?\s*configuredHrZones\?\.zones\b/.test(analysisSrc), 'a ride no longer prefers ride zones');
-  assert(/zones_run\s*\?\?\s*configuredHrZones\?\.zones\b/.test(analysisSrc), 'a run no longer prefers run zones');
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+Deno.test('the READERS read no stored zone table: the analysis and Baselines both ask heartRateZoneSet (2026-09-26)', () => {
+  const analysisCode = stripComments(analysisSrc);
+  assert(!/zones_ride|zones_run|configuredHrZones|configured_hr_zones\?*\.zones\b|cfg\.zones\b/.test(analysisCode), 'the analysis reads a stored zone table again');
+  assert(/heartRateZoneSet\(baselineRow, zoneSport,/.test(analysisCode), 'the analysis no longer counts heart rate on the one chain');
+  assert(/timeInZones\(hr_bpm, time_s, hrSet\.tops\)/.test(analysisCode), 'the analysis counts heart rate by a rule of its own');
+  const readoutCode = stripComments(readoutSrc);
+  assert(!/zones_ride|zones_run|cfg\.zones\b/.test(readoutCode), 'the Baselines zone table reads a stored zone table again');
+  assert(/heartRateZoneSet\(row, 'run', \{ today \}\)/.test(readoutCode) && /heartRateZoneSet\(row, 'ride', \{ today \}\)/.test(readoutCode),
+    'the Baselines zone table left the chain the analysis counts by');
 });
 
 Deno.test('the zone block derives its own sport flag — the outer one is out of scope', () => {
-  const zoneBlock = analysisSrc.slice(analysisSrc.indexOf('Priority 1: Athlete-configured'));
-  assert(/const zoneIsRide\s*=/.test(zoneBlock), 'the zone block no longer derives its own sport flag');
-  // ⛔ `isRideSport` is declared inside the baselines block hundreds of lines earlier. Referring to it
+  const zoneBlock = analysisSrc.slice(analysisSrc.indexOf('TIME IN ZONE — THE ONE TABLE PER METRIC'));
+  assert(/const zoneSport\s*=\s*hrZoneSport\(sport\)/.test(zoneBlock), 'the zone block no longer derives its own sport flag');
+  // ⛔ `isRideSport` was declared inside the baselines block hundreds of lines earlier. Referring to it
   // here is a runtime ReferenceError that `@ts-nocheck` will not report.
-  const codeOnly = zoneBlock.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  assert(!/\bisRideSport\b/.test(codeOnly), 'the zone block reaches for an out-of-scope sport flag');
+  assert(!/\bisRideSport\b/.test(stripComments(zoneBlock)), 'the zone block reaches for an out-of-scope sport flag');
 });
 
-Deno.test('the receipt says WHICH array was used', () => {
-  // A ride binned on shared zones and a ride binned on ride zones must not log identically — that is
-  // how this went unnoticed in the first place.
-  assert(/whichArray/.test(analysisSrc), 'the zone schema no longer records which array it used');
+Deno.test('the receipt says WHICH zone set and anchor the session was counted in', () => {
+  // A ride counted on the threshold and a ride counted on an age estimate must not store identically — the
+  // card's words, and the next audit, are written from these two fields.
+  assert(/schema: hrSet\.schema/.test(analysisSrc) && /anchor_bpm: hrSet\.anchor_bpm/.test(analysisSrc), 'the zone set is no longer stored with the bins');
 });
 
 Deno.test('the shared scalar is not written when it would be ambiguous', () => {

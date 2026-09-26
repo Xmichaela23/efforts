@@ -978,7 +978,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
         ))}
         {zt.basis && <p className="text-[12px] text-white/50 px-1 mt-1">{zt.basis}</p>}
       </div>
-    ) : <p className="text-[12px] text-white/50">{zt?.empty ?? 'Heart-rate zones need a threshold heart rate, or a max and a resting heart rate.'}</p>;
+    ) : <p className="text-[12px] text-white/50">{zt?.empty ?? 'Heart-rate zones need a threshold heart rate, a max heart rate, or your birthday.'}</p>;
     return { rows, table };
   };
   const equipmentChips = (discipline: 'swimming' | 'strength', options: string[]) => (
@@ -1026,7 +1026,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {hr.rows[0]}
         </div>
       ) },
-      { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Five heart-rate zones from your threshold heart rate. With no threshold, from max and resting heart rate (Karvonen). Max heart rate is what your runs have shown, or an age estimate until then.', body: (
+      { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Your heart-rate zones come from your threshold heart rate. With no threshold, they come from your max heart rate. With neither, your age gives an estimated max until your runs record one.', body: (
         <div className="space-y-1.5">
           {hr.rows[1]}
           {hr.rows[2]}
@@ -1056,7 +1056,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {hr.rows[0]}
         </div>
       ) },
-      { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones from FTP. Heart-rate zones from your threshold heart rate on the bike; with no threshold, from max and resting heart rate.', body: (
+      { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones come from your FTP. Heart-rate zones come from your threshold heart rate on the bike. With no threshold, they come from your max heart rate. With neither, your age gives an estimated max until your rides record one.', body: (
         <div className="space-y-1.5">
           {powerZones.length > 0 && (
             <div className="space-y-0.5 mb-2">

@@ -12,8 +12,6 @@ import {
 import { useAppContext } from '@/contexts/AppContext';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
-import HRZoneChart from './HRZoneChart';
-import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase, invokeFunction } from '../lib/supabase';
 import { readoutPlateStyle as readoutPlate, readoutValueStyle } from '@/lib/readout-plate';
@@ -142,6 +140,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     elevation_display?: string | null;
     avg_speed_display?: string | null;
     max_speed_display?: string | null;
+    /** 2026-09-26: a ride's Time / Moving Time / Elapsed Time as its source sent them (`session-times.ts`). */
+    times?: Array<{ key: string; label: string; seconds: number; display: string }> | null;
   };
 
   // NOTE: Hooks MUST run before any early returns.
@@ -888,6 +888,46 @@ const formatMaxSpeed = (speedValue: any): string => {
 // ⛔ The legacy-column fallback rungs are deleted (2026-09-16, Stage 7 session 1): the server writes
 // `duration_s` on every Details reply.
 const formatMovingTime = () => formatDuration(norm.duration_s);
+/**
+ * ⛔ A SESSION'S TIMES ARE ITS SOURCE'S, UNDER GARMIN CONNECT'S NAMES (2026-09-26, Michael: "Garmin's three times,
+ * under Garmin's names", rides first, then runs and walks). `display_metrics.times` — Time, Moving Time, Elapsed Time,
+ * whichever the source sent, composed on the server (`_shared/session-detail/session-times.ts`); Performance prints
+ * the same rows. The "Duration" and "Moving Time" tiles printed Garmin's timer total twice on a Garmin ride (2:15:09
+ * and 2:15:09) while its clock read 2:23:56. A session whose source sent no times (typed by hand) keeps the two tiles.
+ */
+const sessionTimes = Array.isArray(dmDisplay.times) ? dmDisplay.times : [];
+/** The time tiles after Distance, in the ride grid and the run / walk grid alike. */
+const renderTimeTiles = () => (sessionTimes.length > 0 ? sessionTimes.map((t, i) => (
+  // Distance holds the first cell; a third time starts the next row and takes that row's spacing.
+  <div key={t.key} className={i + 1 < 3 ? 'px-0.5 pb-1' : 'px-0.5 py-1'}>
+    <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+      {t.display}
+    </div>
+    <div className="text-xs text-muted-foreground font-normal">
+      <div className="text-xs font-light" style={metricLabelStyle}>{t.label}</div>
+    </div>
+  </div>
+)) : (
+  <>
+    <div className="px-0.5 pb-1">
+      <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+        {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
+      </div>
+      <div className="text-xs text-muted-foreground font-normal">
+        <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
+      </div>
+    </div>
+
+    <div className="px-0.5 pb-1">
+      <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+        {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
+      </div>
+      <div className="text-xs text-muted-foreground font-normal">
+        <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
+      </div>
+    </div>
+  </>
+));
 
 
  return (
@@ -1030,23 +1070,8 @@ const formatMovingTime = () => formatDuration(norm.duration_s);
             </div>
           </div>
 
-          <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
-            </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
-            </div>
-          </div>
-
-          <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
-            </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
-            </div>
-          </div>
+          {/* The session's times, printed as the server wrote them (`renderTimeTiles` above). */}
+          {renderTimeTiles()}
 
           {/* Row 2 */}
           <div className="px-0.5 py-1">
@@ -1263,23 +1288,8 @@ const formatMovingTime = () => formatDuration(norm.duration_s);
             </div>
           </div>
 
-          <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.elapsed_s ? formatDuration(norm.elapsed_s) : (norm.duration_s ? formatDuration(norm.duration_s) : 'N/A')}
-            </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>Duration</div>
-            </div>
-          </div>
-
-          <div className="px-0.5 pb-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.duration_s ? formatDuration(norm.duration_s) : 'N/A'}
-            </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>Moving Time</div>
-            </div>
-          </div>
+          {/* The session's times, printed as the server wrote them (`renderTimeTiles` above). */}
+          {renderTimeTiles()}
 
           {/* Row 2 */}
           <div className="px-0.5 py-1">
@@ -1638,57 +1648,8 @@ const formatMovingTime = () => formatDuration(norm.duration_s);
         );
       })()}
 
-      {/* Zones section (HR and Power) - render once */}
-      {(() => {
-        // ⛔ THE BINS COME WITH THEIR SHARES (2026-09-16, Stage 4 session 3) — `display_metrics.zones`,
-        // the analyser's own bins with each one's share of the window written beside it. Both charts
-        // divided a bin by the sum in their own render. A response without the field falls back to the
-        // raw bins and the charts draw no percentages, rather than working them out again.
-        const zonesHr = (norm as any)?.zones?.hr ?? (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
-        const zonesPower = (norm as any)?.zones?.power ?? (hydrated||workoutData)?.computed?.analysis?.zones?.power;
-        const hasHRZones = zonesHr?.bins?.length;
-        const hasPowerZones = zonesPower?.bins?.length;
-        const isRide = String(workoutData?.type || '').toLowerCase().includes('ride') || String(workoutData?.type || '').toLowerCase().includes('bike');
-        
-        if (!hasHRZones && !hasPowerZones) return null;
-        
-        return (
-          <div className="mt-6 mx-[-16px] px-3 py-3 space-y-4">
-            {/* HR Zones */}
-            {hasHRZones && (
-              <div className="my-4">
-                <HRZoneChart
-                  zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)}
-                  zoneShares={zonesHr.bins.map((b:any)=> Number(b.share)||0)}
-                  durationDisplay={typeof zonesHr.duration_display === 'string' ? zonesHr.duration_display : undefined}
-                  zones={zonesHr.bins.map((b:any, i:number) => ({ name: `Zone ${i+1}`, min: Number(b.min)||0, max: Number(b.max)||0 }))}
-                  avgHr={norm.avg_hr ?? undefined}
-                  maxHr={norm.max_hr ?? undefined}
-                  title="Heart Rate Zones"
-                />
-              </div>
-            )}
-            
-            {/* Power Zones - only for rides with power data */}
-            {hasPowerZones && isRide && (
-              <div className="my-4">
-                <PowerZoneChart 
-                  zoneBins={zonesPower.bins.map((b:any)=> ({ 
-                    i: Number(b.i) || 0,
-                    t_s: Number(b.t_s) || 0,
-                    min: Number(b.min) || 0,
-                    max: Number(b.max) || 0,
-                    share: Number(b.share) || 0,
-                  }))}
-                  avgPower={norm.avg_power ?? undefined}
-                  maxPower={norm.max_power ?? undefined}
-                  title="Power Distribution" 
-                />
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* ⛔ THE ZONE CARDS MOVED TO PERFORMANCE (2026-09-26, Michael) — `SessionZoneCards`, rendered by
+          MobileSummary for the same sessions this tab drew them for. */}
 
       {!isSwimType && (hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mt-6 mx-[-16px] px-3 py-3">

@@ -83,7 +83,8 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
      * second copy of every one.
      *
      * ⛔ IT COULD ONLY RUN FOR A MOMENT. `workout-detail` writes `display_metrics` on EVERY answer
-     * (`index.ts`, unconditional), and this hook has exactly one caller (`CompletedTab`), so the ladder
+     * (`index.ts`, unconditional), and this hook had exactly one caller (`CompletedTab`; since 2026-09-26
+     * also `SessionZoneCards`, handed the same workout-detail row), so the ladder
      * was reachable only in the frame before the fetch returned. A number that is right for one frame
      * and then replaced is not worth a second copy of the maths.
      *

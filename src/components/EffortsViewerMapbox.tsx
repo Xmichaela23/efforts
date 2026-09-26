@@ -315,7 +315,15 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick,
     vam: '#06b6d4'
   };
   const activeColor = metricType && metricColors[metricType] ? metricColors[metricType] : '#60a5fa';
-  
+  // ⛔ THE UNIT HAS ITS OWN LINE (2026-09-26, Michael: "12.8 …" and "140 b…" on a phone). The pill is 54 px and does
+  // not grow, while the phone's own text size scales every letter in it (`src/lib/dynamic-type.ts`): "140 bpm" is
+  // 53 px at the default size and 59 px one step up. Under the number, in the label's size, the unit ("mph", "bpm",
+  // "ft/h", "/mi", "%") and the number each fit up to the largest text size the app follows.
+  // guard: layout — splits the printed text onto two lines, computes no number.
+  const valueParts = /^(.*\d)\s*([^\d\s][^\d]*)$/.exec(String(value));
+  const valueNum = valueParts ? valueParts[1] : String(value);
+  const valueUnit = valueParts ? valueParts[2] : null;
+
   return (
     <div 
       title={titleAttr || ''} 
@@ -338,7 +346,9 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick,
       onMouseLeave={(e) => { if (onClick) e.currentTarget.style.opacity = "1"; }}
     >
       <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.6)", fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{value}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{valueNum}</span>
+      {/* A pill with no unit keeps the line empty, so every pill's "(avg)" sits on the same line. */}
+      <span style={{ fontSize: 10, fontWeight: 600, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{valueUnit ?? "\u00a0"}</span>
       {subValue ? (
         <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.5)", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue}</span>
       ) : null}
@@ -644,7 +654,17 @@ function EffortsViewerMapbox({
   const yDomain = useMemo<[number, number]>(() => {
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
-    
+    /**
+     * ⛔ A RIDE'S CADENCE AXIS RUNS FROM 0 TO THE TOP READING (2026-09-26, Michael). The axis below is the middle 80%
+     * of the readings (10th to 90th percentile) plus a margin, so the coasting zeros and the top 10% fell off the
+     * chart: 118 of 600 points on the 2026-09-19 ride (64–91 rpm shown). Coasting is drawn at 0 now
+     * (`display-series.ts rideCadenceLine`), so the axis starts there and nothing is cut.
+     * guard: layout — the top is the highest reading rounded up to a whole 20 rpm, so the four steps read in whole rpm.
+     */
+    if (tab === 'cad' && workoutData?.type === 'ride') {
+      return [0, Math.max(20, Math.ceil(Math.max(...vals) / 20) * 20)];
+    }
+
     // Outdoor: prefer wider coverage for pace to avoid clipping; otherwise robust winsorize
     const usePaceWide = (tab === 'pace');
     const winsorized = isOutdoorGlobal
@@ -1040,7 +1060,12 @@ function EffortsViewerMapbox({
    * ⛔ THE "(avg)" PILLS PRINT THE SESSION'S SERVER NUMBERS (2026-09-10, audit H-D04). Each pill used to
    * walk its own ladder of columns, and pace guessed its unit ("others might be sec/km"). Pace and heart
    * rate are the Performance tab's (`session_detail_v1.completed_totals`); speed, power and cadence are
-   * the Details tab's (`display_metrics`); VAM is `computed.overall.avg_vam`. Missing prints "—".
+   * the Details tab's (`display_metrics`). Missing prints "—".
+   * ⛔ GRADE AND VAM HAVE NO "(avg)" (2026-09-26, Michael). Both are read for the stretch under the cursor, the way
+   * TrainingPeaks computes VAM for a section of a workout ("Breaking Down VAM") and Strava shows grade for a selected
+   * range or segment (Strava help, "Ride Activity Pages"). At rest the Grade pill printed a typed "—" and the VAM pill
+   * divided the ride's whole climb by its whole time (906 ft/h on the 2026-09-19 ride). Their pills show only while
+   * dragging; the VAM tab on the chart is unchanged.
    */
   const finiteOrNull = (v: unknown): number | null => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
   // The screen's session detail when it has one (a first open), else the copy saved on the workout.
@@ -1056,8 +1081,19 @@ function EffortsViewerMapbox({
   const getAvgCadence = finiteOrNull(workoutData?.type === 'ride'
     ? workoutData?.display_metrics?.avg_cycling_cadence_rpm
     : workoutData?.display_metrics?.avg_running_cadence_spm);
-  // ⛔ In the athlete's unit, whole (display_metrics.avg_vam_display) — 2026-09-16, Stage 7 session 1.
-  const getAvgVam = finiteOrNull(workoutData?.display_metrics?.avg_vam_display);
+  /**
+   * ⛔ THE "(total)" TIME IS THE SESSION'S TIME (2026-09-26) — the ride's "Time" row (`display_metrics.times`,
+   * `_shared/session-detail/session-times.ts`), the number the Time tile below prints. It printed the chart's last
+   * point, one second off Garmin's timer total on the 2026-09-19 ride (2:15:10 against 2:15:09), and on a session
+   * whose source sent no timer it still does.
+   */
+  const sessionTimeRow: { display: string; seconds: number } | null = (() => {
+    const rows = (workoutData as { display_metrics?: { times?: unknown } })?.display_metrics?.times;
+    if (!Array.isArray(rows)) return null;
+    const row = rows.find((r) => (r as { key?: unknown })?.key === 'time') as { display?: unknown; seconds?: unknown } | undefined;
+    return typeof row?.display === 'string' && Number.isFinite(Number(row?.seconds)) ? { display: row.display, seconds: Number(row.seconds) } : null;
+  })();
+  const sessionTimeDisplay: string | null = sessionTimeRow?.display ?? null;
 
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
@@ -1492,7 +1528,8 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 16, padding: "0 20px" }}>
         {/* Current metric values aligned with tabs
             Running: Pace, HR, Grade, Cadence, Power
-            Cycling: Speed, Power, HR, Grade, Cadence, VAM */}
+            Cycling: Speed, Power, HR, Grade, Cadence, VAM
+            Grade and VAM only while dragging (2026-09-26). */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8 }}>
           {/* Speed/Pace - always first */}
           <Pill 
@@ -1556,23 +1593,17 @@ function EffortsViewerMapbox({
             onClick={() => setTab("bpm")}
             metricType="bpm"
           />
-          {/* Grade */}
-          <Pill
-            label="Grade"
-            value={(() => {
-              if (isScrubbing) {
-                return fmtPct(s?.grade_pct);
-              } else {
-                // No avg_grade in workoutData, show "—"
-                return '—';
-              }
-            })()}
-            subValue={isScrubbing ? undefined : "(avg)"}
-            active={tab==="elev"}
-            width={54}
-            onClick={() => setTab("elev")}
-            metricType="elev"
-          />
+          {/* Grade — the stretch under the cursor, only while dragging (2026-09-26; see the note above the pills). */}
+          {isScrubbing && (
+            <Pill
+              label="Grade"
+              value={fmtPct(s?.grade_pct)}
+              active={tab==="elev"}
+              width={54}
+              onClick={() => setTab("elev")}
+              metricType="elev"
+            />
+          )}
           {/* Cadence */}
           <Pill 
             label="Cadence" 
@@ -1604,16 +1635,12 @@ function EffortsViewerMapbox({
               metricType="pwr"
             />
           )}
-          {/* VAM - cycling only */}
-          {workoutData?.type !== 'run' && (
-            <Pill 
-              label="VAM" 
-              value={(() => {
-                if (isScrubbing) return elevText(s?.vam_disp, sdUnits?.vam);
-                return elevText(getAvgVam, sdUnits?.vam);
-              })()} 
-              subValue={isScrubbing ? undefined : "(avg)"}
-              active={tab==="vam"} 
+          {/* VAM - cycling only, the stretch under the cursor, only while dragging (2026-09-26). */}
+          {isScrubbing && workoutData?.type !== 'run' && (
+            <Pill
+              label="VAM"
+              value={elevText(s?.vam_disp, sdUnits?.vam)}
+              active={tab==="vam"}
               width={54}
               onClick={() => setTab("vam")}
               metricType="vam"
@@ -1638,14 +1665,16 @@ function EffortsViewerMapbox({
         
         {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
-          {/* Altitude - show total when not scrubbing */}
+          {/* Altitude — at the cursor, else where the session ENDED: the last point of the server's altitude line
+              (`series_display.elevation`). ⛔ It read "(total)" (2026-09-26, Michael) — an altitude is not a total. "end" is
+              the word the weather line on this tab uses for the reading at the finish ("54° end"). */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700 }}>
               Alt {elevText(isScrubbing ? s?.elev_disp : last?.elev_disp, sdUnits?.elevation)}
             </div>
             {!isScrubbing && (
               <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
-                (total)
+                (end)
               </div>
             )}
           </div>
@@ -1659,9 +1688,9 @@ function EffortsViewerMapbox({
               letterSpacing: "0.5px",
               color: "rgba(255, 255, 255, 0.9)"
             }}>
-              {isScrubbing 
+              {isScrubbing
                 ? `${distText(s?.dist_disp)} · ${fmtTime(s?.t_s ?? 0)}`
-                : `${distText(last?.dist_disp)} · ${fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
+                : `${distText(last?.dist_disp)} · ${sessionTimeDisplay ?? fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
               }
             </div>
             {!isScrubbing && (
@@ -1677,14 +1706,19 @@ function EffortsViewerMapbox({
             */}
           {(() => {
             // ⛔ Whole feet or metres from the server (series_display.gain / loss) — 2026-09-16, Stage 7 session 1.
+            // ⛔ EACH HALF ONLY WHEN THE SOURCE SENT IT (2026-09-26, Michael): a Strava session sends no descent, so the
+            // server sends no loss line and this reads "+gain" alone, as Strava's own page does. Neither: no readout.
             const at = isScrubbing ? s : last;
             const gainNow = at?.gain_disp;
             const lossNow = at?.loss_disp;
-            if (!sdUnits || !Number.isFinite(gainNow as any) || !Number.isFinite(lossNow as any)) return <div />;
+            const hasGain = Number.isFinite(gainNow as any);
+            const hasLoss = Number.isFinite(lossNow as any);
+            if (!sdUnits || (!hasGain && !hasLoss)) return <div />;
+            const climbText = [hasGain ? `+${gainNow}` : null, hasLoss ? `-${lossNow}` : null].filter(Boolean).join(' / ');
             return (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700, whiteSpace: "nowrap" }}>
-              {`+${gainNow} / -${lossNow} ${sdUnits.elevation}`}
+              {`${climbText} ${sdUnits.elevation}`}
             </div>
             {!isScrubbing && (
               <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
@@ -1774,8 +1808,9 @@ function EffortsViewerMapbox({
             const distM = distCalc.d0 + ratio * (distCalc.dN - distCalc.d0); // guard: layout — x-axis tick position
             const distDisplay = useMiles ? (distM / 1609.34).toFixed(1) : (distM / 1000).toFixed(1); // guard: layout — x-axis tick label at a quarter of the chart width
             const distUnit = useMiles ? 'mi' : 'km';
-            // Calculate time at this point (interpolate from samples)
-            const totalTime = normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0;
+            // Calculate time at this point (interpolate from samples). The right-hand end is the session's Time when the
+            // ride has one (2026-09-26), so the axis ends on the "(total)" figure above it.
+            const totalTime = sessionTimeRow?.seconds ?? (normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0);
             const timeAtPoint = totalTime * ratio;
             const mins = Math.floor(timeAtPoint / 60);
             const secs = Math.floor(timeAtPoint % 60);

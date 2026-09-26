@@ -68,8 +68,27 @@ function roundMag(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Dominant HR zone bucket → endurance intensity_modifier + context */
-function enduranceIntensityFromZones(timeInZone: Record<string, number> | null | undefined): {
+/**
+ * Which of this rule's five zones a `time_in_zone` key counts in.
+ *
+ * ⛔ SEVEN ZONES REACH HERE NOW (2026-09-26). A session's heart rate is counted in Friel's seven zones
+ * (`_shared/endurance/display-zones.ts`, zones 1–4, 5a, 5b, 5c) and `compute-facts` keys the bins by position,
+ * so z5 = Zone 5a, z6 = Zone 5b, z7 = Zone 5c. This read z1–z5 only, and time in 5b and 5c fell out of both the
+ * total and the hard share. Friel's 5a, 5b and 5c are all at or above threshold (100–102, 103–106 and over 106%
+ * of LTHR — "A Quick Guide to Setting Zones"), so all three count as this rule's Zone 5, with Zone 4 the hard
+ * share as before. A five-zone session (% of max heart rate, or one counted before today) maps one to one.
+ * A key named for a sub-zone ("z5a" … "z5c") counts as Zone 5 too.
+ */
+function ruleZoneOf(key: string): 1 | 2 | 3 | 4 | 5 | null {
+  const m = /^z?(\d+)[abc]?$/i.exec(key.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (n >= 5) return 5;
+  return n >= 1 ? (n as 1 | 2 | 3 | 4) : null;
+}
+
+/** Dominant HR zone bucket → endurance intensity_modifier + context. Exported for its test. */
+export function enduranceIntensityFromZones(timeInZone: Record<string, number> | null | undefined): {
   modifier: number;
   context: string;
   z4z5Minutes: number;
@@ -86,12 +105,12 @@ function enduranceIntensityFromZones(timeInZone: Record<string, number> | null |
   for (const [k, v] of Object.entries(timeInZone)) {
     const sec = Number(v) || 0;
     const min = sec / 60;
-    const z = k.replace(/^z/i, "");
-    if (z === "1") z1 += min;
-    else if (z === "2") z2 += min;
-    else if (z === "3") z3 += min;
-    else if (z === "4") z4 += min;
-    else if (z === "5") z5 += min;
+    const z = ruleZoneOf(k);
+    if (z === 1) z1 += min;
+    else if (z === 2) z2 += min;
+    else if (z === 3) z3 += min;
+    else if (z === 4) z4 += min;
+    else if (z === 5) z5 += min;
   }
   const total = z1 + z2 + z3 + z4 + z5;
   const z4z5 = z4 + z5;

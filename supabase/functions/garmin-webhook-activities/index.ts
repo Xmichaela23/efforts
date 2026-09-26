@@ -526,6 +526,10 @@ async function processActivityDetails(activityDetails) {
         if (samples.length > 0) baseRecord.samples_data = samples;
         const gain = Number(activityDetail?.summary?.totalElevationGainInMeters);
         if (Number.isFinite(gain)) baseRecord.elevation_gain_meters = gain;
+        // Garmin's Total Descent beside its Total Ascent (2026-09-26) — the summary path above keeps both; this one
+        // kept only the ascent.
+        const loss = activityDetail?.summary?.totalElevationLossInMeters;
+        if (loss != null && Number.isFinite(Number(loss))) baseRecord.elevation_loss_meters = Number(loss);
         if (avgTemperature !== null) baseRecord.avg_temperature = avgTemperature;
         if (maxTemperature !== null) baseRecord.max_temperature = maxTemperature;
         const { error: upsertErr } = await supabase.from('garmin_activities').upsert(baseRecord, {
@@ -674,6 +678,9 @@ async function processActivityDetails(activityDetails) {
             max_speed_mps: activity.maxSpeedInMetersPerSecond ?? null,
             calories: activity.activeKilocalories ?? null,
             elevation_gain_meters: activityDetail?.summary?.totalElevationGainInMeters ?? null,
+            // ⛔ GARMIN'S TOTAL DESCENT (2026-09-26, Michael: "save and show the device's descent") — ingest-activity
+            // saves it as `workouts.elevation_loss`. It was never sent, so the ride kept only our own sum.
+            elevation_loss_meters: activityDetail?.summary?.totalElevationLossInMeters ?? null,
             starting_latitude: activity.startingLatitudeInDegree ?? null,
             starting_longitude: activity.startingLongitudeInDegree ?? null,
             // Swim specifics if present
