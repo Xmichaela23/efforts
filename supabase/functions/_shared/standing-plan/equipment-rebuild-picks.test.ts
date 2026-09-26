@@ -11,7 +11,7 @@ import { accessoryPicksAfter, picksOnNewKit } from './equipment-rebuild-picks.ts
 import { composeBlock } from './compose.ts';
 import { defaultViadaPicks, flattenViadaPicks, normalizeViadaPrefs } from './accessory-picks.ts';
 import { restateFromTest } from './restate.ts';
-import { swapGroupsFor } from './swap-groups.ts';
+import { slotCellOf, swapGroupsFor } from './swap-groups.ts';
 import { canonicalize } from '../canonicalize.ts';
 
 const MIN = ['Home gym'];
@@ -69,19 +69,28 @@ Deno.test('⛔ THE SAME KIT MOVES NOTHING — the stored picks come back byte-id
   assertEquals(picksOnNewKit({ stored: gym, chosenKeys: null, builtKit: ['Commercial gym'], currentKit: ['Commercial gym', 'Sled'], dial: [], frame: FRAME }).changed, []);
 });
 
-Deno.test('⛔ A HAND PICK SURVIVES THE EQUIPMENT REBUILD — recorded as the athlete\'s, or read as one by differing from the default', () => {
+Deno.test('⛔ A RECORDED HAND PICK STAYS; WITH NO RECORD A STAND-IN GIVES WAY AND A PRINTED PICK STAYS', () => {
   // Recorded: the athlete set the braced hinge row (to the default's own value, even) — it stays.
   const recorded = picksOnNewKit({ stored, chosenKeys: ['braced_hinge'], builtKit: MIN, currentKit: BENCH, dial: [], frame: FRAME });
   assertEquals(recorded.changed, []);
   assertEquals(recorded.picks.braced_hinge, 'weighted reverse hyper');
-  // Not recorded (a block built before 2026-09-25): a pick that is not the built kit's default is the athlete's.
+  // No record: a stand-in the athlete may have hand-picked still gives way (the rare case; it stays in Swap).
   const hand = { ...stored, braced_hinge: 'db romanian deadlift' };
-  const kept = picksOnNewKit({ stored: hand, chosenKeys: null, builtKit: MIN, currentKit: BENCH, dial: [], frame: FRAME });
-  assertEquals(kept.changed, []);
-  assertEquals(kept.picks.braced_hinge, 'db romanian deadlift');
-  // A block with no stored kit reads the defaults of "not asked" — nothing moves rather than a guess.
-  const noKit = picksOnNewKit({ stored, chosenKeys: null, builtKit: null, currentKit: BENCH, dial: [], frame: FRAME });
-  assert(noKit.changed.every((c) => c.key !== 'braced_hinge') || stored.braced_hinge !== defaultViadaPicks(null, [], FRAME).braced_hinge);
+  const moved = picksOnNewKit({ stored: hand, chosenKeys: null, builtKit: MIN, currentKit: BENCH, dial: [], frame: FRAME });
+  assertEquals(moved.changed, [{ key: 'braced_hinge', from: 'db romanian deadlift', to: 'ghd back extension' }]);
+  // No record: a printed cell movement is never moved (a gym's picks on a gym with a sled).
+  const gym = defaultViadaPicks(['Commercial gym'], [], FRAME) as Record<string, string>;
+  assertEquals(picksOnNewKit({ stored: gym, chosenKeys: null, builtKit: ['Commercial gym'], currentKit: ['Commercial gym', 'Sled'], dial: [], frame: FRAME }).changed, []);
+});
+
+Deno.test('⛔ THE OWNER\'S OWN BLOCK STATE (2026-09-25): athlete_equipment already overwritten with the current kit, no record — the stand-in still moves', () => {
+  // Block 14288283 after the first rebuild: `athlete_equipment` = current kit (bench chip on), `slot_picks.braced_hinge`
+  // still the reverse hyper, no `slot_picks_chosen`, no `built_equipment`.
+  const out = picksOnNewKit({ stored, chosenKeys: null, builtKit: BENCH, currentKit: BENCH, dial: [], frame: FRAME });
+  assertEquals(out.changed, [{ key: 'braced_hinge', from: 'weighted reverse hyper', to: 'ghd back extension' }]);
+  assertEquals({ ...out.picks, braced_hinge: stored.braced_hinge }, stored);
+  // And with no stored kit at all.
+  assertEquals(picksOnNewKit({ stored, chosenKeys: null, builtKit: null, currentKit: BENCH, dial: [], frame: FRAME }).changed.length, 1);
 });
 
 Deno.test('⛔ THE RESTATE REWRITES THE CHANGED SLOT AS A CHANGED MOVEMENT, FROM TODAY ON; done rows and earlier rows untouched', () => {
@@ -95,11 +104,14 @@ Deno.test('⛔ THE RESTATE REWRITES THE CHANGED SLOT AS A CHANGED MOVEMENT, FROM
     return d.toISOString().slice(0, 10);
   };
   const TODAY = dateOf(3, 'Wednesday');
+  // The stored rows predate the slot stamps (the owner's block: every row read `{no slot}`), so the restate has to
+  // write them as shape onto rows whose movement does not change too.
+  const strip = (rows: Row[]) => rows.map(({ slot_category: _c, slot_pattern: _p, slot_key: _k, slot_frame: _f, ...r }) => r);
   const planned = before.flatMap((w) => w.sessions.filter((s) => s.type === 'strength').map((s, i) => ({
     id: `w${w.week}-${s.day}-${i}`, week_number: w.week, date: dateOf(w.week, s.day), type: 'strength',
     // Week 3 Monday was done; everything else is planned.
     workout_status: w.week === 3 && s.day === 'Monday' ? 'completed' : 'planned',
-    strength_exercises: JSON.parse(JSON.stringify(s.strength_exercises ?? [])),
+    strength_exercises: strip(JSON.parse(JSON.stringify(s.strength_exercises ?? []))),
   })));
   const oldBraced = braced(before);
   assert(oldBraced.length >= 20 && oldBraced.every((b) => b.row.name === 'Weighted Reverse Hyper'), oldBraced.map((b) => b.row.name).join(','));
@@ -111,7 +123,9 @@ Deno.test('⛔ THE RESTATE REWRITES THE CHANGED SLOT AS A CHANGED MOVEMENT, FROM
   let rewritten = 0;
   for (const p of planned) {
     const out = byId.get(p.id);
-    const had = (p.strength_exercises as Row[]).filter(isBracedHinge);
+    // The stored side carries no stamps (stripped above): the braced-hinge row is the reverse hyper in the superset.
+    const wasBracedHinge = (r: Row) => /braced hinge/i.test(String(r.source_row)) && canonicalize(r.name) === 'weighted_reverse_hyper';
+    const had = (p.strength_exercises as Row[]).filter(wasBracedHinge);
     if (had.length === 0) continue;
     if (p.workout_status === 'completed' || p.date < TODAY) {
       assertEquals(out, undefined, `${p.id} was rewritten`);
@@ -126,9 +140,21 @@ Deno.test('⛔ THE RESTATE REWRITES THE CHANGED SLOT AS A CHANGED MOVEMENT, FROM
       rewritten++;
     }
     // The rest of the session is the composer's row for the same movement — nothing else changed name.
-    const otherBefore = (p.strength_exercises as Row[]).filter((r) => !isBracedHinge(r)).map((r) => r.name);
+    const otherBefore = (p.strength_exercises as Row[]).filter((r) => !wasBracedHinge(r)).map((r) => r.name);
     const otherAfter = (out.strength_exercises as Row[]).filter((r) => !isBracedHinge(r)).map((r) => r.name);
     assertEquals(otherAfter, otherBefore);
+    // Every accessory row now carries its cell (a row with a pick key carries the key; an asymmetrical row has none by
+    // design and carries its own swap list instead), so `swap-list` builds the slot's cell from the stored row.
+    for (const r of out.strength_exercises as Row[]) {
+      if (/^(Back Squat|Deadlift|Bench Press|Overhead Press)$/.test(r.name)) continue; // a competition lift
+      assert(r.slot_category && r.slot_pattern && r.slot_frame === 'all_rounder', `${p.id} ${r.name} carries no cell: ${JSON.stringify([r.slot_category, r.slot_pattern, r.slot_key, r.slot_frame])}`);
+      const cell = slotCellOf(r);
+      assert(cell && cell.category === r.slot_category, `${r.name}: slotCellOf gave ${JSON.stringify(cell)}`);
+      if (/asymmetrical/i.test(String(r.source_row))) {
+        assertEquals(r.slot_key, undefined, 'an asymmetrical row has no pick key');
+        assert(Array.isArray(r.swap_options) && r.swap_options.length > 0, 'the asymmetrical row carries its own swap list');
+      } else assert(r.slot_key, `${r.name} carries no pick key`);
+    }
   }
   assert(rewritten >= 15, `only ${rewritten} rows rewritten`);
   // The reverse hyper stays in the Swap sheet for the slot, on the bench kit.

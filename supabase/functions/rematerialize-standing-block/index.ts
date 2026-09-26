@@ -393,9 +393,14 @@ Deno.serve(async (req: Request) => {
      * the ledger row). The restate pairs the changed slot's rows by `source_row` and rewrites them as a changed
      * movement from today on. The moved picks become the block's own below, beside the kit.
      */
-    const builtKit: string[] | null = Array.isArray(sp?.athlete_equipment)
-      ? sp.athlete_equipment as string[]
-      : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment as string[] : null);
+    // ⛔ THE KIT THE BLOCK WAS BUILT WITH, KEPT APART FROM THE KIT IT COMPOSES AGAINST (2026-09-25, second pass): the
+    // first rebuild wrote the current kit into `athlete_equipment` and the pick rule lost its evidence. `built_equipment`
+    // is written once (below) and never overwritten; on a block from before, `athlete_equipment` is the best record.
+    const builtKit: string[] | null = Array.isArray(sp?.built_equipment)
+      ? sp.built_equipment as string[]
+      : (Array.isArray(sp?.athlete_equipment)
+        ? sp.athlete_equipment as string[]
+        : (Array.isArray(config?.athlete_equipment) ? config.athlete_equipment as string[] : null));
     const rebuiltPicks = useCurrentEquipment && currentKit && blockSlotPicks
       ? picksOnNewKit({
         stored: blockSlotPicks as never,
@@ -859,7 +864,9 @@ Deno.serve(async (req: Request) => {
           ...baseConfig,
           standing_plan: {
             ...sp,
-            // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`).
+            // The kit the athlete rebuilt with becomes the block's own (see `useCurrentEquipment`); the kit it was BUILT
+            // with is kept once, apart, for the pick rule (`built_equipment`, 2026-09-25).
+            ...(currentKit && !Array.isArray(sp?.built_equipment) && builtKit ? { built_equipment: builtKit } : {}),
             ...(currentKit ? { athlete_equipment: currentKit } : {}),
             // …and the picks the new kit moved (2026-09-25, `picksOnNewKit`): the next refresh composes the same week.
             ...(picksMoved ? { slot_picks: slotPicksNow, accessory_picks: accessoryPicksNow } : {}),

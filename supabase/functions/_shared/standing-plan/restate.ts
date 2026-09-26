@@ -409,6 +409,14 @@ export function restateFromTest(args: {
       // ⛔ THE SET-COUNT LINE IS SHAPE (2026-09-25): stamped on the week the count moved, written as an absence on the
       // next rebuild so it is gone (`sets_line`, `EARNED_SETS_EVERY_ROW_IS_OURS`).
       if ((fr.sets_line ?? null) !== (er.sets_line ?? null)) shape.sets_line = fr.sets_line;
+      // ⛔ THE SLOT'S CELL IS SHAPE (2026-09-25, found on the owner's live block: every row his equipment rebuild wrote
+      // carried no slot stamps, so the Swap sheet fell back to the movement's own filing). `slot_category`,
+      // `slot_pattern`, `slot_key`, `slot_frame` travel like `sets_line` — written when they differ, as an absence when
+      // the composed row has none. A row with no pick key (the asymmetrical rows) carries no `slot_key` by design; the
+      // sheet builds from category + pattern and the row's own `swap_options`.
+      for (const k of ['slot_category', 'slot_pattern', 'slot_key', 'slot_frame'] as const) {
+        if ((fr[k] ?? null) !== (er[k] ?? null)) shape[k] = fr[k];
+      }
       if (shapeOnly) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;

@@ -17,11 +17,17 @@
  * when that default is now one of the cell's printed movements. A pick the athlete made by hand stays.
  *
  * WHICH PICKS WERE THE ATHLETE'S. The picking screen sends only the rows the athlete changed
- * (`assistance_picks.viada.picks`, 2026-09-13); since this date the block records those keys (`sp.slot_picks_chosen`).
- * A block built before carries no record, so a stored pick that equals the picking screen's default on the kit the
- * block was built with (`sp.athlete_equipment`) is read as a default. ⚠️ A hand pick that happened to equal the
- * default on such a block is read as a default too — the same movement, so nothing the athlete sees is lost until
- * the kit changes.
+ * (`assistance_picks.viada.picks`, 2026-09-13); since this date the block records those keys (`sp.slot_picks_chosen`)
+ * and a recorded key stays. A block with NO record: origin unknown is not "hand-picked" — a stored pick that is a
+ * stand-in for its cell (filed outside the cell, a variant, or a same-muscle substitute) gives way when the current
+ * kit reaches a printed cell movement; a stored pick that IS a printed cell movement stays. A hand-picked stand-in is
+ * the rare case, and it stays on offer in the Swap sheet. (The first cut compared the stored pick with the built
+ * kit's default — and the rebuild had already written the CURRENT kit into `athlete_equipment`, so on the owner's own
+ * block the default no longer matched and the stand-in read as a hand pick. The rule had overwritten its evidence.)
+ *
+ * THE KIT THE BLOCK WAS BUILT WITH is `sp.built_equipment` (written once at build, never overwritten; the rebuild
+ * writes it from `athlete_equipment` on a block that predates it), so `athlete_equipment` can keep carrying the kit
+ * the block now composes against.
  *
  * THE RESTATE SURVIVES THE CHANGE: the composed row for the changed slot carries the same `source_row` as the stored
  * row, and `restateFromTest` pairs rows of one slot by `source_row` and replaces a different movement wholesale — the
@@ -63,8 +69,8 @@ function printedForCell(key: ViadaPickKey, name: string, kit: string[] | null, f
 
 /**
  * The block's picks after an equipment rebuild. `stored` is `sp.slot_picks`; `chosenKeys` is `sp.slot_picks_chosen`
- * (null on a block built before it was recorded); `builtKit` is `sp.athlete_equipment`; `currentKit` the kit on
- * Baselines. Returns the picks to compose with and the slots that moved. Same kit, or nothing to move: the stored
+ * (null on a block built before it was recorded); `builtKit` is `sp.built_equipment` (else `athlete_equipment`, which
+ * an earlier rebuild may already have overwritten with the current kit); `currentKit` the kit on Baselines. Returns the picks to compose with and the slots that moved. Same kit, or nothing to move: the stored
  * picks back, unchanged, and an empty list.
  */
 export function picksOnNewKit(args: {
@@ -76,9 +82,8 @@ export function picksOnNewKit(args: {
   frame: FrameId;
 }): { picks: Partial<Record<ViadaPickKey, string>>; changed: PickChange[] } {
   const dial = (args.dial ?? []).filter(isDialChip) as DialChip[];
-  const built = Array.isArray(args.builtKit) ? args.builtKit : null;
+  const built = Array.isArray(args.builtKit) && args.builtKit.length > 0 ? args.builtKit : args.currentKit;
   const chosen = Array.isArray(args.chosenKeys) ? new Set(args.chosenKeys.map(String)) : null;
-  const builtDefaults = defaultViadaPicks(built, dial, args.frame);
   const nowDefaults = defaultViadaPicks(args.currentKit, dial, args.frame);
   const picks: Partial<Record<ViadaPickKey, string>> = { ...args.stored };
   const changed: PickChange[] = [];
@@ -86,11 +91,10 @@ export function picksOnNewKit(args: {
     const key = k as ViadaPickKey;
     const from = String(v ?? '').trim();
     if (!from || !VIADA_PICKS[key]) continue;
-    // The athlete's own pick stays.
-    const athletes = chosen ? chosen.has(key) : canonicalize(from) !== canonicalize(String(builtDefaults[key] ?? ''));
-    if (athletes) continue;
-    // A default that was one of the cell's printed movements on the built kit was not a stand-in.
-    if (printedForCell(key, from, built, args.frame)) continue;
+    // A pick the athlete is recorded as having set stays.
+    if (chosen && chosen.has(key)) continue;
+    // A pick that is one of the cell's printed movements (on the built kit, else the current one) is no stand-in.
+    if (printedForCell(key, from, built, args.frame) || printedForCell(key, from, args.currentKit, args.frame)) continue;
     const to = String(nowDefaults[key] ?? '').trim();
     if (!to || canonicalize(to) === canonicalize(from)) continue;
     if (!printedForCell(key, to, args.currentKit, args.frame)) continue;
