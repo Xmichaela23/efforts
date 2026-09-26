@@ -23,13 +23,10 @@ import {
   calculateStrengthWorkload,
   strengthSetVolume,
   resolveBodyweightLb,
-  calculateMobilityWorkload,
-  calculatePilatesYogaWorkload,
   inferIntensityFromPerformance,
   resolveCardioIntensity,
   calculateDurationWorkload,
   getStepsIntensity,
-  getDefaultIntensityForType,
   mapRPEToIntensity,
 } from "../_shared/workload.ts";
 import { assessHrPlausibility, resolveMaxHrCeiling } from "../_shared/hr-plausibility.ts";
@@ -1448,11 +1445,11 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
     // Friel's TSS estimate (TrainingPeaks): minutes ÷ 60 × RPE × 10 — the rating, else RPE = 10 − logged RIR (2026-09-04).
     return calculateStrengthWorkload(dur, w.strength_exercises ?? [], sessionRPE);
   }
-  if (type === "mobility") {
-    return calculateMobilityWorkload(w.mobility_exercises ?? []);
-  }
-  if (type === "pilates_yoga") {
-    return calculatePilatesYogaWorkload(dur, sessionRPE);
+  // ⛔ A DONE SESSION THAT IS NOT CARDIO: THE RATING, ELSE 0 (2026-09-26, calculate-workload `ratedWorkload` — the same
+  // rule). Friel's TSS per hour = rating × 10; no rating, no score (Strava gives no Relative Effort with neither).
+  if (type === "mobility" || type === "pilates_yoga") {
+    return (typeof sessionRPE === "number" && sessionRPE >= 1 && sessionRPE <= 10)
+      ? calculateDurationWorkload(dur, mapRPEToIntensity(sessionRPE)) : 0;
   }
 
   // Cardio: THE ONE RULE — _shared/workload.ts resolveCardioIntensity (measured beats self-reported). This is
@@ -1486,12 +1483,11 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
     return calculateDurationWorkload(dur, intensity);
   }
 
-  // Non-cardio estimate path: sRPE if a logged RPE exists, else the flat default.
+  // Non-cardio: the rating if one was logged, else 0 — no default intensity (2026-09-26).
   if (typeof sessionRPE === "number" && sessionRPE >= 1 && sessionRPE <= 10) {
     return calculateDurationWorkload(dur, mapRPEToIntensity(sessionRPE));
   }
-  const intensity = getDefaultIntensityForType(type);
-  return calculateDurationWorkload(dur, intensity);
+  return 0;
 }
 
 // ---------------------------------------------------------------------------

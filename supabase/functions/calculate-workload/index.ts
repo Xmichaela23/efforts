@@ -43,7 +43,7 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts'
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts'
 
 interface WorkoutData {
-  type: 'run' | 'bike' | 'swim' | 'strength' | 'mobility';
+  type: 'run' | 'ride' | 'bike' | 'swim' | 'walk' | 'strength' | 'mobility' | 'pilates_yoga' | (string & {});
   duration: number; // minutes (elapsed time)
   moving_time?: number; // minutes (moving time - prefer for run/bike/swim)
   steps_preset?: string[];
@@ -81,7 +81,26 @@ interface WorkoutData {
  *   - Performance inference (HR/power/pace → intensity) which needs full workout data
  *   - TRIMP routing for cardio with HR
  */
-function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweightLb: number | null = null): number {
+/**
+ * ⛔ A DONE SESSION IS SCORED FROM WHAT WAS MEASURED OR RATED, ELSE NOTHING (Michael, 2026-09-26: "go"). Cardio:
+ * power, pace or heart rate, then the rating (`resolveCardioIntensity`). Every other kind — mobility, pilates / yoga,
+ * a walk, anything else — scores from the athlete's rating (Friel's TSS per hour = rating × 10), and with no rating
+ * it scores 0. FIELD: Strava uses the 1–10 perceived exertion when there is no heart rate and gives no Relative Effort
+ * with neither; TrainingPeaks records no TSS without data. What this replaced for a DONE session: our intensity table
+ * (a walk at 0.40, pilates at 0.75, run steps from `INTENSITY_FACTORS`), the mobility completion formula, and
+ * pilates / yoga as minutes × rating — Foster's sRPE scale, about six times TSS's, mixed into the same fitness line.
+ * A PLANNED row (`isPlanned`) still estimates its load from the plan's steps and the table, ahead of the session;
+ * nothing that feeds fitness or fatigue reads a planned row.
+ */
+function ratedWorkload(minutes: number, rating: unknown): number {
+  const r = Number(rating);
+  return Number.isFinite(r) && r >= 1 && r <= 10 ? calculateDurationWorkload(Number(minutes) || 0, mapRPEToIntensity(r)) : 0;
+}
+function ratingOf(workout: WorkoutData, sessionRPE?: number): unknown {
+  return sessionRPE ?? (workout.workout_metadata || {}).session_rpe ?? (workout as any).rpe;
+}
+
+function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweightLb: number | null = null, isPlanned = false): number {
   if (workout.type === 'strength') {
     // Friel's TSS estimate (TrainingPeaks): minutes ÷ 60 × RPE × 10 — the rating, else RPE = 10 − logged RIR.
     // 2026-09-04: replaces the tonnage pricing (D1 bodyweight, ÷10,000, the RIR band table — all ours for load).
@@ -89,10 +108,12 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweight
   }
 
   if (workout.type === 'mobility') {
+    if (!isPlanned) return ratedWorkload(workout.duration, ratingOf(workout, sessionRPE));
     return calculateMobilityWorkload(workout.mobility_exercises ?? []);
   }
 
   if (workout.type === 'pilates_yoga') {
+    if (!isPlanned) return ratedWorkload(workout.duration, ratingOf(workout, sessionRPE));
     const metadata = workout.workout_metadata || {};
     const rpe = sessionRPE || metadata.session_rpe;
     return calculatePilatesYogaWorkload(workout.duration, typeof rpe === 'number' ? rpe : undefined);
@@ -108,7 +129,7 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweight
   }
   if (!effectiveDuration) return 0;
 
-  const intensity = getSessionIntensity(workout, sessionRPE);
+  const intensity = getSessionIntensity(workout, sessionRPE, isPlanned);
   return calculateDurationWorkload(effectiveDuration, intensity);
 }
 
@@ -141,10 +162,16 @@ function cardioIntensityInput(w: WorkoutData & Record<string, any>) {
   };
 }
 
-function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number {
+function getSessionIntensity(workout: WorkoutData, sessionRPE?: number, isPlanned = false): number {
   if (workout.type === 'strength') {
     const rpe = strengthSessionRpe(workout.strength_exercises ?? [], sessionRPE);
     return rpe == null ? 0 : mapRPEToIntensity(rpe);
+  }
+  const isCardioType = workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim';
+  // A done session that is not cardio: the rating, else 0 (see `ratedWorkload`).
+  if (!isPlanned && !isCardioType) {
+    const r = Number(ratingOf(workout, sessionRPE));
+    return Number.isFinite(r) && r >= 1 && r <= 10 ? mapRPEToIntensity(r) : 0;
   }
   if (workout.type === 'pilates_yoga') {
     const metadata = workout.workout_metadata || {};
@@ -156,8 +183,9 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   }
   // Cardio: THE ONE RULE lives in _shared/workload.ts resolveCardioIntensity (measured beats self-reported —
   // power, heart rate, pace, then the rating, then the default). Nothing here re-orders it.
-  if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
-    if (workout.steps_preset && workout.steps_preset.length > 0) return getStepsIntensity(workout.steps_preset, workout.type);
+  if (isCardioType) {
+    // The plan's steps estimate a PLANNED row only; a done session is scored from what it measured or was rated.
+    if (isPlanned && workout.steps_preset && workout.steps_preset.length > 0) return getStepsIntensity(workout.steps_preset, workout.type);
     return resolveCardioIntensity({ ...cardioIntensityInput(workout as any), rpe: sessionRPE ?? workout.rpe ?? (workout.workout_metadata || {}).session_rpe }).intensity;
   }
   if (workout.steps_preset && workout.steps_preset.length > 0) {
@@ -489,8 +517,9 @@ serve(async (req) => {
       : undefined;
     
     // Calculate workload (all math happens server-side)
-    const workload = calculateWorkload(finalWorkoutData, sessionRPE, bodyweightLb)
-    const intensity = getSessionIntensity(finalWorkoutData, sessionRPE)
+    const isPlannedRow = workoutStatus === 'planned'
+    const workload = calculateWorkload(finalWorkoutData, sessionRPE, bodyweightLb, isPlannedRow)
+    const intensity = getSessionIntensity(finalWorkoutData, sessionRPE, isPlannedRow)
 
     // D-237: classify HOW this workload was derived so an ESTIMATED load (default
     // intensity / assumed resting HR) is distinguishable from a MEASURED one. Persisted

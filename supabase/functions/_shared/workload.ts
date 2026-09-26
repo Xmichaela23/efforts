@@ -191,27 +191,16 @@ export function mapRPEToIntensity(rpe: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * The RPE a strength session is scored at — FIELD, two published steps:
- *   1. the athlete's own session rating (Foster's session RPE, 1–10), when they gave one;
- *   2. else the sets' logged reps-in-reserve → RPE = 10 − RIR (Zourdos et al. 2016, the RIR-based RPE
- *      scale: RPE 10 = 0 RIR, RPE 8 = 2 RIR), averaged over the completed sets that carry one.
- * Nothing logged → null → the session scores 0 points (TrainingPeaks leaves TSS empty on a workout with
- * no data; it never guesses). 2026-09-04: replaces OUR RIR-to-intensity band table (0.95 … 0.70).
+ * The RPE a strength session is scored at: THE ATHLETE'S OWN SESSION RATING (Foster's session RPE, 1–10), and nothing
+ * else — no rating, no score (null → 0 points), as TrainerRoad and TrainingPeaks score a session with no data.
+ * ⛔ 2026-09-26 (Michael, "go"): the fallback that turned the sets' logged reps in reserve into a session RPE
+ * (10 − average RIR, Zourdos 2016) came off. Reps in reserve are per SET and a session mixes p218's targets (maximum
+ * effort, 3–4 in reserve, 0–2 in reserve); the book's own notes warn against converting one into the other. The
+ * logger now asks for the rating before a lift saves, with nothing pre-picked. `exercises` is kept for the callers'
+ * shape and is not read.
  */
-export function strengthSessionRpe(exercises: any[], sessionRPE?: number | null): number | null {
-  if (typeof sessionRPE === 'number' && sessionRPE >= 1 && sessionRPE <= 10) return sessionRPE;
-  const rirs: number[] = [];
-  for (const ex of Array.isArray(exercises) ? exercises : []) {
-    for (const st of Array.isArray(ex?.sets) ? ex.sets : []) {
-      if (st?.completed === false) continue;
-      // ⚠️ typeof, not Number(): Number(null) is 0, and 0 RIR is RPE 10 — a blank must stay blank.
-      const rir = typeof st?.rir === 'number' ? st.rir : (typeof st?.rir === 'string' && st.rir.trim() !== '' ? Number(st.rir) : NaN);
-      if (Number.isFinite(rir) && rir >= 0) rirs.push(rir);
-    }
-  }
-  if (!rirs.length) return null;
-  const avgRir = rirs.reduce((a, b) => a + b, 0) / rirs.length;
-  return Math.max(1, Math.min(10, 10 - avgRir));
+export function strengthSessionRpe(_exercises: any[], sessionRPE?: number | null): number | null {
+  return typeof sessionRPE === 'number' && sessionRPE >= 1 && sessionRPE <= 10 ? sessionRPE : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +503,7 @@ export function strengthSetVolume(
  * pricing) stays for the VOLUME facts; it no longer prices load.
  *
  * ⚠️ RIPPLE: every stored strength `workload_actual` is on the old scale until re-priced
- * (`backfill-strength-load`), and a session with neither a rating nor a logged RIR scores 0.
+ * (`backfill-strength-load`), and since 2026-09-26 a session with no rating scores 0 (`strengthSessionRpe`).
  */
 export function calculateStrengthWorkload(durationMinutes: number, exercises: any[], sessionRPE?: number | null): number {
   const rpe = strengthSessionRpe(exercises, sessionRPE);
