@@ -79,6 +79,52 @@ dynamic effort, skill, hypertrophy) with their rep range, reserve and set range 
 sessions of the week. Facts only, said the way a person says them (memory: copy sounds spoken). Every
 number is p218's / the frame's page; nothing new. Copy through Michael.
 
+**WORDS APPROVED by Michael 2026-09-25 (build waits on his go).** Where: tapping the plan name on Today's header card
+("Run + Ride + Strength") opens a sheet; the planner's Info (+ → plan card → Info) opens the same sheet. Field: Runna /
+TrainerRoad open the plan overview from the plan. Sections, in order:
+
+- **This week** — one line a day, the plan's own session names: "Monday: Lower body: Push · Easy Run".
+- **Maximum effort** — "Close to the heaviest weight you can lift. 1 to 5 reps. Starts at 1 set and can reach 3. Stop
+  each set while your form still holds." (p218 numbers, p219 meaning)
+- **Dynamic effort** — "Lighter weight, lifted as fast as you can. 2 to 4 reps. Starts at 4 sets and can reach 6. 3 to 4
+  reps in reserve."
+- **Skill** — "Practice for the movement. Lower it with control and lift it fast. 3 to 5 reps. Starts at 3 sets and can
+  reach 5. 3 to 4 reps in reserve."
+- **Hypertrophy** — "Work that builds muscle. 6 to 12 reps. Starts at 3 sets and can reach 4. 0 to 2 reps in reserve.
+  The last reps of a set slow down, and that is expected."
+- **Sets** — `SETS_EARNED_PARAGRAPH` with its last sentence changed to "The working sets under each lift show the
+  count." (the add/remove trigger is OURS, approved 2026-09-25)
+- **Deload** — "The plan can run week after week with no set deload. A deload week is for when a race is close or you
+  need a break. It makes the lifting and the endurance lighter for that week. You can set one on Adjust." (p120; the
+  program pages' taper/deload column)
+- **Retest** — "Your lifting numbers rise slowly on their own, so the plan has no set retest. A retest is for when a
+  number looks wrong. You can retest on Adjust." (p247 rate anchor; "progress without retesting; tests exist for
+  troubleshooting"; D-480)
+- **Endurance** (per plan, from that plan's own page; All Rounder = p275) — "Hard sessions are meant to be hard, and
+  easy sessions are meant to be easy. The endurance gets harder when your threshold numbers go up, not by making
+  sessions longer. For a race, switching to a race plan about a month out gives the best result."
+- **At the bottom:** the p125 pain tolerance note and the plan's own notes (so Info loses nothing), then the test-week
+  sentence as the description prints it ("Week one is a test week: …including the rest of week one."), only while
+  week one is ahead or current.
+- Race builds get their own outline later: each week laid out.
+
+> **BUILT 2026-09-25 (edited, NOT committed/pushed/deployed):** `_shared/standing-plan/program-outline.ts`
+> `composeProgramOutline` (server words; null for non-standing plans), `src/components/ProgramOutlineSheet.tsx`; Today's
+> plan name opens it (`get-week` `training_plan_context.programOutline`), the planner's Info opens it (`plan-overview`
+> `overview.program_outline`). `SETS_EARNED_PARAGRAPH` last sentence changed; `PLAN_WRITER_VERSION` 33→34 so built plans
+> pick up the new description and stored notes on their next refresh. Deploy together: endurance-checkpoint,
+> generate-strength-plan, get-week, materialize-plan, place-lost-day, plan-overview, rematerialize-standing-block,
+> swap-session, validate-reschedule.
+
+## BUILT 2026-09-25 (edited, NOT committed/pushed/deployed) — THE LOAD CARD GETS ITS 12-WEEK CHART
+
+> Michael: the LOAD numbers read as abstract. The card's arrow (beside "LOAD") opens TrainingPeaks' Performance
+> Management Chart shape: fitness and fatigue on one chart, form below, plain lines through the daily values, captions
+> "fitness over 12 weeks: 42 → 57" ending on the card's own number. Server: `fitness-fatigue.ts` series (one walk),
+> coach `load.fitness_fatigue.series` + `series_caption`, payload 217→218. `TrendSparkline` options off by default (other
+> rows byte-identical). Deploy: `coach`. Open: a 2–8 day history prints no caption (needs the word "week"); the (i)
+> rewrite (one name per row, "yesterday's") still waits on Michael's yes.
+
 ## QUEUED (2026-09-18) — HEAVY LIFTERS GET SEVEN WARM-UP SETS OF FIVE
 
 Warm-ups follow StrongLifts (d642b3f8e): 5 reps on every warm-up set. A 300 lb squat or 400 lb deadlift gets seven
@@ -111,7 +157,7 @@ source before it changes. Not urgent: light and middle lifters get two to five s
 - [ ] **The two-drill plyo card** ("Pick one or two of these drills.") — he saw the three-drill card with the (i).
 - [x] Today's narrative on his own plan — the reworded Descending Ladder card, seen 2026-09-20.
 
-## AWAITING MICHAEL (2026-09-20, b229a30e4 PUSHED, iOS synced; NOT checked signed in or on a device) — THE MENU (☰) IS UNRELIABLE
+## [x] VERIFIED on Michael's phone 2026-09-25 ("all good") — THE MENU (☰) IS UNRELIABLE
 
 > Traced 2026-09-20, four causes, all fixed in place. (1) Gear and Import were opened by a flag with no path, so
 > from Account, Connections, Help or the + screen the open screen kept winning and the tap did nothing; both are
@@ -147,6 +193,7 @@ The workload chip on Performance prints "usual 36–54" (`src/components/Adheren
 `typical_low/typical_high`): the athlete's own middle half of that sport's sessions, at least 5 sessions. The framing
 borrows Strava's Relative Effort and Garmin's Training Load bands, but the method is ours (ledger row added
 2026-09-18, b75b3114). Replace it with one named app's own method, or take the range off.
+> Michael 2026-09-25: "everything needs to be sourced, no ours". A named app's method or it comes off; no OURS option.
 
 ## AWAITING MICHAEL — DAY SWIPE (tab bar above the swipe zone VERIFIED on a device 2026-09-18, Michael: "tab is fixed")
 
@@ -255,6 +302,8 @@ The export (`AllPlansInterface.tsx exportPlanToMarkdown`) walks `plan.weeks` as 
 loads one week (`handlePlanClick`), and each week is added only when the athlete taps to it (the week-load effect), so
 a twelve-week plan exported after viewing week 1 prints week 1. Found while tracing the export's lift names; not fixed
 in that change. A file that is meant to match the phone row for row needs every week read from `planned_workouts`.
+> Michael 2026-09-25: this export is for internal review and need not be clean. Separate ask: a tidy athlete-facing
+> export, modelled on what TrainingPeaks exports, so an athlete can drop the plan into their own tools.
 
 ## [x] FIXED 2026-09-17 (c89668dc) — THE WEEK LIST PRINTS "Lateral Raise", THE WORKOUT SCREEN "Dumbbell Lateral Raise"
 
@@ -383,7 +432,7 @@ phone build. Look for: "FTP 168 W · accepted from your rides" on State, the sam
 (two rounds: the first round's script read Adjust's reply at the wrong place). BODY stays on State; the stale
 "REMOVED from State" sentence is gone from STATE-SOURCES.
 
-## AWAITING MICHAEL (2026-09-16 night, deployed + pushed; needs a run with reps) — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
+## [x] VERIFIED on Michael's watch 2026-09-25 ("all good") — TIMED RUN STEPS NOW REACH THE WATCH AS TIME
 
 `_shared/garmin/convert-workout.ts` dropped the `distanceDerived` mark when copying `computed.steps`, so every timed
 run step went to Garmin as a distance (16 Sep run: 6 × 0.41 mi for a 6 × 4:00 plan). Fixed 493fecc7; deployed
@@ -422,7 +471,13 @@ distance on the phone (`c/StructuredPlannedView.tsx:193`) — the page prescribe
 hit the guard's pattern missed — add the pattern. Open question for Michael: the rows re-priced from 8:51 to 9:35 —
 did he tap "use 9:35"? If not, the rebuild took a measured value without an accept (proposed-then-accepted breach).
 
-## QUEUED (Michael, 2026-09-16: "it needs a cue?") — A NOTICE WHEN UPCOMING ROWS PREDATE A RULE CHANGE
+## [x] SUPERSEDED 2026-09-18 (found 2026-09-25) — A NOTICE WHEN UPCOMING ROWS PREDATE A RULE CHANGE
+
+> Built another way on 2026-09-18: `_shared/plan-refresh.ts` `PLAN_WRITER_VERSION` is stamped on every expanded row;
+> when a plan has an upcoming row stamped below it, `get-week` queues one `rematerialize-standing-block` refresh and
+> the upcoming sessions are rewritten on their own (TrainerRoad's "adapt automatically" setting). No notice needed.
+> Everything below is history.
+
 
 A live plan rebuilds only on a tap (Plans admin "Restate weights from logged tests") or after a logged lift; the app
 never rewrites it silently (proposed-then-accepted). When the server's pricing rules change (2026-09-16: bench
@@ -469,6 +524,22 @@ middles, so its line reads "15 of 15 work intervals inside their range." The "at
 the archetypes whose judged work is all floor-only — the progressive repeats and the one-to-one.
 
 ## QUEUED — AN UNATTACHED INTERVAL RIDE STILL GETS A DRIFT NUMBER (filed 2026-09-15, Michael: separate item)
+
+> **RULED 2026-09-25 (Michael, "great"):** a ride or run with no plan attached gets no grade and no steadiness number;
+> it still counts toward load, fitness and threshold learning. FIELD: TrainingPeaks shows an unplanned workout grey (no
+> compliance), TrainerRoad does not score an unstructured ride but uses it for fitness and AI FTP Detection. Build waits
+> on his go.
+>
+> **BUILT 2026-09-25 (edited, NOT committed/pushed/deployed):** `session-detail/build.ts` `noVerdict` (the builder's own
+> `match.planned_id` test, runs and rides): no execution/adherence score, no drift or efficiency row, no flags/limiter,
+> no analyser insights or outlook, no interval colours or percents; `session-boom/line.ts` writes no drift-streak line
+> for a session with no `planned_row`. `SESSION_TOTALS_VERSION` 7→8. Tests: `unattached-no-verdict.test.ts`.
+> Deploy: `workout-detail`, `compute-session-boom`. LEFT OPEN: (1) State's drift chart still plots an unattached
+> session as steady (`compute-snapshot/index.ts:142` `driftReadForPoint`, the `nothing_said` default) — RULED 2026-09-25
+> (Michael): unplanned rides keep counting on State, drift chart included ("they should affect your overall numbers on
+> state"); only the Performance screen drops the grade. Left as is;
+> (2) the ledger's same-day pairing counts as attached on Performance while the good-news line reads only
+> `workouts.planned_id`, so a paired-but-unlinked session shows drift but gets no drift-streak line.
 
 Found while closing the drift gate above and left alone on his ruling. `sessionSteadiness`'s ladder ends at
 `nothing_said`, which returns STEADY — the right default for an unlinked easy run and the wrong one for an interval ride
