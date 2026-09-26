@@ -9,7 +9,7 @@
  *   · Today ran the zone word beside "form −21".
  * The arithmetic and the words are moved unchanged. The screens print them.
  */
-import { formZone, type FormZone } from '../_shared/fitness-fatigue.ts';
+import { formZone, formZoneText, FORM_ZONE_TEXT, type FormZone } from '../_shared/fitness-fatigue.ts';
 
 type DailyLoad = { date: string; load: number; dominant_type: string; by_type?: Array<{ type: string; load: number }> };
 
@@ -66,17 +66,60 @@ export function loadComposition7d(daily: ReadonlyArray<DailyLoad> | null | undef
 }
 
 /**
- * FIELD — Friel, "Managing Training Using TSB", as the TrainingPeaks PMC legend reproduces it
- * (docs/STATE-SOURCES.md, "Form zone word"). The table the load key prints, word for word; `word` is
- * `formZone`'s output for that band, and `form-zone` tests pin every row against it.
+ * FIELD — Friel, "Managing Training Using TSB" (docs/STATE-SOURCES.md, "Form zone word"). The table the load key
+ * prints: the range and the zone's ONE on-screen name (`FORM_ZONE_TEXT`, approved by Michael 2026-09-26 — it replaced
+ * a second column of Friel's zone words). `word` is `formZone`'s key for that band; `form-zone` tests pin every row.
  */
 export const FORM_ZONE_TABLE: ReadonlyArray<{ range: string; word: FormZone; meaning: string }> = [
-  { range: 'above +25', word: 'transitional', meaning: 'fitness fading' },
-  { range: '+5 to +25', word: 'fresh', meaning: 'race shape' },
-  { range: '−10 to +5', word: 'grey zone', meaning: 'not building, not sharp' },
-  { range: '−30 to −10', word: 'optimal', meaning: 'building' },
-  { range: 'below −30', word: 'high risk', meaning: '' },
+  { range: 'above +25', word: 'transitional', meaning: FORM_ZONE_TEXT['transitional'] },
+  { range: '+5 to +25', word: 'fresh', meaning: FORM_ZONE_TEXT['fresh'] },
+  { range: '−10 to +5', word: 'grey zone', meaning: FORM_ZONE_TEXT['grey zone'] },
+  { range: '−30 to −10', word: 'optimal', meaning: FORM_ZONE_TEXT['optimal'] },
+  { range: 'below −30', word: 'high risk', meaning: FORM_ZONE_TEXT['high risk'] },
 ];
+
+/**
+ * ⛔ THE LOAD KEY, APPROVED BY MICHAEL 2026-09-26, VERBATIM — the ⓘ on State's LOAD card and on Today's form line.
+ * It replaced the 2026-09-21 paragraph ("Every workout gets a score…"), which explained the numbers with other
+ * numbers. It starts from what goes in (time and effort, measured by the athlete's own devices), then says what each
+ * reading means. FIELD: TrainingPeaks' Performance Management Chart (TSS; fitness = 42-day, fatigue = 7-day, form =
+ * the difference), worded as TrainingPeaks and Strava describe the three to athletes. Each title carries the
+ * athlete's own reading (the card's `display` values); `chart` prints only where the chart is (State).
+ */
+export const FORM_KEY_HEADING = 'Where these numbers come from';
+export const FORM_KEY_LEAD =
+  'Every workout counts two things: how long you trained and how hard you worked. Your power meter measures how hard '
+  + 'on rides, your heart rate on runs, and on lifts, how hard you said it felt. Hard minutes count for more than easy ones.';
+export const FORM_KEY_FITNESS =
+  'Your training over the last 6 weeks. It rises slowly while you keep training and falls slowly when you stop.';
+export const FORM_KEY_FATIGUE =
+  'Your training over the last 7 days. It rises fast after hard days and falls fast with rest.';
+export const FORM_KEY_FORM =
+  "Your last week compared with your last 6 weeks. Below zero, you've trained more than usual and are carrying "
+  + "tiredness. Above zero, you're rested.";
+export const FORM_KEY_CHART = 'The chart shows each number day by day over the last 12 weeks.';
+
+export type FormKeyText = {
+  heading: string;
+  lead: string;
+  items: Array<{ title: string; text: string }>;
+  chart: string;
+};
+
+/** The key's words with the athlete's readings in the titles ("Fitness 54"); a missing reading prints the word alone. */
+export function formKeyText(readings: { fitness: string | null; fatigue: string | null; form: string | null }): FormKeyText {
+  const title = (word: string, value: string | null) => (value ? `${word} ${value}` : word);
+  return {
+    heading: FORM_KEY_HEADING,
+    lead: FORM_KEY_LEAD,
+    items: [
+      { title: title('Fitness', readings.fitness), text: FORM_KEY_FITNESS },
+      { title: title('Fatigue', readings.fatigue), text: FORM_KEY_FATIGUE },
+      { title: title('Form', readings.form), text: FORM_KEY_FORM },
+    ],
+    chart: FORM_KEY_CHART,
+  };
+}
 
 export function formZoneRows(form: number | null | undefined): Array<{ range: string; word: FormZone; meaning: string; current: boolean }> {
   const zone = formZone(form);
@@ -97,7 +140,7 @@ export const isRecoveryIntent = (weekIntent: string | null | undefined) => weekI
 
 /**
  * ⛔ STATE'S GLANCE HEADLINE. It speaks only when form is in Friel's high-risk zone (under −30), and then
- * it is always "Form −32 · high risk" — in a recovery or taper week too (Michael, 2026-09-10). Form below
+ * it is always "Form −32 · injury and illness risk rises" (the zone's one name since 2026-09-26; was "· high risk") — in a recovery or taper week too (Michael, 2026-09-10). Form below
  * −30 is the warning whatever the week was meant to be, so the coach's "Recovery • …" wording does not
  * replace it here. Null = the header prints nothing.
  * ⚠️ NO "(TrainingPeaks)" ON THE SCREEN. The source is in docs/STATE-SOURCES.md ("Form zone word"), not in
@@ -105,7 +148,7 @@ export const isRecoveryIntent = (weekIntent: string | null | undefined) => weekI
  */
 export function formHeadline(form: number | null | undefined): string | null {
   if (form == null || !Number.isFinite(form) || formZone(form) !== 'high risk') return null;
-  return `Form −${Math.abs(Math.round(form))} · high risk`;
+  return `Form −${Math.abs(Math.round(form))} · ${formZoneText(form)}`; // the zone's one name (FORM_ZONE_TEXT, 2026-09-26)
 }
 
 /**

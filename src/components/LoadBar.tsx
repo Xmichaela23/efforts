@@ -49,8 +49,12 @@ export interface LoadBarData {
     dominant_type: string;
     by_type?: Array<{ type: string; load: number }>;
   }>;
-  /** Friel's form zone word for today's form — the coach's (`formZone` on the server). */
+  /** Friel's form zone word for today's form — the coach's (`formZone` on the server). The KEY: it picks the colour. */
   label?: string | null;
+  /** The zone's one on-screen name ("building"), the coach's (`FORM_ZONE_TEXT`, v219). Printed; `label` only colours it. */
+  label_text?: string | null;
+  /** The ⓘ's words, composed by the coach with the athlete's readings in the titles (`formKeyText`, v219). */
+  form_key?: FormKeyText | null;
   /** The form-zone table the ⓘ prints, the current zone flagged (coach, audit 2026-09-10 H-T21). */
   form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
   /** The rolling seven days' workload points, the sport that carried most, and each sport's printed share (coach, H-T21). */
@@ -128,36 +132,40 @@ export function Dot() {
  * on one, the workload paragraph on another. The boundary falls between the two subjects: what a
  * workload point is, and what form is.
  */
-export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
-  // ⛔ THE TABLE IS THE COACH'S (`load.form_zones`, H-T21) — ranges, words and the current zone. A payload
-  // without it prints no table rather than a copy kept here.
+export type FormKeyText = { heading: string; lead: string; items: Array<{ title: string; text: string }>; chart: string };
+
+/**
+ * ⛔ THE KEY IS THE COACH'S, PRINTED AS SENT (Michael approved the words 2026-09-26, `coach/load-composition.ts`
+ * `formKeyText`). It replaced a paragraph kept here ("Every workout gets a score…", 2026-09-21) that explained the
+ * numbers with other numbers. `withChart` prints the chart sentence — State only, where the chart is. The table is
+ * the range and the zone's ONE name (`load.form_zones[].meaning`); Friel's second word column came off. A payload
+ * without the key prints only the table rather than words kept here.
+ */
+export function LoadKeyForm({ keyText, zones, withChart = false }: { keyText?: FormKeyText | null; zones?: LoadBarData['form_zones']; withChart?: boolean }) {
   const rows = Array.isArray(zones) ? zones : [];
   return (
-    <div className="text-caption text-label-secondary leading-snug">
-      {/**
-        * ⛔ MICHAEL'S LINE (2026-09-09), VERBATIM. It replaced *"Form is one subtraction, fitness −
-        * fatigue, taken as you start the day … The word beside it comes from this table:"* — which
-        * named the arithmetic and never said what the SIGN means, the one thing a reader wants from
-        * a number that can go negative.
-        * ⚠️ AND NO LEAD-IN ABOVE THE TABLE. The old sentence ended by introducing it; his does not,
-        * and the table is left to stand on its own.
-        * ⚠️ THE NUMBERS ARE LIVE — his "47 − 63 = −16" is the shape, not the values. The sentence is
-        * dropped entirely when either number is missing, rather than printed with a blank in it.
-        */}
-      {/* ⛔ THE KEY, APPROVED BY MICHAEL 2026-09-21, VERBATIM — TrainingPeaks' own explanation of its Performance
-          Management Chart: TSS (one hour at threshold = 100), fitness = 42-day and fatigue = 7-day averages of daily
-          TSS, form = fitness − fatigue. It replaced two paragraphs, one of which described week-change numbers the
-          card no longer prints. One paragraph, so State's ⓘ and Today's ⓘ print the same words. */}
-      <p>
-        Every workout gets a score for how long and how hard it was. One hour at your threshold scores 100. Fitness is your average daily score over 6 weeks. Fatigue is your average daily score over 7 days. Form is fitness minus fatigue: positive is fresh, negative is tired.
-      </p>
+    <div className="text-caption text-label-secondary leading-snug space-y-2">
+      {keyText ? (
+        <>
+          <div>
+            <div className="text-label font-medium">{keyText.heading}</div>
+            <p>{keyText.lead}</p>
+          </div>
+          {keyText.items.map((it) => (
+            <div key={it.title}>
+              <div className="text-label font-medium tabular-nums">{it.title}</div>
+              <p>{it.text}</p>
+            </div>
+          ))}
+          {withChart ? <p>{keyText.chart}</p> : null}
+        </>
+      ) : null}
       {rows.length > 0 && (
-        <table className="mt-1 text-caption tabular-nums">
+        <table className="text-caption tabular-nums">
           <tbody>
             {rows.map((r) => (
               <tr key={r.word} className={r.current ? 'text-label' : 'text-label-secondary'}>
-                <td className="pr-3 py-0.5 whitespace-nowrap">{r.range}</td>
-                <td className="pr-3 py-0.5 whitespace-nowrap">{r.current ? '▸ ' : ''}{r.word}</td>
+                <td className="pr-3 py-0.5 whitespace-nowrap">{r.current ? '▸ ' : ''}{r.range}</td>
                 <td className="py-0.5">{r.meaning}</td>
               </tr>
             ))}
@@ -169,10 +177,10 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
 }
 
 /** State's ⓘ opens both halves at once, exactly as it always did. */
-export function LoadKey({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
+export function LoadKey({ keyText, zones }: { keyText?: FormKeyText | null; zones?: LoadBarData['form_zones'] }) {
   return (
     <div className="mt-1.5 max-w-[min(100%,360px)] space-y-1">
-      <LoadKeyForm ff={ff} zones={zones} />
+      <LoadKeyForm keyText={keyText} zones={zones} withChart />
     </div>
   );
 }
@@ -216,15 +224,15 @@ function LoadChart({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) 
 
 export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
-  // The chart opens the way a trend row does, off a down chevron (collapsed by default); "LOAD" names the control.
-  const [showChart, setShowChart] = React.useState(false);
-  const titleId = React.useId();
+  // ⛔ THE CHART IS ALWAYS SHOWING (Michael, 2026-09-26). TrainingPeaks keeps its Performance Management Chart on the
+  // dashboard, open, and the three numbers are read off it; the chevron that hid it (2026-09-25) came off.
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
   // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
   // WHAT THIS REPLACED: the reconciled load word ("balanced" — the app's own reconciler, D-260) and the
   // ACWR ratio (Gabbett). Neither is Garmin's or TrainingPeaks' rule; both stay on the payload for the coach.
   const ff = load.fitness_fatigue ?? null;
-  const zone = load.label ?? null;
+  const zone = load.label ?? null; // the key — picks the colour
+  const zoneText = load.label_text ?? load.label ?? null; // what the athlete reads (v219); a v218 payload prints Friel's word
   // ⛔ NOTHING IS WORKED OUT HERE (2026-09-15, Stage 4 session 2). The number, the week's change and the
   // window are the coach's finished text. What this replaced: a rounder over all three readings, a
   // subtraction of this week against last week, `tau ÷ 7` for the fitness window, and a sign split off
@@ -252,19 +260,11 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   return (
     <div className="px-3 py-3">
       <div className="px-1 py-1">
-        {/* ⛔ THE CHART'S CHEVRON IS AT THE RIGHT END OF THIS TITLE ROW (2026-09-25), never on the readings row, which
-            it would narrow. Everything past "LOAD ⓘ" is the tap, with the trend rows' down chevron, turned when open.
-            The ⓘ stays its own button, unchanged. */}
         <div className="flex items-center">
           <span className="readout-label text-footnote font-semibold tracking-[0.08em] uppercase">
-            <span id={titleId}>LOAD</span>{' '}
+            LOAD{' '}
             <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-label-secondary normal-case tracking-normal font-normal text-subhead align-baseline">ⓘ</button>
           </span>
-          {canChart && (
-            <button type="button" onClick={() => setShowChart((o) => !o)} aria-expanded={showChart} aria-labelledby={titleId} className="flex-1 self-stretch flex items-center justify-end pl-3 bg-transparent border-none cursor-pointer outline-none focus:outline-none">
-              <span className={`text-label text-body leading-none shrink-0 transition-transform ${showChart ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
-            </button>
-          )}
         </div>
         {rd && rd.form.value != null ? (
           /* ⛔ ONE ROW (Michael 2026-09-21: "it takes up too much space", "form can be a little larger"). Form, the
@@ -276,7 +276,7 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
             <div className="flex items-baseline gap-x-2">
               <span className="text-footnote font-medium text-label-secondary">form</span>
               <span className="readout-num text-title3 font-semibold" style={{ textShadow: 'none' }}>{rd.form.value}</span>
-              {zone && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zone}</span>}
+              {zoneText && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zoneText}</span>}
             </div>
             <div className="flex items-baseline gap-x-1.5 text-subhead tabular-nums">
               <span className="text-label-secondary">fitness</span>
@@ -289,14 +289,14 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
         ) : (
           <div className="mt-2 text-subhead text-label-secondary">no sessions logged yet</div>
         )}
-        {showChart && canChart && ff && <LoadChart ff={ff} />}
+        {canChart && ff && <LoadChart ff={ff} />}
         {weekLine && (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-2 leading-snug">
             <span className="text-footnote font-medium text-label-secondary shrink-0">This week</span>
             <span className="text-subhead text-label tabular-nums">{weekLine}</span>
           </div>
         )}
-        {showKey && ff && <LoadKey ff={ff} zones={load.form_zones} />}
+        {showKey && ff && <LoadKey keyText={load.form_key ?? null} zones={load.form_zones} />}
 
         {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the plate's
             footer. Never in the ⓘ key above: "never bury the Garmin attribution in … expandable containers". */}

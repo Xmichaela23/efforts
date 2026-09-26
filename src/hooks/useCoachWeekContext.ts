@@ -570,10 +570,13 @@ export type CoachWeekContextV1 = {
       cross_training_signal?: { label: string; tone: 'positive' | 'warning' | 'info'; detail?: string | null; info?: string | null } | null;
       /** Audit 2026-09-10 (H-B08): State's glance headline — null unless form is in the high-risk zone. */
       form_headline?: string | null;
+      /** The zone's one on-screen name and the ⓘ's words, the coach's (v219). */
+      label_text?: string | null;
+      form_key?: { heading: string; lead: string; items: Array<{ title: string; text: string }>; chart: string } | null;
       /** BODY's one line on Today, written by the coach (v213). */
       body_today_line?: string | null;
       /** Each of the last 84 days' own form and zone word (v214). */
-      form_by_day?: Record<string, { form: number; label: string | null }>;
+      form_by_day?: Record<string, { form: number; label: string | null; label_text?: string | null }>;
       /** Each of the last 84 days' own BODY line (v214). */
       body_line_by_day?: Record<string, string>;
       /** H-T21: the load key's form-zone table, the athlete's current zone flagged. */

@@ -166,6 +166,29 @@ export function computeFitnessFatigue(
  */
 export type FormZone = 'transitional' | 'fresh' | 'grey zone' | 'optimal' | 'high risk';
 
+/**
+ * ⛔ WHAT EACH ZONE IS CALLED ON SCREEN — ONE NAME PER ZONE (Michael approved 2026-09-26). The five Friel words above
+ * stay as the zone's key (colour, tests, the coach's checks); the athlete reads only these, on every surface that
+ * names the zone (State's LOAD card and table, Today's form line, State's glance headline, the loaded-legs Why).
+ * FIELD — Friel, "Managing Training Using TSB" (joefrieltraining.com; Friel co-founded TrainingPeaks): transitional
+ * "the zone of little to no training", freshness "on race day", grey zone "not much happening that will improve
+ * fitness", optimal "when the most effective training occurs"; below −30, TrainingPeaks "Applying the Numbers
+ * Part 3: Training Stress Balance": "increased injury/illness risk".
+ */
+export const FORM_ZONE_TEXT: Record<FormZone, string> = {
+  'transitional': 'fitness fading',
+  'fresh': 'fresh, race shape',
+  'grey zone': 'not building, not sharp',
+  'optimal': 'building',
+  'high risk': 'injury and illness risk rises',
+};
+
+/** The on-screen name of the zone `form` sits in (`FORM_ZONE_TEXT`); null when there is no form. */
+export function formZoneText(form: number | null | undefined): string | null {
+  const zone = formZone(form);
+  return zone ? FORM_ZONE_TEXT[zone] : null;
+}
+
 export function formZone(form: number | null | undefined): FormZone | null {
   if (form == null || !Number.isFinite(form)) return null;
   if (form > 25) return 'transitional';

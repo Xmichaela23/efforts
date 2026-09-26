@@ -5,7 +5,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { formZone } from '../_shared/fitness-fatigue.ts';
-import { formHeadline, formKicker, formZoneRows, loadComposition7d, loadChartCaptions, FORM_ZONE_TABLE } from './load-composition.ts';
+import { formHeadline, formKicker, formZoneRows, loadComposition7d, loadChartCaptions, FORM_ZONE_TABLE, formKeyText } from './load-composition.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { TREND_FIT_MAX_WEEKS } from '../_shared/state-trend/trend-fit.ts';
 
@@ -45,11 +45,27 @@ Deno.test('zone rows: the words are formZone\'s, and exactly the current zone is
   assertEquals(formZoneRows(null).filter((r) => r.current), []);
 });
 
+Deno.test('zone rows: one on-screen name per zone, approved 2026-09-26, in table order', () => {
+  assertEquals(FORM_ZONE_TABLE.map((r) => r.meaning), [
+    'fitness fading', 'fresh, race shape', 'not building, not sharp', 'building', 'injury and illness risk rises',
+  ]);
+});
+
+Deno.test('key: the approved words, the athlete\'s readings in the titles, a missing reading prints the word alone', () => {
+  const k = formKeyText({ fitness: '54', fatigue: '71', form: '−15' });
+  assertEquals(k.heading, 'Where these numbers come from');
+  assertEquals(k.items.map((i) => i.title), ['Fitness 54', 'Fatigue 71', 'Form −15']);
+  assertEquals(k.items[2].text, "Your last week compared with your last 6 weeks. Below zero, you've trained more than usual and are carrying tiredness. Above zero, you're rested.");
+  assertEquals(k.chart, 'The chart shows each number day by day over the last 12 weeks.');
+  assertEquals(formKeyText({ fitness: null, fatigue: null, form: null }).items.map((i) => i.title), ['Fitness', 'Fatigue', 'Form']);
+});
+
 Deno.test('headline: only in high risk, and the form sentence in every week, light weeks included', () => {
-  // ⛔ The exact words, with a real minus sign and no source on the screen (Michael, 2026-09-10).
-  assertEquals(formHeadline(-32.4), 'Form −32 · high risk');
+  // ⛔ The exact words, with a real minus sign and no source on the screen (Michael, 2026-09-10); since 2026-09-26 the
+  // zone's one on-screen name (`FORM_ZONE_TEXT`), not Friel's "high risk".
+  assertEquals(formHeadline(-32.4), 'Form −32 · injury and illness risk rises');
   // ⛔ The function takes no week, so a recovery or taper week gets the same line — never "Recovery • …".
-  assertEquals(formHeadline(-40), 'Form −40 · high risk');
+  assertEquals(formHeadline(-40), 'Form −40 · injury and illness risk rises');
   assertEquals(formHeadline(-30), null, '−30 is optimal, not high risk');
   assertEquals(formHeadline(null), null);
   assertEquals(formKicker(12.2, 'fresh'), 'Form +12 — fresh (TrainingPeaks)');

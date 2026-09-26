@@ -16,7 +16,7 @@ import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
-import { LoadKeyForm } from './LoadBar';
+import { LoadKeyForm, type FormKeyText } from './LoadBar';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
@@ -1453,10 +1453,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const load = coachWeek.data?.weekly_state_v1?.load as {
       fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null } | null;
       form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
+      form_key?: FormKeyText | null;
     } | undefined;
     const ff = load?.fitness_fatigue ?? null;
     if (!ff || ff.form == null || !Number.isFinite(Number(ff.form))) return null;
-    return { ff, zones: load?.form_zones };
+    return { ff, zones: load?.form_zones, keyText: load?.form_key ?? null };
   }, [coachWeek.data]);
 
   /**
@@ -1467,11 +1468,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    */
   const dayForm = useMemo(() => {
     const load = coachWeek.data?.weekly_state_v1?.load as {
-      fitness_fatigue?: { form?: number | null }; label?: string | null;
-      form_by_day?: Record<string, { form: number; label: string | null }>;
+      fitness_fatigue?: { form?: number | null }; label?: string | null; label_text?: string | null;
+      form_by_day?: Record<string, { form: number; label: string | null; label_text?: string | null }>;
     } | undefined;
     const todayRaw = load?.fitness_fatigue?.form;
-    const todays = todayRaw != null && Number.isFinite(Number(todayRaw)) ? { form: Number(todayRaw), label: load?.label ?? null } : null;
+    const todays = todayRaw != null && Number.isFinite(Number(todayRaw)) ? { form: Number(todayRaw), label: load?.label ?? null, label_text: load?.label_text ?? null } : null;
     const own = isTodayDate ? todays : (load?.form_by_day?.[activeDate] ?? null);
     return { own, placeholder: todays };
   }, [coachWeek.data, isTodayDate, activeDate]);
@@ -1481,7 +1482,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (!shownDay) return null;
     const n = Math.round(Number(shownDay.form));
     // ⛔ THE ZONE WORD IS THE COACH'S (`load.label` today, the day's own label otherwise) — State's bar prints the same.
-    const zone = shownDay.label ?? null;
+    const zone = shownDay.label ?? null; // the key — picks the colour
+    // The zone's one on-screen name (v219, `FORM_ZONE_TEXT`); a v218 payload prints Friel's word.
+    const zoneText = (shownDay as { label_text?: string | null }).label_text ?? zone;
     // ⛔ A TYPOGRAPHIC MINUS, as the work order prints it (`form −21 · optimal`).
     const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (
@@ -1513,7 +1516,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {zone ? (
           <>
             <span className="text-footnote" style={{ color: 'var(--label-secondary)' }}>·</span>
-            <span className="text-footnote" style={{ color: formZoneColor(zone) }}>{zone}</span>
+            <span className="text-footnote" style={{ color: formZoneColor(zone) }}>{zoneText}</span>
           </>
         ) : null}
       </span>
@@ -2122,7 +2125,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {showFormKey && isTodayDate && formKey ? (
               /* ⚠️ The card grows to fit it (Michael 2026-09-10) — the key is not scrolled or clipped. */
               <div onClick={(e) => e.stopPropagation()} className="mt-1.5 max-w-[min(100%,360px)]">
-                <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
+                <LoadKeyForm keyText={formKey.keyText} zones={formKey.zones} />
               </div>
             ) : null}
             {/**
