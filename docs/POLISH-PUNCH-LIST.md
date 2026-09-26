@@ -116,7 +116,17 @@ TrainerRoad open the plan overview from the plan. Sections, in order:
 > generate-strength-plan, get-week, materialize-plan, place-lost-day, plan-overview, rematerialize-standing-block,
 > swap-session, validate-reschedule.
 
-## BUILT 2026-09-25 (PUSHED 39dbb0968, DEPLOYED 2026-09-25 from a clean worktree — 13 functions incl. ingest-phone-workout; phone build installed; NOT verified) — THE LOAD CARD GETS ITS 12-WEEK CHART
+## [x] SEEN on the web on Michael's account 2026-09-25 (PUSHED 39dbb0968, DEPLOYED) — THE LOAD CARD GETS ITS 12-WEEK CHART
+
+> Seen: fitness over 12 weeks 33 → 54, fatigue 21 → 71, form +9 → −15; each ends on the card's number. Open: the grey
+> fatigue line is hard to tell from the white fitness line, and the chart is short.
+>
+> **2026-09-26 (PUSHED + DEPLOYED with this entry's commit; NOT seen):** the chart is always showing (TrainingPeaks keeps
+> the PMC open on its dashboard; the arrow came off). The ⓘ prints the approved key from the coach (`load.form_key`,
+> "Where these numbers come from" …), and every form zone prints ONE name (`FORM_ZONE_TEXT`: fitness fading · fresh,
+> race shape · not building, not sharp · building · injury and illness risk rises) — State's headline and table,
+> Today's form line and ⓘ (no chart sentence there), the glance headline, the loaded-legs Why. Payload 218 → 219.
+> Look for: State LOAD reads "form −15 · building" with the chart under it; the ⓘ shows the new words.
 
 > Michael: the LOAD numbers read as abstract. The card's arrow (beside "LOAD") opens TrainingPeaks' Performance
 > Management Chart shape: fitness and fatigue on one chart, form below, plain lines through the daily values, captions
