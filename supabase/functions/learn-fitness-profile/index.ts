@@ -494,17 +494,26 @@ Deno.serve(async (req) => {
     // TrainingPeaks reads. Both numbers come off the same run. It only goes up. So the curves are read
     // across the athlete's whole history (18 months), and the prior learned values ride along for the
     // only-up comparison.
+    // ⛔ THREE CURVES PER RUN, NOT THE ANALYSIS BLOB (2026-09-26, Michael: "fix it"). This selected `computed`
+    // wholesale for 18 months of runs (~375 KB a run, 173 runs on his account) and any error read as "no runs", so the
+    // run threshold heart rate and threshold pace were never measured — the same failure the ride curves hit on
+    // 2026-09-04 (below). Only `hr_curve`, `pace_curve` and `run_best_distances` are read from these rows
+    // (`analyzeRuns`), so only they are fetched, and the `computed` shape is rebuilt so the readers are unchanged.
     const allRunCurves: WorkoutRecord[] = await (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('workouts')
-          .select('id, type, date, computed, avg_heart_rate, workout_status')
+          .select('id, type, date, avg_heart_rate, workout_status, hr_curve:computed->hr_curve, pace_curve:computed->pace_curve, run_best_distances:computed->run_best_distances')
           .eq('user_id', user_id)
           .eq('workout_status', 'completed')
           .in('type', ['run', 'running'])
           .gte('date', eighteenMoAgoISO);
-        return (data ?? []) as WorkoutRecord[];
-      } catch { return []; }
+        if (error) { console.warn('[learn] run curves read failed:', error.message); return []; }
+        return ((data ?? []) as any[]).map((r) => ({
+          id: r.id, type: r.type, date: r.date, avg_heart_rate: r.avg_heart_rate, workout_status: r.workout_status,
+          computed: { hr_curve: r.hr_curve ?? undefined, pace_curve: r.pace_curve ?? undefined, run_best_distances: r.run_best_distances ?? undefined },
+        })) as unknown as WorkoutRecord[];
+      } catch (e) { console.warn('[learn] run curves read threw:', e instanceof Error ? e.message : e); return []; }
     })();
     const priorLearned = await (async () => {
       try {

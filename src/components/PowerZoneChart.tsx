@@ -97,8 +97,10 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
       ]}
       chart={
         <div>
-          <h3 className="text-sm font-medium mb-3">Zone Distribution</h3>
-          <ResponsiveContainer width="100%" height={240}>
+          <h3 className="text-caption text-label-secondary uppercase tracking-widest mb-2">Zone Distribution</h3>
+          {/* The slice labels inherit Caption (12 px), the app's floor, from this wrapper (2026-09-26). */}
+          <div className="text-caption">
+          <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
                 data={zoneData.filter(z => z.duration > 0)}
@@ -116,6 +118,7 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
               <Tooltip formatter={(value: any) => [pctFmt(value), 'Percentage']} />
             </PieChart>
           </ResponsiveContainer>
+          </div>
         </div>
       }
       rows={zoneData.map((zone) => ({
