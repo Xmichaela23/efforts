@@ -10,10 +10,11 @@ Deno.test('the talk test is for the easy run and the long run only', () => {
   assertEquals(familyFromTags(['family:ride_sweet_spot']), 'ride_sweet_spot');
 });
 
-Deno.test('Foster words for every step', () => {
-  assertEquals([1, 2, 3, 4, 5, 6, 7, 9, 10].map(fosterEffortWord), [
-    'Very easy', 'Easy', 'Moderate', 'Somewhat hard', 'Hard', 'Hard', 'Very hard', 'Very hard', 'Maximal',
+Deno.test('Foster words for every step, as printed: none at 6, 8 and 9', () => {
+  assertEquals([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(fosterEffortWord), [
+    'Very, very easy', 'Easy', 'Moderate', 'Somewhat hard', 'Hard', '', 'Very hard', '', '', 'Maximal',
   ]);
+  assertEquals(effortRowText(6), 'RPE 6');
 });
 
 Deno.test('the approved rows', () => {

@@ -1151,7 +1151,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [showSessionRPE, setShowSessionRPE] = useState(false);
   // D-351: sets carrying real typed numbers that were never ticked Done. See `untickedTypedSets`.
   const [showUntickedWarn, setShowUntickedWarn] = useState(false);
-  const [sessionRPE, setSessionRPE] = useState<number>(5);
+  // ⛔ NOTHING IS PICKED FOR THE ATHLETE (2026-09-26): the rating started at 5, so "Submit & Finish" untouched saved a 5
+  // nobody chose — and it scores the session's load (Foster's session RPE × minutes, Friel's per-hour scale).
+  const [sessionRPE, setSessionRPE] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const isMountedRef = useRef(true);
@@ -4068,6 +4070,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
     const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
     if (hasMeta) {
+      // The rating just given is the session's; the notes sheet opens on it (its Save sends `notesRpe`).
+      setNotesRpe(rpe);
       setShowSessionRPE(false);
       setShowNotesModal(true);
     } else {
@@ -4076,17 +4080,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
-  const handleSessionRPESkip = () => {
-    // Check if user has notes/RPE meta, then show notes modal, otherwise save directly
-    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
-    if (hasMeta) {
-      setShowSessionRPE(false);
-      setShowNotesModal(true);
-    } else {
-      // Keep RPE modal open to show loading/success states
-      finalizeSave();
-    }
-  };
+  // ⛔ NO SKIP (Michael, 2026-09-26: a lift is saved with a rating). Tapping outside closes the sheet, unsaved.
 
   // Readiness check handlers
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
@@ -6822,8 +6816,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 ) : (
                   <>
                     <button onClick={()=>setShowNotesModal(false)} className="text-subhead text-label-secondary hover:text-label">Cancel</button>
-                    <button onClick={()=>{ finalizeSave(); }} className="text-subhead text-label-secondary hover:text-label">Skip</button>
-                    <GalaxyButton variant="primary" size="sm" onClick={()=>{ finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className={`text-subhead ${themeColors.hoverText} px-3 py-1.5`}>Save</GalaxyButton>
+                    {/* "Skip" skips the NOTE, never the rating: both save with the effort, and neither saves without one (2026-09-26). */}
+                    <button disabled={typeof notesRpe !== 'number'} onClick={()=>{ if (typeof notesRpe === 'number') finalizeSave({ rpe: notesRpe }); }} className="text-subhead text-label-secondary hover:text-label disabled:opacity-40">Skip</button>
+                    <GalaxyButton variant="primary" size="sm" disabled={typeof notesRpe !== 'number'} onClick={()=>{ if (typeof notesRpe === 'number') finalizeSave({ notes: notesText.trim()||undefined, rpe: notesRpe }); }} className={`text-subhead ${themeColors.hoverText} px-3 py-1.5`}>Save</GalaxyButton>
                   </>
                 )}
               </div>
@@ -7136,7 +7131,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {/* Session RPE Prompt */}
       {showSessionRPE && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : handleSessionRPESkip} />
+          <div className="absolute inset-0 bg-black/40" onClick={isSaving || isSaved ? undefined : () => setShowSessionRPE(false)} />
           <div className="relative w-full max-w-md mx-4 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] p-6 z-10">
             {isSaving ? (
               <div className="flex flex-col items-center justify-center py-8">
@@ -7159,21 +7154,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 
                 {/* The one effort scale (src/components/ui/effort-scale.tsx); reps-left words for lifting. */}
                 <div className="mb-6">
-                  <EffortScale sport="strength" value={sessionRPE} onChange={(v) => setSessionRPE(v ?? 5)} label="How hard was that session?" optional={false} />
+                  <EffortScale sport="strength" value={sessionRPE} onChange={(v) => setSessionRPE(v)} label="How hard was that session?" optional={false} />
                 </div>
                 <div className="flex gap-3">
                   <GalaxyButton
-                    variant="secondary"
-                    size="lg"
-                    onClick={handleSessionRPESkip}
-                    className="flex-1 py-4"
-                  >
-                    Skip
-                  </GalaxyButton>
-                  <GalaxyButton
                     variant="primary"
                     size="lg"
-                    onClick={() => handleSessionRPESubmit(sessionRPE)}
+                    disabled={sessionRPE == null}
+                    onClick={() => { if (sessionRPE != null) handleSessionRPESubmit(sessionRPE); }}
                     className="flex-1 py-4"
                   >
                     Submit & Finish

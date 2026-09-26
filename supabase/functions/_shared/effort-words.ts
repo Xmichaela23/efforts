@@ -35,10 +35,16 @@ export function talkTestAppliesToTags(tags: unknown): boolean {
   return f != null && TALK_TEST_FAMILIES.has(f);
 }
 
-/** Foster session-RPE CR-10 words for 1–10. */
+/**
+ * Foster's session-RPE scale — a modified Borg CR-10 — EXACTLY AS PRINTED (Michael, 2026-09-26: "go"). Foster et al.
+ * 2001, "A new approach to monitoring exercise training", J Strength Cond Res 15(1): 109–115: words at 1–5, 7 and 10;
+ * 6, 8 and 9 carry none (they sit between the words either side). Tested on weight training by Day, McGuigan, Brice
+ * and Foster 2004 (J Strength Cond Res 18(2): 353–358). One list for every session rating: runs, rides, swims' popup
+ * rows, and lifts. Was: "Very easy" at 1, "Hard" at 6, "Very hard" at 8 and 9 (the blanks filled with the word below).
+ */
 const FOSTER: Readonly<Record<number, string>> = {
-  1: 'Very easy', 2: 'Easy', 3: 'Moderate', 4: 'Somewhat hard', 5: 'Hard', 6: 'Hard',
-  7: 'Very hard', 8: 'Very hard', 9: 'Very hard', 10: 'Maximal',
+  1: 'Very, very easy', 2: 'Easy', 3: 'Moderate', 4: 'Somewhat hard', 5: 'Hard',
+  7: 'Very hard', 10: 'Maximal',
 };
 
 export function fosterEffortWord(rpe: number): string {
@@ -46,7 +52,7 @@ export function fosterEffortWord(rpe: number): string {
 }
 
 /** The legend under the popup's 1–10 row. */
-export const FOSTER_LEGEND: readonly string[] = ['1 very easy', '3 moderate', '5 hard', '10 maximal'];
+export const FOSTER_LEGEND: readonly string[] = ['1 very, very easy', '3 moderate', '5 hard', '10 maximal'];
 
 /** The popup question, asked only when the planned session is an easy or long run. */
 // Viada p235 (talk test after 5 and after 20 minutes) and p211 ("without taking a breath"), see header
@@ -57,7 +63,8 @@ export function effortRowText(rpe: unknown): string | null {
   const n = Number(rpe);
   if (rpe == null || !Number.isFinite(n) || n < 1 || n > 10) return null;
   const r = Math.round(n);
-  return `RPE ${r}, ${fosterEffortWord(r).toLowerCase()}`;
+  const word = fosterEffortWord(r);
+  return word ? `RPE ${r}, ${word.toLowerCase()}` : `RPE ${r}`; // Foster prints no word at 6, 8 and 9
 }
 
 /** Performance row: the talk test answer against what the session asked for. Null when unanswered. */
