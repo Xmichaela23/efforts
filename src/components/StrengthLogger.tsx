@@ -5780,20 +5780,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       )}
                       {/* The plates button and the bar chip, once per exercise (2026-09-25; both sat under every set).
                           FIELD — Fitbod help, "Plate Calculator" (help.fitbod.me/hc/en-us/articles/360007700013): a Plate
-                          Calculator button on the exercise, beside History. Plates opens the plates under the next set
-                          not yet checked (one set's plates open at a time, 2026-09-18); the keypad's plates key still opens
-                          the set being typed. The bar chip writes the whole exercise's sets. */}
+                          Calculator button on the exercise, beside History. Plates opens the plates under EVERY set of
+                          the exercise (Michael, 2026-09-28, on his phone); the keypad's plates key still opens only the
+                          set being typed. The bar chip writes the whole exercise's sets. */}
                       {exBarLoaded && !exIsBodyweight && exercise.sets.some((st) => st.duration_seconds === undefined) && (() => {
-                        const nextIdx = (() => {
-                          const i = exercise.sets.findIndex((st) => !st.completed && st.duration_seconds === undefined);
-                          return i >= 0 ? i : exercise.sets.findIndex((st) => st.duration_seconds === undefined);
-                        })();
                         const exPlatesOpen = exercise.sets.some((_, i) => expandedPlates[`${exercise.id}-${i}`]);
+                        const allPlatesOpen = Object.fromEntries(exercise.sets
+                          .map((st, i) => [`${exercise.id}-${i}`, st.duration_seconds === undefined] as const)
+                          .filter(([, on]) => on));
                         return (
                         <div className="px-1.5 pb-2 flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => (exPlatesOpen ? setExpandedPlates({}) : togglePlateCalc(exercise.id, nextIdx))}
+                            onClick={() => setExpandedPlates(exPlatesOpen ? {} : allPlatesOpen)}
                             className="text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors"
                             style={exPlatesOpen
                               ? { color: STRENGTH_CHIP.textOpen, borderColor: STRENGTH_CHIP.borderOpen, background: STRENGTH_CHIP.bgOpen }

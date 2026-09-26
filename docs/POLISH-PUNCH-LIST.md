@@ -60,13 +60,11 @@ line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see 
 - [x] **Run laps:** the 25 Sep run reads correctly. VERIFIED on his phone 2026-09-25.
 - **Rides:** Tuesday 29 Sep's ride on the Edge shows "Until Lap Press" on the warm-up. He checks Tuesday.
 
-## AWAITING MICHAEL (2026-09-25, PUSHED; client only) — THE PLATES PILL AND THE PLATE LINE
+## [x] VERIFIED on Michael's phone 2026-09-25 — THE PLATES PILL AND THE PLATE LINE
 
-- [ ] Under each barbell exercise's name: a "plates" button beside the bar chip, once (Fitbod's shape: one button on
-      the exercise). It opens the plates under the next set not checked; tapping again closes. The per-set pill is gone.
-- [ ] The plates show as coloured discs on one end of a bar, each with its weight printed on it; empty bar = "bar only".
-      The keypad's plates key opens the same picture under the set being typed.
-- Seen only on a local test page (nine lb and two kg weights), not inside the signed-in logger.
+> One "plates" button and the bar chip under each barbell exercise's name (Fitbod's shape); the button opens the
+> plates under every set of the exercise, tap again closes. The keypad's plates key opens the set being typed. The
+> plates are coloured discs on one end of a bar; an empty bar reads "bar only". The per-set pill is gone.
 
 ## QUEUED (2026-09-25, Michael) — THE PROGRAM HAS NO OUTLINE OF ITSELF
 
