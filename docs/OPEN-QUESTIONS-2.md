@@ -1497,3 +1497,26 @@ reaches the list and the Garmin description bare ("4:00 between"). Today's narra
 
 The Vercel project is only a "does main build" signal (`curl -s https://api.github.com/repos/Xmichaela23/efforts/commits/<sha>/status`)
 and the sender of failure emails. Whether to disconnect it is Michael's call.
+
+## Q-306 — A run cut short that ends on an easy jog lays the jog on the next rest — **deferred** (2026-09-25)
+
+`layoutLapsByOrder` (D-490) cannot tell a cool-down lap from the rest that should follow the last rep done. The real
+fix reads the watch's own step index from the activity file (the "later build" noted in the rung comments).
+
+## Q-307 — Standing starts (p236) cannot build — **noted** (2026-09-24)
+
+`translateEnduranceSession` throws "no round token" on `ride_sprints/standing_start` at every level: the page prints
+no duration for a start. No frame reaches it; the pop-up skips shapes it cannot build.
+
+## Q-308 — The plan builder's own workout picker can still pin a trainer-only ride shape — **noted** (2026-09-24)
+
+D-485 filters the rotation and the day's pop-up; `slotVariantOptions` in the builder was not in scope.
+
+## Q-309 — A stale pick name stays in `slot_picks` after its movement is deleted — **noted** (2026-09-25)
+
+Michael's block still stores `ham_iso: 'hip thrust'` (the deleted stand-in). The cell builds its own first option
+(DB Leg Curl), correct on screen; the stale name is never cleaned.
+
+## Q-310 — The Swap sheet heading prints the book's category word ("SECONDARY", "BRACED") — **open** (2026-09-25)
+
+A lifter reads it as nothing. A plain word ("Hinge") was suggested; Michael has not ruled.

@@ -52,6 +52,22 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
+## AWAITING MICHAEL (2026-09-25, D-485…D-490 — all PUSHED through `fc89664d9`, every importer DEPLOYED, phone build has every client change; NOT all seen on the phone)
+
+- **Keypad:** the row being typed into stays in view above the panel; dragging the panel down closes without saving.
+- **Back Extension:** after one more Profile → Rebuild upcoming sessions, Tuesday's and Friday's superset reads
+  Back Extension, and its Swap sheet lists Back Extension first under Braced.
+- **Earned sets:** the week a count moves, the card shows "Up to 4 sets…" once; the block description has the paragraph.
+- **Run laps:** the 25 Sep run reads warm-up · lunges · Cossack squats · five 6:00 in range · four rests · cool-down.
+- **Rides:** Tuesday 29 Sep's ride reaches the Edge with "Until Lap Press" on the warm-up.
+
+## QUEUED (2026-09-25, waiting on Michael's go) — THE PLATES PILL AND THE PLATE LINE
+
+The logger draws a "plates" pill under every barbell set and a boxed PLATES panel reading "45 + 2.5 per side".
+Michael read the 45 as the bar. Proposed: drop the pill (the keyboard's plates key does the job; neither Strong nor
+Hevy has one on the row), show the bar chip once per exercise, and draw the plates as coloured discs on one side of a
+bar (Strong's picture; the colours already exist in `PLATES_BY_UNIT`). He said "ok"; the go was asked and not given.
+
 ## QUEUED (2026-09-25, Michael) — THE PROGRAM HAS NO OUTLINE OF ITSELF
 
 The block description now says how sets grow ("Every exercise starts at the low end of its set range…"),

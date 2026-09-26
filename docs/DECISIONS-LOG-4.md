@@ -350,3 +350,75 @@ the page's own guess line covers here.
 2. **The server decides it once** (get-week `session_title` via `_shared/session-title.ts`); the phone reads it.
 3. **Display only.** Neither row's stored name is rewritten, so unlinking a session brings the provider name back.
 4. **Left on purpose:** the month-grid chip keeps its code, not a name.
+
+## D-485 — Rides build for the road; the trainer is the exception (2026-09-24, Michael)
+
+1. **Every ride shape carries a road/trainer mark** (`endurance-library/source-rules.ts` `Archetype.venue`, OURS,
+   ledgered). Trainer = the three that switch inside two minutes on a controlled family: `short_vo2`, `micro`,
+   `minute_surge`. The other twelve are road. Every family keeps ≥1 road shape at every level (pinned).
+2. **The rotation and the workout pop-up walk road shapes** unless the slot carries `venue:trainer`. A "Trainer" swap
+   with "rest of plan" opens that one slot's later weeks to all shapes; "just today" is the tag only.
+3. **Why:** p275 asks for a power meter, not a trainer; sprints (p236), anaerobic (p237) and endurance (p239) are by
+   feel; the customer rides outside. TrainerRoad's per-ride outdoor switch is the field model; its rewritten intervals
+   and added minutes were rejected (no page).
+4. **Known consequence:** a road athlete rides Long VO2 Repeats every VO2 week (the only road VO2 shape).
+5. **A rider with no power meter: parked.** The book assumes one (pp212–213, every ride in %FTP).
+
+## D-486 — Outdoor ride matching and the open warm-up on Garmin (2026-09-24)
+
+1. `compute-workout-summary`, structured ride, in order: laps snap → the run lap rungs opened to rides → one lap press
+   anchors the walk (`aligned-from-lap`) → no usable laps: efforts found in power against the family's own floor
+   (`workFloorPct × ftp`, `aligned-on-efforts`) → the time walk. Finder numbers OURS, ledgered. Runs byte-identical.
+2. A ride's easy-spin warm-up is a `lap_button` step: Garmin shows "Until Lap Press" (TrainerRoad / TrainingPeaks
+   practice); a warm-up lap of any length snaps. Zwift (via Intervals.icu) keeps the timed warm-up.
+3. **Open:** the cue words on the Edge step and the pop-up line were proposed, never approved — not shipped.
+
+## D-487 — The minimum kit; accessory picks a lifter would recognise (2026-09-24/25, Michael)
+
+1. **Minimum kit = barbell + plates, rack, bench, dumbbells, pull-up bar** (JuggernautAI's stated minimum; the pull-up
+   bar OURS). Always assumed; the chips list extras only. Nothing is designed below it. Sign-up/Profile line
+   (approved): "You'll need a barbell and plates, a rack, a bench and dumbbells."
+2. **No superset holds two barbell movements.** Arms on a dumbbell kit = DB Skull Crusher + Dumbbell Curl; drag curl
+   is a barbell movement. Braced hinge/push superset on the minimum kit = Weighted Reverse Hyper (Back Extension with
+   the back-extension-bench chip) + Goblet Squat. Quad row = Banded Leg Extension with bands, else Reverse Lunge. The
+   braced asymmetrical rows = Bulgarian Split Squat (gym: Single Leg Leg Press, p221 one leg, p275 rotation).
+3. Floor back extension under a loaded bar deleted. Barbell Hip Thrust names its bar. Barbell Row on the DE pull.
+   Split squat, skull crusher, Arnold press, gorilla row log per hand; a station row logs total.
+4. **Deadlift form** (Barbell / Trap bar) chosen on the lift; the number is NOT adjusted (Michael: "users in the know
+   will"); Strong/Hevy/Juggernaut keep variations as their own lifts, none converts. 60 lb bar in the plate math.
+5. **Rejected:** a one-lunge-per-day rule (PM overreach, reverted same day).
+6. Evidence: `docs/audit/accessory-audit-2026-09-24{,-after}.md`.
+
+## D-488 — The strength logger's set entry (2026-09-24, Michael)
+
+1. The keypad is a keyboard-height panel (Strong's shape): digits, decimal on weight, backspace, a plates key on a
+   bar-loaded weight box, Next (weight → reps → RIR). No title, display line, Clear, Save or Close.
+2. The check fills an empty weight/reps from the number its placeholder shows; a band placeholder blocks and opens
+   the keypad; an empty RIR opens the existing reserve strip.
+3. The per-set "target …" line is gone; the header and placeholders carry the target.
+4. **Rejected:** plus/minus keys (not a verified field standard); Next on RIR finishing the set (Michael: "not gonna
+   break with precedent" — Strong/Hevy keep the check separate).
+
+## D-489 — Sets are earned on every row (2026-09-25, Michael)
+
+1. The ME ladder's rule on DE, SKILL and HYP: start at p218's low end; two sessions in a row within one rep of the
+   top with reserve inside the band add a set (p245's two-in-a-row bar; "clean" = Michael 2026-08-24); a session under
+   the floor takes one off; capped at the band. Keyed by movement + intent. OURS extension, ledgered.
+2. Copy (approved, said aloud): card "Up to 4 sets. You hit the top of the range two sessions in a row." / "Back to 3
+   sets. Last session came in under the range."; block: "Every exercise starts at the low end of its set range. Two
+   sessions at the top of the rep range add a set, up to its cap. One session under the range takes one off. The row
+   shows the count." Field precedent: RP Hypertrophy (the row changes, nothing announces it).
+3. A swapped exercise earns as the row it replaced. `resolveLiftSwap` and `applyAdjustment` match by canonical name,
+   never substring (a swap on DB Bench Press no longer renamed Bench Press).
+
+## D-490 — Run laps by order; the Swap sheet by slot; new gear reaches the plan (2026-09-25)
+
+1. **Run laps** (`layoutLapsByOrder`): walked onto the steps in order; a lap under the floor is a stray press; a
+   lap-button step (warm-up drills) takes its lap; the layout with most laps in tolerance wins. `time_work_s` not
+   widened. Found on Michael's 25 Sep run (13 laps, 13 steps).
+2. **The Swap sheet is built for the SLOT** the row fills (rows carry `slot_category/pattern/key/frame`; restate
+   carries them as shape), not the held movement's filing. A stand-in no longer hides its slot's printed options.
+3. **Equipment rebuild:** a stored stand-in with no recorded origin gives way when the current kit reaches a printed
+   cell movement; `built_equipment` is written once and never overwritten; hand picks (`slot_picks_chosen`) stay.
+   Found on Michael's block (the rebuild had overwritten its own evidence).
+4. The back-extension-bench chip's row reads "Back Extension"; "GHD Back Extension" only at a commercial gym.
