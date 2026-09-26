@@ -60,12 +60,13 @@ line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see 
 - [x] **Run laps:** the 25 Sep run reads correctly. VERIFIED on his phone 2026-09-25.
 - **Rides:** Tuesday 29 Sep's ride on the Edge shows "Until Lap Press" on the warm-up. He checks Tuesday.
 
-## QUEUED (2026-09-25, waiting on Michael's go) — THE PLATES PILL AND THE PLATE LINE
+## AWAITING MICHAEL (2026-09-25, PUSHED; client only) — THE PLATES PILL AND THE PLATE LINE
 
-The logger draws a "plates" pill under every barbell set and a boxed PLATES panel reading "45 + 2.5 per side".
-Michael read the 45 as the bar. Proposed: drop the pill (the keyboard's plates key does the job; neither Strong nor
-Hevy has one on the row), show the bar chip once per exercise, and draw the plates as coloured discs on one side of a
-bar (Strong's picture; the colours already exist in `PLATES_BY_UNIT`). He said "ok"; the go was asked and not given.
+- [ ] Under each barbell exercise's name: a "plates" button beside the bar chip, once (Fitbod's shape: one button on
+      the exercise). It opens the plates under the next set not checked; tapping again closes. The per-set pill is gone.
+- [ ] The plates show as coloured discs on one end of a bar, each with its weight printed on it; empty bar = "bar only".
+      The keypad's plates key opens the same picture under the set being typed.
+- Seen only on a local test page (nine lb and two kg weights), not inside the signed-in logger.
 
 ## QUEUED (2026-09-25, Michael) — THE PROGRAM HAS NO OUTLINE OF ITSELF
 

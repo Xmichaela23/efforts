@@ -541,16 +541,38 @@ const plateBarFor = (barType: string, unit: 'lb' | 'kg') => (BAR_TYPES[barType] 
   : BAR_TYPES[barKeysForUnit(unit)[0]]);
 
 /**
- * ⛔ THE PLATES FOR THIS SET, PER SIDE, AND NOTHING ELSE (Michael, 2026-09-18) — e.g. "45 + 2 × 10 per side",
- * inside first; an empty bar is "bar only". `step` is this set's entry in `platePlanForSets` over the exercise's
- * sets in order: the fewest plates per side, carried over only when the next set adds one plate outside
- * (src/lib/plate-plan.ts).
+ * ⛔ THE PLATES FOR THIS SET, ONE SIDE OF THE BAR, AS A PICTURE (2026-09-25 — Strong's plate calculator draws the
+ * loaded sleeve). It replaced the words "45 + 2.5 per side", where Michael read the 45 as the bar. Each disc
+ * carries its own number and the rack's colour, inside first, from the collar out; an empty bar is "bar only".
+ * `step` is this set's entry in `platePlanForSets` over the exercise's sets in order (src/lib/plate-plan.ts).
+ * Disc heights follow the plate's weight so a 45 reads bigger than a 5 — a drawing, not a measurement.
  */
-const PlateMath: React.FC<{ step: PlatePlanStep | null }> = ({ step }) => (
-  <div className="mt-1 p-2 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg text-caption text-label shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-    {platesPerSideText(step?.plates ?? [])}
-  </div>
-);
+const PlateMath: React.FC<{ step: PlatePlanStep | null; rack: Array<{ weight: number; color: string }> }> = ({ step, rack }) => {
+  const plates = step?.plates ?? [];
+  if (plates.length === 0) {
+    return <div className="text-caption text-label">{platesPerSideText([])}</div>;
+  }
+  const heaviest = Math.max(...rack.map((p) => p.weight));
+  const discH = (w: number) => Math.round(22 + 38 * Math.sqrt(w / heaviest)); // 22–60 px
+  return (
+    <div className="flex items-center" role="img" aria-label={platesPerSideText(plates)}>
+      {/* the collar, then the sleeve the discs sit on */}
+      <div className="w-1.5 h-7 rounded-sm bg-white/40 shrink-0" />
+      <div className="relative flex items-center gap-0.5 pl-0.5 pr-4 min-w-0">
+        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-2 rounded-r-sm bg-white/25" aria-hidden="true" />
+        {plates.map((w, i) => (
+          <div
+            key={i}
+            className={`relative shrink-0 w-6 rounded-[3px] flex items-center justify-center ${rack.find((p) => p.weight === w)?.color ?? 'bg-gray-500'}`}
+            style={{ height: discH(w) }}
+          >
+            <span className="text-[10px] font-semibold leading-none text-white tabular-nums">{w}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /**
  * ⛔ WHAT KIND OF SET IS THIS? The standing plan already answered, on the row (2026-08-27).
@@ -5756,6 +5778,54 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           {perSideLine}
                         </div>
                       )}
+                      {/* The plates button and the bar chip, once per exercise (2026-09-25; both sat under every set).
+                          FIELD — Fitbod help, "Plate Calculator" (help.fitbod.me/hc/en-us/articles/360007700013): a Plate
+                          Calculator button on the exercise, beside History. Plates opens the plates under the next set
+                          not yet checked (one set's plates open at a time, 2026-09-18); the keypad's plates key still opens
+                          the set being typed. The bar chip writes the whole exercise's sets. */}
+                      {exBarLoaded && !exIsBodyweight && exercise.sets.some((st) => st.duration_seconds === undefined) && (() => {
+                        const nextIdx = (() => {
+                          const i = exercise.sets.findIndex((st) => !st.completed && st.duration_seconds === undefined);
+                          return i >= 0 ? i : exercise.sets.findIndex((st) => st.duration_seconds === undefined);
+                        })();
+                        const exPlatesOpen = exercise.sets.some((_, i) => expandedPlates[`${exercise.id}-${i}`]);
+                        return (
+                        <div className="px-1.5 pb-2 flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => (exPlatesOpen ? setExpandedPlates({}) : togglePlateCalc(exercise.id, nextIdx))}
+                            className="text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors"
+                            style={exPlatesOpen
+                              ? { color: STRENGTH_CHIP.textOpen, borderColor: STRENGTH_CHIP.borderOpen, background: STRENGTH_CHIP.bgOpen }
+                              : { color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
+                            aria-label={exPlatesOpen ? 'Hide plates' : 'Show plates'}
+                            aria-expanded={exPlatesOpen}
+                          >
+                            plates
+                          </button>
+                          <Select
+                            value={exBarKeyFor(exercise.sets[0]?.barType)}
+                            onValueChange={(value) => setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : ({
+                              ...ex,
+                              sets: ex.sets.map((st) => ({ ...st, barType: value })),
+                            })))}
+                          >
+                            <SelectTrigger
+                              aria-label="Bar type"
+                              className="h-auto text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
+                              style={{ color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
+                            >
+                              {`${BAR_TYPES[exBarKeyFor(exercise.sets[0]?.barType)].load} ${BAR_TYPES[exBarKeyFor(exercise.sets[0]?.barType)].unit} bar`}
+                            </SelectTrigger>
+                            <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-label">
+                              {exBarKeys.map((k) => (
+                                <SelectItem key={k} value={k} className="hover:bg-white/[0.15]">{BAR_TYPES[k].name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        );
+                      })()}
                       {/* Rep-total countdown (option A) — a prominent number + progress bar, its own
                           strip under the title. It does NOT replace the Reps column: every set keeps
                           its own reps field; this just totals what's left and drops as sets complete. */}
@@ -6305,48 +6375,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 target on the left; plates centered under the weight; timed-work control
                                 under weight/reps. AMRAP's own instruction renders ABOVE the row. */}
                             {/* §3 (2026-09-24): the per-set target line that sat in columns 1–3 here came off — see `amrapLine`. */}
-                            {((!isDurationBased && !exIsBodyweight && exBarLoaded) || isDurationBased) && (
+                            {/* 2026-09-25: the "plates" pill and the bar chip came off this line; both sit once per exercise
+                                under the header now. */}
+                            {isDurationBased && (
                               <div style={gridStyle} className="pt-1.5 pb-0.5">
-                                {!isDurationBased && !exIsBodyweight && exBarLoaded && (
-                                  <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }} className="flex items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                                      className="text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors"
-                                      style={platesOpen
-                                        ? { color: STRENGTH_CHIP.textOpen, borderColor: STRENGTH_CHIP.borderOpen, background: STRENGTH_CHIP.bgOpen }
-                                        : { color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
-                                      aria-label={platesOpen ? 'Hide plate math' : 'Show plate math'}
-                                      aria-expanded={platesOpen ? true : false}
-                                    >
-                                      plates
-                                    </button>
-                                    {/* The bar is its own chip (Michael, 2026-08-13: the picker was
-                                        buried in the plates popover and read as lost). Always visible
-                                        on barbell rows, always named — "45 lb bar" is one glance,
-                                        changing it is one tap. Writes the whole exercise's sets. */}
-                                    <Select
-                                      value={exBarKeyFor(set.barType)}
-                                      onValueChange={(value) => setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : ({
-                                        ...ex,
-                                        sets: ex.sets.map((st) => ({ ...st, barType: value })),
-                                      })))}
-                                    >
-                                      <SelectTrigger
-                                        aria-label="Bar type"
-                                        className="h-auto text-caption font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
-                                        style={{ color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
-                                      >
-                                        {`${BAR_TYPES[exBarKeyFor(set.barType)].load} ${BAR_TYPES[exBarKeyFor(set.barType)].unit} bar`}
-                                      </SelectTrigger>
-                                      <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-label">
-                                        {exBarKeys.map((k) => (
-                                          <SelectItem key={k} value={k} className="hover:bg-white/[0.15]">{BAR_TYPES[k].name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
                                 {isDurationBased && (
                                   <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }}>
                                     {!isDurationRunning ? (
@@ -6450,6 +6482,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     })),
                                     PLATES_BY_UNIT[exUnit ?? 'lb'],
                                   )[setIndex]}
+                                  rack={PLATES_BY_UNIT[exUnit ?? 'lb']}
                                 />
                               </div>
                             )}
