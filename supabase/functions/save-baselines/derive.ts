@@ -15,10 +15,12 @@ import { canonicalizeLiftKey } from '../_shared/state-trend/capacity-resolver.ts
 import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
 import { acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { acceptLearnedRunThreshold } from '../../../src/lib/resolve-current-run-pace.ts';
+import { acceptLearnedLthr, acceptedLthrValue, pendingLthrProposal, typedLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 // ── "use this number" → the accepted learned value ───────────────────────────────────────────────
 
-export type AcceptKind = 'ftp' | 'run_threshold';
+/** 'run_lthr' / 'ride_lthr' — the run and ride threshold heart rates (2026-09-26), bpm. */
+export type AcceptKind = 'ftp' | 'run_threshold' | 'run_lthr' | 'ride_lthr';
 
 /**
  * ⛔ THE ACCEPT IS SAVED HERE (2026-09-10). Profile, Adjust and the post-workout popup each re-read
@@ -32,23 +34,58 @@ export type AcceptKind = 'ftp' | 'run_threshold';
  *
  * The manual flag is cleared by the rules `endurance-checkpoint` already applies: FTP drops
  * `ftp_source: 'manual'`; threshold sets `threshold_pace_source: 'learned'`.
+ *
+ * ⛔ THRESHOLD HEART RATE (2026-09-26), bpm, compared to the whole beat. The resolver puts a TYPED threshold heart rate
+ * ahead of the accepted one, so taking the measured number has to set the typed one aside, each sport by its own
+ * auto: the RUN sets `lthr_source: 'learned'` (its auto switch; the typed number stays on file, as the pace's does);
+ * the RIDE clears `configured_hr_zones.manual_ride_lthr` (the bike row's auto has always cleared it — the bike has no
+ * switch). A seed sets nothing aside: it changes nothing the athlete sees.
  */
 export function acceptMeasuredForSave(input: {
   kind: AcceptKind;
   value: number;
   learnedFitness: Record<string, unknown> | null | undefined;
   performanceNumbers: Record<string, unknown> | null | undefined;
+  /** The stored `configured_hr_zones` — read by the threshold heart-rate accepts only. */
+  configuredHrZones?: Record<string, unknown> | null | undefined;
   now: Date;
   /** Which door the athlete said yes at; stored as `accepted_via`. The six-week checkpoint sends 'checkpoint'; the
    *  learner's one-time seed (an athlete already running on a confident estimate, no accepted value) sends 'seed'. */
   via?: 'baselines' | 'checkpoint' | 'seed';
 }):
-  | { ok: true; learned_fitness: Record<string, unknown>; performance_numbers: Record<string, unknown>; accepted_value: number }
+  | {
+    ok: true; learned_fitness: Record<string, unknown>; performance_numbers: Record<string, unknown>; accepted_value: number;
+    /** The new `configured_hr_zones` when the accept cleared a typed ride threshold; absent = leave the column alone. */
+    configured_hr_zones?: Record<string, unknown>;
+  }
   | { ok: false; reason: 'nothing_to_accept' | 'value_changed' } {
   const pn: Record<string, unknown> = { ...(input.performanceNumbers ?? {}) };
   const via = input.via === 'checkpoint' || input.via === 'seed' ? input.via : 'baselines';
   // A seed changes nothing the athlete sees, so it leaves a typed number's source alone.
   const seed = via === 'seed';
+  if (input.kind === 'run_lthr' || input.kind === 'ride_lthr') {
+    const sport = input.kind === 'ride_lthr' ? 'ride' : 'run';
+    const next = acceptLearnedLthr(input.learnedFitness ?? null, sport, via, input.now);
+    if (!next) return { ok: false, reason: 'nothing_to_accept' };
+    const accepted = Number(acceptedLthrValue(next, sport));
+    if (Math.round(accepted) !== Math.round(Number(input.value))) return { ok: false, reason: 'value_changed' };
+    const cfg = input.configuredHrZones ?? null;
+    // ⛔ ONLY WHAT IS OFFERED IS TAKEN: a HIGHER number than the one in use (2026-09-26, `pendingLthrProposal`). A tap on
+    // a screen drawn before the athlete typed a higher number would otherwise lower it. The seed fills an empty slot and
+    // is not an offer.
+    if (!seed && !pendingLthrProposal({ learned_fitness: input.learnedFitness, performance_numbers: pn, configured_hr_zones: cfg } as never, { sport })) {
+      return { ok: false, reason: 'nothing_to_accept' };
+    }
+    const typed = typedLthr({ performance_numbers: pn, configured_hr_zones: cfg } as never, { sport });
+    if (!seed && sport === 'run' && (typed != null || pn.lthr_source === 'manual')) pn.lthr_source = 'learned';
+    const clearedRide = !seed && sport === 'ride' && typed != null
+      ? hrZoneConfigForSave({ typed: { manual_ride_lthr: null }, stored: cfg, nowIso: input.now.toISOString() })
+      : null;
+    return {
+      ok: true, learned_fitness: next, performance_numbers: pn, accepted_value: accepted,
+      ...(clearedRide ? { configured_hr_zones: clearedRide } : {}),
+    };
+  }
   if (input.kind === 'ftp') {
     const next = acceptEstimatedFtp(input.learnedFitness ?? null, via, input.now);
     if (!next) return { ok: false, reason: 'nothing_to_accept' };

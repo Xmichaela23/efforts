@@ -477,10 +477,12 @@ const loadBaselines = async () => {
           const rlt = cfg.manual_run_lthr || null;
           const cmx = cfg.manual_ride_max_hr || null;
           const clt = cfg.manual_ride_lthr || null;
-          if (rmx) setManualRunMaxHR(rmx);
-          if (rlt) setManualRunLTHR(rlt);
-          if (cmx) setManualRideMaxHR(cmx);
-          if (clt) setManualRideLTHR(clt);
+          // Set even when empty (2026-09-26): an accept elsewhere can clear the bike's typed threshold, and a reload that
+          // kept the old one would type it back on this screen's next save.
+          setManualRunMaxHR(rmx);
+          setManualRunLTHR(rlt);
+          setManualRideMaxHR(cmx);
+          setManualRideLTHR(clt);
           setInitialManualHR(JSON.stringify({ manualRunMaxHR: rmx, manualRunLTHR: rlt, manualRideMaxHR: cmx, manualRideLTHR: clt }));
         }
       }
@@ -957,6 +959,15 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
         onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; setCustomRestingHR(v); void commitData((d) => d, { resting: v }); }}
         onAuto={() => { setCustomRestingHR(null); void commitData((d) => d, { resting: null }); }} />,
     );
+    // ⛔ THE MEASURED THRESHOLD HEART RATE, OFFERED BESIDE ITS ROW (2026-09-26, Michael: "go") — the FTP and pace
+    // rows' line, word for word in shape: the server's sentence and button, the sport's colour. Nothing moves until the tap.
+    const hrProp = side?.lthr_proposal ?? null;
+    const offer = hrProp ? (
+      <div key="lthr-offer" className="flex items-center justify-between py-1 gap-3">
+        <span className="text-[13px] text-white/70">{hrProp.text}</span>
+        <button type="button" disabled={lthrAccepting != null} onClick={() => void acceptLthr(sport, hrProp.accept_value)} style={{ borderColor: `${getDisciplineColor(isRun ? 'run' : 'bike')}88`, color: getDisciplineColor(isRun ? 'run' : 'bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{lthrAccepting === sport ? 'Applying…' : hrProp.button}</button>
+      </div>
+    ) : null;
     const zt = side?.zones;
     const table = zt && zt.rows.length > 0 ? (
       <div className="mt-1 space-y-0.5">
@@ -969,7 +980,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
         {zt.basis && <p className="text-[12px] text-white/50 px-1 mt-1">{zt.basis}</p>}
       </div>
     ) : <p className="text-[12px] text-white/50">{zt?.empty ?? 'Heart-rate zones need a threshold heart rate, a max heart rate, or your birthday.'}</p>;
-    return { rows, table };
+    return { rows, table, offer };
   };
   const equipmentChips = (discipline: 'swimming' | 'strength', options: string[]) => (
     <div className="flex flex-wrap gap-2">
@@ -1014,6 +1025,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
             onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK: t.trim(), fiveK_source: 'manual' } as any })); }}
             onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK_source: 'learned' } as any }))} />
           {hr.rows[0]}
+          {hr.offer}
         </div>
       ) },
       { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Your heart-rate zones come from your threshold heart rate. With no threshold, they come from your max heart rate. With neither, your age gives an estimated max until your runs record one.', body: (
@@ -1044,6 +1056,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           )}
           {ftpAcceptNote && <p className="text-[12px] text-white/60">{ftpAcceptNote}</p>}
           {hr.rows[0]}
+          {hr.offer}
         </div>
       ) },
       { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones come from your FTP. Heart-rate zones come from your threshold heart rate on the bike. With no threshold, they come from your max heart rate. With neither, your age gives an estimated max until your rides record one.', body: (
@@ -1185,6 +1198,24 @@ const acceptThr = async (shownSecPerKm: number) => {
     try { await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); } catch { /* the accept stands */ }
   } catch (e) { console.warn('[Profile] accept threshold failed:', e); }
   finally { setThrAccepting(false); }
+};
+const [lthrAccepting, setLthrAccepting] = useState<'run' | 'ride' | null>(null);
+// ⛔ THE PHONE SENDS THE BPM THE BUTTON SHOWED (2026-09-26); save-baselines saves the accept and sets a typed number
+// aside — the run's `lthr_source` goes to auto, the bike's typed number is cleared (its row's own auto).
+const acceptLthr = async (sport: 'run' | 'ride', shownBpm: number) => {
+  const uid = getStoredUserId(); if (!uid || lthrAccepting) return;
+  setLthrAccepting(sport);
+  try {
+    const res = await acceptMeasuredNumber(supabase, sport === 'run' ? 'run_lthr' : 'ride_lthr', shownBpm);
+    if (!res.ok) throw new Error(res.error);
+    // Every save on this screen sends the four typed heart rates it holds; the one the accept cleared goes too, or the
+    // next save would type it back.
+    if (sport === 'ride') { setManualRideLTHR(null); setInitialManualHR(JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR: null })); }
+    await reloadSavedBaselines();
+    // The run's easy sessions carry a heart-rate range off this number; no ride row carries one.
+    if (sport === 'run') { try { await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); } catch { /* the accept stands */ } }
+  } catch (e) { console.warn('[Profile] accept threshold heart rate failed:', e); }
+  finally { setLthrAccepting(null); }
 };
 const disciplineOptions = [
     { id: 'running', name: 'Run', icon: Activity, color: SPORT_COLORS.run },

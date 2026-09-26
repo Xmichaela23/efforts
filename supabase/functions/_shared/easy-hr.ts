@@ -49,7 +49,7 @@
 // learner. Re-exported here so every existing importer keeps working unchanged.
 export { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, Z2_FLOOR_PCT_LTHR, Z4_FLOOR_PCT_LTHR, Z5_FLOOR_PCT_LTHR, easyCeilingBpm, zone3FloorBpm, frielRunZones } from '../../../src/lib/friel-zones.ts';
 import { EASY_CEILING_PCT_LTHR, EASY_FLOOR_PCT_LTHR, easyCeilingBpm } from '../../../src/lib/friel-zones.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentLthr, measuredLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { maxHrBaselines } from './endurance/display-zones.ts';
 /** Cold-start bootstrap: the field's aerobic ceiling is 80% of max — NOT the 75% that starved this. */
@@ -108,13 +108,23 @@ const parseJson = (v: unknown): Record<string, unknown> | null => {
  * NOTE: `learned_fitness.running.threshold_hr` does NOT exist — reading that nested path is the dead lookup that
  * starved `compute-facts.pace_at_easy_hr` on 147 of 147 runs. The owners read the real top-level keys.
  */
-export function resolveRunEasyHrBand(baselines: EasyHrBaselines): EasyHrBand {
+export function resolveRunEasyHrBand(
+  baselines: EasyHrBaselines,
+  /**
+   * ⛔ `anchor: 'measured'` IS THE LEARNER'S, AND ONLY THE LEARNER'S (2026-09-26). Since threshold heart rate became
+   * proposed-then-accepted, `resolveCurrentLthr` answers with the typed or accepted number and never the learner's.
+   * `learn-fitness-profile` builds this band from what its own pass just measured ("the learner measures from runs;
+   * it does not borrow a typed number"), so it asks for the measurement — `measuredLthr`, the same D-284 gate —
+   * and its easy-run selection is unchanged. Every other caller takes the default: the number the app runs on.
+   */
+  opts?: { anchor?: 'in-use' | 'measured' },
+): EasyHrBand {
   const learned = parseJson(baselines?.learned_fitness);
   const cfg = parseJson(baselines?.configured_hr_zones);
-  const lthr = resolveCurrentLthr(
-    { learned_fitness: learned, performance_numbers: parseJson(baselines?.performance_numbers), configured_hr_zones: cfg } as never,
-    { sport: 'run' },
-  );
+  const owned = { learned_fitness: learned, performance_numbers: parseJson(baselines?.performance_numbers), configured_hr_zones: cfg } as never;
+  const lthr = opts?.anchor === 'measured'
+    ? measuredLthr(owned, { sport: 'run' })
+    : resolveCurrentLthr(owned, { sport: 'run' });
 
   if (lthr.bpm != null) {
     return {

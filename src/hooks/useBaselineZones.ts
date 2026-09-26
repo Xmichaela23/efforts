@@ -33,6 +33,12 @@ export type BaselineReadoutRow = {
 /** A measured number waiting to be accepted. `accept_value` is what `acceptMeasuredNumber` is called with. */
 export type BaselineProposal = { text: string; button: string; accept_value: number };
 
+/**
+ * A measured threshold heart rate waiting to be accepted (2026-09-26), bpm. The popup's two numbers arrive printed;
+ * `applied_display` / `up` are null when no threshold heart rate is in use yet.
+ */
+export type LthrProposal = BaselineProposal & { measured_display: string; applied_display: string | null; up: boolean | null };
+
 export type ZoneTable = { rows: Array<{ name: string; range: string }>; basis: string; empty: string };
 
 export type LiftReadoutRow = { key: string; label: string; row: BaselineReadoutRow };
@@ -46,6 +52,7 @@ export type BaselinesReadout = {
     threshold_proposal: BaselineProposal | null;
     easy: BaselineReadoutRow;
     lthr: BaselineReadoutRow;
+    lthr_proposal: LthrProposal | null;
     max_hr: BaselineReadoutRow;
     resting_hr: BaselineReadoutRow;
     five_k: BaselineReadoutRow;
@@ -55,6 +62,7 @@ export type BaselinesReadout = {
     ftp: BaselineReadoutRow;
     ftp_proposal: BaselineProposal | null;
     lthr: BaselineReadoutRow;
+    lthr_proposal: LthrProposal | null;
     max_hr: BaselineReadoutRow;
     resting_hr: BaselineReadoutRow;
     zones: ZoneTable;

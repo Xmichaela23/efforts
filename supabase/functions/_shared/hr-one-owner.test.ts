@@ -33,6 +33,8 @@ const code = (p: string) => src(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\
 
 const learnedThr = (value: number) => ({ value, confidence: 'high', sample_count: 8 });
 const learnedMax = (value: number) => ({ value, confidence: 'high', sample_count: 25 });
+/** The threshold the athlete accepted (2026-09-26: proposed, then accepted — the learned number alone anchors nothing). */
+const acceptedThr = (value: number) => ({ value, confidence: 'high', sample_count: 1, accepted_at: '2026-09-26T00:00:00.000Z', accepted_from: value });
 
 // ── the threshold: one owner, the whole row ─────────────────────────────────────────────────────────────
 
@@ -61,13 +63,15 @@ Deno.test('TYPED THRESHOLD VISIBLE: a typed run or ride threshold with nothing l
 });
 
 Deno.test('WATCH THRESHOLD LAST: the watch file\'s number answers only when the owner has nothing', () => {
-  const learned = { learned_fitness: { run_threshold_hr: learnedThr(162) } };
-  assertEquals(sessionLoadThresholdHr(learned, 'run', 175), 162, 'the watch file\'s number outranked the learned threshold');
+  const learned = { learned_fitness: { run_threshold_hr: learnedThr(162), run_threshold_hr_accepted: acceptedThr(162) } };
+  assertEquals(sessionLoadThresholdHr(learned, 'run', 175), 162, 'the watch file\'s number outranked the accepted threshold');
+  // A measurement nobody accepted is not in the owner's chain (2026-09-26), so the watch file answers.
+  assertEquals(sessionLoadThresholdHr({ learned_fitness: { run_threshold_hr: learnedThr(162) } }, 'run', 175), 175);
   assertEquals(sessionLoadThresholdHr({ configured_hr_zones: { manual_run_lthr: 170 } }, 'run', 175), 170, 'the watch file\'s number outranked a typed one');
   assertEquals(sessionLoadThresholdHr({}, 'run', 175), 175);
   assertEquals(sessionLoadThresholdHr(null, 'run', 175), 175, 'no baselines row at all must still read the watch file');
   // A ride reads the bike's threshold, never the run's.
-  assertEquals(sessionLoadThresholdHr({ learned_fitness: { run_threshold_hr: learnedThr(162), ride_threshold_hr: learnedThr(153) } }, 'ride', 175), 153);
+  assertEquals(sessionLoadThresholdHr({ learned_fitness: { run_threshold_hr_accepted: acceptedThr(162), ride_threshold_hr_accepted: acceptedThr(153) } }, 'ride', 175), 153);
 });
 
 Deno.test('WATCH THRESHOLD LAST: both load paths make the one call, with the watch file\'s number as its last argument', () => {
@@ -158,7 +162,7 @@ Deno.test('ONE SESSION FALLBACK: the run debrief counts on the analysis\'s own l
 });
 
 Deno.test('ONE TABLE: the race band, its stale-strategy hash and the export read the zones Baselines prints', () => {
-  const row = { learned_fitness: { run_threshold_hr: learnedThr(162) } };
+  const row = { learned_fitness: { run_threshold_hr: learnedThr(162), run_threshold_hr_accepted: acceptedThr(162) } };
   const { zones, forHash } = courseHrZones(row, TODAY);
   const rows = heartRateZoneSet(row, 'run', { today: TODAY })!.rows;
   assertEquals(zones.length, rows.length);

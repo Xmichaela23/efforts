@@ -147,3 +147,66 @@ Deno.test('a 1RM test result moves the seed and leaves the lock alone; a typed l
   assertEquals(typed?.locked_baselines, { squat: 225 });
   assertEquals(liftsForSave({ squat: null }, { squat: 200 }, locked, false, { lock: false })?.locked_baselines, { squat: 200 });
 });
+
+// ── 2026-09-26: threshold heart rate, proposed then accepted (the FTP door, per sport) ───────────────
+
+Deno.test('accept run threshold heart rate → run_threshold_hr_accepted, and a typed run number is set aside by auto', () => {
+  const lf = { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1, as_of: '2026-09-20' } };
+  const r = acceptMeasuredForSave({
+    kind: 'run_lthr', value: 162, learnedFitness: lf,
+    performanceNumbers: { lthr_source: 'manual', ftp: 250 }, configuredHrZones: { manual_run_lthr: 158 }, now: new Date(NOW),
+  });
+  if (!r.ok) throw new Error(r.reason);
+  const acc = r.learned_fitness.run_threshold_hr_accepted as Record<string, unknown>;
+  assertEquals([acc.value, acc.accepted_from, acc.accepted_via, acc.accepted_at, acc.as_of], [162, 162, 'baselines', NOW, '2026-09-20']);
+  // The run's auto switch; the typed number stays on file (the pace's rule), and the column is not touched.
+  assertEquals(r.performance_numbers, { lthr_source: 'learned', ftp: 250 });
+  assertEquals(r.configured_hr_zones, undefined);
+});
+
+Deno.test('accept ride threshold heart rate → ride_threshold_hr_accepted, and the typed ride number is cleared (the bike row\'s auto)', () => {
+  const lf = { ride_threshold_hr: { value: 153, confidence: 'medium', sample_count: 2 } };
+  const r = acceptMeasuredForSave({
+    kind: 'ride_lthr', value: 153, learnedFitness: lf, performanceNumbers: {},
+    configuredHrZones: { source: 'manual', manual_ride_lthr: 150, manual_run_max_hr: 190 }, now: new Date(NOW),
+  });
+  if (!r.ok) throw new Error(r.reason);
+  assertEquals((r.learned_fitness.ride_threshold_hr_accepted as Record<string, unknown>).value, 153);
+  assertEquals([r.configured_hr_zones?.manual_ride_lthr, r.configured_hr_zones?.manual_run_max_hr], [null, 190]);
+  assertEquals(r.performance_numbers, {});
+});
+
+Deno.test('the threshold heart-rate SEED fills the slot and sets nothing aside', () => {
+  const lf = { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1 } };
+  const r = acceptMeasuredForSave({
+    kind: 'run_lthr', value: 162, learnedFitness: lf, performanceNumbers: { lthr_source: 'manual' },
+    configuredHrZones: { manual_run_lthr: 168 }, now: new Date(NOW), via: 'seed',
+  });
+  if (!r.ok) throw new Error(r.reason);
+  assertEquals((r.learned_fitness.run_threshold_hr_accepted as Record<string, unknown>).accepted_via, 'seed');
+  assertEquals(r.performance_numbers, { lthr_source: 'manual' });
+  const ride = acceptMeasuredForSave({
+    kind: 'ride_lthr', value: 153, learnedFitness: { ride_threshold_hr: { value: 153, confidence: 'high', sample_count: 1 } },
+    performanceNumbers: {}, configuredHrZones: { manual_ride_lthr: 158 }, now: new Date(NOW), via: 'seed',
+  });
+  assertEquals((ride as any).configured_hr_zones, undefined);
+});
+
+Deno.test('the threshold heart-rate accept refuses a number not shown, a low-confidence one and a formula', () => {
+  const lf = { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1 } };
+  assertEquals(acceptMeasuredForSave({ kind: 'run_lthr', value: 158, learnedFitness: lf, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'value_changed' });
+  assertEquals(acceptMeasuredForSave({ kind: 'ride_lthr', value: 150, learnedFitness: { ride_threshold_hr: { value: 150, confidence: 'low', sample_count: 1 } }, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
+  assertEquals(acceptMeasuredForSave({ kind: 'run_lthr', value: 158, learnedFitness: { run_threshold_hr: { value: 158, confidence: 'low', sample_count: 0, is_estimate: true } }, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
+});
+
+Deno.test('the threshold heart-rate accept takes only what is offered: never a number at or below the one in use', () => {
+  const lf = { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1 } };
+  // A typed 170 is in use; 162 is lower, so there is no offer, and a stale tap is refused.
+  assertEquals(acceptMeasuredForSave({ kind: 'run_lthr', value: 162, learnedFitness: lf, performanceNumbers: {}, configuredHrZones: { manual_run_lthr: 170 }, now: new Date(NOW) }),
+    { ok: false, reason: 'nothing_to_accept' });
+  // The same number already accepted: nothing to take.
+  assertEquals(acceptMeasuredForSave({ kind: 'run_lthr', value: 162, learnedFitness: { ...lf, run_threshold_hr_accepted: { value: 162 } }, performanceNumbers: {}, now: new Date(NOW) }),
+    { ok: false, reason: 'nothing_to_accept' });
+  // The seed is not an offer: it fills an empty slot even under a higher typed number.
+  assertEquals(acceptMeasuredForSave({ kind: 'run_lthr', value: 162, learnedFitness: lf, performanceNumbers: {}, configuredHrZones: { manual_run_lthr: 170 }, now: new Date(NOW), via: 'seed' }).ok, true);
+});

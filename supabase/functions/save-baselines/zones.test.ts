@@ -43,6 +43,7 @@ Deno.test('nothing on file: nothing to print', () => {
     assertEquals(values(readout).filter((v) => v != null), []);
     assertEquals([readout.run.zones.rows, readout.bike.zones.rows], [[], []]);
     assertEquals([readout.run.threshold_proposal, readout.bike.ftp_proposal], [null, null]);
+    assertEquals([readout.run.lthr_proposal, readout.bike.lthr_proposal], [null, null]);
   }
 });
 
@@ -68,7 +69,11 @@ const STRAVA_CFG = {
   zones: [{ min: 0, max: 110 }, { min: 110, max: 137 }, { min: 137, max: 150 }, { min: 150, max: 164 }, { min: 164, max: null }],
   max_heart_rate: 164,
 };
-const learnedRideThreshold = { ride_threshold_hr: { value: 153, confidence: 'high', sample_count: 25 } };
+// The ride threshold in use is the ACCEPTED one (2026-09-26: proposed, then accepted); the learned value alone anchors nothing.
+const learnedRideThreshold = {
+  ride_threshold_hr: { value: 153, confidence: 'high', sample_count: 25 },
+  ride_threshold_hr_accepted: { value: 153, confidence: 'high', sample_count: 25, accepted_at: '2026-09-26T00:00:00.000Z', accepted_from: 153, accepted_via: 'seed' },
+};
 
 Deno.test('Baselines prints exactly the heart-rate zones a ride is counted in, and a ride\'s card prints them too', () => {
   const row = { configured_hr_zones: STRAVA_CFG, learned_fitness: learnedRideThreshold, birthday: '1970-03-01', gender: 'male' };
@@ -124,4 +129,51 @@ Deno.test('the chain per sport: a typed max, then the age estimate (flagged), th
   const runOnly = { configured_hr_zones: { manual_run_lthr: 165 }, birthday: '1970-03-01' };
   assertEquals(heartRateZoneSet(runOnly, 'run', { today: TODAY })?.schema, 'friel-run');
   assertEquals(heartRateZoneSet(runOnly, 'ride', { today: TODAY })?.schema, 'max-hr-age');
+});
+
+// ── threshold heart rate: proposed, then accepted (2026-09-26) ─────────────────────────────────────────────────
+const accepted = (value: number) => ({ value, confidence: 'high', sample_count: 1, accepted_at: '2026-09-21T00:00:00.000Z', accepted_from: value, accepted_via: 'baselines' });
+
+Deno.test('threshold heart rate: measured 162 over none is offered, and nothing is in use until it is taken', () => {
+  const r = zonesForBaselinesRow({ learned_fitness: { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1 } } }, { today: TODAY }).readout.run;
+  assertEquals(r.lthr.value, null);
+  assertEquals(r.lthr_proposal, {
+    text: 'Your runs measure 162 bpm', button: 'use 162 bpm', accept_value: 162,
+    measured_display: '162 bpm', applied_display: null, up: null,
+  });
+});
+
+Deno.test('threshold heart rate: measured 162 over accepted 153 — the row shows 153, the offer 162, and which way it moved', () => {
+  const lf = { run_threshold_hr: { value: 162, confidence: 'high', sample_count: 1 }, run_threshold_hr_accepted: accepted(153) };
+  const r = zonesForBaselinesRow({ learned_fitness: lf }, { today: TODAY }).readout.run;
+  assertEquals([r.lthr.value, r.lthr.note, r.lthr.mine], ['153 bpm · auto', 'from runs', false]);
+  assertEquals([r.lthr_proposal?.measured_display, r.lthr_proposal?.applied_display, r.lthr_proposal?.up], ['162 bpm', '153 bpm', true]);
+  // Once taken, the offer goes.
+  const taken = zonesForBaselinesRow({ learned_fitness: { ...lf, run_threshold_hr_accepted: accepted(162) } }, { today: TODAY }).readout.run;
+  assertEquals([taken.lthr.value, taken.lthr_proposal], ['162 bpm · auto', null]);
+});
+
+Deno.test('threshold heart rate: a typed number is the one in use and says so; the offer is measured against it', () => {
+  const row = {
+    learned_fitness: { ride_threshold_hr: { value: 163, confidence: 'medium', sample_count: 2 }, ride_threshold_hr_accepted: accepted(150) },
+    configured_hr_zones: { manual_ride_lthr: 158 },
+    // The run's auto switch does not touch the bike's typed number.
+    performance_numbers: { lthr_source: 'learned' },
+  };
+  const b = zonesForBaselinesRow(row, { today: TODAY }).readout.bike;
+  assertEquals([b.lthr.value, b.lthr.note, b.lthr.mine], ['158 bpm · your number', 'your number', true]);
+  assertEquals([b.lthr_proposal?.text, b.lthr_proposal?.applied_display, b.lthr_proposal?.up], ['Your rides measure 163 bpm', '158 bpm', true]);
+});
+
+Deno.test('threshold heart rate: low confidence or a formula is never offered', () => {
+  for (const thr of [{ value: 150, confidence: 'low', sample_count: 1 }, { value: 158, confidence: 'high', sample_count: 0 }]) {
+    const b = zonesForBaselinesRow({ learned_fitness: { ride_threshold_hr: thr } }, { today: TODAY }).readout.bike;
+    assertEquals([b.lthr.value, b.lthr_proposal], [null, null]);
+  }
+});
+
+Deno.test('threshold heart rate: a LOWER measurement is never offered — only a higher one (improvement notifications)', () => {
+  const lf = (measured: number) => ({ run_threshold_hr: { value: measured, confidence: 'high', sample_count: 1 }, run_threshold_hr_accepted: accepted(153) });
+  assertEquals(zonesForBaselinesRow({ learned_fitness: lf(148) }, { today: TODAY }).readout.run.lthr_proposal, null);
+  assertEquals(zonesForBaselinesRow({ learned_fitness: lf(158) }, { today: TODAY }).readout.run.lthr_proposal?.button, 'use 158 bpm');
 });

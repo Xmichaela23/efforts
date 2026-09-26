@@ -18,7 +18,11 @@ function zonesFrom(row: Record<string, unknown>) {
     easy_hr_band: b.floor != null && b.ceiling != null ? { floor: b.floor, ceiling: b.ceiling } : undefined,
   };
 }
-const thresholdRow = (lthr: number) => ({ learned_fitness: { run_threshold_hr: { value: lthr, confidence: 'high', sample_count: 6 } } });
+// The run threshold in use is the ACCEPTED one (2026-09-26: proposed, then accepted); the learned value alone anchors nothing.
+const thresholdRow = (lthr: number) => ({ learned_fitness: {
+  run_threshold_hr: { value: lthr, confidence: 'high', sample_count: 6 },
+  run_threshold_hr_accepted: { value: lthr, confidence: 'high', sample_count: 6, accepted_from: lthr },
+} });
 
 const base = {
   distance: 'half', fitness: 'intermediate', goal: 'complete',

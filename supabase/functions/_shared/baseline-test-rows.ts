@@ -150,37 +150,13 @@ export function ftpTestRow(date: string): BaselineTestRow {
 }
 
 /**
- * The 5-minute all-out FTP test (Viada, hybrid-coach course Module 3 "Aerobic Assessments"): "more
- * repeatable because there's no strategy to it — go out as hard as you can and hang on until 5 minutes
- * are up." The module extrapolates FTP as roughly 80% of the 5-minute average; this app does NOT add
- * that as a second FTP formula. The 5-minute effort lands as the 5-minute point on the power-duration
- * curve, and the one FTP rule (the critical-power fit over 2–20 min, TrainerRoad / intervals.icu
- * practice) reads it from there. `ftp_test` keeps the analyser's delegation to the learner;
- * `ftp_test_5min` tells the screens which protocol this is.
+ * ⛔ THE 20-MINUTE TEST (p212) IS THE ONLY CYCLING TEST (2026-09-26, Michael: "that's all we should use for cycling").
+ * The 5-minute all-out test (`ftp5MinTestRow`, hybrid-coach course Module 3, on no page of the book) is no longer
+ * offered and its row builder is gone. Rows already on a calendar still behave: their `ftp_test` / `ftp_test_5min`
+ * tags keep them tests (`standing-plan/restate.ts` TEST_ROW_TAGS, the analyser's delegation to the learner), and the
+ * materializer still expands any `bike_ftp_test_<n>min` token. The power curve's 5-minute point and the
+ * critical-power FTP fit are unchanged.
  */
-export function ftp5MinTestRow(date: string): BaselineTestRow {
-  return {
-    // ⛔ NO "48 HOURS PRIOR" and no source citation in the name — see the run test above.
-    name: 'FTP Test — 5-Minute All-Out', // not-instruction: session name, not an instruction; no page names it; Michael's call
-    type: 'ride',
-    date,
-    // ⛔ NO WORDS (2026-09-18, rule 7 triage). The 5-minute test is coach-course material, not the book: the SOURCE doc
-    // has no 5-minute FTP test (grepped "5-minute", "five-minute", "5 minute", "hang on"), so it prints nothing. The
-    // sentence that stood here ("indoor trainer recommended… start as hard as you can hold and hang on…") was on no page.
-    description: '',
-    // OURS — `ftp5MinTestRow` 40-min duration and the warm-up / cool-down presets: no page
-    duration: 40,
-    steps_preset: [
-      'warmup_bike_quality_8min_fastpedal',
-      'bike_race_prep_3x60s',
-      'bike_recovery_5min_Z1',
-      'bike_ftp_test_5min',
-      'cooldown_bike_easy_10min',
-    ],
-    workout_status: 'planned',
-    tags: ['ftp_test', 'ftp_test_5min', 'baseline_establishment', 'key_workout'],
-  };
-}
 
 /**
  * Where a week-one retest lands, counted from the block's first day (the server inserts these with the

@@ -98,7 +98,8 @@ Deno.serve(async (req) => {
      * what says which analyser last ran: a row stamped with the current version has been measured by
      * this code and is skipped whatever it holds. A row below it, or with no stamp, is recomputed once.
      */
-    const RIDE_FIELDS = ['power_curve', 'ride_records'];
+    // `hr_curve` on rides since v0.3.1 (2026-09-26): the ride's threshold heart rate is read off it.
+    const RIDE_FIELDS = ['power_curve', 'ride_records', 'hr_curve'];
     const RUN_FIELDS = ['best_efforts', 'pace_curve', 'hr_curve', 'run_best_distances', 'run_records'];
 
     const needsBackfill = (workouts || []).filter(w => {

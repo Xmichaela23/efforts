@@ -7,7 +7,8 @@ import { timeUnderCeilingPct } from './time-under-ceiling.ts';
 const lf = (o: Record<string, unknown>) => o;
 
 Deno.test('threshold anchors the ceiling when it is trustworthy — Friel cycling Z2', () => {
-  const r = resolveRideEasyCeiling(lf({ ride_threshold_hr: { value: 160, confidence: 'high' }, ride_max_hr_observed: { value: 190 } }));
+  // The threshold in use is the ACCEPTED one (2026-09-26); the learned value alone anchors nothing.
+  const r = resolveRideEasyCeiling(lf({ ride_threshold_hr: { value: 160, confidence: 'high' }, ride_threshold_hr_accepted: { value: 160, confidence: 'high', accepted_from: 160 }, ride_max_hr_observed: { value: 190 } }));
   assertEquals(r, { ceiling: 142, anchor: 'threshold', confidence: 'high' }); // 0.89 x 160
 });
 

@@ -14,7 +14,7 @@ import SorenessScale from './SorenessScale';
 import { readinessSorenessPatch } from '@/utils/workoutMetadata';
 import { pendingFtpProposal } from '@/lib/resolve-current-ftp';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
-import { localToday } from '@/hooks/useBaselineZones';
+import { localToday, type LthrProposal } from '@/hooks/useBaselineZones';
 import {
   Select,
   SelectContent,
@@ -77,6 +77,39 @@ interface PostWorkoutFeedbackProps {
   mode?: 'popup' | 'inline';  // popup = modal overlay, inline = embedded in view
 }
 
+/**
+ * A measured number waiting on the athlete's yes (FTP, threshold pace, threshold heart rate), as its own card: the
+ * sport's colour, the number the largest text (`text-title3`), the accept button filled in the sport's colour. The
+ * sentence around the number is the approved one; `lead` + `value` + `tail` print it unchanged.
+ */
+function OfferCard({ color, lead, value, tail, sub, button, busy, disabled, onAccept }: {
+  color: string; lead: string; value: string; tail?: string; sub: string; button: string;
+  busy: boolean; disabled: boolean; onAccept: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border px-4 pt-3.5 pb-4" style={{ borderColor: `${color}80`, background: `linear-gradient(180deg, ${color}2e 0%, ${color}0f 100%)` }}>
+      <p className="m-0 text-subhead text-white/85">
+        {lead} <span className="text-title3 font-semibold tabular-nums whitespace-nowrap" style={{ color }}>{value}</span>{tail ? ` ${tail}` : null}
+      </p>
+      <p className="m-0 mt-1 text-footnote text-white/60">{sub}</p>
+      <button type="button" disabled={disabled} onClick={onAccept}
+        className="mt-3 w-full rounded-xl py-2.5 text-subhead font-semibold transition-opacity active:opacity-80 disabled:opacity-50"
+        style={{ backgroundColor: color, color: '#0b0b0c' }}>
+        {busy ? 'Applying…' : button}
+      </button>
+    </div>
+  );
+}
+
+/** The card's line once the number is taken (or the accept failed) — same frame, the note in place of the offer. */
+function OfferNote({ color, text }: { color: string; text: string }) {
+  return (
+    <div className="rounded-2xl border px-4 py-3" style={{ borderColor: `${color}66`, background: `${color}12` }}>
+      <p className="m-0 text-footnote text-white/80">{text}</p>
+    </div>
+  );
+}
+
 const FEELING_OPTIONS = [
   { value: 'great', label: 'Great', description: 'Strong and recovered' },
   { value: 'good', label: 'Good', description: 'Solid effort' },
@@ -118,8 +151,13 @@ export default function PostWorkoutFeedback({
   const [thrProposal, setThrProposal] = useState<{
     button: string; accept_value: number; measured_display: string; applied_display: string; faster: boolean;
   } | null>(null);
-  const [ftpAccepting, setFtpAccepting] = useState(false);
-  const [ftpNote, setFtpNote] = useState<string | null>(null);
+  // ⛔ THE THRESHOLD HEART RATE, OFFERED THE SAME WAY (2026-09-26, Michael: "go") — save-baselines' `lthr_proposal` for
+  // this sport (run or ride), both numbers already printed. Proposed, then accepted, like FTP and the pace above it.
+  const [lthrProposal, setLthrProposal] = useState<LthrProposal | null>(null);
+  // One offer per card, so each card has its own busy state and its own note once taken.
+  type OfferKey = 'ftp' | 'thr' | 'lthr';
+  const [offerBusy, setOfferBusy] = useState<OfferKey | null>(null);
+  const [offerNotes, setOfferNotes] = useState<Partial<Record<OfferKey, string>>>({});
   useEffect(() => {
     if (workoutType !== 'ride' && workoutType !== 'run') return;
     let cancelled = false;
@@ -127,10 +165,13 @@ export default function PostWorkoutFeedback({
       const uid = getStoredUserId(); if (!uid) return;
       try { await supabase.functions.invoke('learn-fitness-profile', { body: { user_id: uid } }); } catch { /* proposal reads whatever is on file */ }
       markBaselinesStale();
+      const { data, error } = await supabase.functions.invoke('save-baselines', { body: { zones: true, today: localToday() } });
+      if (cancelled) return;
+      const readout = !error && data?.success ? data?.zones?.readout : null;
+      const hrProp = (workoutType === 'run' ? readout?.run : readout?.bike)?.lthr_proposal;
+      setLthrProposal(hrProp && hrProp.measured_display ? hrProp : null);
       if (workoutType === 'run') {
-        const { data, error } = await supabase.functions.invoke('save-baselines', { body: { zones: true, today: localToday() } });
-        if (cancelled || error || !data?.success) return;
-        const prop = data?.zones?.readout?.run?.threshold_proposal;
+        const prop = readout?.run?.threshold_proposal;
         setThrProposal(prop && prop.measured_display ? prop : null);
         return;
       }
@@ -143,38 +184,53 @@ export default function PostWorkoutFeedback({
     })();
     return () => { cancelled = true; };
   }, [workoutId, workoutType]);
-  const acceptThr = () => {
-    void (async () => {
-      const uid = getStoredUserId(); if (!uid) return;
-      setFtpAccepting(true);
-      try {
-        // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and clears a manual
-        // choice (2026-09-10). This wrote learned_fitness and the flag itself.
-        if (!thrProposal) return;
-        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.accept_value);
-        if (!res.ok) throw new Error(res.error);
-        let note = `${thrProposal.measured_display} in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} updated.`; } } catch { /* the accept stands */ }
-        setFtpNote(note); setThrProposal(null);
-      } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] threshold accept failed:', e); }
-      finally { setFtpAccepting(false); }
-    })();
+  /** The unstarted endurance rows re-price after an accept (the plan refresh); the words are the ones this popup printed. */
+  const repriceSuffix = async (): Promise<string> => {
+    try {
+      const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
+      const d = rp as any;
+      if (d?.queued) { const t = Number(d.rows_pending ?? 0); return ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; }
+      const n = Number(d?.rows_repriced ?? 0);
+      return n > 0 ? ` ${n} upcoming session${n === 1 ? '' : 's'} updated.` : '';
+    } catch { return ''; /* the accept stands */ }
   };
-  const acceptFtp = () => {
+  const acceptOffer = (key: OfferKey) => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
-      setFtpAccepting(true);
+      setOfferBusy(key);
       try {
-        // ⛔ The shown watts go to save-baselines, which saves the accept and drops a manual FTP flag (2026-09-10).
-        if (!ftpProposal) return;
-        const res = await acceptMeasuredNumber(supabase, 'ftp', ftpProposal.measured);
-        if (!res.ok) throw new Error(res.error);
-        const w = Math.round(res.acceptedValue);
-        let note = `${w} W in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} updated.`; } } catch { /* the accept stands */ }
-        setFtpNote(note); setFtpProposal(null);
-      } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] FTP accept failed:', e); }
-      finally { setFtpAccepting(false); }
+        let note: string;
+        if (key === 'thr') {
+          // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and clears a manual
+          // choice (2026-09-10). This wrote learned_fitness and the flag itself.
+          if (!thrProposal) return;
+          const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.accept_value);
+          if (!res.ok) throw new Error(res.error);
+          note = `${thrProposal.measured_display} in use.` + await repriceSuffix();
+          setThrProposal(null);
+        } else if (key === 'ftp') {
+          // ⛔ The shown watts go to save-baselines, which saves the accept and drops a manual FTP flag (2026-09-10).
+          if (!ftpProposal) return;
+          const res = await acceptMeasuredNumber(supabase, 'ftp', ftpProposal.measured);
+          if (!res.ok) throw new Error(res.error);
+          note = `${Math.round(res.acceptedValue)} W in use.` + await repriceSuffix();
+          setFtpProposal(null);
+        } else {
+          // The shown bpm goes to save-baselines, which saves the accept and sets a typed number aside (2026-09-26).
+          if (!lthrProposal) return;
+          const res = await acceptMeasuredNumber(supabase, workoutType === 'run' ? 'run_lthr' : 'ride_lthr', lthrProposal.accept_value);
+          if (!res.ok) throw new Error(res.error);
+          // ⛔ WHAT RE-PRICES: the run's threshold heart rate sets the heart-rate range on the easy steps of the runs not
+          // yet done (`materialize-plan`, `resolveCurrentLthr` → `_easyHrRange`), so a run accept runs the same plan
+          // refresh as FTP and pace. No ride row carries a heart-rate target, so a ride accept re-prices nothing.
+          note = `${lthrProposal.measured_display} in use.` + (workoutType === 'run' ? await repriceSuffix() : '');
+          setLthrProposal(null);
+        }
+        setOfferNotes((prev) => ({ ...prev, [key]: note }));
+      } catch (e) {
+        setOfferNotes((prev) => ({ ...prev, [key]: 'Could not apply. Try again from Adjust.' }));
+        console.warn(`[PostWorkoutFeedback] ${key} accept failed:`, e);
+      } finally { setOfferBusy(null); }
     })();
   };
   
@@ -626,6 +682,28 @@ export default function PostWorkoutFeedback({
         )}
       </div>
 
+      {/* ⛔ THE OFFERS COME FIRST AND POP (Michael, 2026-09-26: "it should just maybe pop a bit"). Each measured number
+          waiting on a yes is its own card, right under the header: the sport's colour, the number the largest text on
+          it, the accept button filled in the sport's colour. The words are the approved ones, unchanged — the number
+          inside each sentence is set large. Everything below the cards is as it was. */}
+      {thrProposal ? (
+        <OfferCard color={sportColor} lead="Your runs now measure" value={thrProposal.measured_display} tail="at threshold"
+          sub={`${thrProposal.faster ? 'Faster' : 'Slower'} than the ${thrProposal.applied_display} in use. Nothing changes until you take it.`}
+          button={thrProposal.button} busy={offerBusy === 'thr'} disabled={offerBusy != null} onAccept={() => acceptOffer('thr')} />
+      ) : offerNotes.thr ? <OfferNote color={sportColor} text={offerNotes.thr} /> : null}
+      {ftpProposal ? (
+        <OfferCard color={sportColor} lead="Your rides now measure" value={`${ftpProposal.measured} W`}
+          sub={`${ftpProposal.measured > ftpProposal.applied ? 'Up' : 'Down'} from ${ftpProposal.applied} W. Nothing changes until you take it.`}
+          button={`use ${ftpProposal.measured} W`} busy={offerBusy === 'ftp'} disabled={offerBusy != null} onAccept={() => acceptOffer('ftp')} />
+      ) : offerNotes.ftp ? <OfferNote color={sportColor} text={offerNotes.ftp} /> : null}
+      {lthrProposal ? (
+        <OfferCard color={sportColor} lead={`Your ${workoutType === 'run' ? 'runs' : 'rides'} now measure`} value={lthrProposal.measured_display} tail="at threshold heart rate"
+          sub={lthrProposal.applied_display != null
+            ? `${lthrProposal.up ? 'Up' : 'Down'} from ${lthrProposal.applied_display}. Nothing changes until you take it.`
+            : 'Nothing changes until you take it.'}
+          button={lthrProposal.button} busy={offerBusy === 'lthr'} disabled={offerBusy != null} onAccept={() => acceptOffer('lthr')} />
+      ) : offerNotes.lthr ? <OfferNote color={sportColor} text={offerNotes.lthr} /> : null}
+
       {/* Map Preview - Bigger to see the route (map only, no charts/metrics) */}
       {hasMapData && (
         <div className="rounded-lg overflow-hidden" style={{ height: '280px' }}>
@@ -637,34 +715,6 @@ export default function PostWorkoutFeedback({
             height={280}
             useMiles={useImperial}
           />
-        </div>
-      )}
-
-      {(ftpProposal || thrProposal || ftpNote) && (
-        <div className="rounded-xl border px-3 py-2.5 mb-1" style={{ borderColor: `${workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.ride}66`, background: `${workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.ride}12` }}>
-          {thrProposal ? (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[15px] text-white/95">Your runs now measure {thrProposal.measured_display} at threshold</div>
-                <div className="text-[12px] text-white/60">{thrProposal.faster ? 'Faster' : 'Slower'} than the {thrProposal.applied_display} in use. Nothing changes until you take it.</div>
-              </div>
-              <button type="button" disabled={ftpAccepting} onClick={acceptThr} className="shrink-0 text-[13px] px-3 py-1.5 rounded-xl border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.run}99`, color: SPORT_COLORS.run }}>
-                {ftpAccepting ? 'Applying…' : thrProposal.button}
-              </button>
-            </div>
-          ) : ftpProposal ? (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[15px] text-white/95">Your rides now measure {ftpProposal.measured} W</div>
-                <div className="text-[12px] text-white/60">{ftpProposal.measured > ftpProposal.applied ? 'Up' : 'Down'} from {ftpProposal.applied} W. Nothing changes until you take it.</div>
-              </div>
-              <button type="button" disabled={ftpAccepting} onClick={acceptFtp} className="shrink-0 text-[13px] px-3 py-1.5 rounded-xl border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.ride}99`, color: SPORT_COLORS.ride }}>
-                {ftpAccepting ? 'Applying…' : `use ${ftpProposal.measured} W`}
-              </button>
-            </div>
-          ) : (
-            <div className="text-[13px] text-white/80">{ftpNote}</div>
-          )}
         </div>
       )}
 
@@ -952,11 +1002,15 @@ export default function PostWorkoutFeedback({
       />
       
       {/* Panel with glassmorphism and sport color accent */}
-      <div 
-        className="relative w-full max-w-lg mx-4 mb-4 p-6 rounded-2xl backdrop-blur-xl border-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] animate-slide-up"
+      {/* ⛔ IT SCROLLS WHEN IT IS TALLER THAN THE SCREEN (2026-09-26). The panel sits on the bottom edge, so a tall one
+          ran off the TOP — the header and, now that the offers come first, the offers — with no way to scroll to them
+          (375 × 812 with two offers: the panel's top at −124 px). Capped to the screen, it opens at its top. */}
+      <div
+        className="relative w-full max-w-lg mx-4 mb-4 p-6 rounded-2xl backdrop-blur-xl border-2 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] animate-slide-up overflow-y-auto overscroll-contain"
         style={{
           background: `linear-gradient(135deg, rgba(${rgb},0.15) 0%, rgba(${rgb},0.05) 50%, rgba(255,255,255,0.03) 100%)`,
-          borderColor: `rgba(${rgb}, 0.3)`
+          borderColor: `rgba(${rgb}, 0.3)`,
+          maxHeight: 'calc(100dvh - 2rem - env(safe-area-inset-top, 0px))',
         }}
       >
         {loading ? (

@@ -16,8 +16,9 @@
  *                 — a present key sets the value, null clears it, an absent key keeps the stored one,
  *   calibration?: { five_k_pace: 'm:ss', easy_pace?: 'm:ss', units: 'metric' | 'imperial' },
  *   preview?:     true — with `calibration`, return the derived score and paces without saving.
- *   accept?:      { kind: 'ftp' | 'run_threshold', value } — "use this number": the value the button showed
- *                 (watts, or seconds per km). Saved on its own; see `acceptMeasuredForSave`.
+ *   accept?:      { kind: 'ftp' | 'run_threshold' | 'run_lthr' | 'ride_lthr', value } — "use this number": the value
+ *                 the button showed (watts, seconds per km, or bpm for a threshold heart rate — 2026-09-26). Saved on
+ *                 its own; see `acceptMeasuredForSave`.
  *                 { kind: 'lift', lift, value } | { kind: 'swim_pace', value } — My Record's "Logged suggests …
  *                 Update" (2026-09-10, audit H-B12): the logged lift in pounds, or seconds per 100 yd. Checked
  *                 against `_shared/baseline-suggestions.ts`, which respects locked lifts.
@@ -61,6 +62,7 @@ import {
   performanceNumbersForSave,
 } from './derive.ts';
 import { zonesForBaselinesRow } from './zones.ts';
+import { acceptedLthrValue } from '../../../src/lib/resolve-current-lthr.ts';
 import { acceptRecordSuggestion } from '../_shared/baseline-suggestions.ts';
 
 const cors = {
@@ -71,6 +73,13 @@ const cors = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+/**
+ * The accepts the learner's one-time seed may make (Stage 7 session 1; the two threshold heart rates since
+ * 2026-09-26), and every "use this number" kind this function saves.
+ */
+const SEEDABLE = ['ftp', 'run_threshold', 'run_lthr', 'ride_lthr'];
+const MEASURED_KINDS = ['ftp', 'run_threshold', 'run_lthr', 'ride_lthr', 'lift', 'swim_pace'];
 
 /** Columns the phone may never write: derived here, learned elsewhere, or row identity. */
 const NOT_TYPED = [
@@ -105,7 +114,7 @@ Deno.serve(async (req) => {
     // ⛔ A SERVICE CALLER GETS ONE DOOR (2026-09-16, Stage 7 session 1): the tested CSS → swim pace, which the learner
     // asks for after a CSS test. Everything else here is the athlete's own save and needs the athlete's token.
     // And the learner's one-time seed of an accepted value (Stage 7 session 1: the accept stays the one writer of it).
-    const seedAccept = body?.accept?.via === 'seed' && (body?.accept?.kind === 'ftp' || body?.accept?.kind === 'run_threshold');
+    const seedAccept = body?.accept?.via === 'seed' && SEEDABLE.includes(String(body?.accept?.kind));
     if (internal && !(body?.accept?.kind === 'swim_css_test' || seedAccept)) return json({ error: 'unauthorized' }, 401);
     const nowIso = new Date().toISOString();
 
@@ -169,8 +178,8 @@ Deno.serve(async (req) => {
         return json({ success: true, accepted: { kind, value: swim.accepted_value }, performance_numbers: swim.performance_numbers });
       }
       const value = Number(accept.value);
-      if (!['ftp', 'run_threshold', 'lift', 'swim_pace'].includes(kind) || !Number.isFinite(value) || value <= 0) {
-        return json({ error: 'accept needs kind ftp | run_threshold | lift | swim_pace and a positive value' }, 400);
+      if (!MEASURED_KINDS.includes(kind) || !Number.isFinite(value) || value <= 0) {
+        return json({ error: 'accept needs kind ftp | run_threshold | run_lthr | ride_lthr | lift | swim_pace and a positive value' }, 400);
       }
       if (kind === 'lift' || kind === 'swim_pace') {
         const { data: row, error: rowErr } = await supabase
@@ -211,23 +220,32 @@ Deno.serve(async (req) => {
       if (accept.via === 'seed') {
         // A seed only fills an empty slot; an answer the athlete already gave stands.
         const lfNow = parseJson(cur?.learned_fitness) as Record<string, { value?: unknown }> | null;
-        const slot = kind === 'ftp' ? lfNow?.ride_ftp_accepted : lfNow?.run_threshold_pace_accepted;
-        if (slot && Number(slot.value) > 0) return json({ success: true, accepted: null, seeded: false });
+        const filled = kind === 'run_lthr' || kind === 'ride_lthr'
+          ? acceptedLthrValue(lfNow, kind === 'ride_lthr' ? 'ride' : 'run') != null
+          : Number((kind === 'ftp' ? lfNow?.ride_ftp_accepted : lfNow?.run_threshold_pace_accepted)?.value) > 0;
+        if (filled) return json({ success: true, accepted: null, seeded: false });
       }
       const res = acceptMeasuredForSave({
         kind,
         value,
         learnedFitness: parseJson(cur?.learned_fitness) as Record<string, unknown> | null,
         performanceNumbers: parseJson(cur?.performance_numbers) as Record<string, unknown> | null,
+        configuredHrZones: parseJson(cur?.configured_hr_zones) as Record<string, unknown> | null,
         now: new Date(),
         via: accept.via === 'checkpoint' || accept.via === 'seed' ? accept.via : 'baselines',
       });
       if (!res.ok) return json({ error: res.reason }, 409);
-      // ⛔ The accept owns the two accepted keys (2026-09-16, Stage 7 session 1); the learner's keys ride through.
+      // ⛔ The accept owns the accepted keys (2026-09-16, Stage 7 session 1; the two threshold heart rates since
+      // 2026-09-26); the learner's keys ride through. A ride threshold accept that set a typed number aside also writes
+      // `configured_hr_zones` (the bike row's own auto, `acceptMeasuredForSave`).
       const { error: accErr } = await supabase
         .from('user_baselines')
-        /* writes-keys: ride_ftp_accepted, run_threshold_pace_accepted */
-        .update({ learned_fitness: res.learned_fitness, performance_numbers: res.performance_numbers, updated_at: nowIso })
+        /* writes-keys: ride_ftp_accepted, run_threshold_pace_accepted, run_threshold_hr_accepted, ride_threshold_hr_accepted */
+        .update({
+          learned_fitness: res.learned_fitness, performance_numbers: res.performance_numbers,
+          ...(res.configured_hr_zones ? { configured_hr_zones: res.configured_hr_zones } : {}),
+          updated_at: nowIso,
+        })
         .eq('user_id', userId);
       if (accErr) throw accErr;
       return json({

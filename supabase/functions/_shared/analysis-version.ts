@@ -9,11 +9,13 @@
  * ⚠️ BUMP IT WHENEVER THE ANALYSER STARTS WRITING A NEW FIELD, or the backfill will skip every row
  * that was measured by the previous version and the new field will never reach history.
  */
-export const ANALYSIS_VERSION = 'v0.3.0';
+export const ANALYSIS_VERSION = 'v0.3.1';
 
 /**
  * What each version added, newest first.
  *
+ * - v0.3.1 (2026-09-26): `hr_curve` on RIDES — the highest 20- and 60-minute average heart rate, the run's builder
+ *   (`buildRunHrCurve`); the learner reads the ride's threshold heart rate off it by the run's rule.
  * - v0.3.0 (2026-09-19, WORKORDER-record-efforts stage 1): `run_records` and `ride_records` — the
  *   fastest stretch at each Strava record distance, timed for EXACTLY that distance; the ride power
  *   curve widened from twelve durations to sixteen.

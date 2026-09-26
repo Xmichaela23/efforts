@@ -25,20 +25,32 @@
  *   - coach               learned-only
  * Same disease `resolveCurrentFtp` (bike) and `resolveCurrentRunEasyPace` (run pace, Q-174) already cured.
  *
- * Precedence (SPEC-lthr-one-anchor.md, decided 2026-07-13):
- *   0. the athlete's EXPLICIT choice   (`performance_numbers.lthr_source: 'manual' | 'learned'`) — Q-174,
- *      reused verbatim. 'manual' + a manual value wins over even high-confidence learned; 'learned' SKIPS
- *      the manual tier so a declined typed number can't resurface when the learner thins out.
- *   1. learned  run_threshold_hr   (confidence medium/high AND sample_count > 0)      <- MEASURED
- *   2. manual / configured — the sport's OWN typed field (`manual_run_lthr` / `manual_ride_lthr`),
- *      never the sport-agnostic `threshold_heart_rate` (2026-09-15, §8.0 #23) <- an ASSERTION
- *   3. learned-low  (learned, any confidence, still sample_count > 0)
- *   4. device  (per-workout workouts.threshold_heart_rate, passed by workout-aware callers) <- lowest, provenance unknown
- *   5. null                                                                            <- SAY SO. Never 220-age. Never invent (Law 2).
+ * ⛔ PROPOSED, THEN ACCEPTED (2026-09-26, Michael: "go") — the FTP pattern (`resolve-current-ftp.ts`,
+ * `docs/SPEC-ftp-accept-2026-09-04.md`) and the run threshold pace's (`resolve-current-run-pace.ts`), TrainerRoad's
+ * lead. The learner's number (`learned_fitness.run_threshold_hr` / `ride_threshold_hr`) is a PROPOSAL and nothing
+ * reads it as the anchor. The anchor is the athlete's typed number, else the number they ACCEPTED
+ * (`run_threshold_hr_accepted` / `ride_threshold_hr_accepted` — the FTP's `{ ...estimate, accepted_at,
+ * accepted_from, accepted_via }` shape). Accepting happens on the after-workout pop-up, State → Adjust and Training
+ * Baselines, all through `save-baselines`; the learner seeds the first trusted measurement (see
+ * `learn-fitness-profile`, THE SEED).
+ *
+ * Precedence (2026-09-26; supersedes the 2026-07-13 order of SPEC-lthr-one-anchor.md, below as history):
+ *   0. typed — the sport's OWN typed field (`manual_run_lthr` / `manual_ride_lthr`; the run also reads the legacy
+ *      `performance_numbers.threshold_heart_rate`), never the sport-agnostic `configured_hr_zones.threshold_heart_rate`
+ *      (2026-09-15, §8.0 #23) <- an ASSERTION. Skipped on the RUN when the athlete chose auto
+ *      (`lthr_source: 'learned'`, Q-174: a declined typed number cannot resurface). `lthr_source` is the RUN's switch:
+ *      only the run rows write it, and the bike's own auto clears its typed number instead.
+ *   1. accepted — the athlete's yes (or the learner's one-time seed)                     <- MEASURED, AND AGREED
+ *   2. device  (per-workout workouts.threshold_heart_rate, passed by workout-aware callers) <- lowest, provenance unknown
+ *   3. null                                                                              <- SAY SO. Never 220-age. Never invent (Law 2).
+ *
+ * Was (2026-07-13): choice → learned medium/high → typed → learned-low → device → null. The learned value read
+ * directly is gone from the chain; `measuredLthr` below keeps it for the two readers that want the MEASUREMENT
+ * (the proposal, and the learner's own easy band).
  *
  * ⛔ THE SAMPLE-COUNT GATE (D-284), lifted here from easy-hr.ts and made universal: a learned
  * run_threshold_hr written as "88% of observed max (estimated)" with sample_count 0 is a FORMULA,
- * not a measurement — it can NEVER anchor. It falls through at BOTH tier 1 and tier 3.
+ * not a measurement — it can NEVER anchor. Since 2026-09-26 it can never be proposed or accepted either.
  *
  * Pure, no I/O — client + edge (edge imports from this src/lib file, per the resolveCurrentFtp precedent;
  * the client never imports from supabase/functions/_shared). Caller passes already-loaded baselines.
@@ -70,8 +82,35 @@ type LearnedThr = {
   is_estimate?: boolean | null;
 } | number | string | null | undefined;
 
+/**
+ * The threshold heart rate the athlete ACCEPTED, as stored: the measurement it was accepted from, plus when and
+ * from what — `AcceptedFtp`'s shape (`resolve-current-ftp.ts`), key for key.
+ */
+export type AcceptedLthr = {
+  value: number;
+  confidence: 'low' | 'medium' | 'high' | string;
+  source?: string;
+  sample_count?: number;
+  as_of?: string;
+  /** ISO timestamp of the tap (or the seed). */
+  accepted_at: string;
+  /** The learned value at the moment of acceptance. */
+  accepted_from: number;
+  /** 'checkpoint' | 'baselines' | 'seed' — where the yes came from. */
+  accepted_via?: string;
+};
+
+type AcceptedLthrLike = (Partial<AcceptedLthr> & { value?: number | string | null }) | null | undefined;
+
 export type BaselinesLike = {
-  learned_fitness?: { run_threshold_hr?: LearnedThr; ride_threshold_hr?: LearnedThr } | null;
+  learned_fitness?: {
+    run_threshold_hr?: LearnedThr;
+    ride_threshold_hr?: LearnedThr;
+    /** The run threshold heart rate the athlete said yes to (2026-09-26). Holds until the next accept. */
+    run_threshold_hr_accepted?: AcceptedLthrLike;
+    /** The ride's, same shape. */
+    ride_threshold_hr_accepted?: AcceptedLthrLike;
+  } | null;
   performance_numbers?: {
     threshold_heart_rate?: number | string | null;
     thresholdHeartRate?: number | string | null;
@@ -131,9 +170,31 @@ function asPositiveFinite(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveOpts): ResolvedLthr {
+export type LthrSport = 'run' | 'ride';
+
+/** `ride` / `bike` / `cycling` (any case, any raw `workout.type`) → 'ride'; everything else → 'run'. */
+export function lthrSport(sport: unknown): LthrSport {
+  return String(sport ?? '').toLowerCase().match(/ride|bike|cycl/) != null ? 'ride' : 'run';
+}
+
+/** The stored keys, per sport — named here once so no other file spells them. */
+const LEARNED_KEY = { run: 'run_threshold_hr', ride: 'ride_threshold_hr' } as const;
+const ACCEPTED_KEY = { run: 'run_threshold_hr_accepted', ride: 'ride_threshold_hr_accepted' } as const;
+
+function confWord(v: unknown): 'low' | 'medium' | 'high' | null {
+  const c = String(v ?? '').toLowerCase();
+  return c === 'low' || c === 'medium' || c === 'high' ? c : null;
+}
+
+/**
+ * THE MEASUREMENT — the learned threshold heart rate, behind the D-284 gate, and nothing else. NOT the anchor the app
+ * runs on (that is `resolveCurrentLthr`). Two readers want exactly this: the proposal (`pendingLthrProposal`) and the
+ * learner's own easy band, which is built from what the pass just measured (`_shared/easy-hr.ts`, `anchor: 'measured'`).
+ * Source 'learned' at medium/high confidence, 'learned-low' below; null when there is no measurement.
+ */
+export function measuredLthr(baselines: BaselinesLike, opts?: LthrResolveOpts): ResolvedLthr {
   if (!baselines) return NULL_RESULT;
-  const isRide = String(opts?.sport ?? '').toLowerCase().match(/ride|bike|cycl/) != null;
+  const isRide = lthrSport(opts?.sport) === 'ride';
 
   // Learned value — normalise the {value, confidence, sample_count, as_of} shape (or a bare number).
   const learnedRaw = isRide
@@ -146,7 +207,7 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
   const sampleCountStated = rawSampleCount != null && Number.isFinite(Number(rawSampleCount));
   const learnedSamples = sampleCountStated ? Number(rawSampleCount) : null; // null == "not stated"
   const learnedAsOf = typeof learnedObj?.as_of === 'string' && learnedObj.as_of.length >= 10 ? learnedObj.as_of : null;
-  const confOut = (learnedConf === 'low' || learnedConf === 'medium' || learnedConf === 'high') ? learnedConf : null;
+  const confOut = confWord(learnedConf);
 
   // ⛔ THE GATE (D-284, mirrors easy-hr.ts exactly): an EXPLICIT sample_count of 0 is a formula, not a
   // measurement — "88% of observed max (estimated)" — and can NEVER anchor. An ABSENT sample_count is
@@ -160,14 +221,30 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
    * and starved the easy-pace learner whose runs sit at 133-141. `is_estimate` is the writer stating
    * it outright; the count stays for rows written before the field existed.
    *
-   * ⚠️ Q-171 IS UNCHANGED. *Weak but MEASURED still anchors* — a low-confidence reading from four real
-   * threshold efforts is `is_estimate: false` and still anchors. The gate was always
-   * invented-vs-measured; it can now read that directly instead of inferring it.
+   * ⚠️ Q-171: *weak but MEASURED* is still a measurement here (`learned-low`) — the gate is invented-vs-measured.
+   * ⛔ BUT SINCE 2026-09-26 NO MEASUREMENT ANCHORS ON ITS OWN: it is proposed, and only at medium/high confidence
+   * (FTP's "learned-low never proposes"), so a low-confidence reading is neither used nor offered until the learner
+   * firms it up. The learner's own easy band still reads it (`measured` anchor, `_shared/easy-hr.ts`).
    */
   const learnedIsEstimate = learnedObj?.is_estimate === true;
   const learnedUsable = learnedValue != null && learnedSamples !== 0 && !learnedIsEstimate;
   const learnedTrusted = learnedUsable && (learnedConf === 'medium' || learnedConf === 'high');
 
+  if (!learnedUsable) return NULL_RESULT;
+  return {
+    bpm: learnedValue, source: learnedTrusted ? 'learned' : 'learned-low', confidence: confOut,
+    sample_count: learnedSamples, as_of: learnedAsOf, is_estimate: false,
+  };
+}
+
+/**
+ * The sport's TYPED threshold heart rate — what the athlete entered, whether or not it is the one in use (the run's
+ * auto switch can set it aside). One definition for the resolver below and for the accept, which has to know whether
+ * there is a typed number to set aside.
+ */
+export function typedLthr(baselines: BaselinesLike, opts?: LthrResolveOpts): number | null {
+  if (!baselines) return null;
+  const isRide = lthrSport(opts?.sport) === 'ride';
   const pn = baselines.performance_numbers;
   // ⛔ SPORT-SPECIFIC BEFORE SPORT-AGNOSTIC. `manual_run_lthr` is unambiguously a RUN number;
   // `threshold_heart_rate` is whichever sport the writer happened to call primary. See the type above.
@@ -190,38 +267,108 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
    * ⚠️ `performance_numbers.threshold_heart_rate` STAYS. That one is a legacy RUN field — no current
    * writer, but what is stored there is a run number, not a borrowed bike one.
    */
-  const manualValue = isRide
+  return isRide
     ? asPositiveFinite(baselines.configured_hr_zones?.manual_ride_lthr)
     : (asPositiveFinite(baselines.configured_hr_zones?.manual_run_lthr)
         ?? asPositiveFinite(pn?.threshold_heart_rate)
         ?? asPositiveFinite(pn?.thresholdHeartRate));
+}
 
+/** The accepted threshold heart rate's value for the sport, or null when the athlete has not accepted one. */
+export function acceptedLthrValue(learned: Record<string, unknown> | null | undefined, sport: unknown): number | null {
+  const slot = (learned as Record<string, { value?: unknown } | null | undefined> | null | undefined)?.[ACCEPTED_KEY[lthrSport(sport)]];
+  return asPositiveFinite(slot?.value);
+}
+
+export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveOpts): ResolvedLthr {
+  if (!baselines) return NULL_RESULT;
+  const sport = lthrSport(opts?.sport);
+
+  const manualValue = typedLthr(baselines, { sport });
   const deviceValue = asPositiveFinite(opts?.deviceThresholdHr);
 
-  // ── Tier 0 (Q-174): the athlete's explicit choice outranks everything. ──
-  const chosen = pn?.lthr_source;
-  if (chosen === 'manual' && manualValue != null) {
-    return { bpm: manualValue, source: 'manual-chosen', confidence: null, sample_count: null, as_of: null, is_estimate: false };
+  // ── Tier 0: the typed number (an assertion). ──
+  // ⛔ THE RUN'S SWITCH ONLY. `lthr_source` is written by the run rows (Baselines, Adjust) and by the run accept; read
+  // for the bike it let a run "auto" hide the bike's typed number while the bike row still said "your number".
+  const chosen = sport === 'run' ? baselines.performance_numbers?.lthr_source : null;
+  // chosen === 'learned' (auto) → SKIP the typed tier (Q-174: a declined typed number must not resurface).
+  if (manualValue != null && chosen !== 'learned') {
+    return { bpm: manualValue, source: chosen === 'manual' ? 'manual-chosen' : 'manual', confidence: null, sample_count: null, as_of: null, is_estimate: false };
   }
-  // chosen === 'learned' → fall through, but SKIP the manual tier (a declined typed number must not resurface).
-  const manualEligible = chosen !== 'learned';
 
-  // 1. learned, trusted + sampled.
-  if (learnedTrusted) {
-    return { bpm: learnedValue, source: 'learned', confidence: confOut, sample_count: learnedSamples, as_of: learnedAsOf, is_estimate: false };
+  // ── Tier 1: the accepted number (the athlete's yes, or the learner's one-time seed). ──
+  // Only ever written from a measured, medium/high learned value (`acceptLearnedLthr`), so it is 'learned' by
+  // construction; its stored confidence is the measurement's at the time and is not re-checked — the athlete said yes.
+  const acceptedRaw = baselines.learned_fitness?.[ACCEPTED_KEY[sport]];
+  const acceptedValue = asPositiveFinite(acceptedRaw?.value);
+  if (acceptedValue != null) {
+    const samples = asPositiveFinite(acceptedRaw?.sample_count);
+    const asOf = typeof acceptedRaw?.as_of === 'string' && acceptedRaw.as_of.length >= 10 ? acceptedRaw.as_of : null;
+    return { bpm: acceptedValue, source: 'learned', confidence: confWord(acceptedRaw?.confidence), sample_count: samples, as_of: asOf, is_estimate: false };
   }
-  // 2. manual / configured (an assertion).
-  if (manualValue != null && manualEligible) {
-    return { bpm: manualValue, source: 'manual', confidence: null, sample_count: null, as_of: null, is_estimate: false };
-  }
-  // 3. learned-low (any confidence, still sampled).
-  if (learnedUsable) {
-    return { bpm: learnedValue, source: 'learned-low', confidence: confOut, sample_count: learnedSamples, as_of: learnedAsOf, is_estimate: false };
-  }
-  // 4. device (per-workout, provenance unknown) — lowest.
+
+  // ── Tier 2: device (per-workout, provenance unknown) — lowest. ──
   if (deviceValue != null) {
     return { bpm: deviceValue, source: 'device', confidence: null, sample_count: null, as_of: null, is_estimate: false };
   }
-  // 5. null — never 220-age, never invent.
+  // ── null — never 220-age, never invent, and never the learner's number unaccepted. ──
   return NULL_RESULT;
+}
+
+/** The threshold heart rate the athlete's sessions measured, waiting on acceptance. */
+export type LthrProposal = {
+  /** The measured value (bpm). */
+  measured: number;
+  /** The value in use now — typed or accepted — or null when there is none. */
+  applied: number | null;
+  confidence: string;
+};
+
+/**
+ * The measured threshold heart rate the athlete has not said yes to — or null when there is nothing to accept.
+ *
+ * Against the number IN USE, typed or accepted, exactly as `pendingFtpProposal` / `pendingRunThresholdProposal`
+ * (2026-09-05, Michael: the proposal shows even on "your number"; taking it is what switches back to auto). Null when:
+ * no measurement; below medium confidence (learned-low never proposes — FTP's rule); a formula (D-284 gate); or the
+ * measurement is NOT HIGHER than the number in use, compared to the whole beat the screen prints.
+ * ⛔ ONLY A HIGHER NUMBER IS OFFERED (2026-09-26, Michael). TrainingPeaks' threshold notifications — the article the
+ * learner's rule cites (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications) — are IMPROVEMENT
+ * notifications: a new best raises the threshold; nothing offers to lower it. A lower number is never offered; the
+ * athlete can still type any number on Baselines. (FTP and the run pace keep their own rules — both directions.)
+ * ⚠️ ONE DIFFERENCE FROM FTP, AND IT FOLLOWS FROM THE RESOLVER: with nothing in use (no typed, no accepted) the
+ * measurement is still offered, `applied: null`. FTP returns null there because its estimate already applies; a
+ * threshold heart rate never applies unaccepted.
+ */
+export function pendingLthrProposal(baselines: BaselinesLike, opts?: LthrResolveOpts): LthrProposal | null {
+  if (!baselines) return null;
+  const sport = lthrSport(opts?.sport);
+  const measured = measuredLthr(baselines, { sport });
+  if (measured.bpm == null || measured.source !== 'learned') return null;
+  const applied = resolveCurrentLthr(baselines, { sport }).bpm;
+  if (applied != null && Math.round(measured.bpm) <= Math.round(applied)) return null;
+  return { measured: measured.bpm, applied, confidence: String(measured.confidence ?? '') };
+}
+
+/**
+ * THE ONE WRITE — `acceptEstimatedFtp` / `acceptLearnedRunThreshold`, the heart-rate twin. Returns a new
+ * `learned_fitness` with the sport's accepted key set from the live measurement, or null when there is nothing to
+ * accept (no measurement, a formula, or below medium confidence). `save-baselines` is its only caller (the three
+ * screens, and the learner's seed, all go through it).
+ */
+export function acceptLearnedLthr(
+  learned: Record<string, unknown> | null | undefined,
+  sport: unknown,
+  via: 'checkpoint' | 'baselines' | 'seed',
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  if (!learned || typeof learned !== 'object') return null;
+  const s = lthrSport(sport);
+  const measured = measuredLthr({ learned_fitness: learned as never }, { sport: s });
+  if (measured.bpm == null || measured.source !== 'learned') return null;
+  const est = (learned as Record<string, unknown>)[LEARNED_KEY[s]];
+  const value = measured.bpm;
+  return {
+    ...learned,
+    [ACCEPTED_KEY[s]]: { ...(est && typeof est === 'object' ? est as object : {}), value, accepted_at: now.toISOString(), accepted_from: value, accepted_via: via },
+  };
 }

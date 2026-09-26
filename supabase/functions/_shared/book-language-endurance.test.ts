@@ -254,3 +254,20 @@ Deno.test('a floor saved with no shown top goes to Garmin as "N W and up" with n
   assert(work.targetType !== 'POWER', JSON.stringify(work));
   assert(String(work.description ?? '').includes('253 W and up'), JSON.stringify(work));
 });
+
+// ── 2026-09-26: the 20-minute test (p212) is the only cycling test ────────────────────────────────
+
+Deno.test('the 20-minute test is the only cycling test offered; a 5-minute row already on a calendar still behaves', async () => {
+  const REPO = new URL('../../../', import.meta.url);
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const rows = await import('./baseline-test-rows.ts');
+  assert(!('ftp5MinTestRow' in rows), 'the 5-minute FTP test can be built again');
+  const adjust = strip(await Deno.readTextFile(new URL('src/components/context/StateAdjustLens.tsx', REPO)));
+  assert(!/ftp5/.test(adjust), 'Adjust offers the 5-minute test again');
+  assert(!/5-minute test/.test(adjust), 'Adjust names the 5-minute test again');
+  // An old row keeps its meaning: still a test to the restate, and its token still expands to one work step.
+  const restate = strip(await Deno.readTextFile(new URL('supabase/functions/_shared/standing-plan/restate.ts', REPO)));
+  assert(/TEST_ROW_TAGS = new Set\(\[[^\]]*'ftp_test_5min'/.test(restate), 'a 5-minute row on a calendar stopped counting as a test');
+  const { steps } = expandTokensForRow({ type: 'ride', steps_preset: ['bike_ftp_test_5min'], tags: ['ftp_test', 'ftp_test_5min'] }, { ftp: 250 } as any);
+  assertEquals(steps.map((s: any) => [s.kind, s.duration_s]), [['work', 300]]);
+});

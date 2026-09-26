@@ -1751,6 +1751,11 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       if (powerCurve) {
         console.log(`⚡ Power curve saved for bike workout`);
       }
+      // ⛔ THE RIDE'S HEART-RATE CURVE (2026-09-26, Michael: "yeah lets do that") — the highest 20- and 60-minute average
+      // heart rate, the SAME builder the run uses below (`buildRunHrCurve`: time-weighted, a window needs heart rate on
+      // 80% of its time; run-specific in name only). The learner reads the ride's threshold heart rate off it by the
+      // run's rule (TrainingPeaks' best 60 minutes, or 95% of the best 20). Rides analysed before today carry none.
+      hrCurve = buildRunHrCurve(time_s, hr_bpm);
       /**
        * ⛔ THE RIDE'S FASTEST DISTANCES (2026-09-19). Strava's own list, on elapsed time
        * (support.strava.com/en-us/articles/15401645-best-efforts-cycling). A ride with no power meter

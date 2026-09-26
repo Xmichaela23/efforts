@@ -16,8 +16,7 @@
    "Threshold Time Trial",
    "An easy 6- to 8-minute jog to warm up. 2 × 100-meter strides (begin slow and accelerate to near full tilt). 3 rounds of 30 seconds at a \"fast run\" (mile PR) pace followed by 1 minute easy walk/jog. 1 minute additional rest. Begin time trial: 9.5/10 intensity to begin, ending at 10/10 intensity. Record distance traveled after 12 minutes (beginner, less than 2 years of training). The app reads the trial lap, takes 88% of that speed as your threshold pace and sets it.",
    "FTP Test — 20-Minute Protocol",
-   "Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. With average watts, take the 20-minute number and multiply it by 0.95. It is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it.",
-   "FTP Test — 5-Minute All-Out"
+   "Set your screen/device to average wattage. 5- to 10-minute easy warm-up. 3 x 1 minute at low resistance/high turnover (think rapid legs/rowing/etc.) with 1-minute rest between each. 3-minute easy recovery. 3 minutes at high intensity. Push yourself at a 9/10 effort. 6 to 8 minutes at a low pace to recover. Reset your device/hit the lap button, start a stopwatch, and do 20 minutes at your best effort! 5 to 10 minutes of easy recovery. With average watts, take the 20-minute number and multiply it by 0.95. It is your starting functional threshold power (FTP) in watts. The app reads the lap and sets it."
   ],
   "supabase/functions/_shared/endurance-library/source-rules.ts": [
    "percent of threshold speed/pace, 100% = threshold / VT2",

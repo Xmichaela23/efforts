@@ -21,7 +21,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow } from '@/lib/baseline-tests';
+import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
 // ⛔ EVERY NUMBER ON THIS SCREEN IS THE SERVER'S (2026-09-15, one-truth workorder Stage 4 session 1).
 import { useBaselineZones } from '@/hooks/useBaselineZones';
 
@@ -151,6 +151,30 @@ export default function StateAdjustLens({ mainLifts }: {
       finally { setAccepting(false); }
     })();
   };
+  /**
+   * ⛔ THE THRESHOLD HEART RATE, PROPOSED THEN ACCEPTED (2026-09-26, Michael: "go") — per sport, the same line and the
+   * same write as FTP and pace above: the shown bpm to save-baselines. A run's accept re-prices the unstarted rows (the
+   * easy runs carry a heart-rate range off it); no ride row carries a heart-rate target, so a ride's re-prices nothing.
+   */
+  const [acceptingLthr, setAcceptingLthr] = useState<'run' | 'ride' | null>(null);
+  const acceptLthr = (sport: 'run' | 'ride') => {
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      const prop = (sport === 'run' ? run : bike)?.lthr_proposal ?? null;
+      if (!prop) return;
+      setAcceptingLthr(sport); setSaveNote(sport === 'run' ? REPRICE_WAIT : null); setLastSaved(sport === 'run' ? 'run' : 'bike');
+      try {
+        const res = await acceptMeasuredNumber(supabase, sport === 'run' ? 'run_lthr' : 'ride_lthr', prop.accept_value);
+        if (!res.ok) throw new Error(res.error);
+        // The bpm the button showed, which is the number now in use.
+        let note = `${prop.button.replace(/^use /, '')} in use.`;
+        if (sport === 'run') { try { note = await repriceEndurance(note); } catch { /* the accept stands */ } }
+        setSaveNote(note);
+        await reload();
+      } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept threshold heart rate failed:', e); }
+      finally { setAcceptingLthr(null); }
+    })();
+  };
   const thrProposal = run?.threshold_proposal ?? null;
   const [acceptingThr, setAcceptingThr] = useState(false);
   const acceptThr = () => {
@@ -239,7 +263,7 @@ export default function StateAdjustLens({ mainLifts }: {
   // server's readout names (today; the athlete moves it on the calendar if it does not suit). The lifts open the logger's test flow (Lower / Upper / Full Body), the same
   // entry Baselines uses. A scheduled test is detected by its tag (`run_test` / `ftp_test`), the contract.
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
-  const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null; ftp5: { id: string; date: string } | null }>({ run: null, ftp: null, ftp5: null });
+  const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null }>({ run: null, ftp: null });
   const [testBusy, setTestBusy] = useState<string | null>(null);
   const refreshScheduled = async () => {
     const uid = getStoredUserId(); if (!uid) return;
@@ -248,10 +272,12 @@ export default function StateAdjustLens({ mainLifts }: {
     const { data } = await supabase.from('planned_workouts').select('id, date, tags').eq('user_id', uid).eq('workout_status', 'planned').gte('date', today).order('date');
     const rows = (data ?? []) as Array<{ id: string; date: string; tags?: string[] | null }>;
     const find = (tag: string, not?: string) => { const r = rows.find((x) => Array.isArray(x.tags) && x.tags.includes(tag) && !(not && x.tags.includes(not))); return r ? { id: r.id, date: r.date } : null; };
-    setScheduled({ run: find('run_test'), ftp: find('ftp_test', 'ftp_test_5min'), ftp5: find('ftp_test_5min') });
+    // ⛔ THE 20-MINUTE TEST IS THE ONLY CYCLING TEST (2026-09-26). A 5-minute row already on the calendar is still a test
+    // there (its tags), but it is not the 20-minute one, so the "20 min" pill does not claim it.
+    setScheduled({ run: find('run_test'), ftp: find('ftp_test', 'ftp_test_5min') });
   };
   useEffect(() => { void refreshScheduled(); }, []);
-  const scheduleTest = (kind: 'run' | 'ftp' | 'ftp5') => {
+  const scheduleTest = (kind: 'run' | 'ftp') => {
     void (async () => {
       setTestBusy(kind);
       try {
@@ -260,14 +286,14 @@ export default function StateAdjustLens({ mainLifts }: {
         // somewhere else. The readout carries the day; the athlete moves it on the calendar if it suits.
         const date = readout?.retest.date;
         if (!date) return;
-        const row = kind === 'run' ? runThresholdTestRow(date) : kind === 'ftp5' ? ftp5MinTestRow(date) : ftpTestRow(date);
+        const row = kind === 'run' ? runThresholdTestRow(date) : ftpTestRow(date);
         await addPlannedWorkout(row as any);
         await refreshScheduled();
       } catch (e) { console.warn('[StateAdjustLens] schedule test failed:', e); }
       finally { setTestBusy(null); }
     })();
   };
-  const removeTest = (kind: 'run' | 'ftp' | 'ftp5') => {
+  const removeTest = (kind: 'run' | 'ftp') => {
     const t = scheduled[kind]; if (!t) return;
     void (async () => {
       setTestBusy(kind);
@@ -294,7 +320,7 @@ export default function StateAdjustLens({ mainLifts }: {
   const [saveNote, setSaveNote] = useState<string | null>(null);
   // Which sport's section shows the note — the one whose number was just saved.
   const [lastSaved, setLastSaved] = useState<'strength' | 'run' | 'bike' | null>(null);
-  const sportOf = (id: string): 'strength' | 'run' | 'bike' => id === 'ftp' ? 'bike' : id === 'threshold' || id === 'lthr' ? 'run' : 'strength';
+  const sportOf = (id: string): 'strength' | 'run' | 'bike' => id === 'ftp' || id === 'ride-lthr' ? 'bike' : id === 'threshold' || id === 'lthr' ? 'run' : 'strength';
   const reload = async () => {
     await loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
     await refreshReadout();
@@ -322,13 +348,17 @@ export default function StateAdjustLens({ mainLifts }: {
         // ⛔ The typed threshold only (2026-09-10). `save-baselines` stores it and rebuilds the zone tables
         // from it — this wrote the object itself and left the old zone arrays standing beside the new number.
         saved = await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } }, { manual_run_lthr: v });
+      } else if (id === 'ride-lthr') {
+        // The bike's typed threshold heart rate — the same write Baselines' bike row makes (2026-09-26).
+        const v = Math.round(Number(t)); if (!(v > 0)) return;
+        saved = await saveUserBaselines(baselines, { manual_ride_lthr: v });
       } else {
         const key = canonicalizeLiftKey(id); const v = Number(t);
         if (!key || !Number.isFinite(v) || !(key === 'pullupMaxReps' ? v >= 0 : v > 0)) return;
         saved = await saveUserBaselines(baselines, undefined, { lifts: { [key]: v } });
       }
       applyReadout(saved?.zones);
-      setSaveNote(await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength'));
+      setSaveNote(await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' || id === 'ride-lthr' ? 'endurance' : 'strength'));
       await reload();
     } catch (e) {
       setSaveNote('Could not save. Try again.');
@@ -395,12 +425,15 @@ export default function StateAdjustLens({ mainLifts }: {
         await saveUserBaselines({ ...baselines, performanceNumbers: next });
       } else if (id === 'lthr') {
         await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'learned' } });
+      } else if (id === 'ride-lthr') {
+        // The bike has no auto switch: auto clears its typed number, as Baselines' bike row does.
+        await saveUserBaselines(baselines, { manual_ride_lthr: null });
       } else {
         const key = canonicalizeLiftKey(id); if (!key) return;
         // `null` clears that lift's lock — the server's one write shape, same as a typed value.
         await saveUserBaselines(baselines, undefined, { lifts: { [key]: null } });
       }
-      setSaveNote((await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength')).replace('Saved.', 'Auto.'));
+      setSaveNote((await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' || id === 'ride-lthr' ? 'endurance' : 'strength')).replace('Saved.', 'Auto.'));
       await reload();
     } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
@@ -425,7 +458,7 @@ export default function StateAdjustLens({ mainLifts }: {
   const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is your zone 2 pace, worked out from threshold pace. The threshold test goes on the calendar today; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
   // ⛔ "The 20-minute test is the classic … all-out with no pacing, so it repeats well" came off (2026-09-18, book-language
   // pass 2): on no page. What is left says how the app reads the tests.
-  const BIKE_INFO = "The FTP tests go on the calendar today; a ride logged within a day of the test is read as the test. The 5-minute test counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
+  const BIKE_INFO = "The FTP test goes on the calendar today; a ride logged within a day of the test is read as the test. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
   type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
   const sections: Section[] = [
@@ -487,6 +520,12 @@ export default function StateAdjustLens({ mainLifts }: {
             </div>
           )}
           <Row id="lthr" name="Threshold heart rate" row={run?.lthr} sport="run" />
+          {run?.lthr_proposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-footnote text-label-secondary">{run.lthr_proposal.text}</span>
+              <button type="button" disabled={acceptingLthr != null} onClick={() => acceptLthr('run')} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-footnote px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingLthr === 'run' ? 'Applying…' : run.lthr_proposal.button}</button>
+            </div>
+          )}
           <Row id="easy" name="Easy pace" editable={false} row={run?.easy} sport="run" />
           <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3">
             <span className="text-subhead text-label">Retest</span>
@@ -513,6 +552,15 @@ export default function StateAdjustLens({ mainLifts }: {
               <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-footnote px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : proposal.button}</button>
             </div>
           )}
+          {/* ⛔ THE BIKE'S THRESHOLD HEART RATE (2026-09-26): the row Baselines' bike section already shows, here so its
+              offer has the number it would replace beside it — the run section's shape. */}
+          <Row id="ride-lthr" name="Threshold heart rate" row={bike?.lthr} sport="bike" />
+          {bike?.lthr_proposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-footnote text-label-secondary">{bike.lthr_proposal.text}</span>
+              <button type="button" disabled={acceptingLthr != null} onClick={() => acceptLthr('ride')} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-footnote px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingLthr === 'ride' ? 'Applying…' : bike.lthr_proposal.button}</button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-y-2 py-1 gap-3">
             <span className="text-subhead text-label">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">
@@ -521,15 +569,10 @@ export default function StateAdjustLens({ mainLifts }: {
               ) : (
                 <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className={pill}>20 min</button>
               )}
-              {scheduled.ftp5 ? (
-                <button type="button" disabled={testBusy === 'ftp5'} onClick={() => removeTest('ftp5')} className={pill}>5 min · {fmtDay(scheduled.ftp5.date)} · remove</button>
-              ) : (
-                <button type="button" disabled={testBusy === 'ftp5'} onClick={() => scheduleTest('ftp5')} className={pill}>5 min</button>
-              )}
             </span>
           </div>
         </div>
-        <p className="text-footnote text-label-secondary mt-2 leading-snug">The FTP tests go on the calendar today.</p>
+        <p className="text-footnote text-label-secondary mt-2 leading-snug">The FTP test goes on the calendar today.</p>
         {saveNote && lastSaved === 'bike' && <p className="text-footnote text-label-secondary mt-1.5">{saveNote}</p>}
       </>
     ) },

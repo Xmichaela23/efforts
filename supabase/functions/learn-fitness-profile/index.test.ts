@@ -124,6 +124,9 @@ Deno.test('the fresh row wins for keys this run does not own', () => {
   const out = carryThroughFresh(merged, fresh) as any;
   assertEquals(out.strength_1rms.squat.value, 225);
   assertEquals(out.ride_ftp_accepted.value, 245);
+  // The two threshold heart rates the athlete accepted ride through too (2026-09-26).
+  const hr = carryThroughFresh({ run_threshold_hr: { value: 165 } }, { run_threshold_hr_accepted: { value: 162 }, ride_threshold_hr_accepted: { value: 153 } }) as any;
+  assertEquals([hr.run_threshold_hr_accepted.value, hr.ride_threshold_hr_accepted.value, hr.run_threshold_hr.value], [162, 153, 165]);
   assertEquals(out.run_threshold_pace_sec_per_km.value, 273);
   assertEquals(out.run_vvo2_pace_sec_per_km.value, 240);
   assertEquals(out.swim_css_sec_per_100m.value, 109);

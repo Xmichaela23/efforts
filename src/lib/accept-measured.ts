@@ -13,14 +13,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { markBaselinesStale } from '@/lib/baselines-stale';
 
-export type AcceptKind = 'ftp' | 'run_threshold' | 'lift' | 'swim_pace';
+/** 'run_lthr' / 'ride_lthr': the run and ride threshold heart rates, proposed then accepted like FTP (2026-09-26). */
+export type AcceptKind = 'ftp' | 'run_threshold' | 'run_lthr' | 'ride_lthr' | 'lift' | 'swim_pace';
 
 /** One shape, not a union: `tsconfig` runs without strict null checks, so a union would not narrow. */
 export type AcceptResult = {
   ok: boolean;
   /** Set when `ok` is false. */
   error: string | null;
-  /** The accepted value as the server saved it (watts, or seconds per km). NaN when `ok` is false. */
+  /** The accepted value as the server saved it (watts, seconds per km, or bpm). NaN when `ok` is false. */
   acceptedValue: number;
   learnedFitness: Record<string, unknown> | null;
   performanceNumbers: Record<string, unknown> | null;
@@ -31,7 +32,7 @@ export type AcceptResult = {
 const failed = (error: string): AcceptResult => ({ ok: false, error, acceptedValue: NaN, learnedFitness: null, performanceNumbers: null, locked: false });
 
 /**
- * `value`: watts for FTP, seconds per km for run threshold — the proposal's own number; pounds for a lift,
+ * `value`: watts for FTP, seconds per km for run threshold, bpm for a threshold heart rate — the proposal's own number; pounds for a lift,
  * seconds per 100 yd for swim pace — the "Logged suggests" number. `lift`: the lift key, 'lift' only.
  */
 export async function acceptMeasuredNumber(supabase: SupabaseClient, kind: AcceptKind, value: number, lift?: string): Promise<AcceptResult> {

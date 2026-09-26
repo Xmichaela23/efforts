@@ -53,6 +53,8 @@ import {
 // The RUN sites use it; the BIKE band (65-75% max + power filter) is deliberately NOT routed through it.
 import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
 import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
+// The threshold heart-rate MEASUREMENT (the D-284 gate) — what the seed below may accept.
+import { measuredLthr } from '../../../src/lib/resolve-current-lthr.ts';
 // One definition of "this CSS came from the test", shared with save-baselines, which sets the plan's swim pace from it.
 import { isTestedSwimCss } from '../save-baselines/derive.ts';
 
@@ -322,9 +324,12 @@ const stampOf = (m: unknown): string => {
  * (save-baselines) or a test result (another learner run) landing in between was lost. The row is re-read
  * immediately before the write and every key this run does not own is taken from that fresh read:
  *   · `strength_1rms` — compute-facts';
- *   · `ride_ftp_accepted` / `run_threshold_pace_accepted` — the athlete's answer, when one is on the row;
+ *   · `ride_ftp_accepted` / `run_threshold_pace_accepted` / `run_threshold_hr_accepted` / `ride_threshold_hr_accepted`
+ *     — the athlete's answer, when one is on the row (the two heart-rate keys since 2026-09-26);
  *   · a time-trial threshold (with its vVO2) or a tested CSS on the fresh row that is newer than this run's.
  */
+export const ACCEPTED_KEYS = ['ride_ftp_accepted', 'run_threshold_pace_accepted', 'run_threshold_hr_accepted', 'ride_threshold_hr_accepted'] as const;
+
 export function carryThroughFresh(
   merged: Record<string, unknown>,
   fresh: Record<string, unknown> | null | undefined,
@@ -332,7 +337,7 @@ export function carryThroughFresh(
   const out: Record<string, unknown> = { ...merged };
   const f = fresh ?? {};
   out.strength_1rms = f.strength_1rms;
-  for (const k of ['ride_ftp_accepted', 'run_threshold_pace_accepted']) {
+  for (const k of ACCEPTED_KEYS) {
     if (Number((f[k] as { value?: unknown } | undefined)?.value) > 0) out[k] = f[k];
   }
   if (isTrialThreshold(f.run_threshold_pace_sec_per_km)) {
@@ -561,18 +566,25 @@ Deno.serve(async (req) => {
     // WORKER_RESOURCE_LIMIT the first time it ran in prod. Only the best 20-minute power is read here,
     // so only that is fetched; the shape `{ computed: { power_curve: { '20min' } } }` is rebuilt so
     // `analyzeRides` reads it the same way it reads a full row.
+    // ⛔ AND THE HEART-RATE CURVE (2026-09-26): the ride's threshold heart rate is read off `computed.hr_curve` by the
+    // run's rule (`thresholdHrFromCurvesStep`). One more path, `hr_curve:computed->hr_curve` — the run curves' pattern
+    // (f7c32fede) — never `computed` whole; and a read error is logged, not read as "no rides".
     const allRideCurves: WorkoutRecord[] = await (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('workouts')
-          .select('id, type, date, p20:computed->power_curve->>20min')
+          .select('id, type, date, p20:computed->power_curve->>20min, hr_curve:computed->hr_curve')
           .eq('user_id', user_id)
           .eq('workout_status', 'completed')
           .in('type', ['ride', 'cycling', 'bike', 'virtualride', 'indoorcycling', 'gravelride', 'mountainbikeride'])
           .gte('date', eighteenMoAgoISO);
-        return ((data ?? []) as Array<{ id: string; type: string; date: string; p20: string | null }>)
-          .map((r) => ({ id: r.id, type: r.type, date: r.date, computed: { power_curve: { '20min': Number(r.p20) } } })) as unknown as WorkoutRecord[];
-      } catch { return []; }
+        if (error) { console.warn('[learn] ride curves read failed:', error.message); return []; }
+        return ((data ?? []) as Array<{ id: string; type: string; date: string; p20: string | null; hr_curve: RunHrCurve | null }>)
+          .map((r) => ({
+            id: r.id, type: r.type, date: r.date,
+            computed: { power_curve: { '20min': Number(r.p20) }, hr_curve: r.hr_curve ?? undefined },
+          })) as unknown as WorkoutRecord[];
+      } catch (e) { console.warn('[learn] ride curves read threw:', e instanceof Error ? e.message : e); return []; }
     })();
     const rideProfile = analyzeRides(rides, allRideCurves, priorLearned);
     const swimProfile = analyzeSwims(allWorkouts, swimPaceById);
@@ -716,7 +728,7 @@ Deno.serve(async (req) => {
     // never by this learner — EXCEPT the one-time seed below. It is carried over verbatim on every
     // learn: `mergedLearned` is rebuilt from this run's profile, so without this line the first learn
     // after an accept would drop it and every zone would snap back to the live estimate.
-    const acceptSeeds: Array<{ kind: 'ftp' | 'run_threshold'; value: number }> = [];
+    const acceptSeeds: Array<{ kind: 'ftp' | 'run_threshold' | 'run_lthr' | 'ride_lthr'; value: number }> = [];
     const priorAccepted = existing?.ride_ftp_accepted as Record<string, unknown> | undefined;
     if (priorAccepted && Number(priorAccepted.value) > 0) {
       mergedLearned.ride_ftp_accepted = priorAccepted;
@@ -742,6 +754,26 @@ Deno.serve(async (req) => {
       const seedThr = mergedLearned.run_threshold_pace_sec_per_km as LearnedMetric | undefined;
       if (seedThr && Number(seedThr.value) > 0 && (seedThr.confidence === 'medium' || seedThr.confidence === 'high')) {
         acceptSeeds.push({ kind: 'run_threshold', value: Number(seedThr.value) });
+      }
+    }
+    // ⛔ THRESHOLD HEART RATE: PROPOSED, THEN ACCEPTED — the FTP pattern applied per sport (2026-09-26, Michael: "go").
+    // Keep the accepted value; never overwrite it here. THE TRANSITION IS FTP'S LAUNCH RULE, followed exactly
+    // (docs/SPEC-ftp-accept-2026-09-04.md §5 "Seeding", the FTP block above): an athlete with a trusted measurement and
+    // no accepted value gets `accepted = measured` on this learner's next run, through save-baselines' accept
+    // (`via: 'seed'`), no migration and no DB write. Only a MEASURED medium/high value seeds — the same gate the accept
+    // applies (`acceptLearnedLthr`: D-284, learned-low never proposes) — so a formula never becomes "the number they
+    // said yes to". Until the seed lands the resolver has no learned tier to fall back on (it reads typed, then
+    // accepted), so the measured number shows as an offer in the meantime.
+    for (const sport of ['run', 'ride'] as const) {
+      const acceptedKey = sport === 'run' ? 'run_threshold_hr_accepted' : 'ride_threshold_hr_accepted';
+      const priorHrAccepted = existing?.[acceptedKey] as Record<string, unknown> | undefined;
+      if (priorHrAccepted && Number(priorHrAccepted.value) > 0) {
+        mergedLearned[acceptedKey] = priorHrAccepted;
+        continue;
+      }
+      const seedHr = measuredLthr({ learned_fitness: mergedLearned as never }, { sport });
+      if (seedHr.bpm != null && seedHr.source === 'learned') {
+        acceptSeeds.push({ kind: sport === 'run' ? 'run_lthr' : 'ride_lthr', value: seedHr.bpm });
       }
     }
 
@@ -786,7 +818,8 @@ Deno.serve(async (req) => {
       // Re-read immediately before the write; see `carryThroughFresh`.
       const { data: freshRow } = await supabase.from('user_baselines').select('learned_fitness').eq('id', existingBaselines.id).maybeSingle();
       const toWrite = carryThroughFresh(mergedLearned, parseJsonb(freshRow?.learned_fitness));
-      // ⛔ The learned keys below are this step's (2026-09-16, Stage 7 session 1); strength_1rms and the two accepted keys ride through.
+      // ⛔ The learned keys below are this step's (2026-09-16, Stage 7 session 1); strength_1rms and the accepted keys ride through
+      // (four since 2026-09-26: FTP, threshold pace, and the run and ride threshold heart rates).
       const { error: updateError } = await supabase
         .from('user_baselines')
         .update({
@@ -885,6 +918,37 @@ interface RunAnalysisResult {
   max_hr_observed: LearnedMetric | null;
   easy_pace: LearnedMetric | null;
   threshold_pace: LearnedMetric | null;
+}
+
+/**
+ * ⛔ THRESHOLD HEART RATE FROM THE HEART-RATE CURVES — ONE STEP, BOTH SPORTS (2026-09-13 for the run; the ride since
+ * 2026-09-26, Michael: "yeah lets do that"). TrainingPeaks: "your best 60-minute average heart rate, or 95% of your
+ * best 20-minute average heart rate, whichever is higher" (trainingpeaks.com/blog/are-you-using-threshold-improvement-
+ * notifications); `thresholdHrFromHrCurves` (src/lib/run-critical-speed.ts) holds the rule, over every session's stored
+ * `computed.hr_curve` (`buildRunHrCurve`, written for runs and, since 2026-09-26, rides).
+ *
+ * The run's own order, unchanged: a time-trial threshold heart rate on the prior row stands (a test beats an inference,
+ * p210); a prior value written by this rule stays while it is higher (only up); else the curves' answer. Null — no
+ * curves on file and no trial — means "leave the earlier steps' answer standing".
+ */
+export function thresholdHrFromCurvesStep(
+  priorHr: { value?: unknown; source?: unknown } | null | undefined,
+  curves: WorkoutRecord[],
+): LearnedMetric | null {
+  const trialStands = priorHr && /time trial/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
+  if (trialStands) return priorHr as LearnedMetric;
+  const fromCurves = thresholdHrFromHrCurves(curves.map((r) => ({
+    date: String(r.date ?? ''),
+    hrCurve: (r.computed as { hr_curve?: RunHrCurve } | null)?.hr_curve,
+  })));
+  if (!fromCurves) return null;
+  const priorFromCurves = priorHr && /heart-rate window|heart rate window/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
+  if (priorFromCurves && Number(priorHr!.value) >= fromCurves.value) return priorHr as LearnedMetric; // only up
+  const label = fromCurves.basis === '60'
+    ? `best 60-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`
+    : `95% of the best 20-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`;
+  console.log(`  📊 Threshold HR: ${fromCurves.value} bpm — ${label}`);
+  return { value: fromCurves.value, confidence: 'high', source: label, sample_count: 1, as_of: fromCurves.date } as LearnedMetric;
 }
 
 export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[] = [], priorLearned: Record<string, any> | null = null): RunAnalysisResult {
@@ -1008,12 +1072,14 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
   // `observedMaxHR` at :524) — so the band upgrades to the threshold anchor the moment a hard effort
   // is logged, and bootstraps off %max until then. Same shared definition every other surface uses.
   // Only this pass's learned values, on purpose: the learner measures from runs; it does not borrow a typed number.
+  // ⛔ `anchor: 'measured'` (2026-09-26): the owner answers with the typed or ACCEPTED threshold now, never a learned
+  // one; this band is built from what this pass measured, so it asks for the measurement (`measuredLthr`, same gate).
   const runEasyBand = resolveRunEasyHrBand({
     learned_fitness: {
       run_threshold_hr: threshold_hr,
       run_max_hr_observed: observedMaxHR != null ? { value: observedMaxHR, confidence: 'high' } : null,
     },
-  });
+  }, { anchor: 'measured' });
   if (runEasyBand.ceiling != null) {
     const easyEfforts = runs.filter(r => {
       const duration = r.moving_time || r.duration || 0;
@@ -1136,27 +1202,12 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
   // Intervals.icu reads the same windows (forum.intervals.icu/t/threshold-heart-rate-achievements/1459).
   // A time-trial threshold heart rate still stands over this (a test beats an inference, p210). Only up: a prior value
   // written by this rule stays while it is higher. No heart-rate curves on file → the earlier steps' answer stands.
+  // ⛔ ONE STEP FOR BOTH SPORTS (2026-09-26): `thresholdHrFromCurvesStep`, below; the ride reads its own curves with it.
   {
-    const priorHr = priorLearned?.run_threshold_hr;
-    const trialStands = priorHr && /time trial/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
-    const fromCurves = thresholdHrFromHrCurves(allRunCurves.map((r) => ({
-      date: String(r.date ?? ''),
-      hrCurve: (r.computed as { hr_curve?: RunHrCurve } | null)?.hr_curve,
-    })));
-    const priorFromCurves = priorHr && /heart-rate window|heart rate window/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
-    if (trialStands) {
-      threshold_hr = priorHr as LearnedMetric;
-      thresholdHRValue = Number(priorHr.value);
-    } else if (fromCurves && priorFromCurves && Number(priorHr.value) >= fromCurves.value) {
-      threshold_hr = priorHr as LearnedMetric;               // only up
-      thresholdHRValue = Number(priorHr.value);
-    } else if (fromCurves) {
-      const label = fromCurves.basis === '60'
-        ? `best 60-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`
-        : `95% of the best 20-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`;
-      threshold_hr = { value: fromCurves.value, confidence: 'high', source: label, sample_count: 1, as_of: fromCurves.date };
-      thresholdHRValue = fromCurves.value;
-      console.log(`  📊 Threshold HR: ${fromCurves.value} bpm — ${label}`);
+    const step = thresholdHrFromCurvesStep(priorLearned?.run_threshold_hr, allRunCurves);
+    if (step) {
+      threshold_hr = step;
+      thresholdHRValue = Number(step.value);
     }
   }
 
@@ -1227,7 +1278,7 @@ interface RideAnalysisResult {
 
 export function analyzeRides(
   rides: WorkoutRecord[],
-  /** every completed ride on file (18 months) — only `computed.power_curve` is read, for the ceiling */
+  /** every completed ride on file (18 months) — only `computed.power_curve['20min']` and `computed.hr_curve` are read */
   allRideCurves: WorkoutRecord[] = [],
   /** the previous `learned_fitness`, for the compound estimate's rate limit and threshold fallback */
   priorLearned: Record<string, any> | null = null,
@@ -1310,48 +1361,14 @@ export function analyzeRides(
     console.log(`  📊 Threshold candidates (power-filtered): ${thresholdCandidates.length}`);
 
     /**
-     * ⛔ THE HEART RATE DURING THE BEST 20-MINUTE POWER EFFORT (2026-08-20). Tried FIRST, because the
-     * filter above cannot work for most riders and the fallback beneath it is a formula.
-     *
-     * ⛔ WHY THE FILTER FAILS. It requires a WHOLE RIDE to average 85-95% of max heart rate. Real
-     * rides do not: you coast, you descend, you stop at lights. On a real account — 20 rides, high
-     * confidence on max HR — it found ZERO candidates and published `90% of observed max (estimated)`,
-     * sample_count 0, which every consumer then treated as this athlete's cycling threshold. It is the
-     * same defect the RUN threshold pace had, one sport over: judging a sustained effort by an average
-     * over an activity that was not sustained.
-     *
-     * ⛔ AND THE EFFORT WAS ALREADY IDENTIFIED. `power_curve['20min']` is the best 20 minutes of
-     * pedalling in the ride, and the FTP tier below already trusts it enough to derive FTP from it at
-     * 95%. If it is a threshold effort for power it is a threshold effort for heart rate. The only
-     * thing missing was the heart rate during it — now carried as `power_curve._hr`
-     * (`compute-workout-analysis:calculatePowerCurve`).
-     *
-     * ⚠️ THE BEST EFFORT, NOT THE MEDIAN. FTP takes `Math.max` of the 20-minute bests; this takes the
-     * heart rate from THAT SAME ride, so the two anchors describe one effort instead of two.
-     *
-     * ⚠️ NO BACKFILL. `_hr` is written at analysis time, so it lands on rides from here forward.
-     * Until two carry it, the tiers below still answer.
+     * ⛔ THE HEART RATE DURING THE BEST 20-MINUTE POWER EFFORT IS GONE (2026-09-26, Michael: "yeah lets do that").
+     * It read threshold heart rate off the ride that set the best 20-minute POWER (`power_curve._hr`), inside an
+     * uncited 60%–100%-of-max plausibility band, and had no outside source. The ride now reads the run's rule —
+     * TrainingPeaks' highest 60-minute heart rate or 95% of the highest 20-minute heart rate — off its own heart-rate
+     * curves, in the step after this block (`thresholdHrFromCurvesStep`). The tiers below stay as the answer for
+     * rides with no stored heart-rate curve, exactly as the run keeps its own earlier steps.
      */
-    const twentyMinEfforts = rides
-      .map((r) => ({
-        power: Number(r.computed?.power_curve?.['20min']) || 0,
-        hr: Number(r.computed?.power_curve?._hr?.['20min']) || 0,
-      }))
-      .filter((e) => e.power > 50 && e.hr > 0
-        // Plausibility, not judgement: a threshold heart rate sits below max and well above resting.
-        && e.hr < observedMaxHR && e.hr > observedMaxHR * 0.6)
-      .sort((a, b) => b.power - a.power);
-
-    if (twentyMinEfforts.length >= 1) {
-      const best = twentyMinEfforts[0];
-      threshold_hr = {
-        value: Math.round(best.hr),
-        confidence: twentyMinEfforts.length >= 3 ? 'high' : (twentyMinEfforts.length >= 2 ? 'medium' : 'low'),
-        source: `HR during best 20-min power effort (${best.power}W, ${twentyMinEfforts.length} efforts on file)`,
-        sample_count: twentyMinEfforts.length,
-      };
-      console.log(`  💓 Threshold HR from the 20-min power window: ${threshold_hr.value} bpm at ${best.power}W`);
-    } else if (thresholdCandidates.length >= 2) {
+    if (thresholdCandidates.length >= 2) {
       // Take the HIGHER end of the HR range (true threshold, not tempo)
       const sortedHRs = thresholdCandidates.map(r => r.avg_heart_rate).sort((a, b) => b - a); // Descending
       // Take 25th percentile from top (not median - we want hard efforts, not average)
@@ -1386,6 +1403,15 @@ export function analyzeRides(
       };
       console.log(`  💓 Threshold HR fallback: ${Math.round(observedMaxHR * 0.90)} bpm (90% of max)`);
     }
+  }
+
+  // ⛔ THE RUN'S RULE, OFF THE RIDE'S OWN HEART-RATE CURVES (2026-09-26). Same step, same order as `analyzeRuns`:
+  // the highest 60-minute heart rate or 95% of the highest 20-minute, over every ride on file (18 months); a prior value
+  // written by this rule stays while it is higher. No ride carries `computed.hr_curve` until it is analysed again
+  // (`compute-workout-analysis` writes it for rides from 2026-09-26), so until then the tiers above still answer.
+  {
+    const step = thresholdHrFromCurvesStep(priorLearned?.ride_threshold_hr, allRideCurves);
+    if (step) threshold_hr = step;
   }
 
   // ==========================================================================

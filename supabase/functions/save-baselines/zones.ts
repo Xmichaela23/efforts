@@ -42,7 +42,7 @@ import {
   pendingRunThresholdProposal,
   runThresholdSourceWord,
 } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { resolveCurrentLthr, pendingLthrProposal } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr, ageFromBirthday } from '../../../src/lib/resolve-current-max-hr.ts';
 import { resolveRunEasyHrBand } from '../_shared/easy-hr.ts';
 import { resolveStrengthCapacity, type CanonicalLiftKey } from '../_shared/state-trend/capacity-resolver.ts';
@@ -102,6 +102,20 @@ export type RunThresholdProposal = BaselineProposal & {
   faster: boolean;
 };
 
+/**
+ * A threshold heart rate waiting to be accepted (2026-09-26): FTP's sentence and button with `bpm`, plus what the
+ * post-workout popup prints — both numbers with their unit and which way it moved. `applied_display` / `up` are null
+ * when no threshold heart rate is in use yet (the measurement is still offered; see `pendingLthrProposal`).
+ */
+export type LthrProposalReadout = BaselineProposal & {
+  /** e.g. `162 bpm`. */
+  measured_display: string;
+  /** The threshold heart rate in use now, e.g. `153 bpm`; null when there is none. */
+  applied_display: string | null;
+  /** True when the measured number is higher than the one in use (always, when one is: only a higher number is offered); null when there is none. */
+  up: boolean | null;
+};
+
 export type ZoneTableRow = { name: string; range: string };
 
 export type ZoneTable = {
@@ -131,6 +145,7 @@ export type BaselinesReadout = {
     threshold_proposal: RunThresholdProposal | null;
     easy: BaselineReadoutRow;
     lthr: BaselineReadoutRow;
+    lthr_proposal: LthrProposalReadout | null;
     max_hr: BaselineReadoutRow;
     resting_hr: BaselineReadoutRow;
     five_k: BaselineReadoutRow;
@@ -140,6 +155,7 @@ export type BaselinesReadout = {
     ftp: BaselineReadoutRow;
     ftp_proposal: BaselineProposal | null;
     lthr: BaselineReadoutRow;
+    lthr_proposal: LthrProposalReadout | null;
     max_hr: BaselineReadoutRow;
     resting_hr: BaselineReadoutRow;
     zones: ZoneTable;
@@ -406,8 +422,12 @@ function buildReadout(args: {
   const hrFor = (sport: 'run' | 'ride') => {
     const isRun = sport === 'run';
     const lthr = resolveCurrentLthr(baselinesLike, { sport });
-    const manualLthr = positive(isRun ? cfg.manual_run_lthr : cfg.manual_ride_lthr);
-    const lthrMine = isRun ? pn.lthr_source === 'manual' : manualLthr != null;
+    /**
+     * ⛔ "YOUR NUMBER" WHEN THE TYPED NUMBER IS THE ONE IN USE (2026-09-26). This was `lthr_source === 'manual'` on the
+     * run and "a typed number exists" on the bike. The resolver now puts the typed number first (unless the run is on
+     * auto), so the word follows the tier the number came from — the rule `runThresholdSourceWord` already follows.
+     */
+    const lthrMine = lthr.source === 'manual' || lthr.source === 'manual-chosen';
     const lthrRow: BaselineReadoutRow = {
       value: lthr.bpm != null ? `${Math.round(lthr.bpm)} bpm · ${word(lthr.source, !!lthrMine)}` : null,
       raw: lthr.bpm != null ? Math.round(lthr.bpm) : null,
@@ -415,6 +435,21 @@ function buildReadout(args: {
       note: lthrMine ? 'your number' : lthr.bpm != null ? `from ${isRun ? 'runs' : 'rides'}` : null,
       mine: !!lthrMine,
     };
+    /**
+     * ⛔ THE MEASURED THRESHOLD HEART RATE, OFFERED (2026-09-26, Michael: "go") — proposed-then-accepted, FTP's words
+     * and shape with `bpm` ("Your rides measure 258 W" · "use 258 W"). `accept_value` is the bpm the button shows.
+     */
+    const prop = pendingLthrProposal(baselinesLike, { sport });
+    const lthrProposal: LthrProposalReadout | null = prop
+      ? {
+        text: `Your ${isRun ? 'runs' : 'rides'} measure ${Math.round(prop.measured)} bpm`,
+        button: `use ${Math.round(prop.measured)} bpm`,
+        accept_value: Math.round(prop.measured),
+        measured_display: `${Math.round(prop.measured)} bpm`,
+        applied_display: prop.applied != null ? `${Math.round(prop.applied)} bpm` : null,
+        up: prop.applied != null ? Math.round(prop.measured) > Math.round(prop.applied) : null,
+      }
+      : null;
 
     const manualMax = positive(isRun ? cfg.manual_run_max_hr : cfg.manual_ride_max_hr);
     const max = resolveCurrentMaxHr(maxHrBaselines(learned, cfg), { sport, allowAgeEstimate: false });
@@ -431,7 +466,7 @@ function buildReadout(args: {
         `Not on file yet. Your hardest logged ${isRun ? 'run' : 'ride'} sets it, once one is recorded with a heart-rate strap.`,
       );
 
-    return { lthr: lthrRow, max_hr: maxRow, zones: zoneTable(args.hrSets[sport]) };
+    return { lthr: lthrRow, lthr_proposal: lthrProposal, max_hr: maxRow, zones: zoneTable(args.hrSets[sport]) };
   };
   const runHr = hrFor('run');
   const bikeHr = hrFor('ride');
@@ -553,6 +588,7 @@ function buildReadout(args: {
       threshold_proposal,
       easy: easyRow,
       lthr: runHr.lthr,
+      lthr_proposal: runHr.lthr_proposal,
       max_hr: runHr.max_hr,
       resting_hr: restingRow,
       five_k: fiveKRow,
@@ -562,6 +598,7 @@ function buildReadout(args: {
       ftp: ftpRow,
       ftp_proposal,
       lthr: bikeHr.lthr,
+      lthr_proposal: bikeHr.lthr_proposal,
       max_hr: bikeHr.max_hr,
       resting_hr: restingRow,
       zones: bikeHr.zones,

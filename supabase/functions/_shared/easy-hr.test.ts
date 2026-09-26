@@ -21,6 +21,13 @@ import {
 
 // The band takes the whole `user_baselines` row (2026-09-26); these fixtures are about the learned block.
 const lf = (o: Record<string, unknown>) => ({ learned_fitness: o });
+/**
+ * ⛔ THE LEARNED BLOCK IS THE LEARNER'S ANCHOR NOW (2026-09-26). Threshold heart rate became proposed-then-accepted:
+ * the band the app uses reads the typed or ACCEPTED threshold (`resolveCurrentLthr`) and never the learned one. The
+ * fixtures below are about a learned threshold — the band maths and the D-284 gate — so they build the band the
+ * learner builds from its own pass (`anchor: 'measured'`). The band in use is pinned at the bottom of this file.
+ */
+const measuredBand = (b: Parameters<typeof resolveRunEasyHrBand>[0]) => resolveRunEasyHrBand(b, { anchor: 'measured' });
 const metric = (value: number, confidence = 'high') => ({ value, confidence, sample_count: 5 });
 
 // The OLD gate, kept so every fixture can prove what it used to do.
@@ -29,7 +36,7 @@ const OLD_GATE = (maxHr: number) => maxHr * 0.75;
 // ═══ THE REGRESSION THAT STARTED IT ALL ═══════════════════════════════════
 Deno.test('Q-169: the athlete whose easy runs ALL failed the old gate now qualifies', () => {
   // Shape: LTHR 151, observed max 174. Genuine easy runs (RPE 2-3) at 133-141 bpm.
-  const band = resolveRunEasyHrBand(lf({
+  const band = measuredBand(lf({
     run_threshold_hr: metric(151, 'medium'),
     run_max_hr_observed: metric(174, 'high'),
   }));
@@ -49,7 +56,7 @@ Deno.test('Q-169: the athlete whose easy runs ALL failed the old gate now qualif
 });
 
 Deno.test('Q-169 NEG: a genuinely HARD run is still excluded — the gate got RIGHT, not just looser', () => {
-  const band = resolveRunEasyHrBand(lf({
+  const band = measuredBand(lf({
     run_threshold_hr: metric(151, 'medium'),
     run_max_hr_observed: metric(174, 'high'),
   }));
@@ -61,7 +68,7 @@ Deno.test('Q-169 NEG: a genuinely HARD run is still excluded — the gate got RI
 });
 
 Deno.test('Q-169 NEG: a walk / stopped strap is excluded by the FLOOR', () => {
-  const band = resolveRunEasyHrBand(lf({ run_threshold_hr: metric(151) }));
+  const band = measuredBand(lf({ run_threshold_hr: metric(151) }));
   assertEquals(isEasyHr(90, band), false);    // below the 106 floor
   assertEquals(isEasyHr(105, band), false);
   assertEquals(isEasyHr(106, band), true);    // exactly the floor — inclusive
@@ -69,7 +76,7 @@ Deno.test('Q-169 NEG: a walk / stopped strap is excluded by the FLOOR', () => {
 
 // ═══ The anchor: threshold first, %max bootstrap, honest null ═════════════
 Deno.test('ANCHOR: LTHR wins when present, and the band says so', () => {
-  const band = resolveRunEasyHrBand(lf({
+  const band = measuredBand(lf({
     run_threshold_hr: metric(160, 'high'),
     run_max_hr_observed: metric(190, 'high'),
   }));
@@ -79,7 +86,7 @@ Deno.test('ANCHOR: LTHR wins when present, and the band says so', () => {
 });
 
 Deno.test('BOOTSTRAP: no LTHR yet (day-one athlete) → %max band, and it is flagged LOW confidence', () => {
-  const band = resolveRunEasyHrBand(lf({ run_max_hr_observed: metric(190, 'high') }));
+  const band = measuredBand(lf({ run_max_hr_observed: metric(190, 'high') }));
   assertEquals(band.anchor, 'max_hr');
   assertEquals(band.ceiling, Math.round(190 * EASY_CEILING_PCT_MAXHR)); // 152 — the field's 80%, not 75%
   assertEquals(band.floor, Math.round(190 * 0.65));                     // 124
@@ -89,14 +96,14 @@ Deno.test('BOOTSTRAP: no LTHR yet (day-one athlete) → %max band, and it is fla
 });
 
 Deno.test('BOOTSTRAP: the corrected %max band admits athletes the old 75% ceiling excluded', () => {
-  const band = resolveRunEasyHrBand(lf({ run_max_hr_observed: metric(174, 'high') }));
+  const band = measuredBand(lf({ run_max_hr_observed: metric(174, 'high') }));
   assertEquals(band.ceiling, 139);              // 0.80 × 174
   assertEquals(isEasyHr(135, band), true);      // easy — and the old 130.5 gate threw it out
   assertEquals(135 > OLD_GATE(174), true);
 });
 
 Deno.test('LAW 2: no threshold AND no max → NULL. We do not know, so we do not invent.', () => {
-  const band = resolveRunEasyHrBand(lf({}));
+  const band = measuredBand(lf({}));
   assertEquals(band.anchor, 'none');
   assertEquals(band.ceiling, null);
   assertEquals(band.floor, null);
@@ -104,9 +111,9 @@ Deno.test('LAW 2: no threshold AND no max → NULL. We do not know, so we do not
 });
 
 Deno.test('LAW 3: the basis string names the anchor, so the receipt can be rendered', () => {
-  const l = resolveRunEasyHrBand(lf({ run_threshold_hr: metric(151, 'medium') }));
+  const l = measuredBand(lf({ run_threshold_hr: metric(151, 'medium') }));
   assertEquals(l.basis.includes('threshold'), true);
-  const m = resolveRunEasyHrBand(lf({ run_max_hr_observed: metric(174) }));
+  const m = measuredBand(lf({ run_max_hr_observed: metric(174) }));
   assertEquals(m.basis.includes('estimated'), true);
   assertEquals(m.basis.includes('max'), true);
 });
@@ -124,14 +131,14 @@ Deno.test('THE DEAD PATH: `learned_fitness.running.threshold_hr` is NOT where th
   // reconciler's observed side. This fixture pins the real shape so the dead path cannot come back.
   const realShape = lf({ run_threshold_hr: metric(151, 'medium') });
   assertEquals((realShape.learned_fitness as any).running, undefined); // the nested path: does not exist
-  assertEquals(resolveRunEasyHrBand(realShape).anchor, 'lthr'); // the real path: resolves
+  assertEquals(measuredBand(realShape).anchor, 'lthr'); // the real path: resolves
 });
 
 // ═══ Sweep: every athlete with an anchor gets a usable band ═══════════════
 Deno.test('SWEEP: any athlete with an anchor gets a band; a floor always sits below its ceiling', () => {
   for (const lthr of [140, 151, 160, 175]) {
     for (const max of [170, 180, 190, 200]) {
-      const band = resolveRunEasyHrBand(lf({
+      const band = measuredBand(lf({
         run_threshold_hr: metric(lthr), run_max_hr_observed: metric(max),
       }));
       if (band.ceiling == null || band.floor == null) throw new Error(`no band for LTHR ${lthr}/max ${max}`);
@@ -149,7 +156,7 @@ Deno.test('SWEEP: any athlete with an anchor gets a band; a floor always sits be
 // HARD workout — straight into the D-033 reconciler that sets the plan's easy pace.
 
 // Synthetic athlete: LTHR 150 -> easy band [105, 134].
-const BAND = resolveRunEasyHrBand(lf({ run_threshold_hr: metric(150, 'high') }));
+const BAND = measuredBand(lf({ run_threshold_hr: metric(150, 'high') }));
 
 Deno.test('Q-171: a genuine easy run qualifies (the engine must still be FED)', () => {
   // 50 min at avg 128 bpm, 35 min of it in-band. This is the case that must never be gated away —
@@ -190,7 +197,7 @@ Deno.test('Q-171: corrupt/missing HR abstains — never Number(null) === 0', () 
 });
 
 Deno.test('Q-171: no band (no LTHR, no max HR) -> abstain, never guess', () => {
-  const unknown = resolveRunEasyHrBand(lf({}));
+  const unknown = measuredBand(lf({}));
   assertEquals(unknown.ceiling, null);
   assertEquals(runEasyPaceEligible(128, 50, 30 * 60, unknown), false);
 });
@@ -227,7 +234,7 @@ Deno.test('Q-171 REGRESSION: a sample_count:0 "threshold" is a formula, not a me
   // very Q-169 starvation it claims to cure.
   const maxHr = 180;
   const fabricated = { value: Math.round(maxHr * 0.88), confidence: 'low', sample_count: 0 };
-  const band = resolveRunEasyHrBand(lf({
+  const band = measuredBand(lf({
     run_threshold_hr: fabricated,
     run_max_hr_observed: metric(maxHr, 'high'),
   }));
@@ -245,7 +252,7 @@ Deno.test('Q-171 REGRESSION: a sample_count:0 "threshold" is a formula, not a me
 
 Deno.test('Q-171: a WEAK but MEASURED threshold still anchors — the gate is invented-vs-measured, not weak-vs-strong', () => {
   // The 95th-percentile fallback is low-confidence but derived from real sustained efforts (sample_count >= 3).
-  const band = resolveRunEasyHrBand(lf({
+  const band = measuredBand(lf({
     run_threshold_hr: { value: 150, confidence: 'low', sample_count: 4 },
     run_max_hr_observed: metric(180, 'high'),
   }));
@@ -255,7 +262,7 @@ Deno.test('Q-171: a WEAK but MEASURED threshold still anchors — the gate is in
 
 Deno.test('Q-171: an ABSENT sample_count is "not stated", not "measured nothing"', () => {
   // The in-pass synthetic band inside learn-fitness-profile passes no count. It must still anchor.
-  const band = resolveRunEasyHrBand(lf({ run_threshold_hr: { value: 150, confidence: 'medium' } }));
+  const band = measuredBand(lf({ run_threshold_hr: { value: 150, confidence: 'medium' } }));
   assertEquals(band.anchor, 'lthr');
 });
 
@@ -264,7 +271,7 @@ Deno.test('Q-171 REGRESSION: the analyzer Z3 floor and the easy ceiling cannot d
   // They shipped 40 minutes apart with two independent roundings (134 vs 136 at LTHR 151), so a 135 bpm run
   // was Zone 2 on Details and NOT easy to the learner. Now the boundary IS the easy ceiling + 1.
   for (const lthr of [140, 145, 150, 151, 155, 160, 165, 170, 175]) {
-    const band = resolveRunEasyHrBand(lf({ run_threshold_hr: metric(lthr, 'high') }));
+    const band = measuredBand(lf({ run_threshold_hr: metric(lthr, 'high') }));
     const z3 = zone3FloorBpm(lthr);
     assertEquals(z3, (band.ceiling as number) + 1, `LTHR ${lthr}: Z3 floor must be one bpm above the easy ceiling`);
     // The invariant that matters: every HR below the Z3 floor (and above the band floor) is EASY, and the
@@ -272,4 +279,22 @@ Deno.test('Q-171 REGRESSION: the analyzer Z3 floor and the easy ceiling cannot d
     assertEquals(isEasyHr(z3 - 1, band), true, `LTHR ${lthr}: the last bpm of Z2 must be easy`);
     assertEquals(isEasyHr(z3, band), false, `LTHR ${lthr}: the first bpm of Z3 must not be easy`);
   }
+});
+
+// ═══ THE BAND IN USE — typed, else accepted, never the learner's number unaccepted (2026-09-26) ═══════════
+Deno.test('IN USE: an unaccepted learned threshold does not anchor the band the app uses — the bootstrap does', () => {
+  const b = lf({ run_threshold_hr: metric(151, 'high'), run_max_hr_observed: metric(180, 'high') });
+  assertEquals(resolveRunEasyHrBand(b).anchor, 'max_hr');
+  // …while the learner, reading its own pass, still anchors on it.
+  assertEquals(measuredBand(b).anchor, 'lthr');
+});
+
+Deno.test('IN USE: the accepted threshold anchors the band; a typed one outranks it', () => {
+  const accepted = { value: 151, confidence: 'high', sample_count: 1, accepted_at: '2026-09-26T00:00:00.000Z', accepted_from: 151 };
+  const b = lf({ run_threshold_hr: metric(158, 'high'), run_threshold_hr_accepted: accepted, run_max_hr_observed: metric(180) });
+  const band = resolveRunEasyHrBand(b);
+  assertEquals(band.anchor, 'lthr');
+  assertEquals(band.ceiling, Math.round(151 * EASY_CEILING_PCT_LTHR)); // the accepted 151, not the measured 158
+  const typed = resolveRunEasyHrBand({ ...b, configured_hr_zones: { manual_run_lthr: 165 } });
+  assertEquals(typed.ceiling, Math.round(165 * EASY_CEILING_PCT_LTHR));
 });
