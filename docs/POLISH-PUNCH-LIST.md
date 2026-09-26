@@ -108,7 +108,7 @@ TrainerRoad open the plan overview from the plan. Sections, in order:
   week one is ahead or current.
 - Race builds get their own outline later: each week laid out.
 
-> **BUILT 2026-09-25 (edited, NOT committed/pushed/deployed):** `_shared/standing-plan/program-outline.ts`
+> **BUILT 2026-09-25 (PUSHED 39dbb0968, DEPLOYED 2026-09-25 from a clean worktree — 13 functions incl. ingest-phone-workout; phone build installed; NOT verified):** `_shared/standing-plan/program-outline.ts`
 > `composeProgramOutline` (server words; null for non-standing plans), `src/components/ProgramOutlineSheet.tsx`; Today's
 > plan name opens it (`get-week` `training_plan_context.programOutline`), the planner's Info opens it (`plan-overview`
 > `overview.program_outline`). `SETS_EARNED_PARAGRAPH` last sentence changed; `PLAN_WRITER_VERSION` 33→34 so built plans
@@ -116,7 +116,7 @@ TrainerRoad open the plan overview from the plan. Sections, in order:
 > generate-strength-plan, get-week, materialize-plan, place-lost-day, plan-overview, rematerialize-standing-block,
 > swap-session, validate-reschedule.
 
-## BUILT 2026-09-25 (edited, NOT committed/pushed/deployed) — THE LOAD CARD GETS ITS 12-WEEK CHART
+## BUILT 2026-09-25 (PUSHED 39dbb0968, DEPLOYED 2026-09-25 from a clean worktree — 13 functions incl. ingest-phone-workout; phone build installed; NOT verified) — THE LOAD CARD GETS ITS 12-WEEK CHART
 
 > Michael: the LOAD numbers read as abstract. The card's arrow (beside "LOAD") opens TrainingPeaks' Performance
 > Management Chart shape: fitness and fatigue on one chart, form below, plain lines through the daily values, captions
@@ -530,7 +530,7 @@ the archetypes whose judged work is all floor-only — the progressive repeats a
 > compliance), TrainerRoad does not score an unstructured ride but uses it for fitness and AI FTP Detection. Build waits
 > on his go.
 >
-> **BUILT 2026-09-25 (edited, NOT committed/pushed/deployed):** `session-detail/build.ts` `noVerdict` (the builder's own
+> **BUILT 2026-09-25 (PUSHED 39dbb0968, DEPLOYED 2026-09-25 from a clean worktree — 13 functions incl. ingest-phone-workout; phone build installed; NOT verified):** `session-detail/build.ts` `noVerdict` (the builder's own
 > `match.planned_id` test, runs and rides): no execution/adherence score, no drift or efficiency row, no flags/limiter,
 > no analyser insights or outlook, no interval colours or percents; `session-boom/line.ts` writes no drift-streak line
 > for a session with no `planned_row`. `SESSION_TOTALS_VERSION` 7→8. Tests: `unattached-no-verdict.test.ts`.
