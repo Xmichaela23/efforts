@@ -349,9 +349,9 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick,
       <span style={{ fontSize: 12, fontWeight: 700, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{valueNum}</span>
       {/* A pill with no unit keeps the line empty, so every pill's "(avg)" sits on the same line. */}
       <span style={{ fontSize: 10, fontWeight: 600, color: active ? activeColor : "rgba(255, 255, 255, 0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "opacity 150ms ease" }}>{valueUnit ?? "\u00a0"}</span>
-      {subValue ? (
-        <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.5)", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue}</span>
-      ) : null}
+      {/* ⛔ THE LINE STAYS WHEN IT IS EMPTY (2026-09-26, Michael: the strip "bounces up and down between scrolling and
+          letting go"). "(avg)" shows at rest and not while dragging; the line keeps its height either way. */}
+      <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.5)", fontWeight: 600, whiteSpace: "nowrap", transition: "opacity 150ms ease" }}>{subValue ?? "\u00a0"}</span>
     </div>
   );
 };
@@ -1648,20 +1648,22 @@ function EffortsViewerMapbox({
           )}
         </div>
         
-        {/* Context label when scrubbing - shows distance and time */}
-        {isScrubbing && idx !== null && normalizedSamples[idx] && (
-          <div style={{ 
-            textAlign: 'center', 
-            fontSize: 11, 
-            color: 'rgba(255, 255, 255, 0.7)', 
-            marginTop: -4, 
-            marginBottom: 4,
-            transition: 'opacity 150ms ease',
-            opacity: 1
-          }}>
-            at {distText(normalizedSamples[idx].dist_disp)} • {fmtTime(normalizedSamples[idx].t_s)}
-          </div>
-        )}
+        {/* Context label when scrubbing - shows distance and time. Its line is always there (empty at rest), so the
+            strip does not change height between dragging and letting go (2026-09-26). */}
+        <div style={{ 
+          textAlign: 'center', 
+          fontSize: 11, 
+          color: 'rgba(255, 255, 255, 0.7)', 
+          marginTop: -4, 
+          marginBottom: 4,
+          minHeight: 15,
+          transition: 'opacity 150ms ease',
+          opacity: 1
+        }}>
+          {isScrubbing && idx !== null && normalizedSamples[idx]
+            ? `at ${distText(normalizedSamples[idx].dist_disp)} • ${fmtTime(normalizedSamples[idx].t_s)}`
+            : '\u00a0'}
+        </div>
         
         {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
@@ -1672,11 +1674,9 @@ function EffortsViewerMapbox({
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700 }}>
               Alt {elevText(isScrubbing ? s?.elev_disp : last?.elev_disp, sdUnits?.elevation)}
             </div>
-            {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
-                (end)
-              </div>
-            )}
+            <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              {isScrubbing ? '\u00a0' : '(end)'}
+            </div>
           </div>
           {/* Distance and Time - show totals when not scrubbing */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -1693,11 +1693,9 @@ function EffortsViewerMapbox({
                 : `${distText(last?.dist_disp)} · ${sessionTimeDisplay ?? fmtTime(normalizedSamples.length > 0 ? normalizedSamples[normalizedSamples.length - 1].t_s : 0)}`
               }
             </div>
-            {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
-                (total)
-              </div>
-            )}
+            <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              {isScrubbing ? '\u00a0' : '(total)'}
+            </div>
           </div>
           {/**
             * ⛔ ELEVATION GAIN/LOSS IS THE SERVER'S RUNNING CLIMB (2026-09-10, audit H-D03), at the cursor
@@ -1720,11 +1718,9 @@ function EffortsViewerMapbox({
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700, whiteSpace: "nowrap" }}>
               {`${climbText} ${sdUnits.elevation}`}
             </div>
-            {!isScrubbing && (
-              <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
-                (total)
-              </div>
-            )}
+            <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
+              {isScrubbing ? '\u00a0' : '(total)'}
+            </div>
           </div>
             );
           })()}

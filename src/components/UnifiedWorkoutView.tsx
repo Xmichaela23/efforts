@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getProviderAttribution } from '@/lib/provider-attribution';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { X, Calendar, ListCollapse, List } from 'lucide-react';
+import { X, Calendar, ListCollapse, List, Loader2 } from 'lucide-react';
 import CompletedTab from './CompletedTab';
 import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
@@ -131,9 +131,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     include_swim: false,
     resolution: 'low',
   });
-  const isCompleted = (typeof (workout as any)?.is_executed === 'boolean'
+  /**
+   * ⛔ "NOT KNOWN YET" IS NOT "PLANNED" (2026-09-26, Michael: opening a workout "bounces you to the planned section …
+   * then bounces you around once it loads, like if you're on Details"). A row that arrives without the flag used to
+   * read as planned until workout-detail answered: the view jumped to Planned, then reset to Performance when the
+   * answer came. Now the flag has three states. A refresh of the SAME workout keeps the last answer it had, so the
+   * view never moves on a refetch; a first open with no answer yet shows a spinner instead of the Planned tab.
+   */
+  const flagNow: boolean | undefined = typeof (workout as any)?.is_executed === 'boolean'
     ? (workout as any).is_executed
-    : (executedFlagRow as any)?.is_executed) === true;
+    : (typeof (executedFlagRow as any)?.is_executed === 'boolean' ? (executedFlagRow as any).is_executed : undefined);
+  const lastExecutedRef = useRef<{ id: string; value: boolean } | null>(null);
+  if (flagNow !== undefined && wid) lastExecutedRef.current = { id: wid, value: flagNow };
+  const rememberedFlag = lastExecutedRef.current?.id === wid ? lastExecutedRef.current.value : undefined;
+  const executedResolved: boolean | undefined = flagNow ?? (flagMissing ? rememberedFlag : false);
+  const executedUnknown = executedResolved === undefined;
+  const isCompleted = executedResolved === true;
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
   // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
   // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
@@ -142,7 +155,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isStrength = workoutType === 'strength';
   // Strength-family workouts (strength/mobility/pilates) have no Details tab — folded into Performance (D-207).
   const isStrengthFamily = isStrength || isMobility || workoutType === 'pilates_yoga';
-  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'summary' : 'planned'));
+  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted || executedUnknown ? 'summary' : 'planned'));
+  // The tab the athlete picked on THIS workout, kept through refetches so a reload never moves them (2026-09-26).
+  const pickedTabRef = useRef<{ id: string; tab: string } | null>(null);
+  const pickTab = (v: string) => { pickedTabRef.current = { id: wid, tab: v }; setActiveTab(v); };
   /**
    * ⛔ SWIPE BETWEEN WORKOUTS, BY DATE, ON PERFORMANCE ONLY (2026-09-14, Michael). Right = the workout
    * before this one, left = the one after, every sport, completed only. Details is left alone: its charts
@@ -466,7 +482,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
-    let desired = initialTab || (isCompleted ? 'summary' : 'planned');
+    if (executedUnknown) return; // wait for the answer; never park on Planned in the meantime
+    const picked = pickedTabRef.current?.id === wid ? pickedTabRef.current.tab : null;
+    let desired = picked ?? (initialTab || (isCompleted ? 'summary' : 'planned'));
     // D-207: the strength family has no 'completed' (Details) tab — fold any request for it into
     // Performance so an external initialTab='completed' (e.g. AppLayout routing) can't strand the
     // view on a triggerless tab that still renders the old Details content.
@@ -480,13 +498,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // ⚠️ This is EXACTLY the trap the D-207 line above describes, on the other tab. Same fix.
     if (!isCompleted) desired = 'planned';
     setActiveTab(desired);
-  }, [initialTab, isCompleted, workout?.id]);
+  }, [initialTab, isCompleted, executedUnknown, workout?.id]);
 
   // Defense-in-depth, mirroring the D-207 enforcement below: whatever call site moves the tab, a
   // workout with nothing executed cannot come to rest anywhere but 'planned'.
   useEffect(() => {
-    if (!isCompleted && activeTab !== 'planned') setActiveTab('planned');
-  }, [isCompleted, activeTab]);
+    if (!executedUnknown && !isCompleted && activeTab !== 'planned') setActiveTab('planned');
+  }, [executedUnknown, isCompleted, activeTab]);
 
   // D-207 enforcement (defense-in-depth for the documented constraint): a strength-family workout
   // must never rest on 'completed'. Catches ANY setActiveTab('completed') from any call site.
@@ -1231,7 +1249,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Planned workout (not completed): Planned tab only */}
       {/* Completed + linked: Planned, Performance, Details */}
       {/* Completed + not linked: Performance, Details */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {executedUnknown ? (
+        <div className="flex items-center justify-center py-16" aria-busy="true">
+          <Loader2 className="h-6 w-6 animate-spin text-label-secondary" />
+        </div>
+      ) : (
+      <Tabs value={activeTab} onValueChange={pickTab}>
         <TabsList
           className={`grid w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-0 py-0 ${
           !isCompleted
@@ -1669,6 +1692,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
         </div>
       </Tabs>
+      )}
       {/* Delete (2026-09-08, Michael: "Delete is too close to Share. Just put it at the bottom."). It sat in
           the header under Share on 2026-09-07; now the last thing on the page, above the nav-bar spacer. */}
       {isCompleted && onDelete && workout?.id && (
