@@ -564,7 +564,7 @@ export function doneHeadline(workout: Record<string, unknown>): string | null {
 }
 
 /** One of Today's tiles on a finished ride or run — get-week's `DoneTile` (`get-week/week-totals.ts`). */
-type DoneTile = { key: string; label: string; display: string; line?: string };
+type DoneTile = { key: string; label: string; display: string };
 
 /** get-week's `done_tiles`: a list on a ride or run (possibly empty), null on every other sport. */
 function doneTilesOf(workout: Record<string, unknown>): DoneTile[] | null {
@@ -577,7 +577,8 @@ function doneTilesOf(workout: Record<string, unknown>): DoneTile[] | null {
 /**
  * The ride or run tiles, in `AdherenceChips`' dense type and spacing so the card reads as before. Four go two by two
  * (the 2026-09-14 rule: four one-line readouts need more than a phone's width); three or fewer share one row.
- * server-word: every label, number and line is get-week's; the plan line is `session_detail_v1.block.line`, the one
+ * server-word: every label and number is get-week's, and every tile is the same height (no words under the Execution
+ * number since 2026-09-27; they stay on Performance). The plan line is `session_detail_v1.block.line`, the one
  * `AdherenceChips` printed above its tiles.
  */
 const DoneTiles: React.FC<{ tiles: DoneTile[]; planLine: string | null }> = ({ tiles, planLine }) => {
@@ -586,7 +587,6 @@ const DoneTiles: React.FC<{ tiles: DoneTile[]; planLine: string | null }> = ({ t
     <div key={t.key} className="flex flex-col items-center px-1 min-w-0">
       <div className="readout-num text-subhead whitespace-nowrap">{t.display}</div>
       <div className="readout-label text-caption uppercase text-center whitespace-nowrap">{t.label}</div>
-      {t.line ? <div className="text-caption text-label-secondary text-center leading-snug whitespace-nowrap">{t.line}</div> : null}
     </div>
   ));
   return (

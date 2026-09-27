@@ -138,7 +138,7 @@ Deno.test('⛔ a ride with a plan: Distance · Moving Time · Elevation · Execu
     { key: 'distance', label: 'Distance', display: '10.4 mi' },
     { key: 'moving', label: 'Moving Time', display: '1:23:21' },
     { key: 'elevation', label: 'Elevation', display: '1398 ft' },
-    { key: 'execution', label: 'Execution', display: '71%', line: '14 of 17 intervals done' },
+    { key: 'execution', label: 'Execution', display: '71%' },
   ]);
   // Nothing from Performance's own four: no workload, no minutes of plan, no drift.
   const shown = JSON.stringify(t);
@@ -168,7 +168,7 @@ Deno.test('⛔ a run with a plan: Distance · Pace · Moving Time · Execution',
     { key: 'distance', label: 'Distance', display: '5.0 mi' },
     { key: 'pace', label: 'Pace', display: '9:36/mi' },
     { key: 'moving', label: 'Moving Time', display: '48:00' },
-    { key: 'execution', label: 'Execution', display: '84%', line: 'Time in easy HR' },
+    { key: 'execution', label: 'Execution', display: '84%' },
   ]);
 });
 

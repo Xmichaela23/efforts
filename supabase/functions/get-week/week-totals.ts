@@ -108,8 +108,6 @@ export type DoneTile = {
   key: 'distance' | 'moving' | 'elevation' | 'pace' | 'execution';
   label: string;
   display: string;
-  /** The Execution tile only: the server's words under the number ("4 of 6 intervals done"), when it wrote some. */
-  line?: string;
 };
 
 /** A session time row (`_shared/session-detail/session-times.ts`), the fields read here. */
@@ -133,10 +131,13 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ?
  *                   Performance and Details print. A source that sent no moving time gets no tile.
  *   · Elevation   — `completed_totals.elevation_display` on the stored session detail.
  *   · Pace        — `completed_totals.avg_pace_display` on the stored session detail.
- *   · Execution   — `execution.execution_score` and `execution_line` on the stored session detail, when the detail
+ *   · Execution   — `execution.execution_score` on the stored session detail, when the detail
  *                   names a planned session (`plan_context.planned_id`) and does not hide its adherence tiles
  *                   (`display.show_adherence_chips`, false on a goal race or an all-zero read). The builder nulls
  *                   the score on a run or ride with no plan attached (`noVerdict`), so that session gets none.
+ *                   ⛔ NUMBER AND LABEL ONLY (2026-09-27, Michael: the fourth tile "drops"). The words under the score
+ *                   ("1 of 1 intervals done") made that tile a line taller than the other three; they stay on
+ *                   Performance's Execution tile (`AdherenceChips`), and every tile here is the same height.
  * ⚠️ THE STORED DETAIL IS REBUILT WHEN THE SESSION IS OPENED, so a session analysed again reads its old Elevation,
  * Pace and Execution here until then — the same copy Today's tiles read before this change.
  * Null on any other sport: that card keeps its lines.
@@ -154,8 +155,8 @@ function doneTiles(type: string, done_distance: string | null, sessionTimes: unk
     ? `${Math.round(score)}%`
     : null;
   const tiles: DoneTile[] = [];
-  const add = (key: DoneTile['key'], label: string | null, display: string | null, line: string | null = null) => {
-    if (label && display) tiles.push({ key, label, display, ...(line ? { line } : {}) });
+  const add = (key: DoneTile['key'], label: string | null, display: string | null) => {
+    if (label && display) tiles.push({ key, label, display });
   };
   add('distance', 'Distance', done_distance);
   if (isRide) {
@@ -165,7 +166,7 @@ function doneTiles(type: string, done_distance: string | null, sessionTimes: unk
     add('pace', 'Pace', text(totals?.avg_pace_display));
     add('moving', text(moving?.label), text(moving?.display));
   }
-  add('execution', 'Execution', execution, text(sd?.execution?.execution_line));
+  add('execution', 'Execution', execution);
   return tiles;
 }
 
