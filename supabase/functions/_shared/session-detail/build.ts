@@ -4,7 +4,7 @@
 
 import { talkTestAppliesToTags } from '../effort-words.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
-import { resolveSessionDrift, driftLineApplies, STEADY_RIDE_MAX_VI } from './drift-pct.ts';
+import { resolveSessionDrift, STEADY_RIDE_MAX_VI } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
@@ -1013,11 +1013,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     : null;
 
   /**
-   * ⛔ AN UNSTEADY RIDE'S DRIFT PRINTS WITHOUT THE 5% LINE (2026-09-27, Michael) — `driftLineApplies`
-   * (`drift-pct.ts`): a ride whose variability index is above 1.05 (TrainingPeaks: "a steady and even
-   * output … should have a VI of 1.05 or less") keeps its percentage and carries no `line`. Runs unchanged.
+   * ⛔ A RIDE WHOSE POWER SWUNG HAS NO DRIFT (2026-09-27, Michael). A variability index above 1.05 (TrainingPeaks:
+   * "a steady and even output … should have a VI of 1.05 or less") makes `resolveSessionDrift` and the window below
+   * return nothing, so `decouplingV1` is null: no Drift tile, no Heart rate drift row. The rule is `driftReadApplies`
+   * in `drift-pct.ts`, not a check here. ⚠️ The first cut that morning kept the percentage and dropped only its 5%
+   * line (`driftLineOn`, deleted). Runs unchanged.
    */
-  const driftLineOn = driftLineApplies(type, (factPacket as any)?.facts?.variability_index);
 
   // D-036 aerobic decoupling, resolved ONCE (single source): the classification
   // block below and the Performance "Aerobic decoupling" row both read this — they
@@ -1036,8 +1037,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
      * builds LSD with sets in it, and a whole-file number on that session reports a durability
      * failure every week on an athlete following the page exactly. `vt1WindowDrift` removes the sets
      * and their recoveries and splits what is left; a plain long session has nothing to remove and
-     * says `not_applicable`, so it keeps the ordinary read below. See that file for why the test is
-     * p107's bout length rather than the step's prescribed intensity.
+     * says `not_applicable`, so it keeps the ordinary read below. See that file for how the sets are
+     * found, and for its floor: twenty minutes of easy time (`DRIFT_MIN_STEADY_S`, 2026-09-27).
      */
     // ⛔ THE SAME MATERIALS THE LADDER READS BELOW — the window may not answer where p107's gate says no.
     const driftSteadiness = {
@@ -1063,7 +1064,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // The windowed number replaces the whole-file one; everything else about the row is unchanged.
       return {
         pct: win.pct, basis: win.basis, assessment: null, confounded: d?.confounded ?? false,
-        whole_session: false, line: driftLineOn ? driftLineFor(win.pct) : null,
+        whole_session: false, line: driftLineFor(win.pct),
       };
     }
     if (!d) return null;
@@ -1073,7 +1074,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       assessment: (['good', 'needs_work'] as const).includes(d.assessment as any) ? (d.assessment as 'good' | 'needs_work') : null,
       confounded: d.confounded,
       whole_session: false,
-      line: driftLineOn ? driftLineFor(d.pct) : null,
+      line: driftLineFor(d.pct),
     };
   })();
 
@@ -1336,8 +1337,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // attached (`noVerdict`, above). The watts, the minutes and the heart rate stay.
     if (!noVerdict && Number.isFinite(vi) && vi > 0) {
       // FIELD — TrainingPeaks, "Power Terminology For Cycling": "A steady and even output, like during a triathlon,
-      // should have a VI of 1.05 or less" (`STEADY_RIDE_MAX_VI`, drift-pct.ts — the same line takes the 5% line off
-      // an unsteady ride's drift). Was OURS until 2026-09-27; STATE-SOURCES row "Ride steadiness".
+      // should have a VI of 1.05 or less" (`STEADY_RIDE_MAX_VI`, drift-pct.ts — the same line takes the drift off an
+      // unsteady ride). Was OURS until 2026-09-27; STATE-SOURCES row "Ride steadiness".
       parts.push(vi <= STEADY_RIDE_MAX_VI
         ? 'Power held steady the whole way.'
         : 'Power came in uneven as a result of surging.');
@@ -2408,10 +2409,9 @@ export function buildAnalysisDetailRows(
         && signal != null && Math.abs(signal) >= 3;
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
       if (!decouplingShown && pctAny != null && !intervalSession) {
-        // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints. And the same gate
-        // (2026-09-27, `driftLineApplies`): a ride whose variability index is above 1.05 prints the
-        // percentage without the line.
-        const room = driftLineApplies(sport, factPacket?.facts?.variability_index) ? driftLineFor(pctAny) : null;
+        // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints. A ride whose variability index
+        // is above 1.05 never reaches here: it has no drift (2026-09-27, `driftReadApplies` in drift-pct.ts).
+        const room = driftLineFor(pctAny);
         // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.

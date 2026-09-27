@@ -454,6 +454,8 @@ export type SessionDetailV1 = {
      *           null  = not computed (interval workout, < 20 min, etc.).
      *  • assessment: the shared frielBand states (Q-161 — one science line at 5%) — 'good' (≤5%,
      *    aerobic base sound) / 'needs_work' (>5%, build base). Same band as State run row + coach.
+     * ⛔ NULL ON A RIDE WHOSE VARIABILITY INDEX IS ABOVE 1.05 (2026-09-27, `driftReadApplies` in drift-pct.ts):
+     * no given output, so no drift — no Drift tile and no Heart rate drift row. Runs unchanged.
      */
     decoupling: {
       pct: number | null;
@@ -466,9 +468,7 @@ export type SessionDetailV1 = {
        *  so it is not the same read as a steady run. Stated on the screen, never hidden. */
       whole_session?: boolean;
       /** The one drift line ("1.0 over the 5% line"), printed by the Drift chip and the Heart rate row
-       *  alike (audit H-D09, `driftLineFor` in build.ts). Null when there is no percentage, and on a ride
-       *  whose variability index is above 1.05 (2026-09-27, `driftLineApplies` in drift-pct.ts): the
-       *  percentage prints, the 5% line does not. */
+       *  alike (audit H-D09, `driftLineFor` in build.ts). Null when there is no percentage. */
       line?: string | null;
     } | null;
     /** D-264 step-0 receipt: HR drift (bpm) as it flows through the fixed pipeline

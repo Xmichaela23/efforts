@@ -22,6 +22,9 @@
  *      MATERIALS it has (the planned row, the fact packet, the workout row, the rendered rows) so
  *      that no screen can answer the question for itself. A caller with nothing to hand over gets
  *      the ladder's own "nothing said" verdict, which is steady.
+ *   0b. ⛔ A RIDE WHOSE POWER SWUNG HAS NO DRIFT (2026-09-27, Michael): a variability index above 1.05
+ *      means the ride held no given output, so there is nothing to read drift at — null, whatever the
+ *      ladder said. `driftReadApplies` below; runs are not touched by it.
  *   1. The analyser's pace-to-heart-rate decoupling, `heart_rate_summary.decouplingPct` (D-036),
  *      basis 'gap' or 'raw', when it computed one (runs).
  *   2. A ride's power-to-heart-rate decoupling, `computed.analysis.efficiency.aerobic_decoupling_pct`
@@ -29,7 +32,7 @@
  *      State's bike drift reads.
  *   3. Heart rate alone, second half against first — `hr_drift_v1.pct`, written by both analysers
  *      from `_shared/hr-drift-halves.ts` — basis 'hr'. The fallback when there is no output to
- *      ratio against.
+ *      ratio against. ⛔ Only when the halves cover `DRIFT_MIN_STEADY_S`, 20 minutes (2026-09-27, below).
  *   4. Else no read. ⚠️ THERE IS NO FIFTH. State carried one (`workout_facts.drift`) and it was the
  *      only place a drift number could appear that Performance had no way to show.
  * Rounded to one decimal, as the tile prints it — a reader comparing against 5 must see 4.96 as 5.0.
@@ -50,6 +53,27 @@ export type SessionDrift = {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const RIDE = /^(ride|bike|cycling)$/;
+
+/**
+ * ⛔ TWENTY MINUTES OF STEADY WORK, OR NO DRIFT (2026-09-27, Michael: "let's just have long steady count", "Go").
+ * One rule for runs and rides: drift is read on a steady session of 20 minutes or more, and on nothing else.
+ *
+ * FIELD — TrainingPeaks Help Center, "Aerobic Decoupling (Pw:Hr and Pa:HR) and Efficiency Factor (EF)"
+ * (help.trainingpeaks.com/hc/en-us/articles/204071724, read 2026-09-27): "Aerobic Decoupling values for efforts
+ * under 20 minutes in duration aren't as valid", and the read is for a long, steady-state effort. TrainingPeaks
+ * prints the number on every workout and leaves the reading to the athlete; this app prints it only where the
+ * advice says it means something.
+ *
+ * ⚠️ RUNGS 1 AND 2 ARE ALREADY GATED AT THE SOURCE. The run analyser computes no pace decoupling on fewer than
+ * 1,200 samples (`analyze-running-workout/lib/heart-rate/efficiency.ts`), and the ride's power ratio needs a
+ * 1,200-second pedalling span (`cycling-v1/ride-physiology.ts`). The two reads that did not wait were heart rate
+ * alone (rung 3, from 6 minutes) and the long-session window (`vt1-window-drift.ts`, from 10 minutes of easy
+ * work — p107's shortest worthwhile VT1 bout, which is not a drift number). Both use this constant now.
+ * ⚠️ MEASURED ON WHAT IS COMPARED: rung 3's `seconds` is the span its halves cover after the warm-up skip, and the
+ * window's is the easy time left once the sets are out. A stored read with no `seconds` on it is not a 20-minute
+ * read and gets nothing.
+ */
+export const DRIFT_MIN_STEADY_S = 1200;
 
 export function resolveSessionDrift(input: {
   workoutAnalysis: unknown;
@@ -72,6 +96,8 @@ export function resolveSessionDrift(input: {
   const st = input.steadiness ?? {};
   const fp = st.factPacket ?? a.fact_packet_v1 ?? null;
   if ((isRun || isRide) && !sessionSteadiness({ ...st, factPacket: fp }).steady) return null;
+  // 0b. a ride whose power swung — no given output, so no drift (below). The same packet, else the analysis's own.
+  if (isRide && !driftReadApplies(sport, variabilityIndexOf(fp ?? factPacketOf(a)))) return null;
 
   // 1. the analyser's decoupling
   const hrs = a.heart_rate_summary && typeof a.heart_rate_summary === 'object' ? a.heart_rate_summary : null;
@@ -90,21 +116,26 @@ export function resolveSessionDrift(input: {
     if (Number.isFinite(pdec)) return { pct: round1(pdec), basis: 'power', assessment: null, confounded: false };
   }
 
-  // 3. heart rate alone
+  // 3. heart rate alone — over 20 minutes or more (`DRIFT_MIN_STEADY_S`)
   const halves = a.hr_drift_v1;
-  if (halves && typeof halves.pct === 'number' && Number.isFinite(halves.pct)) {
+  if (halves && typeof halves.pct === 'number' && Number.isFinite(halves.pct)
+    && Number(halves.seconds) >= DRIFT_MIN_STEADY_S) {
     return { pct: round1(halves.pct), basis: 'hr', assessment: null, confounded: false };
   }
   return null;
 }
 
 /**
- * ⛔ A RIDE WHOSE POWER SWUNG KEEPS ITS DRIFT NUMBER AND LOSES THE 5% LINE (2026-09-27, Michael). His Saturday
+ * ⛔ A RIDE WHOSE POWER SWUNG HAS NO DRIFT AT ALL (2026-09-27, Michael, "Go" — revised the same day). His Saturday
  * ride was planned steady and ridden as climbs and drops: pedalling power 142 W in the first half, 106 W in the
  * second, normalized power 125 W over an average of 77 W. The Drift tile read "10.8% · 5.8 over the 5% line".
- * The drift read is for a steady session (rule 0 above: a given pace or output at a given heart rate, p107); this
- * ride's output was not held, so the percentage still prints and the 5% line under it does not — on the tile, the
- * Heart rate row and the good-news line ("Drift under 5 percent, N rides in a row").
+ * The book reads drift at a given output (rule 0 above: a given pace or output at a given heart rate, p107); this
+ * ride held none, so it has no drift read — the same null an interval session gets. The first cut that morning
+ * kept the percentage and took only the 5% line off; that is gone. Because the null is decided HERE, every reader
+ * of this rule agrees without a check of its own: the Drift tile and the Heart rate row on Performance
+ * (`build.ts decouplingV1`), the "Drift under 5 percent" line on Today (`session-boom/line.ts`), State's drift
+ * chart (`compute-snapshot driftReadForPoint`), and the long-session window (`vt1-window-drift.ts`). The ride
+ * paragraph's heart-rate-with-power sentence asks the same function (`insights/bike-insights.ts`).
  *
  * FIELD — TrainingPeaks, "Power Terminology For Cycling" (trainingpeaks.com/blog/power-terminology-for-cycling/,
  * read 2026-09-27): "A steady and even output, like during a triathlon, should have a VI of 1.05 or less."
@@ -114,16 +145,33 @@ export function resolveSessionDrift(input: {
  *
  * ⚠️ THE FACT PACKET'S `variability_index`, the one the cycling packet writes (`cycling-v1/build.ts`). NOT the
  * analyser's `is_mixed_effort` stamp — that one is VI ≥ 1.05 OR power CV ≥ 12% (OURS) and a hedge, never a filter.
- * ⚠️ RIDES ONLY. A run has no power VI and keeps its line; so does a ride with no VI on file (no power meter).
+ * ⚠️ RIDES ONLY. A run has no power VI and is unchanged (its own steadiness ladder decides); so is a ride with no VI
+ * on file (no power meter).
  */
 export const STEADY_RIDE_MAX_VI = 1.05;
 
-/** False on a ride whose variability index is above 1.05: print the drift, not the 5% line. True otherwise. */
-export function driftLineApplies(sport: string | null | undefined, variabilityIndex: unknown): boolean {
+/** False on a ride whose variability index is above 1.05: no drift read at all. True otherwise. */
+export function driftReadApplies(sport: string | null | undefined, variabilityIndex: unknown): boolean {
   if (!RIDE.test(String(sport ?? '').toLowerCase())) return true;
   if (variabilityIndex == null || variabilityIndex === '') return true;
   const vi = Number(variabilityIndex);
   return !(Number.isFinite(vi) && vi > STEADY_RIDE_MAX_VI);
+}
+
+/**
+ * The fact packet an analysis carries: at the top, else under `session_state_v1.details`, where the ride analyser
+ * writes the same packet (`analyze-cycling-workout`). The builder and Today's line already read it in that order.
+ */
+export function factPacketOf(workoutAnalysis: unknown): unknown {
+  let wa = workoutAnalysis;
+  if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { return null; } }
+  const a = (wa && typeof wa === 'object' ? wa : {}) as Record<string, any>;
+  return a.fact_packet_v1 ?? a.session_state_v1?.details?.fact_packet_v1 ?? null;
+}
+
+/** The packet's `facts.variability_index`, as stored (the gate above reads it). */
+export function variabilityIndexOf(factPacket: unknown): unknown {
+  return (factPacket as { facts?: { variability_index?: unknown } } | null | undefined)?.facts?.variability_index ?? null;
 }
 
 /**

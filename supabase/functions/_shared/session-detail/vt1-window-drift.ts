@@ -44,20 +44,20 @@
  * fallback a single-row VT1 block takes. Guessing which rows were the sets from their shape is the
  * thing this file will not do.
  *
- * ⚠️ `VT1_MIN_BOUT_S` IS THE FLOOR AND NOTHING ELSE. p107's bout length says whether a VT1 bout is
- * worth doing; it is not a set detector, and a number borrowed from one context is not licensed as
- * a filter in another. It is used once, below, to decide whether enough VT1 time is left to read.
+ * ⛔ THE FLOOR IS TWENTY MINUTES OF EASY TIME (2026-09-27, `DRIFT_MIN_STEADY_S` in drift-pct.ts — TrainingPeaks:
+ * decoupling on an effort under 20 minutes is not a valid read). It was p107's VT1 bout floor, 10 minutes, and
+ * that number says whether a VT1 bout is worth doing, not whether drift can be read over it; `vt1-bout.ts` went
+ * with it. It is used once, below, to decide whether enough easy time is left to read.
  */
-import { VT1_MIN_BOUT_S } from './vt1-bout.ts';
 import { sessionSteadiness, type SteadinessInput } from './session-steadiness.ts';
+import { DRIFT_MIN_STEADY_S, driftReadApplies, factPacketOf, variabilityIndexOf } from './drift-pct.ts';
 
 export type Vt1WindowDrift =
   /** Read over the VT1 portions. `pct` matches Friel's sign: positive means efficiency fell. */
   | { kind: 'read'; pct: number; basis: 'gap' | 'raw' | 'power'; seconds: number }
   /**
-   * No VT1 bout in the session — every row was under p107's floor, so nothing qualifies to read
-   * over. ⚠️ `seconds` is 0 whenever this fires: a row-wise read makes "is this row a bout" and "is
-   * enough bout time left" the same question against the same number. The screen says so in words.
+   * Under 20 minutes of easy time once the sets and recoveries are out (`DRIFT_MIN_STEADY_S`), so there is
+   * nothing long enough to read over. `seconds` is the easy time that was left. The screen says so in words.
    */
   | { kind: 'too_short'; seconds: number }
   /** No sets in it — the caller keeps the ordinary whole-session read. */
@@ -171,6 +171,10 @@ export function vt1WindowDrift(input: {
    * what keeps it on those. It is the gate, not the test, that decides eligibility.
    */
   if (input.steadiness && !sessionSteadiness(input.steadiness).steady) return { kind: 'not_applicable' };
+  // ⛔ AND A RIDE WHOSE POWER SWUNG (2026-09-27, `driftReadApplies` in drift-pct.ts): VI above 1.05 has no drift,
+  // so the window may not answer either — not a number, and not "not enough easy riding to read".
+  const vi = variabilityIndexOf(input.steadiness?.factPacket ?? factPacketOf(input.workoutAnalysis));
+  if (!driftReadApplies(input.sport, vi)) return { kind: 'not_applicable' };
   const given = Array.isArray(input.intervals) ? input.intervals : [];
   const rows = given.length > 0 ? given : rowsFromAnalysis(input.workoutAnalysis);
   if (rows.length === 0) return { kind: 'not_applicable' };
@@ -239,7 +243,7 @@ export function vt1WindowDrift(input: {
   const vt1Rows = rows.filter((r) =>
     dur(r) > 0 && kindOf(r) !== 'warmup' && kindOf(r) !== 'recovery' && !isSet(r));
   const seconds = vt1Rows.reduce((s, r) => s + dur(r), 0);
-  if (seconds < VT1_MIN_BOUT_S) return { kind: 'too_short', seconds: Math.round(seconds) };
+  if (seconds < DRIFT_MIN_STEADY_S) return { kind: 'too_short', seconds: Math.round(seconds) };
 
   /**
    * ⛔ HALVES BY TIME, AND A ROW BELONGS TO THE HALF ITS MIDPOINT FALLS IN. The rows are averages

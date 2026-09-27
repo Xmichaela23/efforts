@@ -43,6 +43,7 @@ import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE "WAS IT DONE" AND THE WEEK BAR'S TOTALS (2026-09-10, audit H-T10 / H-T03).
 import { isExecutedWorkout } from '../_shared/is-executed.ts';
 import { doneLines, weekBarTotals } from './week-totals.ts';
+import { sessionTimeRows, wantsStoredStreamTail } from '../_shared/session-detail/session-times.ts';
 import { displayFormat } from '../_shared/display-format.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 import { emptyDayLine } from '../_shared/empty-day-line.ts';
@@ -763,6 +764,29 @@ Deno.serve(async (req)=>{
         }
       });
     } catch  {}
+    /**
+     * ⛔ THE MOVING TIME ON TODAY'S RIDE AND RUN TILES IS THE SESSION-TIMES COMPOSER'S (2026-09-27, `done_tiles` in
+     * ./week-totals.ts) — `sessionTimeRows`, the rows Performance and Details print, so the three cannot differ. A Garmin
+     * ride or run saved before 2026-09-26 reads its Moving Time off Garmin's counter at the last stored sample, the
+     * same one sample workout-detail fetches (`sessionTimesForRow`): fetched here once for the week, by id, never the
+     * stream. No sample, or a failed read: that session gets no Moving Time tile.
+     */
+    const streamTailById = new Map();
+    try {
+      const tailIds = workouts
+        .filter((w)=>{
+          const t = String(w?.type || '').toLowerCase();
+          return (t === 'ride' || t === 'run') && wantsStoredStreamTail(w);
+        })
+        .map((w)=>String(w.id));
+      if (tailIds.length > 0) {
+        const { data: tails, error: tailErr } = await supabase.from('workouts')
+          .select('id,tail:sensor_data->-1,samples_tail:sensor_data->samples->-1')
+          .eq('user_id', userId).in('id', tailIds);
+        if (!tailErr) for (const r of Array.isArray(tails) ? tails : []) streamTailById.set(String(r.id), r?.tail ?? r?.samples_tail ?? null);
+        else if (debug) debugNotes.push({ where: 'stream_tail', err: tailErr.message });
+      }
+    } catch  {}
     const unify = (w)=>{
       const date = String(w.date).slice(0, 10);
       const type = String(w.type).toLowerCase();
@@ -1002,7 +1026,12 @@ Deno.serve(async (req)=>{
           n + (Array.isArray(ex?.sets) ? ex.sets.filter((s: any) => isPerformedSet(s) && (Number(s?.reps) || 0) > 0).length : 0), 0)
         : null;
       // ⛔ THE FINISHED SESSION'S WORDS, IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 1) — see `doneLines`.
-      const lines = doneLines({ type, status, planned, executed, moving_seconds: movingSeconds, strength_volume_lb: strengthVolumeLb, workout_analysis: w?.workout_analysis ?? null }, fmt);
+      // `session_times` feeds the Moving Time tile (2026-09-27): the composer's rows for this row, see `streamTailById`.
+      let sessionTimes = null;
+      if (status === 'completed') {
+        try { sessionTimes = sessionTimeRows(w, streamTailById.get(String(w.id)) ?? null); } catch { sessionTimes = null; }
+      }
+      const lines = doneLines({ type, status, planned, executed, moving_seconds: movingSeconds, strength_volume_lb: strengthVolumeLb, workout_analysis: w?.workout_analysis ?? null, session_times: sessionTimes }, fmt);
       return {
         id: w.id,
         date,
@@ -1783,6 +1812,7 @@ Deno.serve(async (req)=>{
         done_distance: item.done_distance ?? null,
         done_volume: item.done_volume ?? null,
         done_headline: item.done_headline ?? null,
+        done_tiles: item.done_tiles ?? null,
         is_executed: item.is_executed === true,
         day_order: item.day_order ?? null,
         intent_title: item.intent_title ?? null,

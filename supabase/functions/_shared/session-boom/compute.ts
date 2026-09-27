@@ -64,6 +64,9 @@ const PRIOR_SELECT = [
   'counts_toward_trend:workout_analysis->bike_fitness_v1->counts_toward_trend',
   'decoupling_pct:workout_analysis->heart_rate_summary->decouplingPct',
   'hr_drift_pct:workout_analysis->hr_drift_v1->pct',
+  // ⛔ AND ITS LENGTH (2026-09-27): heart-rate-alone drift counts only over 20 minutes (`DRIFT_MIN_STEADY_S`,
+  // `../session-detail/drift-pct.ts`), so a prior needs the span its halves covered or it cannot be judged.
+  'hr_drift_seconds:workout_analysis->hr_drift_v1->seconds',
   // The two fields the drift rule needs beyond those (2026-09-12): the steady test and the ride's ratio.
   'total_steps:workout_analysis->fact_packet_v1->derived->interval_execution->total_steps',
   'aerobic_decoupling_pct:computed->analysis->efficiency->aerobic_decoupling_pct',
@@ -83,6 +86,12 @@ const PRIOR_SELECT = [
   'planned_id',
   'strava_workout_type:strava_data->original_activity->workout_type',
   'segments:workout_analysis->fact_packet_v1->facts->segments',
+  /**
+   * ⛔ A PRIOR RIDE'S VARIABILITY INDEX (2026-09-27). A ride above 1.05 has no drift (`driftReadApplies`,
+   * `../session-detail/drift-pct.ts`), so it is skipped in the streak — which the rule can only see when the
+   * number is on the row. Without it every earlier unsteady ride kept counting.
+   */
+  'variability_index:workout_analysis->fact_packet_v1->facts->variability_index',
   /**
    * ⛔ THE VT1 WINDOW NEEDS THE ANALYSER'S ROWS (2026-09-15, §8.0 #15). A long session with sets is read over
    * its VT1 portions on Performance and on State's chart; without this path a PRIOR in the streak was judged
@@ -114,12 +123,19 @@ export function priorFromRow(r: Record<string, unknown>, plannedRow?: { tags?: u
     workout_analysis: {
       ...(bf ? { bike_fitness_v1: bf } : {}),
       ...(r.decoupling_pct != null ? { heart_rate_summary: { decouplingPct: r.decoupling_pct } } : {}),
-      ...(r.hr_drift_pct != null ? { hr_drift_v1: { pct: r.hr_drift_pct } } : {}),
+      ...(r.hr_drift_pct != null
+        ? { hr_drift_v1: { pct: r.hr_drift_pct, ...(r.hr_drift_seconds != null ? { seconds: r.hr_drift_seconds } : {}) } }
+        : {}),
       ...(r.interval_breakdown != null ? { granular_analysis: { interval_breakdown: r.interval_breakdown } } : {}),
-      ...(r.total_steps != null || r.segments != null
+      ...(r.total_steps != null || r.segments != null || r.variability_index != null
         ? { fact_packet_v1: {
             ...(r.total_steps != null ? { derived: { interval_execution: { total_steps: r.total_steps } } } : {}),
-            ...(r.segments != null ? { facts: { segments: r.segments } } : {}),
+            ...(r.segments != null || r.variability_index != null
+              ? { facts: {
+                  ...(r.segments != null ? { segments: r.segments } : {}),
+                  ...(r.variability_index != null ? { variability_index: r.variability_index } : {}),
+                } }
+              : {}),
           } }
         : {}),
     },

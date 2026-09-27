@@ -4,7 +4,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
-import { VT1_MIN_BOUT_S } from './vt1-bout.ts';
+import { DRIFT_MIN_STEADY_S } from './drift-pct.ts';
 
 // A VT1 row: the plan asked for one easy pace (the library resolves `vt1` to a single value).
 const vt1 = (duration_s: number, avg_hr: number, pace: number, target = 600) =>
@@ -83,7 +83,7 @@ Deno.test('a long ride with sets reads on power, Friel\'s sign', () => {
   }
 });
 
-Deno.test('under p107\'s floor the session says so instead of printing a number', () => {
+Deno.test('under twenty minutes of easy time the session says so instead of printing a number', () => {
   // Two easy segments of four minutes each: they ARE VT1 (the plan asked for the easy pace) and they
   // stay in, but eight minutes is under the floor, so there is not enough easy running to read over.
   const r = vt1WindowDrift({
@@ -91,7 +91,19 @@ Deno.test('under p107\'s floor the session says so instead of printing a number'
     sport: 'run',
   });
   assertEquals(r, { kind: 'too_short', seconds: 480 });
-  assertEquals(VT1_MIN_BOUT_S, 600);
+  assertEquals(DRIFT_MIN_STEADY_S, 1200);
+});
+
+Deno.test('⛔ THE FLOOR IS TWENTY MINUTES, NOT p107\'s TEN (2026-09-27, TrainingPeaks: under 20 minutes is not a valid read)', () => {
+  // Fifteen minutes of easy running with a set in the middle: it cleared the old ten-minute floor and printed.
+  assertEquals(
+    vt1WindowDrift({ intervals: [vt1(450, 140, 600), set(90, 178, 380), rec(30), vt1(450, 145, 600)], sport: 'run' }),
+    { kind: 'too_short', seconds: 900 },
+  );
+  // Exactly twenty minutes reads.
+  const r = vt1WindowDrift({ intervals: [vt1(600, 140, 600), set(90, 178, 380), rec(30), vt1(600, 147, 600)], sport: 'run' });
+  assertEquals(r.kind, 'read');
+  assertEquals(r.kind === 'read' && r.seconds, 1200);
 });
 
 Deno.test('⛔ AN EASY 8-MINUTE SEGMENT STAYS IN THE READING — it is not a set', () => {
@@ -181,7 +193,7 @@ Deno.test('an anaerobic ride gets no window — its 90% middles are not easy rid
    * p237's sandwich, level 1 at FTP 168, AS THE ROWS STOOD BEFORE this session's floor-only change:
    * 5 rounds of 30s at 202-202 W / 2:30 at 151-151 W. That is the shape the 3.4% was read off — the
    * five 2:30 middles were the session's easiest work step, so the window called them VT1 riding,
-   * 750 seconds cleared p107's floor, and their first half was compared against their second.
+   * 750 seconds cleared p107's floor (the floor then), and their first half was compared against their second.
    * ⚠️ THE FIXTURE KEEPS THE OLD SHAPE ON PURPOSE. The floor-only change happens to hide the surges
    * from `demand` (a row with no upper carries no demand), which closes this by accident. The GATE is
    * the fix; this pins that it holds on the rows that actually produced the number.
@@ -196,8 +208,10 @@ Deno.test('an anaerobic ride gets no window — its 90% middles are not easy rid
   for (let i = 0; i < 5; i += 1) {
     rows.push(surge(165 + i, 230), sustained(150 + i, 152), surge(168 + i, 228), rec(240));
   }
-  // Ungated, the window reads — this is the number that printed and counted in the streak.
-  assertEquals(vt1WindowDrift({ intervals: rows as never, sport: 'ride' }).kind, 'read');
+  // Ungated, the window READ — 750 seconds cleared p107's ten-minute floor, and this is the number that printed and
+  // counted in the streak. Under the twenty-minute floor (2026-09-27) the same rows are too short to read at all;
+  // the gate below is still what says "not this kind of session".
+  assertEquals(vt1WindowDrift({ intervals: rows as never, sport: 'ride' }), { kind: 'too_short', seconds: 750 });
   // Gated by the plan's family, it says nothing.
   assertEquals(
     vt1WindowDrift({

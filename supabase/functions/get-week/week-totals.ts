@@ -99,7 +99,75 @@ export type DoneLines = {
   done_distance: string | null;
   done_volume: string | null;
   done_headline: string | null;
+  /** Today's tiles on a finished ride or run (`doneTiles`, below); null on every other sport. */
+  done_tiles: DoneTile[] | null;
 };
+
+/** One tile on Today's finished ride or run card: the number as another screen prints it, under its label. */
+export type DoneTile = {
+  key: 'distance' | 'moving' | 'elevation' | 'pace' | 'execution';
+  label: string;
+  display: string;
+  /** The Execution tile only: the server's words under the number ("4 of 6 intervals done"), when it wrote some. */
+  line?: string;
+};
+
+/** A session time row (`_shared/session-detail/session-times.ts`), the fields read here. */
+type TimeRow = { key?: unknown; label?: unknown; display?: unknown };
+
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/**
+ * ═══ TODAY'S TILES ON A FINISHED RIDE OR RUN (2026-09-27, Michael, "Go") ═══════════════════════════════════════
+ *
+ *   · ride — Distance · Moving Time · Elevation, then Execution when a plan is attached.
+ *   · run  — Distance · Pace · Moving Time, then Execution when a plan is attached.
+ * FIELD (as cited in the approval; not re-read here): Strava's feed shows distance, elevation gain and moving time on
+ * every ride, and distance, pace and time on every run; TrainingPeaks marks plan compliance.
+ * Workload, Duration of plan and Drift are not on Today's card; they stay on Performance.
+ *
+ * ⛔ NOTHING IS WORKED OUT HERE — each value is the finished string another screen prints:
+ *   · Distance    — `done_distance` (above): `displayFormat.distance` on the stored overall's metres, the formatter
+ *                   and metres behind Performance's `completed_totals.distance_display`.
+ *   · Moving Time — the session-times composer's own row (`_shared/session-detail/session-times.ts`), the one
+ *                   Performance and Details print. A source that sent no moving time gets no tile.
+ *   · Elevation   — `completed_totals.elevation_display` on the stored session detail.
+ *   · Pace        — `completed_totals.avg_pace_display` on the stored session detail.
+ *   · Execution   — `execution.execution_score` and `execution_line` on the stored session detail, when the detail
+ *                   names a planned session (`plan_context.planned_id`) and does not hide its adherence tiles
+ *                   (`display.show_adherence_chips`, false on a goal race or an all-zero read). The builder nulls
+ *                   the score on a run or ride with no plan attached (`noVerdict`), so that session gets none.
+ * ⚠️ THE STORED DETAIL IS REBUILT WHEN THE SESSION IS OPENED, so a session analysed again reads its old Elevation,
+ * Pace and Execution here until then — the same copy Today's tiles read before this change.
+ * Null on any other sport: that card keeps its lines.
+ */
+function doneTiles(type: string, done_distance: string | null, sessionTimes: unknown, sd: Item | null): DoneTile[] | null {
+  const isRide = type === 'ride' || type === 'bike' || type === 'cycling';
+  if (!isRide && type !== 'run') return null;
+  const totals = sd?.completed_totals ?? null;
+  const moving = Array.isArray(sessionTimes)
+    ? (sessionTimes as TimeRow[]).find((r) => r?.key === 'moving') ?? null
+    : null;
+  const score = Number(sd?.execution?.execution_score);
+  const execution = sd?.execution?.execution_score != null && Number.isFinite(score)
+    && !!sd?.plan_context?.planned_id && sd?.display?.show_adherence_chips !== false
+    ? `${Math.round(score)}%`
+    : null;
+  const tiles: DoneTile[] = [];
+  const add = (key: DoneTile['key'], label: string | null, display: string | null, line: string | null = null) => {
+    if (label && display) tiles.push({ key, label, display, ...(line ? { line } : {}) });
+  };
+  add('distance', 'Distance', done_distance);
+  if (isRide) {
+    add('moving', text(moving?.label), text(moving?.display));
+    add('elevation', 'Elevation', text(totals?.elevation_display));
+  } else {
+    add('pace', 'Pace', text(totals?.avg_pace_display));
+    add('moving', text(moving?.label), text(moving?.display));
+  }
+  add('execution', 'Execution', execution, text(sd?.execution?.execution_line));
+  return tiles;
+}
 
 /** The plyo day: a `strength` row whose plan carries the `plyo` tag. */
 export function isPlyoDay(item: Item): boolean {
@@ -113,7 +181,7 @@ export function doneDistanceMeters(item: Item): number | null {
 }
 
 export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
-  const none: DoneLines = { done_metrics: [], done_distance: null, done_volume: null, done_headline: null };
+  const none: DoneLines = { done_metrics: [], done_distance: null, done_volume: null, done_headline: null, done_tiles: null };
   // ⚠️ NOT GATED ON STATUS: each screen prints these only on a row it shows as done, and the lift's pounds and
   // the moving time are already gated on `completed` in `unify`.
   const type = String(item?.type ?? '').toLowerCase();
@@ -166,5 +234,7 @@ export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
     done_distance,
     done_volume: null,
     done_headline: headParts.length ? headParts.join(' · ') : null,
+    // `session_times` — the session-times composer's rows for this row, composed by get-week (`sessionTimeRows`).
+    done_tiles: doneTiles(type, done_distance, item?.session_times, item?.workout_analysis?.session_detail_v1 ?? null),
   };
 }

@@ -314,8 +314,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *       5% line under the drift of a ride whose variability index is above 1.05 (2026-09-27, Michael). A copy stored
  *       at v8 would show no tile, the old Conditions row with the climbing in it, and "over the 5% line" until it
  *       rebuilt.
+ *  10 — a ride whose variability index is above 1.05 has no drift at all: `classification.decoupling` is null, so no
+ *       Drift tile and no Heart rate drift row (2026-09-27, Michael, revising v9's line-only cut; `driftReadApplies`
+ *       in drift-pct.ts). A copy stored at v9 would keep printing that ride's drift number until it rebuilt.
  */
-const SESSION_TOTALS_VERSION = 9;
+const SESSION_TOTALS_VERSION = 10;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 

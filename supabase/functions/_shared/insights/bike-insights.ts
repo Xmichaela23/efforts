@@ -8,6 +8,8 @@
 // aerobic_decoupling_pct, work-interval target hits) — does not recompute them. Pure function → any surface
 // renders its output.
 
+import { driftReadApplies } from '../session-detail/drift-pct.ts';
+
 export type BikeType = 'endurance' | 'recovery' | 'long' | 'tempo' | 'sweetspot' | 'threshold' | 'vo2' | 'anaerobic' | 'sprint' | 'over_under' | 'group' | 'other';
 
 // Three families (same architecture as run): AEROBIC (endurance/recovery/long) = the steady story;
@@ -194,7 +196,11 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   const tss = typeof p.tss === 'number' ? p.tss : null;
   const vi = typeof p.vi === 'number' ? p.vi : null;
   const ef = typeof inp.efficiency?.factor === 'number' ? inp.efficiency.factor : null;
-  const dcp = typeof inp.decoupling?.pct === 'number' ? inp.decoupling.pct : null;
+  // ⛔ NO HEART-RATE-WITH-POWER SENTENCE ON A RIDE WHOSE POWER SWUNG (2026-09-27, Michael). Above a variability
+  // index of 1.05 the ride has no drift (`driftReadApplies`, session-detail/drift-pct.ts — TrainingPeaks: "a steady
+  // and even output … should have a VI of 1.05 or less"), and "heart rate held / climbed relative to the power" is
+  // that drift in words. The Drift tile says nothing on such a ride, so the paragraph does not either.
+  const dcp = typeof inp.decoupling?.pct === 'number' && driftReadApplies('ride', vi) ? inp.decoupling.pct : null;
   const dcpTxt = dcp != null ? `${Math.round(dcp * 10) / 10}%` : null;
   const hrHeld = dcp != null && dcp <= 5; // Friel line, same as run/State
   const power = inp.hasPower && np != null;

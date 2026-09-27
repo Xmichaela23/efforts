@@ -516,9 +516,14 @@ export const SessionCard: React.FC<{
  * Today is one object at three states — planned, done, and the deck — rather than two visual
  * languages on one list.
  *
- * ⛔ LINE 2 IS THE PERFORMANCE TAB'S OWN FOUR TILES, `AdherenceChips`, rendered rather than
- * reimplemented: Workload with the usual range, Execution, Duration of plan, and Drift against
- * p107's 5 percent line. SAME NUMBERS, SAME SOURCE, NOTHING RECOMPUTED — they come off
+ * ⛔ A RIDE OR A RUN SHOWS ITS OWN TILES (2026-09-27, Michael): ride — Distance · Moving Time · Elevation; run —
+ * Distance · Pace · Moving Time; Execution after them when a plan is attached. They are get-week's `done_tiles`
+ * (`get-week/week-totals.ts doneTiles`), each value the string another screen prints, drawn here as sent. Workload,
+ * Duration of plan and Drift stay on Performance. The "10.4 mi · 1:23:21" headline is not drawn over them: the
+ * Distance and Moving Time tiles carry both numbers. With no tile at all, the headline stays.
+ *
+ * ⛔ EVERY OTHER SPORT (`done_tiles` null) KEEPS LINE 2 AS THE PERFORMANCE TAB'S OWN TILES, `AdherenceChips`,
+ * rendered rather than reimplemented: SAME NUMBERS, SAME SOURCE, NOTHING RECOMPUTED — they come off
  * `workout_analysis.session_detail_v1`, the payload the Performance tab reads, which `get-week`
  * already carries on the row. ⚠️ NO SECOND FETCH: `extractSessionDetailV1FromWorkout` reads what is
  * in hand. A row whose analysis has not landed shows line 1 and no tiles, which is the honest state.
@@ -558,6 +563,44 @@ export function doneHeadline(workout: Record<string, unknown>): string | null {
   return typeof h === 'string' && h ? h : null;
 }
 
+/** One of Today's tiles on a finished ride or run — get-week's `DoneTile` (`get-week/week-totals.ts`). */
+type DoneTile = { key: string; label: string; display: string; line?: string };
+
+/** get-week's `done_tiles`: a list on a ride or run (possibly empty), null on every other sport. */
+function doneTilesOf(workout: Record<string, unknown>): DoneTile[] | null {
+  const raw = workout?.done_tiles;
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((t): t is DoneTile =>
+    !!t && typeof (t as DoneTile).label === 'string' && typeof (t as DoneTile).display === 'string');
+}
+
+/**
+ * The ride or run tiles, in `AdherenceChips`' dense type and spacing so the card reads as before. Four go two by two
+ * (the 2026-09-14 rule: four one-line readouts need more than a phone's width); three or fewer share one row.
+ * server-word: every label, number and line is get-week's; the plan line is `session_detail_v1.block.line`, the one
+ * `AdherenceChips` printed above its tiles.
+ */
+const DoneTiles: React.FC<{ tiles: DoneTile[]; planLine: string | null }> = ({ tiles, planLine }) => {
+  if (tiles.length === 0) return null;
+  const cells = tiles.map((t) => (
+    <div key={t.key} className="flex flex-col items-center px-1 min-w-0">
+      <div className="readout-num text-subhead whitespace-nowrap">{t.display}</div>
+      <div className="readout-label text-caption uppercase text-center whitespace-nowrap">{t.label}</div>
+      {t.line ? <div className="text-caption text-label-secondary text-center leading-snug whitespace-nowrap">{t.line}</div> : null}
+    </div>
+  ));
+  return (
+    <div className="w-full pt-1 pb-2">
+      {planLine ? <div className="readout-label mb-2 text-center text-caption uppercase">{planLine}</div> : null}
+      <div className="flex items-center justify-center gap-2 text-center mb-1">
+        {cells.length >= 4
+          ? <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-0 w-full">{cells}</div>
+          : <div className="flex items-start justify-between w-full px-0 gap-1">{cells}</div>}
+      </div>
+    </div>
+  );
+};
+
 /**
  * ⛔ THE GOOD-NEWS LINE IS THE SERVER'S (2026-09-10, audit H-T14): `computed.session_boom_v1`, stored
  * by recompute-workout and sent on the get-week row. The drawer prints the same stored value as
@@ -584,12 +627,16 @@ export const CompletedSessionCard: React.FC<{
   const rgb = getDisciplineColorRgb(sport);
   const headline = doneHeadline(workout);
   void useImperial; // the headline arrives in the athlete's unit (2026-09-16, Stage 7 session 1)
+  // A ride or run: its own tiles, and no headline over them — Distance and Moving Time already carry its numbers.
+  const tiles = doneTilesOf(workout);
+  const showHeadline = !!headline && !(tiles && tiles.length > 0);
 
   const sd = extractSessionDetailV1FromWorkout(workout) as Parameters<typeof AdherenceChips>[0]['sessionDetail'];
   /* ⚠️ THE SAME GATE THE PERFORMANCE TAB APPLIES. `noPlannedCompare` is what turns the tiles off for
      a session with nothing to compare against; reading it here rather than inventing a rule keeps
      the two surfaces showing the tiles on exactly the same rows. */
   const noPlannedCompare = !(sd?.plan_context as { planned_id?: unknown } | undefined)?.planned_id;
+  const planLine = (sd as { block?: { line?: string | null } | null } | null)?.block?.line ?? null;
 
   return (
     <button
@@ -621,7 +668,7 @@ export const CompletedSessionCard: React.FC<{
           Strava". The old pill row had this line and the card had dropped it. */}
       <ProviderAttributionLine workout={workout} className="block" style={{ marginTop: 3 }} />
 
-      {headline ? (
+      {showHeadline ? (
         <div className="text-subhead tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'var(--label-secondary)' }}>
           {headline}
         </div>
@@ -639,7 +686,13 @@ export const CompletedSessionCard: React.FC<{
         </div>
       ) : null}
 
-      {sd ? (
+      {tiles ? (
+        tiles.length > 0 ? (
+          <div style={{ marginTop: 2, marginLeft: -8, marginRight: -8, opacity: 0.85 }}>
+            <DoneTiles tiles={tiles} planLine={planLine} />
+          </div>
+        ) : null
+      ) : sd ? (
         <div style={{ marginTop: 2, marginLeft: -8, marginRight: -8, opacity: 0.85 }}>
           <AdherenceChips sessionDetail={sd} hasSessionDetail noPlannedCompare={noPlannedCompare} dense />
         </div>
