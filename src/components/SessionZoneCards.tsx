@@ -9,6 +9,9 @@ import { useWorkoutData } from "@/hooks/useWorkoutData";
  * heart-rate zones whenever the session has heart-rate bins, power zones on a ride with power bins.
  * The caller decides which sessions get them, with the test the Details tab used (UnifiedWorkoutView).
  *
+ * ⛔ ON A RIDE, POWER ZONES COME FIRST (2026-09-27, Michael). A ride with power bins shows the power card, then
+ * the heart-rate card. A run or a walk has heart rate only and is unchanged.
+ *
  * ⛔ THE BINS COME WITH THEIR SHARES (2026-09-16, Stage 4 session 3) — `display_metrics.zones`, the
  * analyser's own bins with each one's share of the window written beside it, and since 2026-09-26 every
  * bin's name and range (heart rate and power) and each card's time with a reading (`total_display`).
@@ -30,43 +33,48 @@ export default function SessionZoneCards({ workoutData }: { workoutData: any }) 
 
   if (!hasHRZones && !(hasPowerZones && isRide)) return null;
 
+  // HR Zones
+  const hrCard = hasHRZones ? (
+    <HRZoneChart
+      key="hr"
+      zoneBins={zonesHr.bins.map((b:any, i:number)=> ({
+        i: Number.isFinite(Number(b.i)) ? Number(b.i) : i,
+        t_s: Number(b.t_s) || 0,
+        share: Number(b.share) || 0,
+        // server-field: the zone's name and range, written by workout-detail from display-zones.ts
+        name: typeof b.name === 'string' ? b.name : null,
+        range: typeof b.range === 'string' ? b.range : null,
+      }))}
+      totalDisplay={typeof zonesHr.total_display === 'string' ? zonesHr.total_display : null}
+      avgHr={norm.avg_hr ?? undefined}
+      maxHr={norm.max_hr ?? undefined}
+      title="Heart rate zones"
+    />
+  ) : null;
+
+  // Power Zones - only for rides with power data
+  const powerCard = hasPowerZones && isRide ? (
+    <PowerZoneChart
+      key="power"
+      zoneBins={zonesPower.bins.map((b:any)=> ({
+        i: Number(b.i) || 0,
+        t_s: Number(b.t_s) || 0,
+        share: Number(b.share) || 0,
+        // server-field: the level's name and range, written by workout-detail from display-zones.ts
+        name: typeof b.name === 'string' ? b.name : null,
+        range: typeof b.range === 'string' ? b.range : null,
+      }))}
+      totalDisplay={typeof zonesPower.total_display === 'string' ? zonesPower.total_display : null}
+      avgPower={norm.avg_power ?? undefined}
+      maxPower={norm.max_power ?? undefined}
+      title="Power zones"
+    />
+  ) : null;
+
   return (
     <div className="px-3 py-3 space-y-4 border-t border-white/[0.055]">
-      {/* HR Zones */}
-      {hasHRZones && (
-        <HRZoneChart
-          zoneBins={zonesHr.bins.map((b:any, i:number)=> ({
-            i: Number.isFinite(Number(b.i)) ? Number(b.i) : i,
-            t_s: Number(b.t_s) || 0,
-            share: Number(b.share) || 0,
-            // server-field: the zone's name and range, written by workout-detail from display-zones.ts
-            name: typeof b.name === 'string' ? b.name : null,
-            range: typeof b.range === 'string' ? b.range : null,
-          }))}
-          totalDisplay={typeof zonesHr.total_display === 'string' ? zonesHr.total_display : null}
-          avgHr={norm.avg_hr ?? undefined}
-          maxHr={norm.max_hr ?? undefined}
-          title="Heart rate zones"
-        />
-      )}
-
-      {/* Power Zones - only for rides with power data */}
-      {hasPowerZones && isRide && (
-        <PowerZoneChart
-          zoneBins={zonesPower.bins.map((b:any)=> ({
-            i: Number(b.i) || 0,
-            t_s: Number(b.t_s) || 0,
-            share: Number(b.share) || 0,
-            // server-field: the level's name and range, written by workout-detail from display-zones.ts
-            name: typeof b.name === 'string' ? b.name : null,
-            range: typeof b.range === 'string' ? b.range : null,
-          }))}
-          totalDisplay={typeof zonesPower.total_display === 'string' ? zonesPower.total_display : null}
-          avgPower={norm.avg_power ?? undefined}
-          maxPower={norm.max_power ?? undefined}
-          title="Power zones"
-        />
-      )}
+      {powerCard}
+      {hrCard}
     </div>
   );
 }

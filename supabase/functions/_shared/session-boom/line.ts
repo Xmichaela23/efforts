@@ -42,7 +42,7 @@ import { isEasyPrescribedRun } from '../easy-hr.ts';
 /** ⚠️ THE BAND LIVES WITH THE COMPOSER, not the ladder — `compose.ts` owns "how many sets is an ME
  *  slot", and the ladder is handed it. Importing it from anywhere else would be a second answer. */
 import { ME_SETS_BAND } from '../standing-plan/compose.ts';
-import { sessionDriftPct } from '../session-detail/drift-pct.ts';
+import { sessionDriftPct, driftLineApplies } from '../session-detail/drift-pct.ts';
 import { vt1WindowDrift } from '../session-detail/vt1-window-drift.ts';
 import type { SessionBoomV1 } from './types.ts';
 
@@ -148,7 +148,8 @@ function hrAtEasyPower(w: BoomWorkout): number | null {
 }
 
 /**
- * What the Drift tile prints. Null when the session has no drift read at all.
+ * What the Drift tile prints. Null when the session has no drift read at all, and on a ride above a
+ * variability index of 1.05, whose drift the tile prints without the 5% line (2026-09-27, below).
  * ⚠️ READ OFF THE ANALYSER'S STORED FIELDS, NOT OFF A PERSISTED `session_detail_v1` (2026-09-10). The
  * phone read the drawer's cached copy, which exists only once the drawer has been opened and is
  * dropped whenever a run or a lift is analysed again — so a session nobody had opened broke no streak
@@ -156,6 +157,17 @@ function hrAtEasyPower(w: BoomWorkout): number | null {
  * `sessionDriftPct` is the rule that copy is built with.
  */
 function driftPct(w: BoomWorkout): number | null {
+  /**
+   * ⛔ A RIDE WHOSE POWER SWUNG IS NOT GRADED AGAINST THE 5% LINE (2026-09-27, Michael — `driftLineApplies`,
+   * `../session-detail/drift-pct.ts`). Above a variability index of 1.05 the Drift tile prints its number without
+   * the line, and this line IS the line, so here the ride has no read: it breaks no streak and extends none, the
+   * way a session with no drift read is skipped below. FIELD — TrainingPeaks: "A steady and even output … should
+   * have a VI of 1.05 or less." The VI is the fact packet's, the one the tile's builder reads.
+   */
+  const wa = parseAnalysis(w);
+  const fp = (wa?.fact_packet_v1 ?? (wa?.session_state_v1 as { details?: { fact_packet_v1?: unknown } } | undefined)?.details?.fact_packet_v1) as
+    { facts?: { variability_index?: unknown } } | undefined;
+  if (!driftLineApplies(w.type ?? null, fp?.facts?.variability_index)) return null;
   // Same rule as the Drift tile, whole: steady sessions only, the ride's ratio before heart rate
   // alone. ⛔ THE MATERIALS GO WITH IT (2026-09-12). ⚠️ THE RENDERED INTERVAL ROWS CANNOT: rung 7
   // reads `session_detail_v1.intervals`, which the session-detail builder produces DOWNSTREAM of

@@ -99,6 +99,34 @@ export function resolveSessionDrift(input: {
 }
 
 /**
+ * ⛔ A RIDE WHOSE POWER SWUNG KEEPS ITS DRIFT NUMBER AND LOSES THE 5% LINE (2026-09-27, Michael). His Saturday
+ * ride was planned steady and ridden as climbs and drops: pedalling power 142 W in the first half, 106 W in the
+ * second, normalized power 125 W over an average of 77 W. The Drift tile read "10.8% · 5.8 over the 5% line".
+ * The drift read is for a steady session (rule 0 above: a given pace or output at a given heart rate, p107); this
+ * ride's output was not held, so the percentage still prints and the 5% line under it does not — on the tile, the
+ * Heart rate row and the good-news line ("Drift under 5 percent, N rides in a row").
+ *
+ * FIELD — TrainingPeaks, "Power Terminology For Cycling" (trainingpeaks.com/blog/power-terminology-for-cycling/,
+ * read 2026-09-27): "A steady and even output, like during a triathlon, should have a VI of 1.05 or less."
+ * VI is normalized power ÷ average power (TrainingPeaks Help Center, "Variability Index (VI)",
+ * help.trainingpeaks.com/hc/en-us/articles/204071734-Variability-Index-VI). ⚠️ That help page carries the
+ * definition and a table of rides, not the 1.05; the sentence is on the blog page.
+ *
+ * ⚠️ THE FACT PACKET'S `variability_index`, the one the cycling packet writes (`cycling-v1/build.ts`). NOT the
+ * analyser's `is_mixed_effort` stamp — that one is VI ≥ 1.05 OR power CV ≥ 12% (OURS) and a hedge, never a filter.
+ * ⚠️ RIDES ONLY. A run has no power VI and keeps its line; so does a ride with no VI on file (no power meter).
+ */
+export const STEADY_RIDE_MAX_VI = 1.05;
+
+/** False on a ride whose variability index is above 1.05: print the drift, not the 5% line. True otherwise. */
+export function driftLineApplies(sport: string | null | undefined, variabilityIndex: unknown): boolean {
+  if (!RIDE.test(String(sport ?? '').toLowerCase())) return true;
+  if (variabilityIndex == null || variabilityIndex === '') return true;
+  const vi = Number(variabilityIndex);
+  return !(Number.isFinite(vi) && vi > STEADY_RIDE_MAX_VI);
+}
+
+/**
  * The percentage alone — what the boom line compares against 5.
  * ⚠️ `steadiness` IS NOT OPTIONAL IN PRACTICE. Omitting it leaves every rung with nothing to read,
  * so the ladder says "nothing said" and the session counts as steady. That is the right default for

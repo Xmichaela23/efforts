@@ -334,6 +334,12 @@ export type SessionDetailV1 = {
     swim_pace_athlete_unit_s?: number | null;
     /** Swim only: "5s/100yd faster" — the chip subtracted the two paces and chose the word itself. */
     swim_pace_vs_plan_display?: string | null;
+    /**
+     * 2026-09-27, run and ride: "1398 ft" / "426 m" — the provider's total climbing (`workouts.elevation_gain`),
+     * the number and string the Details tab prints, for the Elevation tile at the top of Performance. Null on a
+     * swim, a lift, an indoor session, or when the provider sent none. Absent on a copy written before totals v9.
+     */
+    elevation_display?: string | null;
   };
   planned_totals: {
     /** 2026-09-16: the planned distance and length as the athlete reads them — the swim card converted
@@ -460,7 +466,9 @@ export type SessionDetailV1 = {
        *  so it is not the same read as a steady run. Stated on the screen, never hidden. */
       whole_session?: boolean;
       /** The one drift line ("1.0 over the 5% line"), printed by the Drift chip and the Heart rate row
-       *  alike (audit H-D09, `driftLineFor` in build.ts). Null when there is no percentage. */
+       *  alike (audit H-D09, `driftLineFor` in build.ts). Null when there is no percentage, and on a ride
+       *  whose variability index is above 1.05 (2026-09-27, `driftLineApplies` in drift-pct.ts): the
+       *  percentage prints, the 5% line does not. */
       line?: string | null;
     } | null;
     /** D-264 step-0 receipt: HR drift (bpm) as it flows through the fixed pipeline

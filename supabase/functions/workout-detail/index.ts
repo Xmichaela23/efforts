@@ -310,8 +310,12 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   8 — a run or ride with no plan attached carries no verdict: no execution or adherence number, no row colour, no
  *       drift or steadiness line, no judging row or flag (2026-09-25, Michael; `noVerdict` in build.ts). A copy stored
  *       at v7 would keep printing the drift line on an unattached ride until it rebuilt.
+ *   9 — completed_totals.elevation_display (the Elevation tile), the Conditions rows without the climbing, and no
+ *       5% line under the drift of a ride whose variability index is above 1.05 (2026-09-27, Michael). A copy stored
+ *       at v8 would show no tile, the old Conditions row with the climbing in it, and "over the 5% line" until it
+ *       rebuilt.
  */
-const SESSION_TOTALS_VERSION = 8;
+const SESSION_TOTALS_VERSION = 9;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 

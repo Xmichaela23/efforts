@@ -4,7 +4,7 @@
 
 import { talkTestAppliesToTags } from '../effort-words.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
-import { resolveSessionDrift } from './drift-pct.ts';
+import { resolveSessionDrift, driftLineApplies, STEADY_RIDE_MAX_VI } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
@@ -1012,6 +1012,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       })()
     : null;
 
+  /**
+   * ⛔ AN UNSTEADY RIDE'S DRIFT PRINTS WITHOUT THE 5% LINE (2026-09-27, Michael) — `driftLineApplies`
+   * (`drift-pct.ts`): a ride whose variability index is above 1.05 (TrainingPeaks: "a steady and even
+   * output … should have a VI of 1.05 or less") keeps its percentage and carries no `line`. Runs unchanged.
+   */
+  const driftLineOn = driftLineApplies(type, (factPacket as any)?.facts?.variability_index);
+
   // D-036 aerobic decoupling, resolved ONCE (single source): the classification
   // block below and the Performance "Aerobic decoupling" row both read this — they
   // cannot diverge. { pct, basis, assessment } from the analyzer's heart_rate_summary.
@@ -1056,7 +1063,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // The windowed number replaces the whole-file one; everything else about the row is unchanged.
       return {
         pct: win.pct, basis: win.basis, assessment: null, confounded: d?.confounded ?? false,
-        whole_session: false, line: driftLineFor(win.pct),
+        whole_session: false, line: driftLineOn ? driftLineFor(win.pct) : null,
       };
     }
     if (!d) return null;
@@ -1066,7 +1073,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       assessment: (['good', 'needs_work'] as const).includes(d.assessment as any) ? (d.assessment as 'good' | 'needs_work') : null,
       confounded: d.confounded,
       whole_session: false,
-      line: driftLineFor(d.pct),
+      line: driftLineOn ? driftLineFor(d.pct) : null,
     };
   })();
 
@@ -1092,6 +1099,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
      */
     return isIndoorSession(completedRow ?? null);
   })();
+
+  /**
+   * ⛔ THE ELEVATION TILE (2026-09-27, Michael; "Elevation" is Strava's word) — the provider's own total climbing,
+   * `workouts.elevation_gain` (`providerElevationGainM`), the number the Details tab prints, through the formatter
+   * Details uses (`display-format.ts elevation`), so the two tabs print one string. Runs and rides; a swim or a
+   * lift gets none. None indoors, the rule that kept the climbing off the Conditions row. None when the provider
+   * sent no climbing, as Details prints no number then. The Conditions rows no longer print the climbing.
+   */
+  completedTotals.elevation_display = ((type === 'run' || type === 'ride') && !indoorVenue
+    && typeof providerElevationGainM === 'number' && providerElevationGainM > 0)
+    ? sdFmt.elevation(providerElevationGainM)
+    : null;
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
   // Goal races use structured technical_insights only — suppress fact-packet rows to avoid duplication
@@ -1316,8 +1335,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // ⛔ "Power held steady" IS A STEADINESS WORD, and it and the flag sentence come off a ride with no plan
     // attached (`noVerdict`, above). The watts, the minutes and the heart rate stay.
     if (!noVerdict && Number.isFinite(vi) && vi > 0) {
-      // OURS — `cyclingNarrativeFallback` variability index 1.05 or less reads "held steady"; no citation in the repo, kept as found
-      parts.push(vi <= 1.05
+      // FIELD — TrainingPeaks, "Power Terminology For Cycling": "A steady and even output, like during a triathlon,
+      // should have a VI of 1.05 or less" (`STEADY_RIDE_MAX_VI`, drift-pct.ts — the same line takes the 5% line off
+      // an unsteady ride's drift). Was OURS until 2026-09-27; STATE-SOURCES row "Ride steadiness".
+      parts.push(vi <= STEADY_RIDE_MAX_VI
         ? 'Power held steady the whole way.'
         : 'Power came in uneven as a result of surging.');
     }
@@ -1976,8 +1997,10 @@ export function buildAnalysisDetailRows(
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
   decoupling: { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean; whole_session?: boolean } | null = null,
-  /** The provider's own elevation total (metres) — the number the DETAILS tab renders. See the TERRAIN
-   *  row below: without this, the two tabs derived elevation separately and printed different numbers. */
+  /** The provider's own elevation total (metres) — the number the DETAILS tab renders.
+   *  ⚠️ NOT READ HERE SINCE 2026-09-27: the climbing left the Conditions rows for the Elevation tile
+   *  (`completed_totals.elevation_display`, composed in `buildSessionDetailV1`). The slot stays because the
+   *  arguments are POSITIONAL — see the 2026-08-02 note below about the row that vanished. */
   providerElevationGainM: number | null = null,
   /** ⛔ SESSION START/END TEMPERATURE — AND THE BUG THAT ADDING THEM CAUSED (2026-08-02).
    *
@@ -2022,6 +2045,7 @@ export function buildAnalysisDetailRows(
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
   const derived = factPacket?.derived;
+  void providerElevationGainM; // the Elevation tile's now — see the parameter's note
 
   try {
     if (unattached) throw new Error('skip: no plan attached');
@@ -2270,8 +2294,7 @@ export function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  // Terrain (cycling): elevation gain + temperature. Labelled "Conditions" so the client relabels it
-  // TERRAIN.
+  // Conditions (cycling): the ride's temperature.
   //
   // ⛔ THE COMMENT THAT WAS HERE SAID "temp is not persisted for rides — omitted". THAT WAS FALSE —
   // the ride screen prints it, and has been.
@@ -2280,34 +2303,19 @@ export function buildAnalysisDetailRows(
   // fix gave the run `74 → 78°F` through `formatSessionTemp` and left the ride on a single number
   // (`81°F`) — a divergence opened by the change that existed to close exactly that. Same formatter
   // now, so a rider and a runner read one screen family in one language.
+  //
+  // ⛔ THE CLIMBING LEFT THIS ROW (2026-09-27, Michael). It read "1398 ft gain · 68 → 79°F"; the climbing is the
+  // Elevation tile at the top of the card now (`completed_totals.elevation_display`, the provider's total, the
+  // number Details prints). The row keeps the temperature; with no temperature there is no row. The 15 m cut that
+  // gated the row (OURS) and the computed / first-lap fallbacks for the climbing went with it.
   try {
-    if (sport === 'ride') {
-      // computed.overall.elevation_gain_m is frequently null for rides; the value
-      // actually lives on the activity lap (computed.analysis.events.laps[0]
-      // .total_elevation_gain, metres). Prefer overall when present, else the lap.
-      // ⛔ THE PROVIDER'S TOTAL FIRST — same field the DETAILS tab prints, so the two tabs cannot
-      // disagree about one fact. The computed/lap values stay as the fallback for rows that predate
-      // the column or arrived without it.
-      const lap0 = comp?.analysis?.events?.laps?.[0];
-      // ⛔ All device totals, none ours (2026-09-16, Stage 7 session 1): the parameter holds the row's
-      // `elevation_gain`; nothing writes computed.overall.elevation_gain(_m); the lap is the device's lap.
-      const elevM = Number( /* sent-held: elevation_gain — providerElevationGainM */
-        providerElevationGainM ??
-          comp?.overall?.elevation_gain_m ??
-          comp?.overall?.elevation_gain ??
-          lap0?.total_elevation_gain,
-      );
-      // OURS — `buildAnalysisDetailRows` a ride with more than 15 m of climbing gets a Conditions row; no source, kept as found
-      if (!indoors && Number.isFinite(elevM) && elevM > 15) {
-        const tempStr = formatSessionTemp({
-          temperature_f: weatherTempF,
-          temp_start_f: weatherTempStartF,
-          temp_end_f: weatherTempEndF,
-        });
-        const tempSuffix = tempStr ? ` · ${tempStr}` : '';
-        // FIELD — definition: 1 m = 3.28084 ft
-        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain${tempSuffix}` });
-      }
+    if (sport === 'ride' && !indoors) {
+      const tempStr = formatSessionTemp({
+        temperature_f: weatherTempF,
+        temp_start_f: weatherTempStartF,
+        temp_end_f: weatherTempEndF,
+      });
+      if (tempStr) rows.push({ label: 'Conditions', value: tempStr });
     }
   } catch { /* */ }
 
@@ -2400,14 +2408,16 @@ export function buildAnalysisDetailRows(
         && signal != null && Math.abs(signal) >= 3;
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
       if (!decouplingShown && pctAny != null && !intervalSession) {
-        // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints.
-        const room = driftLineFor(pctAny);
+        // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints. And the same gate
+        // (2026-09-27, `driftLineApplies`): a ride whose variability index is above 1.05 prints the
+        // percentage without the line.
+        const room = driftLineApplies(sport, factPacket?.facts?.variability_index) ? driftLineFor(pctAny) : null;
         // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.
         const scope = decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
           : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : '');
-        rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}% (${room})${scope}` });
+        rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}%${room ? ` (${room})` : ''}${scope}` });
       } else if (withheldForPaceSpread) {
         rows.push({
           label: 'Heart rate',
@@ -2492,10 +2502,15 @@ export function buildAnalysisDetailRows(
       ? wx.heat_stress_level : null;
 
     const parts: string[] = [];
-    if (terrainType && elevFt != null && elevFt > 0) {
+    // ⛔ ON A RUN OR RIDE THE CLIMBING IS THE ELEVATION TILE'S (2026-09-27) — `completed_totals.elevation_display`,
+    // the provider's total in the athlete's unit. This row printed a second copy off the fact packet, in feet on
+    // every account ("Rolling (420 ft gain)"). The row keeps the weather; with no weather, no row. A sport with
+    // no tile keeps the clause.
+    const climbingOnTile = sport === 'run' || sport === 'ride';
+    if (!climbingOnTile && terrainType && elevFt != null && elevFt > 0) {
       parts.push(`${terrainType.charAt(0).toUpperCase() + terrainType.slice(1)} (${elevFt} ft gain)`);
     // OURS — `buildAnalysisDetailRows` elevation over 50 ft is named; humidity at 50% or more is named; no source, kept as found
-    } else if (elevFt != null && elevFt > 50) {
+    } else if (!climbingOnTile && elevFt != null && elevFt > 50) {
       parts.push(`${elevFt} ft elevation gain`);
     }
     if (tempStr != null) {
