@@ -275,7 +275,7 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
           <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div className="flex items-baseline gap-x-2">
               {/* "form today" (Michael 2026-09-28): the number and its zone are one day's balance, not the block's trend. */}
-              <span className="text-footnote font-medium text-label-secondary">form today</span>
+              <span className="text-footnote font-medium text-label-secondary whitespace-nowrap">form today</span>
               <span className="readout-num text-title3 font-semibold" style={{ textShadow: 'none' }}>{rd.form.value}</span>
               {zoneText && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zoneText}</span>}
             </div>
