@@ -4,6 +4,9 @@
  * One row per ride — a day's two workouts are one ride, named "{first}, then {second}" — length chips on the long ride and
  * on the midweek easy ride (Friday's follows Tuesday's, p281), and a switch on each optional ride (p278's Day 2 easy ride).
  * It replaced the six/seven ride-count chips.
+ * ⛔ THE SWITCH SITS ON THE OPTIONAL RIDE'S OWN ROW (Michael, 2026-09-28), so the card itself says it is optional. Switched
+ * off, the row stays with its name, its line and the switch, and drops its length; the chips move to the next ride held
+ * to that length.
  * ⛔ EVERYTHING ON THIS CARD IS THE SERVER'S (`ride_strength_week`): the rows, the chips, the default and every line.
  * The card renders them and holds no words of its own. See `RunStrengthWeekCard` for the layout it follows.
  */
@@ -29,12 +32,13 @@ export default function RideStrengthWeekCard(props: Props) {
   const week = props.readout;
   if (!week) return null;
   const off = new Set(props.slotsOff ?? []);
-  const visible = week.rows.filter((row) => !off.has(row.key));
+  const isOff = (row: (typeof week.rows)[number]) => row.optional && off.has(row.key);
   // ⛔ ONE SET OF CHIPS PER LENGTH: rides held to one length (p281's Tuesday and Friday) share a pick, shown on the first
   // of them still in the week — Friday's row when Day 2 is switched off.
   const chipsOn = new Set<string>();
   const asked = new Set<string>();
-  for (const row of visible) {
+  for (const row of week.rows) {
+    if (isOff(row)) continue;
     if (row.length && !asked.has(row.length.key)) { asked.add(row.length.key); chipsOn.add(row.key); }
   }
 
@@ -42,8 +46,9 @@ export default function RideStrengthWeekCard(props: Props) {
     <div className="space-y-3">
       <p className="text-white/55 text-sm leading-relaxed">{week.sub_line}</p>
       <div className="space-y-2">
-        {visible.map((row) => {
-          const len = row.length;
+        {week.rows.map((row) => {
+          const rowOff = isOff(row);
+          const len = rowOff ? null : row.length;
           const picked = len ? props.slotMinutes?.[len.key] : undefined;
           return (
             <div
@@ -52,7 +57,21 @@ export default function RideStrengthWeekCard(props: Props) {
               className="rounded-xl border border-white/12 bg-white/[0.02] p-3 border-l-2"
               style={{ borderLeftColor: rideColor }}
             >
-              <p className="text-white text-[15px]">{row.line}</p>
+              {row.optional ? (
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className={rowOff ? 'text-white/55 text-[15px]' : 'text-white text-[15px]'}>{row.line}</p>
+                    {row.optional_line ? <p className="text-white/55 text-xs mt-1 leading-relaxed">{row.optional_line}</p> : null}
+                  </div>
+                  <Switch
+                    data-testid={`ride-optional-${row.key}`}
+                    checked={!rowOff}
+                    onCheckedChange={(on) => props.onSlotOn(row.key, on)}
+                  />
+                </div>
+              ) : (
+                <p className="text-white text-[15px]">{row.line}</p>
+              )}
               {len && picked != null && len.options.includes(picked) ? (
                 <p className="text-white/55 text-xs mt-1 leading-relaxed">
                   {/* "Same length as Day 2." while Day 2 carries the chips; on its own when it has them. */}
@@ -81,19 +100,6 @@ export default function RideStrengthWeekCard(props: Props) {
           );
         })}
       </div>
-      {week.optional.map((o) => (
-        <div key={o.key} className="rounded-xl border border-white/12 bg-white/[0.02] p-4 flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-white text-[15px] leading-snug">{o.label}</p>
-            {o.line ? <p className="text-white/55 text-xs mt-1 leading-relaxed">{o.line}</p> : null}
-          </div>
-          <Switch
-            data-testid={`ride-optional-${o.key}`}
-            checked={!off.has(o.key)}
-            onCheckedChange={(on) => props.onSlotOn(o.key, on)}
-          />
-        </div>
-      ))}
       <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p>
     </div>
   );

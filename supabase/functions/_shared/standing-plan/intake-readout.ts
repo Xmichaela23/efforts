@@ -141,15 +141,15 @@ export type EnduranceIntakeReadout = {
      * ride's own printed level, selected until the rider picks.
      */
     rows: Array<{
-      key: SlotKey; line: string; is_long: boolean; optional: boolean;
+      key: SlotKey; line: string; is_long: boolean;
+      /** An optional ride carries a switch on its own row, on by default (the week as printed), and this line under its name. */
+      optional: boolean; optional_line: string | null;
       length: {
         key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null;
         /** On a ride held to another's length: "Same length as Day N." — shown while that ride is in the week. */
         same_as: string | null;
       } | null;
     }>;
-    /** One switch per optional ride, on by default (the week as printed). */
-    optional: Array<{ key: SlotKey; label: string; line: string | null }>;
     easy_line: string;
   } | null;
   tier_line: string | null;
@@ -372,6 +372,7 @@ export function enduranceIntakeReadout(args: {
         }),
         is_long: row.role === 'long',
         optional: slotOf(row.frameKey)?.optional === true,
+        optional_line: slotOf(row.frameKey)?.optional === true ? RIDES_COPY.optional_line_by_frame[frame] ?? null : null,
         length: (() => {
           const l = leads ? lengthFor(leads) : null;
           if (!l || leads === row.frameKey) return l;
@@ -384,11 +385,6 @@ export function enduranceIntakeReadout(args: {
       sub_line: RIDES_COPY.sub,
       length_label: RUNS_COPY.length_label,
       rows,
-      optional: all.filter((row) => slotOf(row.frameKey)?.optional === true).map((row) => ({
-        key: row.key,
-        label: fill(RIDES_COPY.optional_label, { day: row.frameDay }),
-        line: RIDES_COPY.optional_line_by_frame[frame] ?? null,
-      })),
       easy_line: RIDES_COPY.easy_line,
     };
   })();

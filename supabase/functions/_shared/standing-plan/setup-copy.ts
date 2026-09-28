@@ -85,12 +85,13 @@ export const PROGRAM_COPY = {
   // advanced cyclists".
   // ⛔ OFF 2026-09-18 (round 3): "Six or seven rides" — the six-ride choice was the builder's, not the page's.
   // ⛔ "Seven rides" → "Five rides" (Michael, 2026-09-27): the two-workout days are one ride each.
+  // ⛔ "Five rides" → "Four or five rides" (Michael, 2026-09-28): Day 2's easy ride is optional (p278, `EnduranceSlot.optional`).
   // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
   // strength progress together." (no page).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Options for intermediate and advanced cyclists. Five rides, three lifting days.',
+    blurb: 'Options for intermediate and advanced cyclists. Four or five rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
@@ -304,7 +305,8 @@ export const RIDES_COPY = {
   // ⛔ ON A RIDE HELD TO ANOTHER'S LENGTH (p281's Friday = Tuesday; Michael approved 2026-09-27). {day} is the other ride's.
   same_length: 'Same length as Day {day}.',
   // ⛔ AN OPTIONAL RIDE'S SWITCH (Michael, 2026-09-27; `EnduranceSlot.optional`). Replaces the six/seven count chips.
-  optional_label: 'Easy ride on Day {day}',  // not-instruction: a switch label (name)
+  // ⛔ ON THE RIDE'S OWN ROW (Michael, 2026-09-28): the switch and this line sit on the optional ride's card, so the card
+  // itself says it is optional. The separate "Easy ride on Day {day}" switch box is gone.
   optional_line_by_frame: {
     // p278 (Day 2's easy ride between Day 1 and Day 3), p134 (easy work is cut before hard work)
     cycling_base: 'Optional. An easy ride between the hard days.',  // Michael approved the words 2026-09-27

@@ -89,7 +89,9 @@ Deno.test('⛔ Rides screen and runs screen — rows and words from the server',
   assertEquals(ride.rows.find((r) => r.line.startsWith('Day 5'))!.length!.same_as, 'Same length as Day 2.');
   assertEquals(tue.same_as, null);
   assertEquals(ride.rows.filter((r) => r.length).map((r) => r.key), ['easy', 'hard3', 'long']);
-  assertEquals(ride.optional, [{ key: 'easy', label: 'Easy ride on Day 2', line: 'Optional. An easy ride between the hard days.' }]);
+  // The switch and its line sit on the optional ride's own row (2026-09-28).
+  assertEquals(ride.rows.filter((r) => r.optional).map((r) => r.optional_line), ['Optional. An easy ride between the hard days.']);
+  assertEquals(ride.rows.filter((r) => !r.optional).map((r) => r.optional_line), ride.rows.filter((r) => !r.optional).map(() => null));
   assertEquals(ride.rows.filter((r) => r.optional).map((r) => r.key), ['easy']);
   // The screen and the composed week agree, the switch on and off (this pin moved here from the phone's test).
   const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
