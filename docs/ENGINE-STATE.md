@@ -7,8 +7,9 @@
 > the permission check blocks pushes to main and deploys from Claude, so hand him the exact command.
 >
 > **Your job, in order:**
-> 1. **Q-311** — a rep cut short by a lap press moves every later round back one ("14 of 16" on a run where 15 were
->    run). Fix proposed; waits on his go. `compute-workout-summary` `layoutLapsByOrder`.
+> 1. **Q-311** — the first surge after the standing drills read as a 4-second lap (the watch recorded 15 s), so every
+>    later round moved back one ("14 of 16" on a run where all 16 were run). He pressed nothing. Trace why the app's lap
+>    windows differ from the watch's lap starts first; fix waits on his go. `compute-workout-summary` `layoutLapsByOrder`.
 > 2. **Long Ride + Strength (p279, goal "Go longer")** — build it on the Ride + Strength frame. The write-up is done and
 >    UNCOMMITTED in the `/Users/michaelambp/efforts-279` worktree: `docs/NOTES-p279-frame-2026-09-27.md` + SOURCE Part E10.
 >    Commit those first. Test on throwaway accounts before bringing it to him.

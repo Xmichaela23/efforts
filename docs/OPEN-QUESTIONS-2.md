@@ -1521,11 +1521,14 @@ Michael's block still stores `ham_iso: 'hip thrust'` (the deleted stand-in). The
 
 A lifter reads it as nothing. A plain word ("Hinge") was suggested; Michael has not ruled.
 
-## Q-311 — A rep cut short by a lap press moves every later round back one — **open, fix proposed** (2026-09-28)
+## Q-311 — A surge right after standing drills reads as a 4-second lap and moves every later round back one — **open** (2026-09-28)
 
-Michael's 28 Sep Surge and Float: Lap 4 (0:04) was the first 15-second surge ended by a press. `layoutLapsByOrder` could
-not place it, laid rounds 2–8 on steps 1–7 and marked round 8 "not matched": "14 of 16 reps done" where 15 of 16 were
-run. Proposed: a lap cut short by a press takes its step. Waits on Michael's go.
+Michael's 28 Sep Surge and Float (workout `6d420a73`). The watch's own laps (`laps[].startTimeInSeconds`) are clean:
+600 · 124 · 55 · 15 · 45 · 60, then the rest of the 8 rounds as planned. No early press. The app's rows for the same laps
+read 600/575 · 123/77 · 27/2 · 13/4 (seconds / moving seconds): the Cossack lap 27 s against the watch's 55, the first
+surge 13 s with 4 moving. Laps are judged on moving time (ALIGN tolerance, STATE-SOURCES row 175), so the surge fell under
+the floor, `layoutLapsByOrder` laid rounds 2–8 on steps 1–7 and marked round 8 "not matched": "14 of 16 reps done"
+where 16 were run. Why the app's lap windows differ from the watch's lap starts is not yet traced. Fix waits on Michael's go.
 
 ## Q-312 — The off-range sentence names one range when the reps had two — **noted** (2026-09-28)
 
