@@ -15,7 +15,6 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildSessionDetailV1 } from './build.ts';
 import { driftReadApplies, resolveSessionDrift, STEADY_RIDE_MAX_VI } from './drift-pct.ts';
-import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { sessionBoomLine, type BoomWorkout } from '../session-boom/line.ts';
 import { priorFromRow } from '../session-boom/compute.ts';
 import { composeBikeInsight, buildBikeInsightInputFromPacket } from '../insights/bike-insights.ts';
@@ -79,8 +78,16 @@ Deno.test('VI exactly 1.05 is steady — TrainingPeaks says "1.05 or less"', () 
   assertEquals(ride(1.05).classification.decoupling!.pct, 10.8);
 });
 
-Deno.test('a ride with no VI on file (no power meter) keeps its drift', () => {
+Deno.test('a ride with no VI on file keeps its power-to-heart-rate drift', () => {
   assertEquals(ride(null).classification.decoupling!.line, '5.8 over the 5% line');
+});
+
+Deno.test('⛔ a ride with no power meter has no drift: heart rate alone is not TrainingPeaks\' decoupling (2026-09-27)', () => {
+  const noPower = { fact_packet_v1: { facts: { variability_index: null } }, hr_drift_v1: { pct: 6.1, seconds: 3600 } };
+  assertEquals(resolveSessionDrift({
+    workoutAnalysis: noPower, computed: {}, sport: 'ride',
+    steadiness: { factPacket: noPower.fact_packet_v1, plannedRow: { tags: ['family:ride_endurance'] }, workoutRow: {} },
+  }), null);
 });
 
 Deno.test('a run is unchanged — no power VI, the drift and the line stay', () => {
@@ -106,17 +113,16 @@ Deno.test('⛔ State: VI 1.62 gives no drift point; VI 1.03 does', () => {
   assertEquals(resolveSessionDrift({ workoutAnalysis: wa(1.03), computed: comp, sport: 'ride', steadiness: materials(1.03) })?.pct, 10.8);
 });
 
-Deno.test('⛔ the long-ride window cannot answer on VI 1.62 either', () => {
-  const row = (duration_s: number, avg_hr: number, power_watts: number, interval_type = 'work', upper_w = 150) =>
-    ({ interval_type, planned_power_range: { lower_w: 0, upper_w },
-       executed: { duration_s, avg_hr, power_watts, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
-  const set = (duration_s: number, avg_hr: number, power_watts: number) =>
-    ({ interval_type: 'work', planned_power_range: { lower_w: 250, upper_w: 290 },
-       executed: { duration_s, avg_hr, power_watts, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
-  const intervals = [row(1800, 130, 160), set(240, 168, 300), row(60, 140, 90, 'recovery'), row(1800, 130, 152)];
-  const at = (vi: number) => vt1WindowDrift({ intervals, sport: 'ride', workoutAnalysis: { fact_packet_v1: { facts: { variability_index: vi } } } });
-  assertEquals(at(1.62), { kind: 'not_applicable' });
-  assertEquals(at(1.03).kind, 'read');
+Deno.test('⛔ a long ride with a harder set in it has no drift, at any VI (2026-09-27)', () => {
+  const row = (interval_type: string, upper_w: number) => ({ interval_type, planned_power_range: { lower_w: 0, upper_w } });
+  const intervals = [row('work', 150), row('work', 290), row('recovery', 150), row('work', 150)];
+  const comp = { analysis: { efficiency: { aerobic_decoupling_pct: 10.8 } } };
+  const at = (vi: number) => resolveSessionDrift({
+    workoutAnalysis: { fact_packet_v1: { facts: { variability_index: vi } } }, computed: comp, sport: 'ride',
+    steadiness: { plannedRow: { tags: ['family:ride_endurance'] }, intervals },
+  });
+  assertEquals(at(1.62), null);
+  assertEquals(at(1.03), null);
 });
 
 /* ── The good-news line on Today grades the same drift against the same 5% (session-boom/line.ts). ── */
@@ -158,13 +164,21 @@ Deno.test('⛔ the narrow prior row carries its VI, so the skip happens off the 
   }), 'Drift under 5 percent, 2 rides in a row.');
 });
 
-/* ── The ride paragraph's heart-rate-with-power sentence is that drift in words (insights/bike-insights.ts). ── */
+/* ── The ride paragraph's heart-rate-with-power sentence is that drift in words (insights/bike-insights.ts). ──
+ * 2026-09-27: `analyze-cycling-workout` hands the paragraph the Drift tile's own number, `resolveSessionDrift` over the
+ * ride's Pw:Hr, with the materials the tile gets; the paragraph does not judge it again. */
 
 Deno.test('⛔ the ride paragraph says nothing about heart rate against power on VI 1.62, and does on VI 1.03', () => {
-  const para = (vi: number, dec: number) => composeBikeInsight(buildBikeInsightInputFromPacket(
-    { facts: { classified_type: 'endurance', normalized_power_w: 125, avg_power_w: 77, variability_index: vi } },
-    { decouplingPct: dec },
-  )) ?? '';
+  const para = (vi: number, dec: number) => {
+    const fp = { facts: { classified_type: 'endurance', normalized_power_w: 125, avg_power_w: 77, variability_index: vi } };
+    const tileDrift = resolveSessionDrift({
+      workoutAnalysis: { fact_packet_v1: fp },
+      computed: { analysis: { efficiency: { aerobic_decoupling_pct: dec } } },
+      sport: 'ride',
+      steadiness: { factPacket: fp, plannedRow: { tags: ['family:ride_endurance'] }, workoutRow: {} },
+    })?.pct ?? null;
+    return composeBikeInsight(buildBikeInsightInputFromPacket(fp, { decouplingPct: tileDrift })) ?? '';
+  };
   assertEquals(/heart rate/i.test(para(1.62, 10.8)), false);
   assertEquals(para(1.03, 10.8).includes('Heart rate climbed relative to the power across the ride.'), true);
   assertEquals(para(1.03, 3.1).includes('Heart rate held with the power across the ride.'), true);

@@ -63,11 +63,8 @@ const PRIOR_SELECT = [
   'hr_at_band:workout_analysis->bike_fitness_v1->hr_at_band',
   'counts_toward_trend:workout_analysis->bike_fitness_v1->counts_toward_trend',
   'decoupling_pct:workout_analysis->heart_rate_summary->decouplingPct',
-  'hr_drift_pct:workout_analysis->hr_drift_v1->pct',
-  // ⛔ AND ITS LENGTH (2026-09-27): heart-rate-alone drift counts only over 20 minutes (`DRIFT_MIN_STEADY_S`,
-  // `../session-detail/drift-pct.ts`), so a prior needs the span its halves covered or it cannot be judged.
-  'hr_drift_seconds:workout_analysis->hr_drift_v1->seconds',
-  // The two fields the drift rule needs beyond those (2026-09-12): the steady test and the ride's ratio.
+  // ⚠️ NO `hr_drift_v1` (2026-09-27): the drift rule has no heart-rate-only rung (`../session-detail/drift-pct.ts`).
+  // The two fields the drift rule needs beyond the run's ratio (2026-09-12): the steady test and the ride's ratio.
   'total_steps:workout_analysis->fact_packet_v1->derived->interval_execution->total_steps',
   'aerobic_decoupling_pct:computed->analysis->efficiency->aerobic_decoupling_pct',
   /**
@@ -93,11 +90,10 @@ const PRIOR_SELECT = [
    */
   'variability_index:workout_analysis->fact_packet_v1->facts->variability_index',
   /**
-   * ⛔ THE VT1 WINDOW NEEDS THE ANALYSER'S ROWS (2026-09-15, §8.0 #15). A long session with sets is read over
-   * its VT1 portions on Performance and on State's chart; without this path a PRIOR in the streak was judged
-   * whole-file while the session that just finished was judged windowed — one streak, two rules. This is the
-   * breakdown summary (one entry per interval: role, length, heart rate, output, planned band), not the
-   * sample series, and `rowsFromAnalysis` reads exactly those fields.
+   * ⛔ THE STEADINESS LADDER NEEDS THE ANALYSER'S ROWS (2026-09-27). A long session with harder sets in it is not
+   * steady and has no drift (`session-detail/session-steadiness.ts`, rung 0, off the rows' planned bands); without
+   * this path a PRIOR in the streak would be judged without them. This is the breakdown summary (one entry per
+   * interval: role, length, heart rate, output, planned band), not the sample series.
    */
   'interval_breakdown:workout_analysis->granular_analysis->interval_breakdown',
 ].join(',');
@@ -123,9 +119,6 @@ export function priorFromRow(r: Record<string, unknown>, plannedRow?: { tags?: u
     workout_analysis: {
       ...(bf ? { bike_fitness_v1: bf } : {}),
       ...(r.decoupling_pct != null ? { heart_rate_summary: { decouplingPct: r.decoupling_pct } } : {}),
-      ...(r.hr_drift_pct != null
-        ? { hr_drift_v1: { pct: r.hr_drift_pct, ...(r.hr_drift_seconds != null ? { seconds: r.hr_drift_seconds } : {}) } }
-        : {}),
       ...(r.interval_breakdown != null ? { granular_analysis: { interval_breakdown: r.interval_breakdown } } : {}),
       ...(r.total_steps != null || r.segments != null || r.variability_index != null
         ? { fact_packet_v1: {

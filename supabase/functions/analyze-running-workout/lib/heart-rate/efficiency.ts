@@ -1,21 +1,23 @@
 /**
- * Efficiency Metrics Calculator
- * 
- * Calculates pace:HR efficiency and decoupling for steady-state workouts.
- * Decoupling = how much harder your body works to maintain pace over time.
+ * THE RUN'S DRIFT (2026-09-27): TrainingPeaks' Pa:Hr, worked out by `_shared/run-pace.ts runDecouplingPct` over the
+ * one drift rule rides share (`_shared/aerobic-decoupling.ts steadyDecouplingPct`). It reads the steady middle (the first 20 minutes and the last 10 left out, at least 20 left), splits it at its middle second, and compares each half's average grade-adjusted speed (every
+ * recorded second, stops at 0) over its average heart rate. Sources are in those
+ * files.
+ *
+ * ⛔ IT READS THE RECORDING'S ROWS, NOT THE ANALYSER'S SAMPLES. The analyser's samples are the moving ones
+ * (`supabase/lib/analysis/sensor-data/extractor.ts extractSensorData` drops a second with no pace), so a stop's heart
+ * rate left its half and the read started at the first moving second. The rows are every second of the recording
+ * (`normalizeSamples`, the ride's row reader), so a stop counts as it does on a ride.
+ *
+ * Replaced that day, and deleted rather than kept beside it: a 10-minute warm-up skip (at most 15% of the samples)
+ * with nothing cut at the end, a 1,200-sample floor, halves split by sample count, and a ratio built from the mean of
+ * the pace. The mixed-effort switch (D-037) went with them: it reached no screen, and drift is read on steady
+ * sessions only (`_shared/session-detail/session-steadiness.ts`).
  */
 
-import {
-  SensorSample,
-  HRAnalysisContext,
-  WorkoutType,
-  EfficiencyMetrics
-} from './types.ts';
+import { EfficiencyMetrics, RecordingRow } from './types.ts';
 import { frielBand } from '../../../_shared/state-trend/run.ts';
-
-// Skip first 10 minutes (warmup/ramp-up)
-// OURS — `WARMUP_SKIP_SECONDS` 10 min (at most 15% of samples), 20 min of data, 10 min after the skip; the ledger's drift row names the skip (Friel) but no source gives the minutes; kept as found
-const WARMUP_SKIP_SECONDS = 600;
+import { runDecouplingPct } from '../../../_shared/run-pace.ts';
 
 /**
  * Map a decoupling % to this pipeline's display words using the SINGLE shared band the STATE run row +
@@ -29,145 +31,20 @@ export function decouplingAssessmentFromPct(pct: number): 'good' | 'needs_work' 
 }
 
 /**
- * Calculate efficiency metrics for steady-state workouts.
- *
- * D-037: `options.forMixedEffort=true` bypasses the intervals/hill_repeats steady-state guard so a
- * mixed-effort run (fartlek, or a steady run the variance gate flagged as mixed) still gets a
- * whole-session decoupling read — but a split-half ratio across heterogeneous efforts is NOT a clean
- * steady-state signal, so `basis` is forced to 'raw' regardless of GAP enrichment (the prompt's
- * raw-basis rule then treats the number as inconclusive, not a fitness verdict). Restored 2026-07-12:
- * the option was accidentally reverted by a8bf025b (an unrelated State-headline commit, 2026-06-14).
+ * The run's pace-to-heart-rate decoupling, or undefined when its steady middle is under 20 minutes.
+ * ⛔ `basis` answers ONE question: was the speed grade-adjusted (the run had usable elevation)? Nothing else. Only a
+ * 'gap' read is a trustworthy fitness signal — the Performance drift row gates on it (Q-158 follow-on), and
+ * `state-trend/run.ts` drops a 'raw' row from the durability trend on exactly that meaning (2026-07-14).
  */
-export function calculateEfficiency(
-  sensorData: SensorSample[],
-  validHRSamples: SensorSample[],
-  context: HRAnalysisContext,
-  workoutType: WorkoutType,
-  options?: { forMixedEffort?: boolean }
-): EfficiencyMetrics | undefined {
-  console.log('📈 [EFFICIENCY] Calculating pace:HR efficiency...');
-
-  // Only calculate for steady-state-ish workouts — unless forMixedEffort explicitly opts a mixed run
-  // in (basis is forced to 'raw' below so the number reads as inconclusive, not a clean verdict).
-  if (!options?.forMixedEffort && (workoutType === 'intervals' || workoutType === 'hill_repeats')) {
-    console.log('📈 [EFFICIENCY] Skipping for interval workout');
-    return undefined;
-  }
-  
-  // Need samples with both pace and HR
-  const samplesWithBoth = sensorData.filter(s => 
-    // OURS — heart rate 250+ and pace slower than 30 min/mi dropped as sensor errors; kept as found
-    s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250 &&
-    s.pace_s_per_mi && s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1800 // < 30 min/mi
-  );
-  
-  console.log('📈 [EFFICIENCY] Samples with pace and HR:', samplesWithBoth.length);
-  
-  if (samplesWithBoth.length < 1200) { // Need at least 20 min of data
-    console.log('📈 [EFFICIENCY] Insufficient data for efficiency calculation');
-    return undefined;
-  }
-  
-  // Skip warmup
-  const warmupSkip = Math.min(WARMUP_SKIP_SECONDS, Math.floor(samplesWithBoth.length * 0.15));
-  const samplesAfterWarmup = samplesWithBoth.slice(warmupSkip);
-  
-  if (samplesAfterWarmup.length < 600) { // Need 10 min after warmup
-    return undefined;
-  }
-  
-  // Split into halves
-  const midpoint = Math.floor(samplesAfterWarmup.length / 2);
-  const firstHalf = samplesAfterWarmup.slice(0, midpoint);
-  const secondHalf = samplesAfterWarmup.slice(midpoint);
-  
-  // Calculate pace:HR ratio for each half
-  // Lower pace (faster) + lower HR = more efficient
-  // We use pace/HR so higher = more efficient
-  const earlyRatio = calculateEfficiencyRatio(firstHalf);
-  const lateRatio = calculateEfficiencyRatio(secondHalf);
-  
-  console.log('📈 [EFFICIENCY] Early ratio:', earlyRatio);
-  console.log('📈 [EFFICIENCY] Late ratio:', lateRatio);
-  
-  if (earlyRatio === null || lateRatio === null) {
-    return undefined;
-  }
-  
-  // Decoupling = how much efficiency dropped
-  // Negative decoupling (rare) means you got MORE efficient
-  // Positive decoupling means you got less efficient (normal)
-  const decouplingPercent = earlyRatio > 0 
-    ? ((earlyRatio - lateRatio) / earlyRatio) * 100 
-    : 0;
-  
-  console.log('📈 [EFFICIENCY] Decoupling:', decouplingPercent, '%');
-  
-  // Assess decoupling on the SAME shared band State + coach use (see decouplingAssessmentFromPct).
-  const assessment = decouplingAssessmentFromPct(decouplingPercent);
-
-  // Basis of this decoupling: 'gap' when the pace series was grade-adjusted (enrichSamplesWithGAP
-  // stamps raw_pace_s_per_mi on every sample when the run had usable elevation), else 'raw' (device
-  // pace, terrain-confounded). Only a 'gap' read is a trustworthy fitness signal — the Performance
-  // "Aerobic decoupling" row gates on it (Q-158 follow-on). Detected the same way gap.ts:200 does.
-  const basis: 'gap' | 'raw' =
-    samplesAfterWarmup[0] && typeof (samplesAfterWarmup[0] as any).raw_pace_s_per_mi !== 'undefined'
-      ? 'gap'
-      : 'raw';
-  // `basis` answers ONE question: was the pace grade-adjusted? Nothing else.
-  //
-  // ⛔ It used to answer two. D-037 forced basis='raw' on a mixed-effort session to mark the number
-  // low-confidence — but 'raw' already meant "terrain-confounded", and `state-trend/run.ts` DROPS a
-  // 'raw' row from the durability substrate on that older meaning. So the low-confidence stamp read
-  // as a delete order: 3 of 3 runs after the 2026-07-12 restore were binned, and the State durability
-  // trend stopped advancing entirely (last counting run 2026-06-28, 16 days stale).
-  //
-  // Mixed-effort now travels on its OWN channel — `mixedEffort` below, from the variance gate — and
-  // every consumer decides for itself what to do with it. Confidence and terrain are different facts.
-  // Field standard (Garmin, TrainingPeaks): hedge the metric, never silently delete the session.
-  const mixedEffort = options?.forMixedEffort === true;
-
-  // Overall average efficiency
-  const avgRatio = calculateEfficiencyRatio(samplesAfterWarmup);
-
+export function calculateEfficiency(recording: ReadonlyArray<RecordingRow>): EfficiencyMetrics | undefined {
+  const drift = runDecouplingPct(recording.map((r) => ({ t: r.t, d: r.d, v: r.v_mps, elev: r.elev, hr: r.hr })));
+  if (drift == null) return undefined;
   return {
     decoupling: {
-      basis,
-      mixedEffort,
-      percent: Math.round(decouplingPercent * 10) / 10,
-      earlyRatio: Math.round(earlyRatio * 1000) / 1000,
-      lateRatio: Math.round(lateRatio * 1000) / 1000,
-      assessment
+      basis: drift.basis,
+      percent: drift.pct,
+      // Assessed on the SAME shared band State + coach use (see decouplingAssessmentFromPct).
+      assessment: decouplingAssessmentFromPct(drift.pct),
     },
-    avgEfficiencyRatio: avgRatio !== null ? Math.round(avgRatio * 1000) / 1000 : 0
   };
-}
-
-/**
- * Calculate efficiency ratio for a set of samples.
- * 
- * Efficiency = pace (normalized) / HR
- * Higher = more efficient (faster pace per HR beat)
- * 
- * We invert pace so faster = higher number.
- */
-function calculateEfficiencyRatio(samples: SensorSample[]): number | null {
-  if (samples.length === 0) return null;
-  
-  // Get average pace and HR
-  const paces = samples.map(s => s.pace_s_per_mi!);
-  const hrs = samples.map(s => s.heart_rate!);
-  
-  const avgPace = paces.reduce((a, b) => a + b, 0) / paces.length;
-  const avgHR = hrs.reduce((a, b) => a + b, 0) / hrs.length;
-  
-  if (avgHR === 0) return null;
-  
-  // Invert pace so higher = faster
-  // Normalize by dividing by typical easy pace (~700 s/mi = 11:40/mi)
-  // OURS — 700 s/mi scale factor; it cancels in the early / late decoupling ratio; kept as found
-  const normalizedSpeed = 700 / avgPace;
-  
-  // Efficiency ratio: speed / HR
-  return normalizedSpeed / avgHR;
 }

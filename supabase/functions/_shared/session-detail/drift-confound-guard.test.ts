@@ -29,7 +29,10 @@ function fp(opts: { tempF?: number; heat?: string; terrainBpm?: number; typical?
   };
 }
 const hr = (rows: Array<{ label: string; value: string }>) => rows.find((r) => r.label === 'Heart rate')?.value ?? '';
-const build = (packet: any) => buildAnalysisDetailRows(packet, [], false, null, false, [], 'run', null, null, null);
+// The bpm line prints only on a session with a drift read (2026-09-27, the one drift rule), so the run carries one the
+// percentage line does not print: a raw-basis pace ratio (no usable elevation).
+const RAW_READ = { pct: 6.1, basis: 'raw' as const, assessment: null, confounded: false };
+const build = (packet: any) => buildAnalysisDetailRows(packet, [], false, null, false, [], 'run', null, null, RAW_READ);
 
 Deno.test('HOT run, drift above typical → names the heat, NOT a fitness verdict', () => {
   const v = hr(build(fp({ tempF: 82, signal: 12, typical: 6 })));

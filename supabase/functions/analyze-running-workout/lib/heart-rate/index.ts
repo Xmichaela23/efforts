@@ -85,10 +85,7 @@ export function analyzeHeartRate(
   // Pace VARIANCE must NOT re-label the run type (research-backed, 2026-07-12): a fartlek is DELIBERATE
   // speed play; an easy run that wobbles (hills / lights / GPS noise) is not one, and no commercial app
   // (Garmin, TrainingPeaks, Stryd, COROS, Runna, Strava, Polar) names a run "fartlek" from variance.
-  // So the variance gate (context.varianceGate.isMixedEffort) keeps the honest type and instead only
-  // marks the DECOUPLING low-confidence — the steady-state path forces basis='raw' below so the metric
-  // carries the uncertainty, not the label (the Garmin/TrainingPeaks/Stryd/Whoop pattern). This
-  // SUPERSEDES the D-038 Piece 1B steady→fartlek override (which produced false "Fartlek" tags).
+  // This SUPERSEDES the D-038 Piece 1B steady→fartlek override (which produced false "Fartlek" tags).
   console.log('💓 [HR ANALYSIS] Workout type (final):', workoutType);
   
   // Calculate zone distribution (always done)
@@ -112,7 +109,7 @@ export function analyzeHeartRate(
     case 'fartlek':
     case 'mixed':
     default:
-      result = analyzeMixedWorkout(sensorData, validHRSamples, context, workoutType, zones, durationMinutes);
+      result = analyzeMixedWorkout(validHRSamples, context, workoutType, zones, durationMinutes);
       break;
   }
   
@@ -146,11 +143,9 @@ function analyzeSteadyStateWorkout(
     const drift = analyzeSteadyStateDrift(sensorData, validHRSamples, context, workoutType);
     console.log('💓 [HR ANALYSIS] Drift calculated:', drift?.driftBpm);
     
-    // Calculate efficiency (pace:HR decoupling). When the variance gate flags the effort as not steady
-    // enough, force basis='raw' so the decoupling reads as low-confidence — the metric carries the
-    // uncertainty while the run keeps its honest type label (no false "fartlek").
-    console.log('💓 [HR ANALYSIS] Calculating efficiency...');
-    const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: context.varianceGate?.isMixedEffort === true });
+    // Pace:HR decoupling over the steady middle — the one drift rule runs and rides share (2026-09-27), read over the
+    // recording's every row rather than the moving samples.
+    const efficiency = calculateEfficiency(context.recording ?? []);
     
     // Build trends if historical data available
     const trends = buildTrends(drift, efficiency, context);
@@ -213,7 +208,6 @@ function analyzeSteadyStateWorkout(
         decouplingPct: null,
         decouplingBasis: null,
         decouplingAssessment: null,
-        efficiencyRatio: null,
         timeInZones: { z1Seconds: 0, z2Seconds: 0, z3Seconds: 0, z4Seconds: 0, z5Seconds: 0 },
         intervalHrCreepBpm: null,
         intervalRecoveryRate: null,
@@ -280,7 +274,6 @@ function analyzeIntervalWorkout(
 // =============================================================================
 
 function analyzeMixedWorkout(
-  sensorData: SensorSample[],
   validHRSamples: SensorSample[],
   context: HRAnalysisContext,
   workoutType: WorkoutType,
@@ -289,14 +282,9 @@ function analyzeMixedWorkout(
 ): HRAnalysisResult {
   console.log('💓 [HR ANALYSIS] Analyzing as mixed/fartlek workout');
 
-  // For mixed workouts, zone distribution is the main insight
+  // For mixed workouts, zone distribution is the main insight. No decoupling: drift is read on steady
+  // sessions only (2026-09-27; D-037's whole-session read on a mixed run is gone).
   const { confidence, reasons } = determineMixedConfidence(validHRSamples.length);
-
-  // D-037: whole-session decoupling for fartlek / mixed sessions (planned or not). forMixedEffort
-  // bypasses the steady-state guard AND forces basis='raw' so the prompt's raw-branch rule treats the
-  // number as inconclusive — HR behavior is described in plain language, fitness is not claimed.
-  // (Restored 2026-07-12; the call was dropped when a8bf025b reverted this path.)
-  const efficiency = calculateEfficiency(sensorData, validHRSamples, context, workoutType, { forMixedEffort: true });
 
   // Build interpretation narrative
   const interpretation = buildInterpretation({
@@ -307,13 +295,12 @@ function analyzeMixedWorkout(
   });
 
   // Build summary for aggregation
-  const summary = buildMixedSummary(validHRSamples, efficiency, zones, workoutType, durationMinutes, confidence);
+  const summary = buildSummary(validHRSamples, null, undefined, zones, workoutType, durationMinutes, confidence);
 
   return {
     workoutType,
     analysisType: 'zones',
     zones,
-    efficiency,
     interpretation,
     summaryLabel: 'Zone Summary',
     confidence,
@@ -355,7 +342,6 @@ function createInsufficientDataResult(
       decouplingPct: null,
       decouplingBasis: null,
       decouplingAssessment: null,
-      efficiencyRatio: null,
       timeInZones: { z1Seconds: 0, z2Seconds: 0, z3Seconds: 0, z4Seconds: 0, z5Seconds: 0 },
       intervalHrCreepBpm: null,
       intervalRecoveryRate: null,
@@ -521,7 +507,7 @@ function determineMixedConfidence(
 function buildSummary(
   validHRSamples: SensorSample[],
   drift: any,
-  efficiency: any,
+  efficiency: EfficiencyMetrics | undefined,
   zones: ZoneDistribution,
   workoutType: WorkoutType,
   durationMinutes: number,
@@ -541,9 +527,7 @@ function buildSummary(
     driftBpm: drift?.driftBpm ?? null,
     decouplingPct,
     decouplingBasis: decouplingPct == null ? null : (efficiency?.decoupling?.basis ?? null),
-    decouplingMixedEffort: decouplingPct == null ? null : (efficiency?.decoupling?.mixedEffort ?? false),
     decouplingAssessment: decouplingPct == null ? null : (efficiency?.decoupling?.assessment ?? null),
-    efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: null,
     intervalRecoveryRate: null,
@@ -571,41 +555,9 @@ function buildIntervalSummary(
     decouplingPct: null,
     decouplingBasis: null,
     decouplingAssessment: null,
-    efficiencyRatio: null,
     timeInZones: zonesToTimeInZones(zones),
     intervalHrCreepBpm: intervals?.hrCreep?.creepBpm ?? null,
     intervalRecoveryRate: intervals?.recovery?.recoveryRate ?? null,
-    workoutType,
-    analysisConfidence: confidence,
-    durationMinutes
-  };
-}
-
-function buildMixedSummary(
-  validHRSamples: SensorSample[],
-  efficiency: EfficiencyMetrics | undefined,
-  zones: ZoneDistribution,
-  workoutType: WorkoutType,
-  durationMinutes: number,
-  confidence: 'high' | 'medium' | 'low'
-): HRSummaryMetrics {
-  const hrValues = validHRSamples.map(s => s.heart_rate!);
-
-  return {
-    avgHr: Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length),
-    maxHr: Math.max(...hrValues),
-    minHr: Math.min(...hrValues),
-    driftBpm: null,
-    // D-037: decoupling populated via the forMixedEffort path. `basis` now reports GAP-ness honestly;
-    // the "this ratio is inconclusive" fact rides on decouplingMixedEffort, not on a forced 'raw'.
-    decouplingPct: efficiency?.decoupling?.percent ?? null,
-    decouplingBasis: efficiency?.decoupling?.basis ?? null,
-    decouplingMixedEffort: efficiency?.decoupling?.mixedEffort ?? null,
-    decouplingAssessment: efficiency?.decoupling?.assessment ?? null,
-    efficiencyRatio: efficiency?.avgEfficiencyRatio ?? null,
-    timeInZones: zonesToTimeInZones(zones),
-    intervalHrCreepBpm: null,
-    intervalRecoveryRate: null,
     workoutType,
     analysisConfidence: confidence,
     durationMinutes

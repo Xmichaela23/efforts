@@ -13,7 +13,7 @@ Deno.test('endurance WITH power — efficiency + load, no fabricated anything', 
   // didn't cost you HR" was the paragraph restating — louder — a figure printed two lines below it.
   assert(/Heart rate held with the power/.test(s));
   // 0.68 IS the endurance band, so the label is earned here.
-  assert(/62 TSS at 0\.68 intensity — an aerobic-base load\./.test(s));
+  assert(/62 workload at 68% of FTP — an aerobic-base load\./.test(s));
 });
 
 Deno.test('an aerobic-family ride at threshold intensity is NOT called base work', () => {
@@ -26,7 +26,7 @@ Deno.test('an aerobic-family ride at threshold intensity is NOT called base work
     decoupling: { pct: 7.4 },
   })!;
   assert(!/aerobic-base load/.test(s));
-  assert(/109 TSS at 0\.98 intensity — harder than base work\./.test(s));
+  assert(/109 workload at 98% of FTP — harder than base work\./.test(s));
   // And the heart-rate clause follows the number, not the other way round.
   assert(/Heart rate climbed relative to the power/.test(s));
   assert(!/didn't cost you HR/.test(s));

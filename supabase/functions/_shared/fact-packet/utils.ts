@@ -112,7 +112,7 @@ export function calculatePaceFadePct(segments: WorkoutSegmentV1[]): number | nul
       const p = coerceNumber(s.pace_sec_per_mi);
       const d = coerceNumber(s.duration_s) ?? 0;
       if (p == null || !(p > 0)) continue;
-      // OURS — `calculatePaceFadePct` / `calculateCardiacDecouplingPct` a segment with no duration weighs 60 s: no outside source
+      // OURS — `calculatePaceFadePct` a segment with no duration weighs 60 s: no outside source
       const wt = d > 0 ? d : 60;
       sum += p * wt;
       w += wt;
@@ -125,40 +125,6 @@ export function calculatePaceFadePct(segments: WorkoutSegmentV1[]): number | nul
   if (p1 == null || p2 == null || !(p1 > 0)) return null;
   const pct = ((p2 - p1) / p1) * 100;
   return Math.round(pct * 10) / 10;
-}
-
-export function calculateCardiacDecouplingPct(segments: WorkoutSegmentV1[]): number | null {
-  // Coarse segment-based decoupling: compare pace/hr ratio in first vs second half.
-  const work = segments
-    .filter((s) => !/warm|cool/i.test(String(s.name || '')))
-    .filter((s) => coerceNumber(s.pace_sec_per_mi) != null && coerceNumber(s.avg_hr) != null);
-  if (work.length < 2) return null;
-  const midpoint = Math.floor(work.length / 2);
-  const firstHalf = work.slice(0, midpoint);
-  const secondHalf = work.slice(midpoint);
-  if (!firstHalf.length || !secondHalf.length) return null;
-
-  const avgRatio = (arr: WorkoutSegmentV1[]): number | null => {
-    let sum = 0;
-    let w = 0;
-    for (const s of arr) {
-      const pace = coerceNumber(s.pace_sec_per_mi);
-      const hr = coerceNumber(s.avg_hr);
-      if (pace == null || hr == null || !(pace > 0) || !(hr > 0)) continue;
-      const d = coerceNumber(s.duration_s) ?? 0;
-      // OURS — `calculatePaceFadePct` / `calculateCardiacDecouplingPct` a segment with no duration weighs 60 s: no outside source
-      const wt = d > 0 ? d : 60;
-      sum += (pace / hr) * wt;
-      w += wt;
-    }
-    return w > 0 ? sum / w : null;
-  };
-
-  const r1 = avgRatio(firstHalf);
-  const r2 = avgRatio(secondHalf);
-  if (r1 == null || r2 == null || !(r1 > 0)) return null;
-  const pct = ((r1 - r2) / r1) * 100;
-  return Math.max(0, Math.round(pct * 10) / 10);
 }
 
 export function isoDateAddDays(dateIso: string, deltaDays: number): string {

@@ -79,18 +79,3 @@ export function resolveRunGap(workout: any): number | null {
     ?? pos(workout?.computed?.overall?.gap_pace_s_per_mi)
     ?? null;
 }
-
-/**
- * Read-through accessor for the run's decoupling (already single-sourced by the HR analyzer into
- * workout_analysis.heart_rate_summary, D-036). Provided so "one place reads run's signals" holds;
- * value-preserving — reads the same field the card already does. Honest nulls (no 0-from-missing).
- */
-export function resolveRunDecoupling(workout: any): { pct: number | null; basis: string | null; assessment: string | null } {
-  const hrs = workout?.workout_analysis?.heart_rate_summary ?? {};
-  const pctRaw = Number(hrs?.decouplingPct);
-  return {
-    pct: Number.isFinite(pctRaw) ? pctRaw : null, // decoupling can be small/negative → only null when truly absent
-    basis: typeof hrs?.decouplingBasis === 'string' ? hrs.decouplingBasis : null,
-    assessment: typeof hrs?.decouplingAssessment === 'string' ? hrs.decouplingAssessment : null,
-  };
-}

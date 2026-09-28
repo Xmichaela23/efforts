@@ -2,6 +2,7 @@ import { withAlarm } from '../_shared/alarm.ts';
 import { isCeilingOnly, judgedPowerRange, normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
+import { resolveSessionDrift } from '../_shared/session-detail/drift-pct.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
 import { movingSecondsUnderCeiling, timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
@@ -171,8 +172,6 @@ export function generateCyclingAdherenceSummary(opts: {
   } | null | undefined;
   intervalBreakdown: Array<{ interval_type?: string; adherence_percentage?: number; adherence?: number }> | null | undefined;
   factPacket: { facts?: { normalized_power_w?: number | null; intensity_factor?: number | null; classified_type?: string | null } | null } | null | undefined;
-  /** Computed from `hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr * 100`; null when HR unavailable. */
-  hrDriftPct: number | null;
   /** Two-halves pedalling power; the drift reading is withheld when they differ by more than 10%. */
   powerHalves?: { first_w?: number | null; second_w?: number | null } | null;
 }): CyclingAdherenceSummary | null {
@@ -245,13 +244,14 @@ export function generateCyclingAdherenceSummary(opts: {
   // read — beside the session builder's drift line, which it could contradict ("power held" under a
   // pacing row that said power fell). The ride's drift is ONE number now: the power-to-heart-rate
   // decoupling, read by the Drift tile and State alike (`session-detail/build.ts decouplingV1`,
-  // `compute-snapshot driftReadForPoint`). `hrDriftPct` stays on the options for the paragraph.
+  // `compute-snapshot driftReadForPoint`).
   const facts = opts.factPacket?.facts;
   if (facts && typeof facts.normalized_power_w === 'number' && typeof facts.intensity_factor === 'number') {
     const ct = facts.classified_type ? String(facts.classified_type).replace(/_/g, ' ') : 'training stimulus';
     technical_insights.push({
       label: 'Intensity',
-      value: `Normalized power ${facts.normalized_power_w}W at IF ${facts.intensity_factor.toFixed(2)} — ${ct} effort.`,
+      // Neutral words for TrainingPeaks' registered names (Normalized Power®, Intensity Factor®), 2026-09-27, approved by Michael.
+      value: `Weighted power ${facts.normalized_power_w} W, ${Math.round(facts.intensity_factor * 100)}% of FTP — ${ct} effort.`,
     });
   }
 
@@ -1183,7 +1183,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
         planned_id, user_id, date, moving_time, duration, distance, elevation_gain, workout_status, workload_actual, workload_planned,
-        achievements, weather_data, rpe, metrics
+        achievements, weather_data, rpe, metrics, strava_data, laps
       `)
       .eq('id', workout_id)
       .single();
@@ -1883,8 +1883,6 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
 
     // Build structured adherence summary (Tier 3 item 7 — mirrors running's
     // `adherence_summary` shape so client renderers don't sport-branch).
-    // HR drift % computed from cycling's hr_drift_bpm + early_avg_hr (cycling
-    // stores absolute beats; running stores percent — convert here for symmetry).
     // ⛔⛔ ONE DRIFT NUMBER FOR THE WHOLE RIDE (2026-09-03, Michael: "we cannot have bad drift data").
     //
     // ⛔ WHAT WENT WRONG. This function produced TWO drift figures from the same ride and put both on
@@ -1894,16 +1892,22 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     // time, after the warm-up) and said 7.4%. Same ride, same fact, two numbers, and the prose
     // contradicted the measurement under it.
     //
-    // ⛔ THE RULE, AND IT IS THE SAME ONE THE RUN SIDE ALREADY KEEPS: `hr-drift-halves.ts` is the
-    // definition, it is computed ONCE, and every reader here takes it — the paragraph, the adherence
-    // summary, the decoupling write, and the stored `hr_drift_v1`. A second derivation of a printed
-    // number is how a screen ends up arguing with itself.
-    //
-    // ⚠️ COMPUTED FROM THE RESOLVED `sensorData`, not a second extraction. The stored value used to
-    // re-extract from the raw workout object, which is a different call that can yield a different
-    // sample set — the same fracture one layer down.
-    // ⚠️ THE OLD FIGURE SURVIVES ONLY AS A FALLBACK, for a ride whose samples cannot be read at all.
-    // Losing the read entirely is worse than a coarser one, but it is never preferred to the real one.
+    // ⛔ THE RULE (2026-09-27, the one drift rule, Michael: "abide by training peaks"): the ride's drift is the number
+    // the Drift tile prints, `resolveSessionDrift` (`_shared/session-detail/drift-pct.ts`) — TrainingPeaks' Pw:Hr over
+    // the ride's steady middle (`computed.analysis.efficiency.aerobic_decoupling_pct`, `_shared/aerobic-decoupling.ts`), the ride's
+    // variability-index gate and the steadiness ladder, handed the materials the tile is handed. The paragraph and the
+    // carryover check read it. Until that day they read heart rate alone (`hr_drift_v1`, a 3-minute skip, nothing cut
+    // at the end), so a ride with no Drift tile could still get "heart rate held with the power", and a
+    // long ride could land on the other side of the 5% line from its tile. A ride with no drift gets neither.
+    const rideDriftPct = resolveSessionDrift({
+      workoutAnalysis: { fact_packet_v1: cyclingFactPacketV1, granular_analysis: granularAnalysis },
+      computed: (workout as any)?.computed ?? null,
+      sport: 'ride',
+      steadiness: { factPacket: cyclingFactPacketV1, plannedRow: plannedWorkout as any, workoutRow: workout },
+    })?.pct ?? null;
+    // `hr_drift_v1` — heart rate alone, halves by time (`_shared/hr-drift-halves.ts`) — is still worked out and stored
+    // for the coach, compute-facts and the daily ledger. ⚠️ COMPUTED FROM THE RESOLVED `sensorData`, not a second
+    // extraction, which can yield a different sample set.
     const rideDriftHalves = (() => {
       try {
         const totalS = Number((workout as any)?.moving_time ?? (workout as any)?.duration ?? 0);
@@ -1912,21 +1916,10 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         });
       } catch { return null; }
     })();
-    const cyclingHrDriftPct = typeof rideDriftHalves?.pct === 'number'
-      ? rideDriftHalves.pct
-      : (
-        hrAnalysis?.available &&
-        typeof hrAnalysis?.hr_drift_bpm === 'number' &&
-        typeof hrAnalysis?.early_avg_hr === 'number' &&
-        hrAnalysis.early_avg_hr > 0
-      )
-        ? (hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr) * 100
-        : null;
     const adherenceSummary = generateCyclingAdherenceSummary({
       performance,
       intervalBreakdown,
       factPacket: cyclingFactPacketV1,
-      hrDriftPct: cyclingHrDriftPct,
       powerHalves: (cyclingFactPacketV1 as any)?.derived?.power_halves ?? null,
     });
     console.log('📝 [ADHERENCE SUMMARY] verdict:', adherenceSummary?.verdict ?? '(null)', 'technical_insights:', adherenceSummary?.technical_insights?.length ?? 0, 'plan_impact:', !!adherenceSummary?.plan_impact);
@@ -2499,7 +2492,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         : null;
       ai_summary = composeBikeInsight(buildBikeInsightInputFromPacket(cyclingFactPacketV1, {
         tss: (fitnessV1 as any)?.tss_today ?? null,
-        decouplingPct: typeof cyclingHrDriftPct === 'number' ? cyclingHrDriftPct : null,
+        decouplingPct: rideDriftPct,
         intervals: _bikeIntervals,
         conditions: _wx || _elevM != null ? {
           tempF: _num(_wx?.temperature),
@@ -2519,13 +2512,13 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       void cyclingFlagsV1; void cyclingVsSimilar; void cyclingPRs; void npTrendV1; void pwr20TrendV1; void spineBikeTrend; void bike_spine_verdict; void cyclingLimiter; void _varGateRide; void plannedWorkout; void aiSummaryDebug; // dead LLM-path refs, retained for the cleanup sweep ([Q-246])
 
       // Axis 1 — cross-domain carryover (BIKE card). Discipline-correct signal: power-at-HR decoupling
-      // (cyclingHrDriftPct — HR rising relative to power = engine straining to hold watts). For cycling,
+      // (rideDriftPct, the Drift tile's Pw:Hr — HR rising relative to power = engine straining to hold watts). For cycling,
       // DOMS lowers power AND raises HR, so this COMPOUNDS (no self-cancel, no cadence-DOMS analog).
       // Conservative + silence-default; heat / hard-prescription confounds → suppress; declared-easy vetoes.
       try {
         const uid = (workout as any)?.user_id;
         const wDate = String((workout as any)?.date || '').slice(0, 10);
-        if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate) && Number.isFinite(Number(cyclingHrDriftPct))) {
+        if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate) && rideDriftPct != null) {
           // Read a WIDER 7d window (detector still filters to ≤3d) so the diagnostic can say "no lift in
           // window" when a leg session exists but is too old.
           // OURS — 7-day lifting window read for the diagnostic; no page, kept as found
@@ -2546,7 +2539,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
             .map((s) => ({ s, age: Math.round((new Date(wDate + 'T12:00:00Z').getTime() - new Date(s.date + 'T12:00:00Z').getTime()) / 86400000) }))
             .sort((a, b) => a.age - b.age);
           const nearestLift = legLifts[0] || null;
-          const decoupPct = Number(cyclingHrDriftPct);
+          const decoupPct = rideDriftPct;
           const tempF = Number((workout as any)?.avg_temperature);
           // OURS — 82 °F counts as a heat confound; no page, kept as found
           const heatConfound = Number.isFinite(tempF) && tempF >= 82;
@@ -2750,11 +2743,10 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         workout_analysis: {
           ...(existingAnalysis || {}),
           ...(analysisPayload || {}),
-          // 2026-09-03: the ride's heart-rate drift as a percentage (late window vs early window, heart rate
-          // alone) — read by session-detail as the Drift chip / Heart rate row so a ride is never without one.
-          // ⛔ THE SAME OBJECT THE PARAGRAPH AND THE ADHERENCE SUMMARY READ — computed once, near the
-          // top of this function, off the RESOLVED sample set. It used to be recomputed here from a
-          // second extraction, which could see a different sample set than the analysis did.
+          // 2026-09-03: the ride's heart-rate drift as a percentage (second half against first, heart rate alone),
+          // computed once near the top of this function off the RESOLVED sample set. Read by the coach, compute-facts
+          // and the daily ledger. ⛔ NOT the Drift tile or the paragraph (2026-09-27): a ride's drift is its
+          // power-to-heart-rate decoupling or nothing (`_shared/session-detail/drift-pct.ts`).
           hr_drift_v1: rideDriftHalves,
           classified_type: cyclingFactPacketV1?.facts?.classified_type || null,
           fact_packet_v1: cyclingFactPacketV1,

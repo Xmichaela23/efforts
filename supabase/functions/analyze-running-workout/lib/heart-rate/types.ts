@@ -34,6 +34,12 @@ export interface HRAnalysisContext {
     totalElevationGainM?: number;
     samples: SensorSample[];  // For grade calculation
   };
+
+  /**
+   * The recording's every row, stopped seconds included (2026-09-27). The pace-to-heart-rate decoupling reads these
+   * (`efficiency.ts`), not the moving samples above, so a stop counts as it does on a ride.
+   */
+  recording?: RecordingRow[];
   
   // Weather (if available)
   weather?: {
@@ -50,27 +56,6 @@ export interface HRAnalysisContext {
     paceRanges?: { lower: number; upper: number }[];
     intent?: 'easy' | 'long' | 'tempo' | 'intervals' | 'recovery';
   };
-
-  /**
-   * True when the workout has no linked plan session (canonical D-035 signal:
-   * `!isLinkedPlanSession`). Used by the interval-route decoupling gate —
-   * detected intervals on an unplanned run still compute decoupling (basis
-   * forced to 'raw') so INSIGHTS can describe HR behavior; planned interval
-   * sessions keep the existing skip because per-interval read is the honest one.
-   */
-  isUnplanned?: boolean;
-
-  /**
-   * Pre-HR variance-gate hint (D-038 Piece 1B). When `isMixedEffort: true` AND
-   * `detectWorkoutType` returns `'steady_state'`, route flips to
-   * `analyzeMixedWorkout` (workoutType override → `'fartlek'`). This catches
-   * unplanned interval-class sessions where `detectWorkoutType`'s
-   * planned-side heuristics miss the variance the run analyzer already
-   * detected via pace CV / detected intervals / plan intent. ONE-WAY override:
-   * if `detectWorkoutType` already returned `'intervals'`/`'tempo_finish'`/
-   * `'progressive'`, the more specific verdict wins.
-   */
-  varianceGate?: { isMixedEffort: boolean };
   
   // Execution metrics (from pace-adherence calculation)
   paceAdherencePct?: number;  // 0-100, overall pace adherence
@@ -156,6 +141,18 @@ export interface IntervalData {
     durationS?: number;
     avgHr?: number;
   };
+}
+
+/**
+ * One row of the recording as `supabase/lib/analysis/sensor-data/extractor.ts normalizeSamples` reads it: the
+ * recording's own seconds, cumulative metres, elevation, heart rate and device speed. Every second, stops included.
+ */
+export interface RecordingRow {
+  t: number;
+  d?: number;
+  elev?: number;
+  hr?: number;
+  v_mps?: number;
 }
 
 export interface SensorSample {
@@ -346,11 +343,9 @@ export interface ZoneTime {
 // =============================================================================
 
 export interface EfficiencyMetrics {
-  // Pace:HR decoupling
+  /** Pace:HR decoupling over the steady middle (`efficiency.ts`, `_shared/aerobic-decoupling.ts`). */
   decoupling: {
-    percent: number;            // Decoupling %
-    earlyRatio: number;         // Early pace/HR ratio
-    lateRatio: number;          // Late pace/HR ratio
+    percent: number;            // Decoupling %, one decimal
     assessment: 'good' | 'needs_work'; // Q-161: 5% line — 'good' ≤5% / 'needs_work' >5%
     /**
      * D-036: which pace series fed the ratio. TERRAIN ONLY — it says nothing about effort quality.
@@ -359,17 +354,7 @@ export interface EfficiencyMetrics {
      * 'raw' otherwise.
      */
     basis: 'gap' | 'raw';
-    /**
-     * Variance gate: the session's efforts were heterogeneous, so a whole-session first/second-half
-     * ratio is dominated by WHERE the hard bits fell, not by efficiency drift. A CONFIDENCE flag —
-     * consumers hedge on it. It is NOT an exclusion order, and it must never be folded back into
-     * `basis` (that collision silently emptied the State durability trend; see efficiency.ts).
-     */
-    mixedEffort?: boolean;
   };
-  
-  // Overall efficiency
-  avgEfficiencyRatio: number;   // Avg pace / Avg HR (normalized)
 }
 
 // =============================================================================
@@ -419,20 +404,12 @@ export interface HRSummaryMetrics {
    * D-036: which pace series fed the decoupling ratio. TERRAIN ONLY.
    * 'gap' = grade-adjusted pace (terrain neutralized; honest fitness signal).
    * 'raw' = raw pace (no usable elevation; terrain confound not removed).
-   * null = decoupling not computed (interval workout, < 20 min, etc.).
-   * ⛔ Effort quality does NOT live here — see decouplingMixedEffort.
+   * null = decoupling not computed (interval workout, a steady middle under 20 minutes — a run under about 50).
+   * ⛔ Effort quality does NOT live here: drift is read on steady sessions only.
    */
   decouplingBasis: 'gap' | 'raw' | null;
-  /**
-   * Variance gate: the efforts inside this session were heterogeneous, so the first/second-half
-   * ratio is dominated by where the hard bits fell. A CONFIDENCE flag, not an exclusion order —
-   * hedge the prose, keep the number. Persisted on `heart_rate_summary` so every downstream
-   * consumer (State trend, coach, session detail) reads the same fact.
-   */
-  decouplingMixedEffort?: boolean | null;
   /** Q-161: the shared frielBand state at the 5% science line, from decouplingAssessmentFromPct. */
   decouplingAssessment: 'good' | 'needs_work' | null; // 'good' ≤5% / 'needs_work' >5%
-  efficiencyRatio: number | null;
   
   // For weekly zone aggregation
   timeInZones: {

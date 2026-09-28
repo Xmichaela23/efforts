@@ -6,7 +6,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { plannedWhole } from '../_shared/joined-session.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
-import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds, secondsInPaceRangeBetween } from '../_shared/run-pace.ts';
+import { DRIFT_LINE_PCT, gapSecPerMiBetween, movingSecondsBetween, runDecouplingPct, runGrades, runMovingSeconds, secondsInPaceRangeBetween } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW, shareInPowerRange } from '../_shared/ride-power.ts';
 import { FAMILIES } from '../_shared/endurance-library/source-rules.ts';
@@ -450,75 +450,38 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number, paceSecPerMi:number|n
   }
 }
 
-// ---------- Aerobic decoupling (Pa:HR) execution score for runs ----------
-// Mirrors TrainingPeaks methodology: compare pace:HR ratio in first half vs second half.
-// <5% drift = excellent (100), 5-10% = good (80-90), 10-15% = moderate (60-79), >15% = poor (<60).
-// Guards: min 40min moving, steady-state only (skips interval sessions), heat annotation.
+// ---------- Execution score for runs, from the run's drift ----------
+/**
+ * The run's execution score, from its pace-to-heart-rate drift: 100 at or under the 5% line, 4 points off for every
+ * percent over it, never under 0; and whether the day was hot enough to explain a higher drift.
+ * ⛔ THE DRIFT IS NOT WORKED OUT HERE (2026-09-27). It is `_shared/run-pace.ts runDecouplingPct`, the one drift rule
+ * the run analyser reads (TrainingPeaks' Pa:Hr over the steady middle (the first 20 minutes and the last 10 left out, at least 20 left),
+ * so a run needs about 50 minutes), worked out once per run below.
+ * This function used to carry a third copy — a 5-minute skip, a 40-minute floor, halves by sample count, mean speed
+ * over mean heart rate — and it is deleted.
+ * ⚠️ THE SCORE IS MADE OF THE DRIFT AND NOTHING ELSE, so a run with no drift has no score: there is no other part to
+ * keep, and no fallback is invented. A run under about 50 minutes has no score (2026-09-27, Michael: the steady middle,
+ * "yes"); the old copy scored runs from 40 minutes of moving time.
+ */
 function aerobicDecouplingScore(
-  rows: any[],
+  decouplingPct: number | null,
   plannedSteps: any[],
   avgTempC: number | null,
 ): { score: number | null; hot_conditions: boolean } {
   const none = { score: null, hot_conditions: false };
-  try {
-    // Guard 1: steady-state only — skip if planned has >2 distinct work steps
-    // (intervals, fartlek, tempo repeats mix work+rest and break the first/second-half split)
-    const workSteps = plannedSteps.filter((s: any) => {
-      const role = String(s?.type || s?.kind || s?.role || '').toLowerCase();
-      return !role.includes('rest') && !role.includes('recovery') && !role.includes('warmup') && !role.includes('cooldown');
-    });
-    if (workSteps.length > 2) {
-      console.log(`🔍 [AEROBIC DECOUPLING] Skipping — interval session (${workSteps.length} work steps)`);
-      return none;
-    }
-
-    // Filter to moving samples with HR
-    const valid = rows.filter(r =>
-      typeof r.hr === 'number' && r.hr >= 50 && r.hr <= 220 &&
-      typeof r.v === 'number' && r.v > 0.5
-    );
-    if (valid.length < 20) return none;
-
-    // Guard 2: minimum 40 minutes of moving time
-    const firstT = Number(valid[0]?.t ?? 0);
-    const lastT = Number(valid[valid.length - 1]?.t ?? 0);
-    const movingSeconds = lastT - firstT;
-    if (movingSeconds < 2400) {
-      console.log(`🔍 [AEROBIC DECOUPLING] Skipping — too short (${Math.round(movingSeconds / 60)} min moving, need 40)`);
-      return none;
-    }
-
-    // Skip first 5 minutes — HR lag from warmup distorts first-half ratio
-    const warmupCutoff = firstT + 300;
-    const steady = valid.filter(r => Number(r.t) >= warmupCutoff);
-    if (steady.length < 20) return none;
-
-    const mid = Math.floor(steady.length / 2);
-    const first = steady.slice(0, mid);
-    const second = steady.slice(mid);
-
-    const avgPaceHrRatio = (samples: any[]): number | null => {
-      const avgSpeed = samples.reduce((s: number, r: any) => s + r.v, 0) / samples.length;
-      const avgHr = samples.reduce((s: number, r: any) => s + r.hr, 0) / samples.length;
-      if (avgHr <= 0 || avgSpeed <= 0) return null;
-      return avgSpeed / avgHr;
-    };
-
-    const r1 = avgPaceHrRatio(first);
-    const r2 = avgPaceHrRatio(second);
-    if (r1 == null || r2 == null || r1 <= 0) return none;
-
-    const decouplingPct = ((r1 - r2) / r1) * 100;
-    const score = Math.round(Math.max(0, Math.min(100, 100 - (Math.max(0, decouplingPct - 5) * 4))));
-
-    // Heat flag: >27°C (80°F) — score is real but conditions explain higher drift
-    const hot_conditions = avgTempC != null && avgTempC > 27;
-
-    console.log(`🔍 [AEROBIC DECOUPLING] moving=${Math.round(movingSeconds / 60)}min, decoupling=${decouplingPct.toFixed(1)}%, score=${score}, hot=${hot_conditions}`);
-    return { score, hot_conditions };
-  } catch {
-    return none;
-  }
+  // OURS — more than two planned work steps is an interval session and gets no score: the steadiness ladder's
+  // planned-steps line (`_shared/session-detail/session-steadiness.ts`, rung 2), counted here on the planned row
+  // because the fact packet the ladder reads is written later, by the run analyser. Kept as found.
+  const workSteps = plannedSteps.filter((s: any) => {
+    const role = String(s?.type || s?.kind || s?.role || '').toLowerCase();
+    return !role.includes('rest') && !role.includes('recovery') && !role.includes('warmup') && !role.includes('cooldown');
+  });
+  if (workSteps.length > 2 || decouplingPct == null) return none;
+  // Viada p107 — the 5% line (`DRIFT_LINE_PCT`); OURS — 4 points off per percent over it, kept as found
+  const score = Math.round(Math.max(0, Math.min(100, 100 - Math.max(0, decouplingPct - DRIFT_LINE_PCT) * 4)));
+  // OURS — over 27 °C (80 °F) the day is flagged hot: the score is real, the conditions explain a higher drift. Kept as found.
+  const hot_conditions = avgTempC != null && avgTempC > 27;
+  return { score, hot_conditions };
 }
 
 // ---------- Adherence calculation function ----------
@@ -1204,6 +1167,11 @@ Deno.serve(async (req) => {
       console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} user=${w.user_id} sport=${sport} samples=${sampleCount} rows=${rows.length} laps=${laps.length} plannedSteps=${plannedStepsDbg}`);
     } catch {}
 
+    // ⛔ THE RUN'S DRIFT, ONCE, OVER THE RECORDING'S STEADY MIDDLE (2026-09-27): `_shared/run-pace.ts runDecouplingPct`, the rule
+    // the run analyser reads too. Worked out before the movement gate below trims a standing start, because the 20
+    // minutes left out are counted from the recording's first second, stops included. Read by the execution score (`aerobicDecouplingScore`).
+    const runDrift = sport === 'run' ? runDecouplingPct(rows) : null;
+
     // Movement gate: skip initial non-movement, but ONLY when no planned link
     if (!w.planned_id) {
       try {
@@ -1582,7 +1550,7 @@ Deno.serve(async (req) => {
       // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
       const avgTempC = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
       const { score: overallExecutionScore, hot_conditions } = sport === 'run'
-        ? aerobicDecouplingScore(rows, plannedSteps, avgTempC)
+        ? aerobicDecouplingScore(runDrift?.pct ?? null, plannedSteps, avgTempC)
         : { score: null, hot_conditions: false };
 
       console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
@@ -2041,7 +2009,7 @@ Deno.serve(async (req) => {
       // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
       const avgTempC2 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
       const { score: overallExecutionScore, hot_conditions: hot2 } = sport === 'run'
-        ? aerobicDecouplingScore(rows, plannedSteps, avgTempC2)
+        ? aerobicDecouplingScore(runDrift?.pct ?? null, plannedSteps, avgTempC2)
         : { score: null, hot_conditions: false };
 
       const computed = {
@@ -2826,7 +2794,7 @@ Deno.serve(async (req) => {
     // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
     const avgTempC3 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
     const { score: overallExecutionScore, hot_conditions: hot3 } = sport === 'run'
-      ? aerobicDecouplingScore(rows, plannedSteps, avgTempC3)
+      ? aerobicDecouplingScore(runDrift?.pct ?? null, plannedSteps, avgTempC3)
       : { score: null, hot_conditions: false };
 
     console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {

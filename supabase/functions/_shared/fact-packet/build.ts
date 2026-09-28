@@ -5,7 +5,6 @@ import type { DriftExplanation, FactPacketV1, FlagV1, HrZone, WeatherV1, Workout
 import {
   classifyTerrain,
   coerceNumber,
-  calculateCardiacDecouplingPct,
   calculateOverallHrDriftBpm,
   calculatePaceFadePct,
   deriveDewPointF,
@@ -280,8 +279,16 @@ export async function buildWorkoutFactPacketV1(args: {
     lastGoalRaceYmd?: string | null;
     daysSinceLastGoalRace?: number | null;
   } | null;
+  /**
+   * ⛔ THE RUN'S ONE DRIFT (2026-09-27): the analyser's pace-to-heart-rate decoupling, read over the steady middle
+   * (`../aerobic-decoupling.ts`, via `analyze-running-workout/lib/heart-rate/efficiency.ts`), null when that middle is under
+   * 20 minutes. The packet used to work out a second one from its segments (halves by segment count, warm-up and
+   * cool-down segments dropped by name), and that coarse number filled the gap wherever the analyser had none.
+   */
+  decoupling?: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'good' | 'needs_work' | null } | null;
 }): Promise<{ factPacket: FactPacketV1; flags: FlagV1[] }> {
   const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, baselines, arcContext } = args;
+  const decouplingPct = args.decoupling?.pct ?? null;
 
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
@@ -455,7 +462,6 @@ export async function buildWorkoutFactPacketV1(args: {
   })();
 
   const hr_drift_typical = coerceNumber((vsSimilar as any)?.avg_hr_drift) ?? null;
-  const dec = calculateCardiacDecouplingPct(segments);
   const fade = calculatePaceFadePct(segments);
   const driftSeg = calculateOverallHrDriftBpm(segments);
 
@@ -893,6 +899,7 @@ export async function buildWorkoutFactPacketV1(args: {
           ? (overallDurMin != null ? Math.round(overallDurMin) : null)
           : (coerceNumber(plannedWorkout?.duration) ?? coerceNumber(plannedWorkout?.planned_duration_min) ?? null),
       interval_count: coerceNumber((plannedWorkout as any)?.interval_count) ?? null,
+      decoupling_pct: decouplingPct,
     }
   );
 
@@ -989,7 +996,9 @@ export async function buildWorkoutFactPacketV1(args: {
       pace_normalized_drift_bpm,
       drift_explanation,
       hr_drift_typical,
-      cardiac_decoupling_pct: dec,
+      cardiac_decoupling_pct: decouplingPct,
+      decoupling_basis: decouplingPct == null ? null : (args.decoupling?.basis ?? null),
+      decoupling_assessment: decouplingPct == null ? null : (args.decoupling?.assessment ?? null),
       pace_fade_pct: fade,
       pacing_pattern,
       training_load: trainingLoad,

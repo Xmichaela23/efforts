@@ -120,12 +120,12 @@ Deno.test('ride 4 — drift under the line, N rides running', () => {
   }), 'Drift under 5 percent, 3 rides in a row.');
 });
 
-Deno.test('ride 4 — a ride with heart-rate drift only (no decoupling) still reads, as the tile does', () => {
+Deno.test('⛔ ride 4 — a ride with heart-rate drift only (no power ratio) has no drift line, as the tile has none (2026-09-27)', () => {
   assertEquals(sessionBoomLine({
     workout: ride('2026-09-09', { planned_row: {}, workout_analysis: { hr_drift_v1: { pct: 2.5, seconds: 2400 } } }),
     prior: [ride('2026-09-05', { workout_analysis: { hr_drift_v1: { pct: 4.0, seconds: 2400 } } })],
     blockStartISO: BLOCK,
-  }), 'Drift under 5 percent, 2 rides in a row.');
+  }), null);
 });
 
 Deno.test('⛔ ride 4 — 4.96 prints as 5.0 on the tile, so it is not under the line', () => {

@@ -19,20 +19,24 @@
  *    TrainingPeaks EF ("average heart rate for the workout"), intervals.icu. The pedaling-only HR
  *    denominator is gone: no vendor divides by it, and it made Performance disagree with State.
  *    compute-facts copies this number; it does not recompute it. Still needs >= 60 paired samples.
- *  - aerobic decoupling: Friel first-half vs second-half power:HR ratio; only
- *    emitted when the paired pedaling span >= 20 min (1200 s), else interval
- *    structure is conflated with drift. Positive % = HR drifted up relative to
- *    power (aerobic decoupling / fatigue).
+ *  - aerobic decoupling (2026-09-27): TrainingPeaks' Pw:Hr, worked out by `../aerobic-decoupling.ts
+ *    steadyDecouplingPct`, the one drift rule runs share. It reads the steady middle (the first 20 minutes and the last 10 left out, at least 20 left),
+ *    splits it at its middle second, and compares each half's normalized power (coasting at 0 W) over its average heart rate (every
+ *    heart-rate second, not only the pedalling ones). Sources are in that file. Positive % = heart rate rose
+ *    against the power.
  *  - VAM: climbing samples = grade >= 3% with positive elevation delta; needs
  *    >= 30 m climbed and >= 120 s climbing to be meaningful.
  */
+
+import { steadyDecouplingPct } from '../aerobic-decoupling.ts';
+import { powerStreamW } from '../ride-power.ts';
 
 export type RideEfficiency = {
   /** Judged power ÷ whole-ride average heart rate, 2 dp (see header). Null when either is missing.
    *  Higher = more aerobic output per heartbeat; comparable over time. */
   efficiency_factor: number | null;
   avg_pedaling_power_w: number;
-  /** Friel aerobic decoupling %. Present only for steady efforts >= 20 min. */
+  /** Friel aerobic decoupling %, over the steady middle (`../aerobic-decoupling.ts`). Absent when that middle is under 20 min. */
   aerobic_decoupling_pct?: number;
 };
 
@@ -120,38 +124,25 @@ export function computeRideEfficiency(
   judgedPowerW: number | null,
   avgHrBpm: number | null,
 ): RideEfficiency | null {
+  // The seconds with both heart rate and pedalling power: the gate below and the average pedalling power.
   const n = Math.min(timeS.length, hrBpm.length, powerW.length);
-  const ped: Array<{ t: number; hr: number; p: number }> = [];
+  const ped: number[] = [];
   for (let i = 0; i < n; i++) {
     const hr = hrBpm[i];
     const p = powerW[i];
-    const t = timeS[i];
-    if (typeof hr === 'number' && hr > 0 && typeof p === 'number' && p > 0 && Number.isFinite(t)) {
-      ped.push({ t, hr, p });
-    }
+    if (typeof hr === 'number' && hr > 0 && typeof p === 'number' && p > 0 && Number.isFinite(timeS[i])) ped.push(p);
   }
-  // OURS — `computeRideEfficiency` ≥ 60 pedalling samples; halves decoupling only on ≥ 1200 s: no outside source
+  // OURS — `computeRideEfficiency` ≥ 60 pedalling samples: no outside source. The decoupling rule is FIELD (`../aerobic-decoupling.ts`).
   if (ped.length < 60) return null;
-  const avgP = mean(ped.map((x) => x.p));
+  const avgP = mean(ped);
   const judged = Number(judgedPowerW);
   const hr = Number(avgHrBpm);
   const out: RideEfficiency = {
     efficiency_factor: judged > 0 && hr > 0 ? Math.round((judged / hr) * 100) / 100 : null,
     avg_pedaling_power_w: Math.round(avgP),
   };
-  const span = ped[ped.length - 1].t - ped[0].t;
-  if (span >= 1200) {
-    const mid = Math.floor(ped.length / 2);
-    const h1 = ped.slice(0, mid);
-    const h2 = ped.slice(mid);
-    if (h1.length > 0 && h2.length > 0) {
-      const r1 = mean(h1.map((x) => x.p)) / mean(h1.map((x) => x.hr));
-      const r2 = mean(h2.map((x) => x.p)) / mean(h2.map((x) => x.hr));
-      if (Number.isFinite(r1) && r1 > 0 && Number.isFinite(r2)) {
-        out.aerobic_decoupling_pct = Math.round(((r1 - r2) / r1) * 1000) / 10;
-      }
-    }
-  }
+  const dec = steadyDecouplingPct(timeS, hrBpm, powerStreamW(powerW), 'normalized');
+  if (dec != null) out.aerobic_decoupling_pct = dec;
   return out;
 }
 

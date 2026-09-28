@@ -459,10 +459,10 @@ export type SessionDetailV1 = {
      */
     decoupling: {
       pct: number | null;
-      /** 'gap' / 'raw' = pace-to-heart-rate decoupling (TrainingPeaks' Pa:Hr); 'hr' = heart rate alone,
-       *  second half against first (the book's own drift, p107) — the fallback so the number is NEVER
-       *  withheld (Michael 2026-09-03: "drift is going to be important"). */
-      basis: 'gap' | 'raw' | 'hr' | 'power' | null;
+      /** 'gap' / 'raw' = pace-to-heart-rate decoupling (TrainingPeaks' Pa:Hr); 'power' = power to heart rate
+       *  (Pw:Hr). ⛔ No 'hr' since 2026-09-27: heart rate alone is not TrainingPeaks' decoupling, so a session
+       *  with neither ratio has no drift (`drift-pct.ts`). */
+      basis: 'gap' | 'raw' | 'power' | null;
       assessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
       /** true when the session had intervals: the number covers the whole session, intervals included,
        *  so it is not the same read as a steady run. Stated on the screen, never hidden. */

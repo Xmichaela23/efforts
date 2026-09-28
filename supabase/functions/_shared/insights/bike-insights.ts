@@ -1,14 +1,13 @@
 // DETERMINISTIC BIKE INSIGHTS COMPOSER (2026-07-19) — replaces the LLM for cycling. Mirrors run-insights:
 // verdict-per-clause, three families, silence when thin. Bike adds ONE fork running doesn't have —
 // POWER vs NO-POWER — because NP/IF/TSS/power-curve all need a meter. With power: the full read. HR only:
-// the honest lighter read (decoupling, HR held), never a fabricated watt. Same law as swim: interpret in
-// proportion to the data you actually have.
+// the honest lighter read, never a fabricated watt — and no drift, which is power to heart rate (2026-09-27).
+// Same law as swim: interpret in proportion to the data you actually have.
 //
 // CONTINUITY: reads the verdicts the cycling engine already computes (NP, IF, TSS, VI, efficiency_factor,
 // aerobic_decoupling_pct, work-interval target hits) — does not recompute them. Pure function → any surface
 // renders its output.
 
-import { driftReadApplies } from '../session-detail/drift-pct.ts';
 
 export type BikeType = 'endurance' | 'recovery' | 'long' | 'tempo' | 'sweetspot' | 'threshold' | 'vo2' | 'anaerobic' | 'sprint' | 'over_under' | 'group' | 'other';
 
@@ -70,6 +69,11 @@ export interface BikeInsightInput {
   power?: { np?: number | null; avg?: number | null; if?: number | null; tss?: number | null; vi?: number | null; ftp?: number | null } | null;
   /** efficiency_factor = watts per heartbeat (aerobic efficiency; higher = fitter at the same HR). */
   efficiency?: { factor?: number | null } | null;
+  /**
+   * The ride's drift as the Drift tile prints it — `resolveSessionDrift` (`../session-detail/drift-pct.ts`), handed in
+   * by `analyze-cycling-workout`: TrainingPeaks' Pw:Hr over the steady middle, null on a ride with no drift (too short,
+   * power that swung, not steady, no power). This composer does not judge it again.
+   */
   decoupling?: { pct: number | null } | null;
   /** work-interval execution: reps hit, whether the power held target, consistency across the set. */
   intervals?: { hit?: number | null; total?: number | null; heldTarget?: boolean | null; consistent?: boolean | null } | null;
@@ -196,11 +200,11 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   const tss = typeof p.tss === 'number' ? p.tss : null;
   const vi = typeof p.vi === 'number' ? p.vi : null;
   const ef = typeof inp.efficiency?.factor === 'number' ? inp.efficiency.factor : null;
-  // ⛔ NO HEART-RATE-WITH-POWER SENTENCE ON A RIDE WHOSE POWER SWUNG (2026-09-27, Michael). Above a variability
-  // index of 1.05 the ride has no drift (`driftReadApplies`, session-detail/drift-pct.ts — TrainingPeaks: "a steady
-  // and even output … should have a VI of 1.05 or less"), and "heart rate held / climbed relative to the power" is
-  // that drift in words. The Drift tile says nothing on such a ride, so the paragraph does not either.
-  const dcp = typeof inp.decoupling?.pct === 'number' && driftReadApplies('ride', vi) ? inp.decoupling.pct : null;
+  // ⛔ THE DRIFT TILE'S NUMBER, OR NO SENTENCE (2026-09-27, Michael). "Heart rate held / climbed relative to the power"
+  // is the ride's drift in words, so it is said only where the tile prints one: the number handed in IS the tile's
+  // (`decoupling` above), already null on a ride whose power swung (VI above 1.05 — TrainingPeaks: "a steady and even
+  // output … should have a VI of 1.05 or less") or too short for the steady middle. No second check here.
+  const dcp = typeof inp.decoupling?.pct === 'number' ? inp.decoupling.pct : null;
   const dcpTxt = dcp != null ? `${Math.round(dcp * 10) / 10}%` : null;
   const hrHeld = dcp != null && dcp <= 5; // Friel line, same as run/State
   const power = inp.hasPower && np != null;
@@ -219,9 +223,9 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
       if (vi != null && vi <= 1.05) parts.push(`You held the power smooth (${np} W normalized${vi <= 1.03 ? ', barely a surge' : ''}).`);
       else parts.push(`Steady aerobic ride at ${np} W normalized.`);
       // The efficiency read — same watts at a lower HR is the fitness gain cyclists track. NO drift NUMBER
-      // here: the EFFICIENCY row owns the figure (Friel aerobic decoupling); the paragraph makes the
-      // qualitative claim. This is what feeds `hrHeld` — raw HR drift, a proxy for the row's decoupling —
-      // so the DECISION stays honest even though we don't print a second, differing number.
+      // here: the Drift tile owns the figure (TrainingPeaks' Pw:Hr, Friel's aerobic decoupling); the paragraph makes
+      // the qualitative claim, decided on that same number (`hrHeld`, 2026-09-27 — it was heart rate alone until then),
+      // so the sentence and the tile cannot disagree.
       // ⛔ THE CLAIM IS THE NUMBER'S, NOT THE PARAGRAPH'S (2026-09-03). "The aerobic engine carried it,
       // the watts didn't cost you HR" was a second, louder statement of a figure printed two lines
       // below — and on a ride whose drift read 7.4% it said the opposite of the row under it. Both
@@ -236,7 +240,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
         const band = iff <= 0.75 ? ' — an aerobic-base load.'
           : iff <= 0.85 ? '.'
           : ' — harder than base work.';
-        parts.push(`${tss} TSS at ${r2(iff)} intensity${band}`);
+        parts.push(`${tss} workload at ${Math.round(iff * 100)}% of FTP${band}`);
       }
       parts.push(conditionsClause(inp));
     } else {
@@ -284,7 +288,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   // ── MIXED — group ride / unstructured: surges by design, never graded for steadiness ──────────────
   if (fam === 'mixed') {
     parts.push('A mixed ride — the power swung with the group by design, not a pacing miss.');
-    if (power && np != null && tss != null) parts.push(`${np} W normalized, ${tss} TSS over the ride.`);
+    if (power && np != null && tss != null) parts.push(`${np} W weighted power, ${tss} workload over the ride.`);
     else if (typeof inp.durationMin === 'number' && typeof inp.distanceMi === 'number' && inp.distanceMi > 0) parts.push(`${inp.distanceMi} mi over ${r0(inp.durationMin)} min of mixed efforts.`);
     return clean(parts);
   }

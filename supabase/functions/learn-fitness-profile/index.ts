@@ -1577,7 +1577,7 @@ export function analyzeRides(
           value: estimatedFTP,
           // Tier 2 cap: NP-from-hard-rides is a fallback, not a 20-min measurement. Never claim resolver-trusted 'high'.
           confidence: normalizedPowers.length >= 2 ? 'medium' : 'low',
-          source: `95% of best NP from ${normalizedPowers.length} hard rides`,
+          source: `95% of best weighted power from ${normalizedPowers.length} hard rides`,
           sample_count: normalizedPowers.length
         };
         console.log(`  ⚡ FTP from hard effort NP: ${estimatedFTP}W (from ${bestNP}W NP)`);

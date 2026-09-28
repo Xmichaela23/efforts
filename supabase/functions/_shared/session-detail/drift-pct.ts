@@ -19,29 +19,33 @@
  *      output at a given heart rate. An interval session has no such pace or output, so it has no
  *      drift: null, not a labelled number. ⛔ THE TEST IS NOT HERE AND IS NOT A BOOLEAN A CALLER MAY
  *      PASS IN — it is `sessionSteadiness` in `./session-steadiness.ts`, and a caller hands over the
- *      MATERIALS it has (the planned row, the fact packet, the workout row, the rendered rows) so
+ *      MATERIALS it has (the planned row, the fact packet, the workout row, the rendered rows; the
+ *      analysis itself is handed over by default, for the planned sets in its breakdown) so
  *      that no screen can answer the question for itself. A caller with nothing to hand over gets
  *      the ladder's own "nothing said" verdict, which is steady.
  *   0b. ⛔ A RIDE WHOSE POWER SWUNG HAS NO DRIFT (2026-09-27, Michael): a variability index above 1.05
  *      means the ride held no given output, so there is nothing to read drift at — null, whatever the
  *      ladder said. `driftReadApplies` below; runs are not touched by it.
  *   1. The analyser's pace-to-heart-rate decoupling, `heart_rate_summary.decouplingPct` (D-036),
- *      basis 'gap' or 'raw', when it computed one (runs).
+ *      basis 'gap' or 'raw', when it computed one (runs) — TrainingPeaks' Pa:Hr.
  *   2. A ride's power-to-heart-rate decoupling, `computed.analysis.efficiency.aerobic_decoupling_pct`
  *      (`_shared/cycling-v1/ride-physiology.ts`), basis 'power' — TrainingPeaks' Pw:Hr, the number
- *      State's bike drift reads.
- *   3. Heart rate alone, second half against first — `hr_drift_v1.pct`, written by both analysers
- *      from `_shared/hr-drift-halves.ts` — basis 'hr'. The fallback when there is no output to
- *      ratio against. ⛔ Only when the halves cover `DRIFT_MIN_STEADY_S`, 20 minutes (2026-09-27, below).
- *   4. Else no read. ⚠️ THERE IS NO FIFTH. State carried one (`workout_facts.drift`) and it was the
- *      only place a drift number could appear that Performance had no way to show.
+ *      State's bike drift reads. Rungs 1 and 2 are one rule, worked out in `../aerobic-decoupling.ts`: over the
+ *      steady middle (the first 20 minutes and the last 10 left out, at least 20 left), so a session needs
+ *      about 50 minutes to have either.
+ *   3. Else no read. ⛔ NO HEART-RATE-ONLY RUNG (2026-09-27, Michael: "abide by training peaks"). Heart rate
+ *      alone (`hr_drift_v1`, `_shared/hr-drift-halves.ts`) used to stand in when there was no ratio — a ride
+ *      with no power, a run whose ratio was withheld — with its own start (3 minutes skipped). TrainingPeaks' decoupling is Pa:Hr or Pw:Hr and nothing else, so a session with neither has
+ *      no drift, the same null a short session gets. `hr_drift_v1` is still written for the coach and the
+ *      daily ledger. ⚠️ THERE IS NO FOURTH. State carried one (`workout_facts.drift`) and it was the only
+ *      place a drift number could appear that Performance had no way to show.
  * Rounded to one decimal, as the tile prints it — a reader comparing against 5 must see 4.96 as 5.0.
  */
 import { sessionSteadiness, type SteadinessInput } from './session-steadiness.ts';
 
 export type { SteadinessInput };
 
-export type DriftBasis = 'gap' | 'raw' | 'hr' | 'power';
+export type DriftBasis = 'gap' | 'raw' | 'power';
 export type SessionDrift = {
   pct: number;
   basis: DriftBasis;
@@ -53,27 +57,6 @@ export type SessionDrift = {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const RIDE = /^(ride|bike|cycling)$/;
-
-/**
- * ⛔ TWENTY MINUTES OF STEADY WORK, OR NO DRIFT (2026-09-27, Michael: "let's just have long steady count", "Go").
- * One rule for runs and rides: drift is read on a steady session of 20 minutes or more, and on nothing else.
- *
- * FIELD — TrainingPeaks Help Center, "Aerobic Decoupling (Pw:Hr and Pa:HR) and Efficiency Factor (EF)"
- * (help.trainingpeaks.com/hc/en-us/articles/204071724, read 2026-09-27): "Aerobic Decoupling values for efforts
- * under 20 minutes in duration aren't as valid", and the read is for a long, steady-state effort. TrainingPeaks
- * prints the number on every workout and leaves the reading to the athlete; this app prints it only where the
- * advice says it means something.
- *
- * ⚠️ RUNGS 1 AND 2 ARE ALREADY GATED AT THE SOURCE. The run analyser computes no pace decoupling on fewer than
- * 1,200 samples (`analyze-running-workout/lib/heart-rate/efficiency.ts`), and the ride's power ratio needs a
- * 1,200-second pedalling span (`cycling-v1/ride-physiology.ts`). The two reads that did not wait were heart rate
- * alone (rung 3, from 6 minutes) and the long-session window (`vt1-window-drift.ts`, from 10 minutes of easy
- * work — p107's shortest worthwhile VT1 bout, which is not a drift number). Both use this constant now.
- * ⚠️ MEASURED ON WHAT IS COMPARED: rung 3's `seconds` is the span its halves cover after the warm-up skip, and the
- * window's is the easy time left once the sets are out. A stored read with no `seconds` on it is not a 20-minute
- * read and gets nothing.
- */
-export const DRIFT_MIN_STEADY_S = 1200;
 
 export function resolveSessionDrift(input: {
   workoutAnalysis: unknown;
@@ -95,7 +78,7 @@ export function resolveSessionDrift(input: {
   // 0. steady sessions only — the ladder decides, never this file and never the caller.
   const st = input.steadiness ?? {};
   const fp = st.factPacket ?? a.fact_packet_v1 ?? null;
-  if ((isRun || isRide) && !sessionSteadiness({ ...st, factPacket: fp }).steady) return null;
+  if ((isRun || isRide) && !sessionSteadiness({ ...st, factPacket: fp, workoutAnalysis: st.workoutAnalysis ?? a }).steady) return null;
   // 0b. a ride whose power swung — no given output, so no drift (below). The same packet, else the analysis's own.
   if (isRide && !driftReadApplies(sport, variabilityIndexOf(fp ?? factPacketOf(a)))) return null;
 
@@ -116,12 +99,7 @@ export function resolveSessionDrift(input: {
     if (Number.isFinite(pdec)) return { pct: round1(pdec), basis: 'power', assessment: null, confounded: false };
   }
 
-  // 3. heart rate alone — over 20 minutes or more (`DRIFT_MIN_STEADY_S`)
-  const halves = a.hr_drift_v1;
-  if (halves && typeof halves.pct === 'number' && Number.isFinite(halves.pct)
-    && Number(halves.seconds) >= DRIFT_MIN_STEADY_S) {
-    return { pct: round1(halves.pct), basis: 'hr', assessment: null, confounded: false };
-  }
+  // 3. no read — no heart-rate-only rung (header).
   return null;
 }
 
@@ -134,8 +112,8 @@ export function resolveSessionDrift(input: {
  * kept the percentage and took only the 5% line off; that is gone. Because the null is decided HERE, every reader
  * of this rule agrees without a check of its own: the Drift tile and the Heart rate row on Performance
  * (`build.ts decouplingV1`), the "Drift under 5 percent" line on Today (`session-boom/line.ts`), State's drift
- * chart (`compute-snapshot driftReadForPoint`), and the long-session window (`vt1-window-drift.ts`). The ride
- * paragraph's heart-rate-with-power sentence asks the same function (`insights/bike-insights.ts`).
+ * chart (`compute-snapshot driftReadForPoint`). The ride
+ * paragraph's heart-rate-with-power sentence is handed this function's number (`analyze-cycling-workout`, 2026-09-27).
  *
  * FIELD — TrainingPeaks, "Power Terminology For Cycling" (trainingpeaks.com/blog/power-terminology-for-cycling/,
  * read 2026-09-27): "A steady and even output, like during a triathlon, should have a VI of 1.05 or less."

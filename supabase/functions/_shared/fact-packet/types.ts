@@ -213,13 +213,14 @@ export type FactPacketV1 = {
     /** What primarily explains the observed HR increase across the session. */
     drift_explanation: DriftExplanation | null;
     hr_drift_typical: number | null;
+    /** The run analyser's pace-to-heart-rate decoupling over the steady middle (`../aerobic-decoupling.ts`, 2026-09-27). */
     cardiac_decoupling_pct: number | null;
     /**
      * D-036: which pace series fed cardiac_decoupling_pct.
      * 'gap' = grade-adjusted pace (terrain-neutral; treat the value as a real
      * cardiovascular efficiency signal).
      * 'raw' = raw pace (terrain confound present; treat as inconclusive).
-     * null = decoupling not computed (interval workout, < 20 min, cycling).
+     * null = decoupling not computed (interval workout, a steady middle under 20 minutes, cycling).
      */
     decoupling_basis?: 'gap' | 'raw' | null;
     /** The shared frielBand states (Q-161 — banded to the one science line at 5%): 'good' (≤5% —
