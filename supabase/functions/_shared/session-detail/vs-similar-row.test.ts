@@ -15,7 +15,7 @@ Deno.test('full case: current NP present → "NP X vs Y avg on similar [type] ri
   const vs = { sample_size: 5, matched_type: 'threshold', np_delta_w: 12, if_delta: 0.04, assessment: 'above_typical' };
   assertEquals(formatCyclingVsSimilarRow(vs, 224), {
     label: 'vs similar',
-    value: 'NP 224W vs 212W avg on similar threshold rides — above typical',
+    value: 'Weighted power 224W vs 212W avg on similar threshold rides — above typical',
   });
 });
 
@@ -23,7 +23,7 @@ Deno.test('negative delta: avg is reconstructed as current − np_delta_w', () =
   const vs = { sample_size: 4, matched_type: 'sweet_spot', np_delta_w: -15, assessment: 'below_typical' };
   assertEquals(formatCyclingVsSimilarRow(vs, 200), {
     label: 'vs similar',
-    value: 'NP 200W vs 215W avg on similar sweet spot rides — below typical',
+    value: 'Weighted power 200W vs 215W avg on similar sweet spot rides — below typical',
   });
 });
 
@@ -41,17 +41,17 @@ Deno.test('no current NP → fallback to signed delta phrasing (still renders)',
   const vs = { sample_size: 5, matched_type: 'threshold', np_delta_w: 12, assessment: 'above_typical' };
   assertEquals(formatCyclingVsSimilarRow(vs, null), {
     label: 'vs similar',
-    value: 'NP +12W vs avg on similar threshold rides — above typical',
+    value: 'Weighted power +12W vs avg on similar threshold rides — above typical',
   });
   assertEquals(formatCyclingVsSimilarRow({ np_delta_w: -8, assessment: 'below_typical' }, undefined), {
     label: 'vs similar',
-    value: 'NP -8W vs avg on similar similar rides — below typical',
+    value: 'Weighted power -8W vs avg on similar similar rides — below typical',
   });
 });
 
 Deno.test('missing matched_type → "similar rides"; missing assessment → no tail', () => {
   assertEquals(formatCyclingVsSimilarRow({ np_delta_w: 5 }, 240), {
     label: 'vs similar',
-    value: 'NP 240W vs 235W avg on similar similar rides',
+    value: 'Weighted power 240W vs 235W avg on similar similar rides',
   });
 });

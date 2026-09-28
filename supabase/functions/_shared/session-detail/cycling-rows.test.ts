@@ -11,7 +11,7 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 
 // ── EFFICIENCY ──────────────────────────────────────────────────────────────
 
-// D-062 / Q-010: the EFFICIENCY row is plain-language ("Watts per heartbeat …"), NOT the old jargon
+// D-062 / Q-010: the EFFICIENCY row is plain-language ("Efficiency factor …"), NOT the old jargon
 // ("EF … · …% HR decoupling"). This test drifted from that shipped change; realigned 2026-07-12.
 //
 // ⛔ DRIFT LEFT THIS ROW 2026-08-02. It used to ride along as "· HR drift 4.3%" — the bike burying its
@@ -21,22 +21,22 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 // ⛔ AND THE ROW IS A COMPARISON, NOT A DEFINITION (2026-09-15, approved copy). It spent its second
 // half explaining what the number is and which way is good; it now says what it is against the rider's
 // own recent rides. With no trend to read, the number alone.
-Deno.test('efficiency: both values finite → "Watts per heartbeat {ef}", drift NOT printed here', () => {
+Deno.test('efficiency: both values finite → "Efficiency factor {ef}", drift NOT printed here', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' },
+    { label: 'EFFICIENCY', value: 'Efficiency factor 1.62.' },
   );
   // 0% decoupling is finite → still renders (Number(null) trap: 0 is a value, absent is not)
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.7, aerobic_decoupling_pct: 0 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.70.' },
+    { label: 'EFFICIENCY', value: 'Efficiency factor 1.70.' },
   );
 });
 
 Deno.test('efficiency: the rider\'s own recent average is the second sentence', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.42, aerobic_decoupling_pct: 3.1 }, { recentEf: 1.384 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.42. Your average on steady rides over the last four weeks is 1.38.' },
+    { label: 'EFFICIENCY', value: 'Efficiency factor 1.42. Your average on steady rides over the last four weeks is 1.38.' },
   );
 });
 
@@ -78,8 +78,8 @@ Deno.test('efficiency: a session the steadiness ladder refuses gets no row', () 
 });
 
 Deno.test('⛔ efficiency: shown without a drift reading (2026-09-27) — a steady ride under 50 minutes keeps its row', () => {
-  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }), { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' });
-  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: null }), { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' });
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }), { label: 'EFFICIENCY', value: 'Efficiency factor 1.62.' });
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: null }), { label: 'EFFICIENCY', value: 'Efficiency factor 1.62.' });
   // The two gates still decide: an interval session or a ride with too little in-band time gets none.
   assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }, { steady: false }), null);
   assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }, { countsTowardTrend: false }), null);

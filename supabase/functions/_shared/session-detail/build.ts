@@ -1301,7 +1301,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const parts: string[] = [];
     const lead = ct ? `${ct.charAt(0).toUpperCase()}${ct.slice(1)} ride` : 'Ride';
     if (Number.isFinite(np) && np > 0 && Number.isFinite(ifv) && ifv > 0) {
-      parts.push(`${lead}: ${Math.round(np)}W normalized power at IF ${ifv.toFixed(2)}${Number.isFinite(dur) && dur > 0 ? ` over ${Math.round(dur)} min` : ''}.`);
+      parts.push(`${lead}: ${Math.round(np)}W weighted power at ${Math.round(ifv * 100)}% of FTP${Number.isFinite(dur) && dur > 0 ? ` over ${Math.round(dur)} min` : ''}.`);
     } else if (Number.isFinite(dur) && dur > 0) {
       parts.push(`${lead} — ${Math.round(dur)} min.`);
     } else {
@@ -1775,7 +1775,7 @@ export function pickCyclingTrendSeries(
       return null;
     }
     // Fallback: NP series is NOT type-filtered (mixed ride types) — no type word.
-    return { points: nptr, metricLabel: 'Normalized power', noun: 'NP', rideType: null };
+    return { points: nptr, metricLabel: 'Weighted power', noun: 'weighted power', rideType: null };
   }
   return null;
 }
@@ -1814,11 +1814,11 @@ export function formatCyclingVsSimilarRow(
   const cur = Number(currentNpW);
   if (Number.isFinite(cur) && cur > 0) {
     const avg = Math.round(cur - npD);
-    return { label: 'vs similar', value: `NP ${Math.round(cur)}W vs ${avg}W avg on similar ${type}${tail}` };
+    return { label: 'vs similar', value: `Weighted power ${Math.round(cur)}W vs ${avg}W avg on similar ${type}${tail}` };
   }
   // No current NP — can't show absolute X/Y; fall back to the signed delta.
   const sign = npD >= 0 ? '+' : '';
-  return { label: 'vs similar', value: `NP ${sign}${Math.round(npD)}W vs avg on similar ${type}${tail}` };
+  return { label: 'vs similar', value: `Weighted power ${sign}${Math.round(npD)}W vs avg on similar ${type}${tail}` };
 }
 
 /**
@@ -1931,7 +1931,8 @@ export function formatCyclingEfficiencyRow(
   const against = Number.isFinite(recent) && recent > 0
     ? ` Your average on steady rides over the last four weeks is ${recent.toFixed(2)}.`
     : '';
-  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef.toFixed(2)}.${against}` };
+  // Efficiency Factor — Friel's and TrainingPeaks' name for this number (2026-09-27, approved by Michael; not a registered mark).
+  return { label: 'EFFICIENCY', value: `Efficiency factor ${ef.toFixed(2)}.${against}` };
 }
 
 /**

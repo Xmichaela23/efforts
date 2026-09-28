@@ -37,14 +37,14 @@ Deno.test('surfaces pwr20 classified_type as rideType (underscores → spaces)',
 Deno.test('falls back to np_trend_v1 when pwr20 absent or <3 (no regression); NP is never type-labelled', () => {
   assertEquals(
     pickCyclingTrendSeries({ np_trend_v1: { points: pts(3) } }),
-    { points: pts(3), metricLabel: 'Normalized power', noun: 'NP', rideType: null },
+    { points: pts(3), metricLabel: 'Weighted power', noun: 'weighted power', rideType: null },
   );
   // pwr20 present but only 2 points → still fall back to NP
   const r = pickCyclingTrendSeries({
     pwr20_trend_v1: { points: pts(2) },
     np_trend_v1: { points: pts(6) },
   })!;
-  assertEquals(r.metricLabel, 'Normalized power');
+  assertEquals(r.metricLabel, 'Weighted power');
   assertEquals(r.points.length, 6);
 });
 

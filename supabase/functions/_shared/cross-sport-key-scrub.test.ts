@@ -119,7 +119,7 @@ Deno.test('scrub does not clobber a cycling key that shares a name with a run ke
   const analysisPayload = {
     ...runOnlyKeyScrub(),
     // hypothetical: cycling decides to emit its own `summary` someday
-    summary: { title: 'Ride Insights', bullets: ['NP 245W', 'IF 0.92'] },
+    summary: { title: 'Ride Insights', bullets: ['Weighted power 245W', 'IF 0.92'] },
   };
   const merged = cyclingMerge({}, analysisPayload);
   // Real cycling summary wins over the scrub null because it's spread last.

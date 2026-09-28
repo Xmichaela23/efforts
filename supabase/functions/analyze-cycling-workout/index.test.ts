@@ -172,7 +172,7 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight uses NP + IF + cla
     },
   });
   const insight = r?.technical_insights.find((i) => i.label === 'Intensity');
-  assertEquals(insight?.value, 'Normalized power 245W at IF 0.92 — threshold effort.');
+  assertEquals(insight?.value, 'Weighted power 245 W, 92% of FTP — threshold effort.');
 });
 
 Deno.test('generateCyclingAdherenceSummary: intensity insight handles underscore in classified_type', () => {
@@ -184,7 +184,7 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight handles underscore
     },
   });
   const insight = r?.technical_insights.find((i) => i.label === 'Intensity');
-  assertEquals(insight?.value, 'Normalized power 220W at IF 0.88 — sweet spot effort.');
+  assertEquals(insight?.value, 'Weighted power 220 W, 88% of FTP — sweet spot effort.');
 });
 
 // ── §6 plan_impact — focus reflects classified_type, outlook reflects exec ─

@@ -249,7 +249,8 @@ export function generateCyclingAdherenceSummary(opts: {
     const ct = facts.classified_type ? String(facts.classified_type).replace(/_/g, ' ') : 'training stimulus';
     technical_insights.push({
       label: 'Intensity',
-      value: `Normalized power ${facts.normalized_power_w}W at IF ${facts.intensity_factor.toFixed(2)} — ${ct} effort.`,
+      // Neutral words for TrainingPeaks' registered names (Normalized Power®, Intensity Factor®), 2026-09-27, approved by Michael.
+      value: `Weighted power ${facts.normalized_power_w} W, ${Math.round(facts.intensity_factor * 100)}% of FTP — ${ct} effort.`,
     });
   }
 

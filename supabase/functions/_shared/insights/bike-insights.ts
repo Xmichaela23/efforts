@@ -240,7 +240,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
         const band = iff <= 0.75 ? ' — an aerobic-base load.'
           : iff <= 0.85 ? '.'
           : ' — harder than base work.';
-        parts.push(`${tss} TSS at ${r2(iff)} intensity${band}`);
+        parts.push(`${tss} workload at ${Math.round(iff * 100)}% of FTP${band}`);
       }
       parts.push(conditionsClause(inp));
     } else {
@@ -288,7 +288,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   // ── MIXED — group ride / unstructured: surges by design, never graded for steadiness ──────────────
   if (fam === 'mixed') {
     parts.push('A mixed ride — the power swung with the group by design, not a pacing miss.');
-    if (power && np != null && tss != null) parts.push(`${np} W normalized, ${tss} TSS over the ride.`);
+    if (power && np != null && tss != null) parts.push(`${np} W weighted power, ${tss} workload over the ride.`);
     else if (typeof inp.durationMin === 'number' && typeof inp.distanceMi === 'number' && inp.distanceMi > 0) parts.push(`${inp.distanceMi} mi over ${r0(inp.durationMin)} min of mixed efforts.`);
     return clean(parts);
   }

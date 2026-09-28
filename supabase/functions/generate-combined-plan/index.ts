@@ -838,9 +838,9 @@ function buildDescription(
   let desc = `${totalWeeks}-week integrated multi-sport plan targeting ${aGoals.join(' and ')}.`;
   if (bGoals.length > 0) desc += ` Also includes ${bGoals.join(', ')} as B-race(s).`;
 
-  desc += ` Built on 80/20 polarized intensity distribution, TSS-budgeted across all sports with a 1.3× run impact adjustment for weight-bearing load.`;
+  desc += ` Built on 80/20 polarized intensity distribution, workload-budgeted across all sports with a 1.3× run impact adjustment for weight-bearing load.`;
   desc += ` Loading follows a ${pattern} pattern (${pattern === '3:1' ? '3 build weeks then 1 recovery' : '2 build weeks then 1 recovery'}).`;
-  desc += ` Peak week: ~${peakTSS} TSS. Average: ~${avgTSS} TSS/week.`;
+  desc += ` Peak week: ~${peakTSS} workload. Average: ~${avgTSS} workload a week.`;
 
   if (!v.no_consecutive_hard_days)    desc += ' ⚠️ Hard/easy rule violations detected — review schedule.';
   if (!v.maintenance_floors_met)      desc += ' ⚠️ Some sport maintenance floors not met.';
