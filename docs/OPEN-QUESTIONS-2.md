@@ -1521,7 +1521,7 @@ Michael's block still stores `ham_iso: 'hip thrust'` (the deleted stand-in). The
 
 A lifter reads it as nothing. A plain word ("Hinge") was suggested; Michael has not ruled.
 
-## Q-311 — A surge right after standing drills reads as a 4-second lap and moves every later round back one — **fixed, not yet deployed** (2026-09-28)
+## Q-311 — A surge right after standing drills reads as a 4-second lap and moves every later round back one — **fixed** (2026-09-28, `f1c02df42`, compute-workout-summary deployed, his run recomputed: 16 work rows, none not done)
 
 Michael's 28 Sep Surge and Float (workout `6d420a73`). The watch's own laps (`laps[].startTimeInSeconds`) are clean:
 600 · 124 · 55 · 15 · 45 · 60, then the rest of the 8 rounds as planned. No early press. The app's rows for the same laps
