@@ -1,34 +1,46 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-25, PM chat — main = `fc89664d9`, PUSHED; every importer DEPLOYED; phone build has every client change)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-28, PM chat — main = `b7aa155a2` + this docs commit; every importer DEPLOYED; phone build has every client change)
 
-> **How to talk to Michael (read first):** `~/.claude/CLAUDE.md` and the memory index. He listens to replies read
-> aloud. Say every line out loud before it ships: verbs, one fact per sentence, no "one catch"/"worth noting".
-> A "go" is the word go. Every athlete-facing line gets his yes.
+> **How to talk to Michael (read first):** `~/.claude/CLAUDE.md` and the memory index. Plain spoken sentences, no
+> jargon, no idioms. A "go" is the word go. Every athlete-facing line gets his yes. Commit/push/deploy wait for him;
+> the permission check blocks pushes to main and deploys from Claude, so hand him the exact command.
 >
-> **Your job: `docs/POLISH-PUNCH-LIST.md`.** Start with its top block, AWAITING MICHAEL (2026-09-25): five things to
-> see on his phone. Then the two QUEUED items under it: the plates pill + disc picture (needs his go) and the program
-> outline (copy through him).
+> **Your job, in order:**
+> 1. **Q-311** — a rep cut short by a lap press moves every later round back one ("14 of 16" on a run where 15 were
+>    run). Fix proposed; waits on his go. `compute-workout-summary` `layoutLapsByOrder`.
+> 2. **Long Ride + Strength (p279, goal "Go longer")** — build it on the Ride + Strength frame. The write-up is done and
+>    UNCOMMITTED in the `/Users/michaelambp/efforts-279` worktree: `docs/NOTES-p279-frame-2026-09-27.md` + SOURCE Part E10.
+>    Commit those first. Test on throwaway accounts before bringing it to him.
+> 3. Leftovers: task chip "Fix State trends wipe at the week seam" (compute-snapshot writes `state_trends_v1` null for an
+>    explicit past `week_start`, any time zone); Q-312 (the off-range sentence names one range when reps had two).
 >
-> **What shipped 2026-09-24/25 — do not redo.** D-485 … D-490 in `DECISIONS-LOG-4.md`:
-> - Rides build for the road; "Trainer" on the swap sheet opens the trainer shapes for that slot (D-485).
-> - Ride matching: laps, one lap press, or efforts found in power; the ride warm-up is an open step on Garmin (D-486).
-> - The minimum kit (barbell, plates, rack, bench, dumbbells, pull-up bar); the accessory table; deadlift form (D-487).
->   Evidence in `docs/audit/accessory-audit-2026-09-24{,-after}.md`. Re-run `scratchpad/audit.ts` shape before any
->   accessory change: zero hits on the six checks is the bar.
-> - Logger: keyboard-height keypad with Next and a plates key; the check fills from the grey number (D-488).
-> - Sets are earned on every row, with approved card and block copy; swaps match by exact name (D-489).
-> - Run laps by order; the Swap sheet built for the slot; new gear reaches the plan on an equipment rebuild (D-490).
+> **What shipped 2026-09-27/28 — do not redo.** D-491 … D-495 in `DECISIONS-LOG-4.md`:
+> - Drift: one rule for runs and rides, intervals.icu's steady middle (first 20 and last 10 minutes out, 20 left);
+>   efficiency row "Higher means more power for the same heart rate."; TrainingPeaks' registered names not printed (D-491).
+> - Ride + Strength: five rides, joined rides as one, Day 2 optional (switch on its own card), picked lengths, offered
+>   step-ups (D-492).
+> - Performance card: Moving Time · Distance · Workload, then Pace/Weighted Power · Elevation · Avg Heart Rate; one time;
+>   Details says "Weighted Power" (D-493).
+> - A run's easy-jog warm-up ends on the lap press on Garmin (D-494).
+> - Notes under Execution saying what pulled it down; the logger keypad keeps a typed number on a tap outside (D-495).
 >
-> **Still unverified:** earned sets (needs two logged sessions) and the Edge warm-up (Tuesday 29 Sep). Keypad, Back
-> Extension and run laps VERIFIED on his phone 2026-09-25. Was: the Back Extension change on his block needed one more
-> Profile → Rebuild upcoming sessions after `fc89664d9` (the earlier rebuild wrote rows with no slot stamps and
-> overwrote the built kit; both fixed in that commit).
+> **VERIFIED on his phone:** the Performance card (Sep 26 ride, Sep 28 run). **DEPLOYED, not yet seen by him:** the
+> Details "Weighted Power" label, the Day 2 switch on its card, the Execution notes, the keypad fix (tested on a test
+> page: typed 3 + check kept the 3, no strip; the old code lost it). The open warm-up: his upcoming hard runs read back
+> with it (Sep 30 – Oct 21); not yet run on the watch.
 >
-> **Open questions from today:** Q-306 … Q-310 in `OPEN-QUESTIONS-2.md`. Q-310 (the swap sheet's "SECONDARY" heading
-> word) waits on Michael.
+> **Carried from 2026-09-25, still unverified:** earned sets (needs two logged sessions); the Edge open warm-up on a
+> ride (Tuesday 29 Sep). Q-310 (the Swap sheet's "SECONDARY" heading word) waits on him.
 >
-> **Paused, unchanged:** `docs/WORKORDER-run-programs-2026-09-23.md` — Stages 0–1 done, 2 removed, 3–4 tabled.
+> **Housekeeping owed:** this file is ~286 KB, over the ~150 KB cap — trim old Solid entries into
+> `archive/ENGINE-STATE-archive.md`. The worktree `/Users/michaelambp/efforts-perfcard` (branch perf-card-2026-09-27) is
+> merged; `/Users/michaelambp/efforts-base` is merged; `/Users/michaelambp/efforts-279` holds the uncommitted p279 docs.
+
+## (older banner) NEXT SESSION — START HERE (written 2026-09-25) — superseded by the 2026-09-28 banner above
+
+> Shipped 2026-09-24/25: D-485 … D-490 (road rides, ride matching + open ride warm-up, minimum kit, logger set entry,
+> earned sets, run laps by order / Swap sheet by slot). Open: Q-306 … Q-310.
 
 ## 🧭 ALSO READ — 2026-09-22: the week is arranged around the athlete's picks, one set of rules
 

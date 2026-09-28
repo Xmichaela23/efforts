@@ -1520,3 +1520,14 @@ Michael's block still stores `ham_iso: 'hip thrust'` (the deleted stand-in). The
 ## Q-310 — The Swap sheet heading prints the book's category word ("SECONDARY", "BRACED") — **open** (2026-09-25)
 
 A lifter reads it as nothing. A plain word ("Hinge") was suggested; Michael has not ruled.
+
+## Q-311 — A rep cut short by a lap press moves every later round back one — **open, fix proposed** (2026-09-28)
+
+Michael's 28 Sep Surge and Float: Lap 4 (0:04) was the first 15-second surge ended by a press. `layoutLapsByOrder` could
+not place it, laid rounds 2–8 on steps 1–7 and marked round 8 "not matched": "14 of 16 reps done" where 15 of 16 were
+run. Proposed: a lap cut short by a press takes its step. Waits on Michael's go.
+
+## Q-312 — The off-range sentence names one range when the reps had two — **noted** (2026-09-28)
+
+`off-prescription.ts` prints `off[0]`'s range: "Eleven of 14 reps were faster than the 8:13–10:03/mi asked for" on a
+session whose surges were asked 6:38–8:06. Copy change; not raised with Michael.

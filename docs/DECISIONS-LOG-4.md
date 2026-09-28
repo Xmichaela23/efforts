@@ -422,3 +422,52 @@ the page's own guess line covers here.
    cell movement; `built_equipment` is written once and never overwritten; hand picks (`slot_picks_chosen`) stay.
    Found on Michael's block (the rebuild had overwritten its own evidence).
 4. The back-extension-bench chip's row reads "Back Extension"; "GHD Back Extension" only at a commercial gym.
+
+## D-491 — Drift reads the steady middle, intervals.icu's way (2026-09-27, Michael)
+
+1. `_shared/aerobic-decoupling.ts` is the one drift rule for runs and rides (replaced `vt1-window-drift.ts`). The first
+   20 minutes and the last 10 are left out (intervals.icu defaults, forum.intervals.icu/t/72); at least 20 minutes must
+   remain (TrainingPeaks Help Center 204071724); the halves split at the window's middle second.
+2. Ride: normalized power per half (coasting at 0 W) ÷ average heart rate. Run: average grade-adjusted speed per half
+   (stops at 0) ÷ average heart rate. Steady sessions only (`session-steadiness.ts`; a planned hard set is not steady);
+   a ride with VI over 1.05 gets none; a ride with power gets no heart-rate-only fallback. No spike rule, no bpm cut
+   (both were invented by a terminal and removed).
+3. The efficiency row no longer needs a drift reading: "Efficiency factor X. Higher means more power for the same heart
+   rate." plus the four-week steady average. Commits `2d629f523`, `1ce77e3ba`, `1baff6d4c`.
+4. TrainingPeaks' registered names are not printed: "Weighted power" (NP), "% of FTP" (IF), "workload" (TSS)
+   (`0231714da`, `3cabe6585` for the Details tile). Lawyer review of the borrowed list before launch.
+
+## D-492 — Ride + Strength (p278): five rides, the joined rides as one, picked lengths (2026-09-27/28, Michael)
+
+1. p278's two-workout days are one ride each (`EnduranceSlot.joinsPrevious`): Day 3 "VO2, then Sweet Spot", Day 5
+   "Sprint Ride, then Ride" — one card, one watch workout, linked to one recorded ride.
+2. Day 2's easy ride is optional: the switch and "Optional. An easy ride between the hard days." sit on the Day 2 card
+   (2026-09-28, `ca087bf52`); switched off, the card stays and the length chips move to Day 5. Program card: "Four or
+   five rides, three lifting days."
+3. Lengths are picked: long ride 1h · 1h40 · 2h30 · 3h30; midweek rides (p239 plain easy ride) 1h or 1h40, Day 5 held
+   to Day 2 (p281). Step-ups are offered, never automatic: at most 5% of the week's easy minutes (p148), at p281's
+   timing, midweek first (p107, p108, p149). PLAN_WRITER 35. Merge `bf799af69`; provenance pins `8bb10054c`.
+4. Long Ride + Strength (p279, goal "Go longer") is written up and NOT built: `docs/NOTES-p279-frame-2026-09-27.md` and
+   SOURCE Part E10, uncommitted in the `/Users/michaelambp/efforts-279` worktree.
+
+## D-493 — The Performance card: TrainingPeaks' order, one time (2026-09-28, Michael)
+
+Ride: Moving Time · Distance · Workload, then Weighted Power · Elevation · Avg Heart Rate. Run: the same with Pace.
+Plan results smaller below (Execution · Duration · Drift). Moving Time is the only time on Performance; Details keeps
+three. Tiles are server-written (`_shared/session-detail/top-tiles.ts`). Commit `fd70f72b5`.
+
+## D-494 — A run's easy-jog warm-up ends on the lap press (2026-09-28, Michael: "more to extend warm ups")
+
+p229/p231/p233 warm-up jog lines carry `lapButton`, as ride easy-spin lines do (D-486): Garmin gets an OPEN step; the
+card, the planned minutes and the after-run table keep the page's minutes; cool-down jogs stay timed. FIELD —
+TrainingPeaks open-ended steps; Garmin Connect "Lap Button Press". Commit `3a891c56d`. Michael's upcoming hard runs were
+rebuilt by his 9:17/mi pace update after the deploy (read back: every hard run Sep 30 – Oct 21 opens on the lap press).
+
+## D-495 — Notes under Execution; the keypad keeps a typed number (2026-09-28, Michael)
+
+1. `_shared/session-detail/score-notes.ts`: one note per cause that took a half of the score below 100 — "11 of 14 reps
+   faster than planned." (slower / both; rides "above/below the planned watts"), "1 rep shorter than planned.", easy
+   sessions "13 min above the easy heart-rate ceiling." and "Shorter than planned." Nothing when a half is at 100.
+   Total session length moves Execution only on an easy session. Saved screens v13. Commit `cdbe93aa1`.
+2. Logger: a tap outside the number pad saves a changed box (Strong/Hevy); before, a reserve typed and then the check
+   tapped was lost and the adjust strip opened. Commit `b7aa155a2`.
