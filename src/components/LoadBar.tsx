@@ -26,6 +26,8 @@ export interface LoadBarData {
       fitness: { value: string | null; change: string | null; window: string | null };
       fatigue: { value: string | null; change: string | null; window: string | null };
       form: { value: string | null; change: string | null; window: string | null };
+      /** The card's first line (coach v221, approved 2026-09-28): "Fitness rising" + "up 7 in 3 weeks". Null = no line. */
+      trend?: { headline: string; detail: string } | null;
     } | null;
     /**
      * ⛔ THE CHART BEHIND THE CHEVRON (coach v218, 2026-09-25) — TrainingPeaks' Performance Management Chart.
@@ -249,7 +251,8 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   // The coach says whether there are days to draw (`draw_series`); a payload before v218 has none, and no chevron.
   const canChart = ff?.draw_series === true && Array.isArray(ff?.series);
 
-  // ⛔ FORM IS THE HEADLINE (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md §6, approved by Michael). Form
+  // ⚠️ SUPERSEDED 2026-09-28: the fitness line in words leads now (see the block in the render); history below.
+  // ⛔ FORM WAS THE HEADLINE (2026-09-18, docs/AUDIT-type-legibility-2026-09-18.md §6, approved by Michael). Form
   // is the number the zone word reads, so it is the Title 1 figure with its word beside it; fitness and fatigue
   // sit beneath it, each with its window under it. The week's changes (`display.*.change`) are OFF the card —
   // the coach still sends them. Every word is the coach's, printed as sent. What this replaced: one wrapped row
@@ -267,24 +270,32 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
           </span>
         </div>
         {rd && rd.form.value != null ? (
-          /* ⛔ ONE ROW (Michael 2026-09-21: "it takes up too much space", "form can be a little larger"). Form, the
-             number the zone word reads, is the biggest figure; fitness and fatigue sit on the same line at the right.
-             Their windows (6 weeks, 7 days) moved into the ⓘ. Form is Title 3 (20 px), the next step down the type scale:
-             36 px and then 28 px both read too big beside the row (Michael, same day). No glow on it: the readout halo
-             (20 px blur) made the one big figure read heavier than its size. */
-          <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <div className="flex items-baseline gap-x-2">
-              {/* "form today" (Michael 2026-09-28): the number and its zone are one day's balance, not the block's trend. */}
-              <span className="text-footnote font-medium text-label-secondary whitespace-nowrap">form today</span>
-              <span className="readout-num text-title3 font-semibold" style={{ textShadow: 'none' }}>{rd.form.value}</span>
-              {zoneText && <span className="text-body font-medium" style={{ color: formZoneColor(zone) }}>{zoneText}</span>}
-            </div>
-            <div className="flex items-baseline gap-x-1.5 text-subhead tabular-nums">
+          /* ⛔ THE CARD ANSWERS "AM I GETTING FITTER?" FIRST (Michael, 2026-09-28: "I have such a hard time comprehending
+             this"). Garmin shows this load model as a word with the numbers beneath; so: the coach's fitness line in
+             words ("Fitness rising · up 7 in 3 weeks"), then today's form zone ("Today: in between · …"), then the three
+             numbers in one row. Every word is the coach's, printed as sent; no first line when the coach sends none. */
+          <div className="mt-1.5">
+            {rd.trend && (
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-title3 font-semibold text-label">{rd.trend.headline}</span>
+                <span className="text-body text-label-secondary">· {rd.trend.detail}</span>
+              </div>
+            )}
+            {zoneText && (
+              <div className="mt-1 text-body">
+                <span className="text-label-secondary">Today: </span>
+                <span className="font-medium" style={{ color: formZoneColor(zone) }}>{zoneText}</span>
+              </div>
+            )}
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-subhead tabular-nums">
               <span className="text-label-secondary">fitness</span>
               <span className="readout-num font-medium">{rd.fitness.value ?? '—'}</span>
               <span className="text-label-secondary">·</span>
               <span className="text-label-secondary">fatigue</span>
               <span className="readout-num font-medium">{rd.fatigue.value ?? '—'}</span>
+              <span className="text-label-secondary">·</span>
+              <span className="text-label-secondary">form</span>
+              <span className="readout-num font-medium">{rd.form.value}</span>
             </div>
           </div>
         ) : (

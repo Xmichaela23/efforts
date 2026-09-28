@@ -10,6 +10,7 @@
  * The arithmetic and the words are moved unchanged. The screens print them.
  */
 import { formZone, formZoneText, FORM_ZONE_TEXT, type FormZone } from '../_shared/fitness-fatigue.ts';
+import { computeLoadFloor } from '../_shared/state-trend/load-floor.ts';
 
 type DailyLoad = { date: string; load: number; dominant_type: string; by_type?: Array<{ type: string; load: number }> };
 
@@ -149,6 +150,33 @@ export const isRecoveryIntent = (weekIntent: string | null | undefined) => weekI
 export function formHeadline(form: number | null | undefined): string | null {
   if (form == null || !Number.isFinite(form) || formZone(form) !== 'high risk') return null;
   return `Form −${Math.abs(Math.round(form))} · ${formZoneText(form)}`; // the zone's one name (FORM_ZONE_TEXT, 2026-09-26)
+}
+
+/**
+ * ⛔ THE LOAD CARD'S FIRST LINE: IS FITNESS RISING? (Michael approved the words 2026-09-28). The card led with form, a
+ * one-day balance, and he could not tell from it whether he was getting fitter ("am I productive or maintaining").
+ * FIELD — Garmin renders the same load model as a word (Productive / Maintaining / …) with the numbers beneath; this
+ * says the one thing the fitness line says, in words: rising, holding or falling over the last 3 weeks.
+ * The word is the bike row's rule (`state-trend/load-floor.ts computeLoadFloor`, ±1 fitness point a week, OURS),
+ * not a second one. OURS — the 3-week window (`FITNESS_TREND_DAYS`). N is the difference of the two PRINTED
+ * (whole) fitness numbers, so the line agrees with the numbers on screen. Null when there is no reading 3 weeks
+ * back (a new account): the card prints no first line.
+ */
+// OURS — `FITNESS_TREND_DAYS` 21: the look-back of the LOAD card's "Fitness rising" line, approved 2026-09-28; no outside source
+export const FITNESS_TREND_DAYS = 21;
+export function fitnessTrendLine(
+  fitnessNow: number | null | undefined,
+  fitnessThen: number | null | undefined,
+): { headline: string; detail: string } | null {
+  if (fitnessNow == null || fitnessThen == null || !Number.isFinite(fitnessNow) || !Number.isFinite(fitnessThen)) return null;
+  const floor = computeLoadFloor({ ctl: fitnessNow, tsb: 0, ctlPrior: fitnessThen, daysBetween: FITNESS_TREND_DAYS });
+  const trend = floor?.fitness_trend ?? null;
+  if (!trend) return null;
+  const weeks = Math.round(FITNESS_TREND_DAYS / 7);
+  const n = Math.abs(Math.round(fitnessNow) - Math.round(fitnessThen));
+  if (trend === 'building') return { headline: 'Fitness rising', detail: `up ${n} in ${weeks} weeks` };
+  if (trend === 'fading') return { headline: 'Fitness falling', detail: `down ${n} in ${weeks} weeks` };
+  return { headline: 'Fitness holding', detail: `about the same as ${weeks} weeks ago` };
 }
 
 /**

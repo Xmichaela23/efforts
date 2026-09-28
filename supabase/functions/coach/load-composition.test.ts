@@ -5,7 +5,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { formZone } from '../_shared/fitness-fatigue.ts';
-import { formHeadline, formKicker, formZoneRows, loadComposition7d, loadChartCaptions, FORM_ZONE_TABLE, formKeyText } from './load-composition.ts';
+import { formHeadline, formKicker, formZoneRows, loadComposition7d, loadChartCaptions, FORM_ZONE_TABLE, formKeyText, fitnessTrendLine } from './load-composition.ts';
 import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
 import { TREND_FIT_MAX_WEEKS } from '../_shared/state-trend/trend-fit.ts';
 
@@ -126,4 +126,15 @@ Deno.test('chart captions: 2 to 8 days span one week and print none ("week" is n
   }
   assertEquals(loadChartCaptions(chart(loadRows(1, () => 50)).series!, FMT), { fitness: null, fatigue: null, form: null });
   assertEquals(loadChartCaptions([], FMT), { fitness: null, fatigue: null, form: null });
+});
+
+Deno.test('first line: fitness rising, holding or falling over 3 weeks, the approved words (2026-09-28)', () => {
+  // Michael's 2026-09-28 reading: 54.9 now, 47.9 three weeks back → +2.3 a week.
+  assertEquals(fitnessTrendLine(54.9, 47.9), { headline: 'Fitness rising', detail: 'up 7 in 3 weeks' });
+  assertEquals(fitnessTrendLine(40, 44.2), { headline: 'Fitness falling', detail: 'down 4 in 3 weeks' });
+  // Under 1 point a week either way (the bike row's rule) → holding.
+  assertEquals(fitnessTrendLine(50, 48.2), { headline: 'Fitness holding', detail: 'about the same as 3 weeks ago' });
+  assertEquals(fitnessTrendLine(50, 51.9), { headline: 'Fitness holding', detail: 'about the same as 3 weeks ago' });
+  assertEquals(fitnessTrendLine(50, null), null);
+  assertEquals(fitnessTrendLine(null, 40), null);
 });
