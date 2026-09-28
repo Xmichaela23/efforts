@@ -20,7 +20,7 @@
  *    denominator is gone: no vendor divides by it, and it made Performance disagree with State.
  *    compute-facts copies this number; it does not recompute it. Still needs >= 60 paired samples.
  *  - aerobic decoupling (2026-09-27): TrainingPeaks' Pw:Hr, worked out by `../aerobic-decoupling.ts
- *    steadyDecouplingPct`, the one drift rule runs share. It reads the whole recording, 20 minutes or more,
+ *    steadyDecouplingPct`, the one drift rule runs share. It reads the steady middle (the first 20 minutes and the last 10 left out, at least 20 left),
  *    splits it at its middle second, and compares each half's normalized power (coasting at 0 W) over its average heart rate (every
  *    heart-rate second, not only the pedalling ones). Sources are in that file. Positive % = heart rate rose
  *    against the power.
@@ -36,7 +36,7 @@ export type RideEfficiency = {
    *  Higher = more aerobic output per heartbeat; comparable over time. */
   efficiency_factor: number | null;
   avg_pedaling_power_w: number;
-  /** Friel aerobic decoupling %, over the whole ride (`../aerobic-decoupling.ts`). Absent when the ride is under 20 min. */
+  /** Friel aerobic decoupling %, over the steady middle (`../aerobic-decoupling.ts`). Absent when that middle is under 20 min. */
   aerobic_decoupling_pct?: number;
 };
 

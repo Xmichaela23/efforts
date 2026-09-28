@@ -99,7 +99,7 @@ Deno.test('Q-158 (2): no GAP % → bpm line renders and NEVER says "normal for N
   // own-baseline comparison is still allowed (honest, individual-relative).
   assertStringIncludes(hrRaw!.value, 'typical');
 
-  // ⛔ null decoupling (a run under 20 minutes, 2026-09-27) → no verdict row and no bpm line either:
+  // ⛔ null decoupling (a run too short for the steady middle, 2026-09-27) → no verdict row and no bpm line either:
   // the Drift tile says nothing on it, so the Heart rate row does not say it in beats.
   const rowsNull = buildAnalysisDetailRows(
     factPacketWithDrift(6), [], false, null, false, [], 'run', null, null, null,

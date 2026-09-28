@@ -1,5 +1,5 @@
 /**
- * ═══ DRIFT, ONE RULE FOR RUNS AND RIDES (2026-09-27, Michael: "fix A"; "match TrainingPeaks, not intervals.icu") ═══
+ * ═══ DRIFT, ONE RULE FOR RUNS AND RIDES (2026-09-27, Michael: "fix A"; the steady middle, "yes") ═══
  *
  * Drift is TrainingPeaks' aerobic decoupling: power to heart rate on a ride (Pw:Hr), pace to heart rate on a run
  * (Pa:Hr). This file works it out, once, and nothing keeps a copy:
@@ -8,14 +8,23 @@
  *     (`analyze-running-workout/lib/heart-rate/efficiency.ts`) and by the summary step's execution score
  *     (`compute-workout-summary aerobicDecouplingScore`).
  *
- * THE WHOLE SESSION, 20 MINUTES OR MORE. Drift is read over the whole recording, first second to last, and a session
- * under 20 minutes has none. Only a steady session is read at all; that gate is `session-detail/session-steadiness.ts`
- * and `session-detail/drift-pct.ts driftReadApplies`, not this file.
+ * THE STEADY MIDDLE. Drift is read over the middle of the recording only: the first 20 minutes and the last 10 are
+ * left out, and at least 20 minutes must be left, so a session needs about 50 minutes to have a drift read. Only a
+ * steady session is read at all; that gate is `session-detail/session-steadiness.ts` and
+ * `session-detail/drift-pct.ts driftReadApplies`, not this file.
+ * FIELD — intervals.icu, "Added warmup and cool down to decoupling charts" (forum.intervals.icu/t/72, read
+ * 2026-09-27): "The default warmup is 20 minutes and cool down 10 minutes."
  * FIELD — TrainingPeaks Help Center, "Aerobic Decoupling (Pw:Hr and Pa:HR) and Efficiency Factor (EF)"
  * (help.trainingpeaks.com/hc/en-us/articles/204071724, read 2026-09-27): "Aerobic Decoupling values for efforts
- * under 20 minutes in duration aren't as valid". TrainingPeaks' summary number counts the whole file.
+ * under 20 minutes in duration aren't as valid".
+ * WHY THE MIDDLE AND NOT THE WHOLE SESSION (2026-09-27, Michael, reversing the whole-session rule of the same day). On a
+ * short session the whole-session number mostly measures the warm-up, while heart rate is still climbing to meet the
+ * effort: the Sep 24 Zwift ride, 30 minutes, read 9.6% over the whole session and 2.7% over its steady middle (the
+ * owner's figures; not re-measured here). Under this rule that ride has no drift read at all: it is under 50 minutes. And
+ * Viada's 5% line (p107) is about drift late in a longer easy session — the page uses drift to judge "the maximum
+ * recommended dose of easy/VT1 work in a given session" — not about the first minutes of a short one.
  *
- * THE HALVES. The session is split at its middle second, so a gap in the recording does not move the split.
+ * THE HALVES. The steady middle is split at its middle second, so a gap in the recording does not move the split.
  * FIELD — intervals.icu's decoupling code splits its per-second stream at the middle (forum.intervals.icu/t/1823).
  * TrainingPeaks compares "the two halves of the workout" and does not say how it splits.
  *
@@ -36,15 +45,20 @@
  */
 import { normalizedPowerW } from './ride-power.ts';
 
-/** The shortest session drift is read over. */
+// FIELD — intervals.icu, forum.intervals.icu/t/72: "The default warmup is 20 minutes and cool down 10 minutes."
+const WARMUP_OUT_S = 1200;
+// FIELD — intervals.icu, forum.intervals.icu/t/72 (the cool down, the line above).
+const COOLDOWN_OUT_S = 600;
+/** The shortest steady middle drift is read over. */
 // FIELD — TrainingPeaks Help Center 204071724: "Aerobic Decoupling values for efforts under 20 minutes in duration aren't as valid".
-export const DRIFT_MIN_STEADY_S = 1200;
+const MIN_STEADY_S = 1200;
 
 /**
- * Drift for one session: the whole recording, halves by time, each half's output over its average heart rate. The
+ * Drift for one session: the steady middle (20 minutes after the first sample to 10 minutes before the last), halves by
+ * time, each half's output over its average heart rate. The
  * three series share a sample index. `output` is already the stream the rule reads: watts with coasting at 0 on a
  * ride, grade-adjusted speed with stops at 0 on a run. `halfOutput` says how a half's output is taken: 'normalized'
- * (a ride, normalized power) or 'average' (a run). Null when the session is under 20 minutes, when a half has no
+ * (a ride, normalized power) or 'average' (a run). Null when the steady middle is under 20 minutes, when a half has no
  * output (under 30 samples on 'normalized', normalized power's own window) or no heart rate, or when the first half's
  * output is zero.
  */
@@ -56,17 +70,17 @@ export function steadyDecouplingPct(
 ): number | null {
   const n = Math.min(timeS.length, hrBpm.length, output.length);
   if (n < 2) return null;
-  const start = Number(timeS[0]);
-  const end = Number(timeS[n - 1]);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < DRIFT_MIN_STEADY_S) return null;
-  const mid = (start + end) / 2;
+  const from = Number(timeS[0]) + WARMUP_OUT_S;
+  const to = Number(timeS[n - 1]) - COOLDOWN_OUT_S;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to - from < MIN_STEADY_S) return null;
+  const mid = (from + to) / 2;
   const halves = [
     { out: [] as number[], hrSum: 0, hrN: 0 },
     { out: [] as number[], hrSum: 0, hrN: 0 },
   ];
   for (let i = 0; i < n; i += 1) {
     const t = Number(timeS[i]);
-    if (!Number.isFinite(t)) continue;
+    if (!(t >= from && t <= to)) continue;
     const h = halves[t < mid ? 0 : 1];
     h.out.push(output[i]);
     const hr = hrBpm[i];

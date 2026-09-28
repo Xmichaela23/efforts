@@ -143,7 +143,7 @@ function analyzeSteadyStateWorkout(
     const drift = analyzeSteadyStateDrift(sensorData, validHRSamples, context, workoutType);
     console.log('💓 [HR ANALYSIS] Drift calculated:', drift?.driftBpm);
     
-    // Pace:HR decoupling over the whole run — the one drift rule runs and rides share (2026-09-27), read over the
+    // Pace:HR decoupling over the steady middle — the one drift rule runs and rides share (2026-09-27), read over the
     // recording's every row rather than the moving samples.
     const efficiency = calculateEfficiency(context.recording ?? []);
     

@@ -53,7 +53,7 @@ export function assessStimulus(
      * not the rule's 80%) on a max heart rate: two easy tops for one athlete.
      */
     easy_ceiling_bpm?: number | null;
-    /** The run's one drift (2026-09-27): the analyser's decoupling over the whole run, null under 20 minutes. */
+    /** The run's one drift (2026-09-27): the analyser's decoupling over the steady middle, null when that middle is under 20 minutes. */
     decoupling_pct?: number | null;
   } | null
 ): StimulusAssessmentV1 | null {

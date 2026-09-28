@@ -2000,7 +2000,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // The whole row (2026-09-26): the packet's segment zones and easy band come from their owners, fed this row.
         baselines: userBaselinesRow,
         arcContext: preFactArc,
-        // The run's one drift (2026-09-27): the sample-level Pa:Hr over the whole run, null included.
+        // The run's one drift (2026-09-27): the sample-level Pa:Hr over the steady middle, null included.
         decoupling: {
           pct: hrAnalysisResult.summary?.decouplingPct ?? null,
           basis: hrAnalysisResult.summary?.decouplingBasis ?? null,

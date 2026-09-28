@@ -1,7 +1,6 @@
 /**
  * THE RUN'S DRIFT (2026-09-27): TrainingPeaks' Pa:Hr, worked out by `_shared/run-pace.ts runDecouplingPct` over the
- * one drift rule rides share (`_shared/aerobic-decoupling.ts steadyDecouplingPct`). It reads the whole recording, 20
- * minutes or more, splits it at its middle second, and compares each half's average grade-adjusted speed (every
+ * one drift rule rides share (`_shared/aerobic-decoupling.ts steadyDecouplingPct`). It reads the steady middle (the first 20 minutes and the last 10 left out, at least 20 left), splits it at its middle second, and compares each half's average grade-adjusted speed (every
  * recorded second, stops at 0) over its average heart rate. Sources are in those
  * files.
  *
@@ -32,7 +31,7 @@ export function decouplingAssessmentFromPct(pct: number): 'good' | 'needs_work' 
 }
 
 /**
- * The run's pace-to-heart-rate decoupling, or undefined when the run is under 20 minutes.
+ * The run's pace-to-heart-rate decoupling, or undefined when its steady middle is under 20 minutes.
  * ⛔ `basis` answers ONE question: was the speed grade-adjusted (the run had usable elevation)? Nothing else. Only a
  * 'gap' read is a trustworthy fitness signal — the Performance drift row gates on it (Q-158 follow-on), and
  * `state-trend/run.ts` drops a 'raw' row from the durability trend on exactly that meaning (2026-07-14).

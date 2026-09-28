@@ -54,7 +54,7 @@ Deno.test('the drift the tile prints: an interval session has none (p107, 2026-0
 });
 
 Deno.test('⛔ no heart-rate-only drift, run or ride (2026-09-27, the one drift rule: Pa:Hr or Pw:Hr, else nothing)', () => {
-  // A run with no pace ratio (under 20 minutes, or no pace): heart rate alone does not put a drift number on it.
+  // A run with no pace ratio (too short for the steady middle, or no pace): heart rate alone does not put a drift number on it.
   assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: null }, hr_drift_v1: { pct: 3.1, seconds: 2220 } }, null, 'run'), null);
   // A ride with power but no power ratio, and a ride with no power at all: no drift either way.
   const withPower = { analysis: { efficiency: { efficiency_factor: 0.98, avg_pedaling_power_w: 132 } } };

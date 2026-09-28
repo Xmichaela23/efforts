@@ -5,7 +5,7 @@
  * basis is 'gap' iff the speed was grade-adjusted — the run had usable elevation (`_shared/gap.ts
  * hasUsableElevation`, the test the analyser has always used) — else 'raw'.
  *
- * 2026-09-27: the read is over the whole run, 20 minutes or more (`_shared/aerobic-decoupling.ts`), and over the
+ * 2026-09-27: the read is over the steady middle, about 50 minutes needed (`_shared/aerobic-decoupling.ts`), and over the
  * recording's rows (`_shared/run-pace.ts runDecouplingPct`).
  *
  * Run: deno test supabase/functions/analyze-running-workout/lib/heart-rate/decoupling-basis.test.ts --no-check --allow-read
@@ -37,7 +37,8 @@ Deno.test('decoupling.basis = "raw" when the run had no usable elevation', () =>
   assertEquals(eff?.decoupling?.basis, 'raw');
 });
 
-Deno.test('⛔ a 30-minute run has a decoupling; a run under 20 minutes has none (2026-09-27)', () => {
-  assertEquals(typeof calculateEfficiency(steadyRows(true, 1800))?.decoupling.percent, 'number');
-  assertEquals(calculateEfficiency(steadyRows(true, 1200)), undefined);
+Deno.test('⛔ a 30- or 40-minute run has no decoupling: its steady middle is under 20 minutes (2026-09-27)', () => {
+  assertEquals(calculateEfficiency(steadyRows(true, 1800)), undefined);
+  assertEquals(calculateEfficiency(steadyRows(true, 2400)), undefined);
+  assertEquals(typeof calculateEfficiency(steadyRows(true, 3001))?.decoupling.percent, 'number');
 });

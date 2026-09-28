@@ -292,8 +292,8 @@ export function cumulativeFlatMeters(samples: ReadonlyArray<RunSample>, grades: 
 
 /**
  * ⛔ THE RUN'S DRIFT (2026-09-27): TrainingPeaks' Pa:Hr, worked out by the one drift rule the ride uses
- * (`./aerobic-decoupling.ts steadyDecouplingPct`: the whole session, 20 minutes or more, halves split at the middle
- * second). Each half's output is its plain average grade-adjusted speed over every recorded second, stops at 0, over
+ * (`./aerobic-decoupling.ts steadyDecouplingPct`: the steady middle (the first 20 minutes and the last 10 left out, at least 20 left),
+ * halves split at its middle second). Each half's output is its plain average grade-adjusted speed over every recorded second, stops at 0, over
  * its average heart rate (the owner's ruling, 2026-09-27; no weighting). The run analyser and the summary step's
  * execution score both call this, so a run has one drift.
  *
@@ -306,7 +306,7 @@ export function cumulativeFlatMeters(samples: ReadonlyArray<RunSample>, grades: 
  * The output is each moving second's grade-adjusted speed: its speed times the Minetti cost of its grade over the flat
  * cost (the weighting `gapSecPerMiBetween` uses), grade over 100 m (`runGrades`). The unit cancels in the ratio.
  * `basis` is 'gap' when the run's elevation was usable and moved the speed (`./gap.ts hasUsableElevation`, the test the
- * run analyser has always used), else 'raw'. Null when the session is under 20 minutes.
+ * run analyser has always used), else 'raw'. Null when the steady middle is under 20 minutes.
  */
 export function runDecouplingPct(samples: ReadonlyArray<RunDriftSample>): { pct: number; basis: 'gap' | 'raw' } | null {
   const grades = hasUsableElevation(samples.map((x) => ({ elevation_m: num(x?.elev) }))) ? runGrades(samples) : null;

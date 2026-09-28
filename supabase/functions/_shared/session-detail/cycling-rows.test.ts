@@ -77,9 +77,12 @@ Deno.test('efficiency: a session the steadiness ladder refuses gets no row', () 
   );
 });
 
-Deno.test('efficiency: decoupling absent (short/interval ride) → null (gate: both finite)', () => {
-  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }), null);
-  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: null }), null);
+Deno.test('⛔ efficiency: shown without a drift reading (2026-09-27) — a steady ride under 50 minutes keeps its row', () => {
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }), { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' });
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: null }), { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' });
+  // The two gates still decide: an interval session or a ride with too little in-band time gets none.
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }, { steady: false }), null);
+  assertEquals(formatCyclingEfficiencyRow({ efficiency_factor: 1.62 }, { countsTowardTrend: false }), null);
 });
 
 Deno.test('efficiency: missing EF → null; null/non-object → null', () => {

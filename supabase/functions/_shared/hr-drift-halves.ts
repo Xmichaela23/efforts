@@ -4,7 +4,7 @@
  * by both analysers as `hr_drift_v1` and read by the coach, compute-facts and the daily ledger (in percent, and in
  * beats through `hrDriftV1Bpm` below).
  * ⛔ NOT THE DRIFT TILE (2026-09-27). The Drift tile, Today's drift line, State's drift chart and the ride paragraph
- * read TrainingPeaks' Pa:Hr / Pw:Hr over the whole session (`./aerobic-decoupling.ts`, `session-detail/drift-pct.ts`). This
+ * read TrainingPeaks' Pa:Hr / Pw:Hr over the steady middle (`./aerobic-decoupling.ts`, `session-detail/drift-pct.ts`). This
  * measure has its own start (below) and is no longer a fallback for any of them.
  *
  *   - The first `skipStartS` (180 s) are dropped: heart rate lags effort by 2–3 min, so the opening minutes

@@ -454,13 +454,13 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number, paceSecPerMi:number|n
  * The run's execution score, from its pace-to-heart-rate drift: 100 at or under the 5% line, 4 points off for every
  * percent over it, never under 0; and whether the day was hot enough to explain a higher drift.
  * ⛔ THE DRIFT IS NOT WORKED OUT HERE (2026-09-27). It is `_shared/run-pace.ts runDecouplingPct`, the one drift rule
- * the run analyser reads (TrainingPeaks' Pa:Hr over the whole run, 20 minutes or more), worked out once per run below.
+ * the run analyser reads (TrainingPeaks' Pa:Hr over the steady middle (the first 20 minutes and the last 10 left out, at least 20 left),
+ * so a run needs about 50 minutes), worked out once per run below.
  * This function used to carry a third copy — a 5-minute skip, a 40-minute floor, halves by sample count, mean speed
  * over mean heart rate — and it is deleted.
  * ⚠️ THE SCORE IS MADE OF THE DRIFT AND NOTHING ELSE, so a run with no drift has no score: there is no other part to
- * keep. Every run that had a score under the old copy (40 minutes or more of moving time) is 20 minutes or more and
- * has a drift under the one rule, so none loses its score (2026-09-27, Michael: "it must not disappear because drift
- * cannot be read"). Runs from 20 to 40 minutes gain one.
+ * keep, and no fallback is invented. A run under about 50 minutes has no score (2026-09-27, Michael: the steady middle,
+ * "yes"); the old copy scored runs from 40 minutes of moving time.
  */
 function aerobicDecouplingScore(
   decouplingPct: number | null,
@@ -1165,9 +1165,9 @@ Deno.serve(async (req) => {
       console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} user=${w.user_id} sport=${sport} samples=${sampleCount} rows=${rows.length} laps=${laps.length} plannedSteps=${plannedStepsDbg}`);
     } catch {}
 
-    // ⛔ THE RUN'S DRIFT, ONCE, OVER THE WHOLE RECORDING (2026-09-27): `_shared/run-pace.ts runDecouplingPct`, the rule
-    // the run analyser reads too. Worked out before the movement gate below trims a standing start, because the drift
-    // starts at the recording's first second, stops included. Read by the execution score (`aerobicDecouplingScore`).
+    // ⛔ THE RUN'S DRIFT, ONCE, OVER THE RECORDING'S STEADY MIDDLE (2026-09-27): `_shared/run-pace.ts runDecouplingPct`, the rule
+    // the run analyser reads too. Worked out before the movement gate below trims a standing start, because the 20
+    // minutes left out are counted from the recording's first second, stops included. Read by the execution score (`aerobicDecouplingScore`).
     const runDrift = sport === 'run' ? runDecouplingPct(rows) : null;
 
     // Movement gate: skip initial non-movement, but ONLY when no planned link

@@ -71,7 +71,7 @@ export interface BikeInsightInput {
   efficiency?: { factor?: number | null } | null;
   /**
    * The ride's drift as the Drift tile prints it — `resolveSessionDrift` (`../session-detail/drift-pct.ts`), handed in
-   * by `analyze-cycling-workout`: TrainingPeaks' Pw:Hr over the whole ride, null on a ride with no drift (too short,
+   * by `analyze-cycling-workout`: TrainingPeaks' Pw:Hr over the steady middle, null on a ride with no drift (too short,
    * power that swung, not steady, no power). This composer does not judge it again.
    */
   decoupling?: { pct: number | null } | null;
@@ -203,7 +203,7 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
   // ⛔ THE DRIFT TILE'S NUMBER, OR NO SENTENCE (2026-09-27, Michael). "Heart rate held / climbed relative to the power"
   // is the ride's drift in words, so it is said only where the tile prints one: the number handed in IS the tile's
   // (`decoupling` above), already null on a ride whose power swung (VI above 1.05 — TrainingPeaks: "a steady and even
-  // output … should have a VI of 1.05 or less") or under 20 minutes. No second check here.
+  // output … should have a VI of 1.05 or less") or too short for the steady middle. No second check here.
   const dcp = typeof inp.decoupling?.pct === 'number' ? inp.decoupling.pct : null;
   const dcpTxt = dcp != null ? `${Math.round(dcp * 10) / 10}%` : null;
   const hrHeld = dcp != null && dcp <= 5; // Friel line, same as run/State

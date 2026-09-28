@@ -280,8 +280,8 @@ export async function buildWorkoutFactPacketV1(args: {
     daysSinceLastGoalRace?: number | null;
   } | null;
   /**
-   * ⛔ THE RUN'S ONE DRIFT (2026-09-27): the analyser's pace-to-heart-rate decoupling, read over the whole run
-   * (`../aerobic-decoupling.ts`, via `analyze-running-workout/lib/heart-rate/efficiency.ts`), null when the run is under
+   * ⛔ THE RUN'S ONE DRIFT (2026-09-27): the analyser's pace-to-heart-rate decoupling, read over the steady middle
+   * (`../aerobic-decoupling.ts`, via `analyze-running-workout/lib/heart-rate/efficiency.ts`), null when that middle is under
    * 20 minutes. The packet used to work out a second one from its segments (halves by segment count, warm-up and
    * cool-down segments dropped by name), and that coarse number filled the gap wherever the analyser had none.
    */

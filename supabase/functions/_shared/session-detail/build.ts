@@ -1029,7 +1029,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     if (noVerdict) return null;
     // ⛔ ONE RULE (2026-09-12, Michael: "we need consistent rules across all screens"): `resolveSessionDrift`
     // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
-    // power-to-heart-rate ratio, both over the whole session of 20 minutes or more (`../aerobic-decoupling.ts`),
+    // power-to-heart-rate ratio, both over the steady middle (`../aerobic-decoupling.ts`: about 50 minutes needed),
     // and nothing else (2026-09-27). Today's boom line and State's drift chart read the same function.
     // ⛔ A LONG SESSION WITH HARDER SETS IN IT HAS NO DRIFT (2026-09-27, Michael): it is not a steady effort, and
     // the steadiness ladder says so (`session-steadiness.ts`, rung 0, off the rows' planned targets). The window
@@ -1917,25 +1917,15 @@ export function formatCyclingEfficiencyRow(
   if (opts?.steady === false) return null;
   const e = (efficiency ?? null) as any;
   if (!e || typeof e !== 'object') return null;
-  // Explicit null/undefined check before Number(): aerobic_decoupling_pct is
-  // optional (absent on short/interval rides; may round-trip as null through
-  // JSONB) and Number(null) === 0 would otherwise render a bogus "0% HR
-  // decoupling" row. Same Number(null) trap class as the vs-similar fix.
-  if (e.efficiency_factor == null || e.aerobic_decoupling_pct == null) return null;
+  // ⛔ NOT GATED ON DRIFT (2026-09-27, Michael: "go"). Efficiency is its own number — TrainingPeaks' EF,
+  // normalized power over average heart rate, printed on every ride — and drift now needs about 50 minutes
+  // (`../aerobic-decoupling.ts`). The row used to require a drift reading as an eligibility signal, which would
+  // have hidden it on every steady ride under 50 minutes. The two gates above (in-band time, steady session)
+  // still decide whether it is a readable aerobic ride.
+  if (e.efficiency_factor == null) return null;
   const ef = Number(e.efficiency_factor);
-  const dec = Number(e.aerobic_decoupling_pct);
-  if (!Number.isFinite(ef) || !Number.isFinite(dec)) return null;
-  // D-062 / Item 4 — plain-language translation per Q-010 / SESSION-CONTEXT.md
-  // §3 cosmetic footgun. "EF" (Efficiency Factor — NP/avg HR) and "HR decoupling"
-  // (Friel pace-vs-HR drift %) are technical-coaching terms; the INSIGHTS prose
-  // is already kept jargon-clean by `summaryHasJargon` (SESSION-CONTEXT §7
-  // 3-guard-stack footgun) but the dashboard rows still leaked the abbreviations.
-  // Athletes recognize "watts per heartbeat" and "HR drift" more readily.
-  // ⛔ DRIFT MOVED OUT (2026-08-02). It rode along here as "· HR drift 0.4%" while the RUN gave the
-  // same idea a row of its own — so one sport buried its durability read inside an efficiency figure
-  // and the other headlined it. `dec` is still required above as an eligibility signal (a ride without
-  // it is not a readable aerobic effort), it is simply no longer PRINTED here. See the Heart rate row.
-  void dec;
+  if (!Number.isFinite(ef)) return null;
+  // D-062 / Item 4 — plain-language label: athletes recognize "watts per heartbeat" more readily than "EF".
   // ⚠️ APPROVED WORD FOR WORD, 2026-09-15. Two plain sentences; no definition, no "higher is fitter".
   const recent = Number(opts?.recentEf);
   const against = Number.isFinite(recent) && recent > 0
@@ -2396,9 +2386,9 @@ export function buildAnalysisDetailRows(
         });
       }
     /**
-     * ⛔ NO DRIFT READ, NO HEART-RATE DRIFT LINE (2026-09-27, the one drift rule). A session with no drift — under 20
-     * minutes (`../aerobic-decoupling.ts`), or a ride whose power swung — has no Drift tile, and the bpm lines below are
-     * the same claim in beats. A run under 20 minutes printed a bpm line here before; it prints none now. A session with a drift read that the line
+     * ⛔ NO DRIFT READ, NO HEART-RATE DRIFT LINE (2026-09-27, the one drift rule). A session with no drift — its steady
+     * middle under 20 minutes (`../aerobic-decoupling.ts`: about 50 minutes needed), or a ride whose power swung — has no
+     * Drift tile, and the bpm lines below are the same claim in beats, so they print nothing either. A session with a drift read that the line
      * above does not print (a raw or heat-confounded pace ratio) keeps the bpm description, as before.
      */
     } else if (typeof decoupling?.pct !== 'number') {

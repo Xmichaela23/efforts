@@ -1585,7 +1585,7 @@ serve(async (req: Request) => {
               // ⛔ The switch above. Null here means "this session was not steady enough to fade-read",
               // which is a different fact from "we did not measure it" — `fadeWithheld` says which.
               // ⛔ THE SAME FUNCTION THE PERFORMANCE SCREEN READS, given the same materials: the pace-to-heart-rate
-              // decoupling (a run) or the power-to-heart-rate one (a ride), over the whole session, and nothing else —
+              // decoupling (a run) or the power-to-heart-rate one (a ride), over the steady middle, and nothing else —
               // no heart-rate-only read since 2026-09-27 (`_shared/session-detail/drift-pct.ts`). The `f.drift`
               // fallback and the runs-only graded-interval flag are both gone; the ladder in `session-steadiness.ts`
               // answers for every sport.

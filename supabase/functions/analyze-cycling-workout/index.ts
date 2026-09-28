@@ -1889,7 +1889,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     //
     // ⛔ THE RULE (2026-09-27, the one drift rule, Michael: "abide by training peaks"): the ride's drift is the number
     // the Drift tile prints, `resolveSessionDrift` (`_shared/session-detail/drift-pct.ts`) — TrainingPeaks' Pw:Hr over
-    // the whole ride (`computed.analysis.efficiency.aerobic_decoupling_pct`, `_shared/aerobic-decoupling.ts`), the ride's
+    // the ride's steady middle (`computed.analysis.efficiency.aerobic_decoupling_pct`, `_shared/aerobic-decoupling.ts`), the ride's
     // variability-index gate and the steadiness ladder, handed the materials the tile is handed. The paragraph and the
     // carryover check read it. Until that day they read heart rate alone (`hr_drift_v1`, a 3-minute skip, nothing cut
     // at the end), so a ride with no Drift tile could still get "heart rate held with the power", and a

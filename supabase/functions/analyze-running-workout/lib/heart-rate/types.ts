@@ -343,7 +343,7 @@ export interface ZoneTime {
 // =============================================================================
 
 export interface EfficiencyMetrics {
-  /** Pace:HR decoupling over the whole run (`efficiency.ts`, `_shared/aerobic-decoupling.ts`). */
+  /** Pace:HR decoupling over the steady middle (`efficiency.ts`, `_shared/aerobic-decoupling.ts`). */
   decoupling: {
     percent: number;            // Decoupling %, one decimal
     assessment: 'good' | 'needs_work'; // Q-161: 5% line — 'good' ≤5% / 'needs_work' >5%
@@ -404,7 +404,7 @@ export interface HRSummaryMetrics {
    * D-036: which pace series fed the decoupling ratio. TERRAIN ONLY.
    * 'gap' = grade-adjusted pace (terrain neutralized; honest fitness signal).
    * 'raw' = raw pace (no usable elevation; terrain confound not removed).
-   * null = decoupling not computed (interval workout, a run under 20 minutes).
+   * null = decoupling not computed (interval workout, a steady middle under 20 minutes — a run under about 50).
    * ⛔ Effort quality does NOT live here: drift is read on steady sessions only.
    */
   decouplingBasis: 'gap' | 'raw' | null;

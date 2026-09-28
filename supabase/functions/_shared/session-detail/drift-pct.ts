@@ -31,7 +31,8 @@
  *   2. A ride's power-to-heart-rate decoupling, `computed.analysis.efficiency.aerobic_decoupling_pct`
  *      (`_shared/cycling-v1/ride-physiology.ts`), basis 'power' — TrainingPeaks' Pw:Hr, the number
  *      State's bike drift reads. Rungs 1 and 2 are one rule, worked out in `../aerobic-decoupling.ts`: over the
- *      whole session, and only on a session of 20 minutes or more.
+ *      steady middle (the first 20 minutes and the last 10 left out, at least 20 left), so a session needs
+ *      about 50 minutes to have either.
  *   3. Else no read. ⛔ NO HEART-RATE-ONLY RUNG (2026-09-27, Michael: "abide by training peaks"). Heart rate
  *      alone (`hr_drift_v1`, `_shared/hr-drift-halves.ts`) used to stand in when there was no ratio — a ride
  *      with no power, a run whose ratio was withheld — with its own start (3 minutes skipped). TrainingPeaks' decoupling is Pa:Hr or Pw:Hr and nothing else, so a session with neither has
