@@ -16,6 +16,7 @@
  * ⚠️ PER SESSION, MINUTES ARE ROUNDED BEFORE THEY ARE ADDED, as the bar did.
  */
 import { clock, displayFormat, durationClock, M_PER_MI, M_PER_YD, type DisplayFormat } from '../_shared/display-format.ts';
+import { SESSION_TILE_LABELS } from '../_shared/session-detail/top-tiles.ts';
 
 // deno-lint-ignore no-explicit-any
 type Item = Record<string, any>;
@@ -111,7 +112,7 @@ export type DoneTile = {
 };
 
 /** A session time row (`_shared/session-detail/session-times.ts`), the fields read here. */
-type TimeRow = { key?: unknown; label?: unknown; display?: unknown };
+type TimeRow = { key?: unknown; display?: unknown };
 
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
@@ -158,13 +159,14 @@ function doneTiles(type: string, done_distance: string | null, sessionTimes: unk
   const add = (key: DoneTile['key'], label: string | null, display: string | null) => {
     if (label && display) tiles.push({ key, label, display });
   };
-  add('distance', 'Distance', done_distance);
+  // The labels are Performance's top card's (`_shared/session-detail/top-tiles.ts`), so the two cards say one thing.
+  add('distance', SESSION_TILE_LABELS.distance, done_distance);
   if (isRide) {
-    add('moving', text(moving?.label), text(moving?.display));
-    add('elevation', 'Elevation', text(totals?.elevation_display));
+    add('moving', SESSION_TILE_LABELS.moving, text(moving?.display));
+    add('elevation', SESSION_TILE_LABELS.elevation, text(totals?.elevation_display));
   } else {
-    add('pace', 'Pace', text(totals?.avg_pace_display));
-    add('moving', text(moving?.label), text(moving?.display));
+    add('pace', SESSION_TILE_LABELS.pace, text(totals?.avg_pace_display));
+    add('moving', SESSION_TILE_LABELS.moving, text(moving?.display));
   }
   add('execution', 'Execution', execution);
   return tiles;

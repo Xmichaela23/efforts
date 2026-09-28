@@ -56,35 +56,23 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
 }
 
 /**
- * ⛔ A RIDE'S TIMES (2026-09-26, Michael: "Garmin's three times, under Garmin's names, on every screen that shows a
- * ride's time"). `session_detail_v1.times` — Time, Moving Time, Elapsed Time, whichever the ride's source sent, the
- * same rows the Details tab prints from `display_metrics.times`; composed once on the server
- * (`_shared/session-detail/session-times.ts`) and printed here as sent. Same type as the tiles above.
- *
- * ⛔ AND ITS CLIMBING, LAST IN THE ROW (2026-09-27, Michael; "Elevation" is Strava's word, and the Details tab's).
- * `completed_totals.elevation_display` — the provider's total climbing in the athlete's unit, composed on the server
- * (`_shared/session-detail/build.ts`), the string Details prints. A run or a ride; the server sends none on a swim,
- * a lift or an indoor session. It sits with the times because it is the same kind of number: the source's own total.
- * ⚠️ FOUR READOUTS GO TWO BY TWO, as the tiles above do (2026-09-14): Time, Moving Time, Elapsed Time and Elevation
- * need more than a 375 px phone's width in one row. Three or fewer stay on one row.
+ * One line of readouts, drawn as sent: the number over its label.
+ * ⛔ THE BIG NUMBERS (2026-09-28, Michael: "should have the big numbers Strava uses") — `session_detail_v1.top_tiles`,
+ * a ride's or run's basics, at Title 3; the plan's results under them stay smaller (`AdherenceChips`).
+ * ⛔ ONE TIME (2026-09-28: "we don't need 3 different times") — `session_detail_v1.times` now carries only a walk's
+ * Moving Time; a ride or run carries it among the big numbers. Time and Elapsed Time are on the Details tab only.
  */
-function SessionTimes({ rows, elevation }: {
-  rows: Array<{ key: string; label: string; display: string }>;
-  elevation?: string | null;
-}) {
-  const cells = [
-    ...rows,
-    ...(elevation ? [{ key: 'elevation', label: 'Elevation', display: elevation }] : []),
-  ].map((r) => (
-    <div key={r.key} className="flex flex-col items-center px-1 min-w-0">
-      <div className="readout-num text-body whitespace-nowrap">{r.display}</div>
-      <div className="readout-label text-caption uppercase text-center whitespace-nowrap">{r.label}</div>
+function ReadoutLine({ rows, big = false }: { rows: Array<{ key: string; label: string; display: string }>; big?: boolean }) {
+  return (
+    <div className="flex items-start justify-around w-full px-3 mb-3">
+      {rows.map((r) => (
+        <div key={r.key} className="flex flex-col items-center px-1 min-w-0">
+          <div className={`readout-num ${big ? 'text-title3' : 'text-body'} whitespace-nowrap`}>{r.display}</div>
+          <div className="readout-label text-caption uppercase text-center whitespace-nowrap">{r.label}</div>
+        </div>
+      ))}
     </div>
-  ));
-  if (cells.length >= 4) {
-    return <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-3 mb-3">{cells}</div>;
-  }
-  return <div className="flex items-start justify-around w-full px-3 mb-3">{cells}</div>;
+  );
 }
 
 type MobileSummaryProps = {
@@ -370,6 +358,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         );
       })()}
       <div className="pt-2 pb-1">
+      {/* ⛔ THE SESSION'S BASICS FIRST, THE PLAN SECOND (2026-09-27, Michael, "go"; TrainingPeaks' order 2026-09-28). A
+          ride: Moving Time · Distance · Workload, then Weighted Power · Elevation · Avg Heart Rate; a run: Moving Time ·
+          Distance · Workload, then Pace · Elevation · Avg Heart Rate. `session_detail_v1.top_tiles`, label and string
+          written on the server (`_shared/session-detail/top-tiles.ts`), drawn as sent. Null on every other sport. */}
+      {Array.isArray((sd as any)?.top_tiles)
+        ? (sd as any).top_tiles.map((line: any, i: number) => <ReadoutLine key={i} rows={line} big />)
+        : null}
       {/* D-166 refinement: swims drop the top adherence header — it duplicated the green-dot
           Distance/Duration pills now inside the swim card (113% Duration was showing twice). */}
       <AdherenceChips
@@ -378,18 +373,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race || type === 'swim'}
       />
-      {/* THE RIDE'S TIMES (2026-09-26) — under the tiles and above the Garmin line; the source's own numbers. A copy of
-          the session saved on the workout carries none (the rows are sent, never saved), so the Details reply's
-          `display_metrics.times` — the same rows from the same row — stands in until this tab's own reply lands.
-          The Elevation tile (2026-09-27) sits last in the same row; see `SessionTimes`. */}
-      {(() => {
-        const rows = Array.isArray((sd as any)?.times) ? (sd as any).times : (completed as any)?.display_metrics?.times;
-        // server-field: the Elevation tile's string (2026-09-27), printed as sent.
-        const elevation = typeof (sd as any)?.completed_totals?.elevation_display === 'string'
-          ? (sd as any).completed_totals.elevation_display as string : null;
-        const hasRows = Array.isArray(rows) && rows.length > 0;
-        return hasRows || elevation ? <SessionTimes rows={hasRows ? rows : []} elevation={elevation} /> : null;
-      })()}
+      {/* A WALK'S MOVING TIME (2026-09-28) — under the tiles and above the Garmin line, the one time Performance prints.
+          Only this tab's own reply carries it; nothing stands in before it lands. */}
+      {Array.isArray((sd as any)?.times) && (sd as any).times.length > 0 ? <ReadoutLine rows={(sd as any).times} /> : null}
       {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, under the tiles.
           Not inside a tooltip or a collapsed section. */}
       {garminDerived ? <GarminDerivedDataLine className="px-3 pb-1" /> : null}

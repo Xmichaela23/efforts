@@ -43,6 +43,7 @@ import { resolveBodyweightLb } from '../_shared/workload.ts';
 import { completedMovingSeconds, providerElapsedSeconds } from '../_shared/moving-seconds.ts';
 // A session's Time / Moving Time / Elapsed Time as its source sent them — one composition, both tabs (2026-09-26).
 import { sessionTimeRows, wantsStoredStreamTail, type SessionTimeRow } from '../_shared/session-detail/session-times.ts';
+import { movingTimeRow, sessionTopTiles } from '../_shared/session-detail/top-tiles.ts';
 // ⛔ THE GOOD-NEWS LINE (2026-09-10, audit H-T14) — stored by recompute-workout, passed through here.
 import type { SessionBoomV1 } from '../_shared/session-boom/types.ts';
 // The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
@@ -227,7 +228,7 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
 /** Strip response-only keys; they must never appear in persisted workout_analysis.session_detail_v1. */
 function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null | undefined): Record<string, unknown> {
   if (!sd || typeof sd !== 'object') return (sd ?? {}) as Record<string, unknown>;
-  const { stale: _s, stale_reason: _r, effort_row: _e, talk_test_row: _t, times: _tm, ...rest } = sd as Record<string, unknown>;
+  const { stale: _s, stale_reason: _r, effort_row: _e, talk_test_row: _t, times: _tm, top_tiles: _tt, ...rest } = sd as Record<string, unknown>;
   return rest as Record<string, unknown>;
 }
 
@@ -326,8 +327,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *       read and the bpm lines until it rebuilt. ⚠️ THE REBUILD DOES NOT MOVE THE NUMBER: the drift itself is stored by
  *       the analysers (`heart_rate_summary.decouplingPct`, `computed.analysis.efficiency.aerobic_decoupling_pct`), so a
  *       session analysed before this rule keeps its old drift until it is analysed again (`recompute-workout`).
+ *  12 — completed_totals.weighted_power_display, the ride's Weighted Power tile in the top card's basics row (2026-09-27,
+ *       Michael, "go"; `_shared/session-detail/top-tiles.ts`). A copy stored at v11 has none, and the ride's top card
+ *       would print no Weighted Power until it rebuilt.
  */
-const SESSION_TOTALS_VERSION = 11;
+const SESSION_TOTALS_VERSION = 12;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -361,7 +365,16 @@ function enrichSessionDetailForResponse(
   // ⛔ THE SESSION'S TIMES, ON EVERY ANSWER (2026-09-26, `_shared/session-detail/session-times.ts`) — the rows Details
   // prints from `display_metrics.times`, composed from the same row, so the two tabs cannot print different times.
   // Read from the row like the rows above, never saved into the copy: a cached copy carries none to go stale.
-  try { base.times = times !== undefined ? times : sessionTimeRows(rowSd); } catch { base.times = null; }
+  // ⛔ AND THE TOP CARD'S BIG NUMBERS, ON A RIDE OR RUN (2026-09-27, `_shared/session-detail/top-tiles.ts`). ONE TIME ON
+  // PERFORMANCE (Michael, 2026-09-28: "we don't need 3 different times"): Moving Time — among the big numbers on a ride
+  // or run, alone in this row on a walk. Time and Elapsed Time stay on the Details tab only.
+  try {
+    const allTimes = times !== undefined ? times : sessionTimeRows(rowSd);
+    const sport = String(base?.type || rowSd?.type || '');
+    base.top_tiles = sessionTopTiles(sport, base, allTimes, rowSd?.avg_heart_rate);
+    const moving = movingTimeRow(allTimes);
+    base.times = !Array.isArray(allTimes) ? allTimes : (base.top_tiles || !moving ? [] : [moving]);
+  } catch { base.times = null; base.top_tiles = null; }
   const rowPlanned = rowSd?.planned_id != null && String(rowSd.planned_id).trim() !== '' ? String(rowSd.planned_id) : '';
   const sdPlanned = base?.plan_context?.planned_id != null && String(base.plan_context.planned_id).trim() !== ''
     ? String(base.plan_context.planned_id)

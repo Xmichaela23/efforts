@@ -74,7 +74,9 @@ export default function AdherenceChips({
   hideTopAdherence,
   dense = false,
 }: AdherenceChipsProps) {
-  const numCls = dense ? 'readout-num text-subhead whitespace-nowrap' : 'readout-num text-body whitespace-nowrap';
+  // ⛔ SMALLER THAN THE BIG NUMBERS ABOVE THEM (2026-09-28, Michael): the plan's results sit under the session's basics
+  // (`MobileSummary`, Title 3) at Subhead, the size the dense card already used.
+  const numCls = 'readout-num text-subhead whitespace-nowrap';
   /**
    * ⛔ 12 px, AND THE MUTED TOKEN AT 0.7 (Michael, 2026-09-09, on the device). The tile label and its
    * sub-label were 9 px on the done card — smaller than any other text on the screen — at 40 per
@@ -356,8 +358,10 @@ export default function AdherenceChips({
                 ⛔ THE DRIFT CHIP RENDERS WITHOUT A NUMBER WHEN THE SERVER SENT WORDS INSTEAD (2026-09-12).
                 A long session whose VT1 portions are under p107's bout floor gets no percentage and a
                 sentence saying why; `chipNote` keeps the Drift label with the words under it. */}
+            {/* ⛔ EXECUTION · DURATION · DRIFT (2026-09-28, Michael, "however TrainingPeaks does it") — the plan's results,
+                under the session's big numbers (`MobileSummary`, `top_tiles`). Workload is one of those big numbers now,
+                so it is not repeated here. No number or word changed. */}
             {rowOf([
-              loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,
               executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, executionSubtitle)}</React.Fragment> : null,
               durationValue ? <React.Fragment key="du">{chipText('Duration', durationValue, 'of plan')}</React.Fragment> : null,
               driftValue != null
@@ -385,8 +389,8 @@ export default function AdherenceChips({
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="readout-label mb-2 text-center text-caption uppercase">{weekLabel}</div>}
         <div className={outerCls}>
+          {/* Execution · Duration · Drift, as the ride (2026-09-28); Workload is among the big numbers above. */}
           {rowOf([
-            loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,
             executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, executionSubtitle)}</React.Fragment> : null,
             durationValue ? <React.Fragment key="du">{chipText('Duration', durationValue, 'of plan')}</React.Fragment> : null,
             driftValue != null ? <React.Fragment key="dr">{chipText('Drift', driftValue, driftSubtitle)}</React.Fragment> : null,

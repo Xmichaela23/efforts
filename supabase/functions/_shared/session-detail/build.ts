@@ -1087,6 +1087,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     ? sdFmt.elevation(providerElevationGainM)
     : null;
 
+  /**
+   * ⛔ THE WEIGHTED POWER TILE (2026-09-27, Michael, "go"; Strava sends the same number as `weighted_average_watts`). The ride's
+   * normalized power as `compute-workout-analysis` stores it — the device's number first (`workouts.normalized_power`:
+   * Garmin `normalized_power`, Strava `weighted_average_watts`), ours from the samples only when none was sent — the
+   * number the Details tab prints. Rides only; none when there is no power.
+   * ⚠️ TrainingPeaks' own name for it is a registered trademark and is not printed.
+   */
+  completedTotals.weighted_power_display = (() => {
+    const np = Number(comp?.analysis?.power?.normalized_power);
+    return type === 'ride' && Number.isFinite(np) && np > 0 ? `${Math.round(np)} W` : null;
+  })();
+
   // ── Analysis detail rows ───────────────────────────────────────────────────
   // Goal races use structured technical_insights only — suppress fact-packet rows to avoid duplication
   const analysisDetailRows = isGoalRaceSession

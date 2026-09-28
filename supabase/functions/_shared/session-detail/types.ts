@@ -153,9 +153,16 @@ export type SessionDetailV1 = {
   /**
    * Response-only (workout-detail enrich, 2026-09-26): a ride's Time / Moving Time / Elapsed Time as its source sent
    * them, under Garmin Connect's names — the same rows as the Details tab's `display_metrics.times`
-   * (`./session-times.ts`). Null on anything but a ride; empty when the source sent none. Never persisted.
+   * (`./session-times.ts`). Null on anything but a ride, run or walk; empty when the source sent none. Since 2026-09-28
+   * Performance prints one time: a walk's Moving Time row alone; empty on a ride or run, whose Moving Time is among
+   * `top_tiles`. Never persisted.
    */
   times?: import('./session-times.ts').SessionTimeRow[] | null;
+  /**
+   * Response-only (workout-detail enrich, 2026-09-27; two lines 2026-09-28): the Performance top card's big numbers on
+   * a ride or run, line by line — label and finished string (`./top-tiles.ts`). Null on every other sport. Never persisted.
+   */
+  top_tiles?: import('./top-tiles.ts').SessionTile[][] | null;
 
   plan_context: {
     planned_id: string | null;
@@ -340,6 +347,11 @@ export type SessionDetailV1 = {
      * swim, a lift, an indoor session, or when the provider sent none. Absent on a copy written before totals v9.
      */
     elevation_display?: string | null;
+    /**
+     * 2026-09-27, ride only: "182 W" — the ride's normalized power, the device's first (`computed.analysis.power`),
+     * for the Weighted Power tile. Null with no power. Absent on a copy written before totals v12.
+     */
+    weighted_power_display?: string | null;
   };
   planned_totals: {
     /** 2026-09-16: the planned distance and length as the athlete reads them — the swim card converted
