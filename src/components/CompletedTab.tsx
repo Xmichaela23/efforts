@@ -1335,7 +1335,7 @@ const renderTimeTiles = () => (sessionTimes.length > 0 ? sessionTimes.map((t, i)
               {norm.normalized_power ? `${norm.normalized_power} W` : 'N/A'}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>Norm Power</div>
+              <div className="text-xs font-light" style={metricLabelStyle}>Weighted Power</div>
             </div>
           </div>
 
