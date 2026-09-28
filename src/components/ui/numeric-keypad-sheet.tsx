@@ -18,9 +18,10 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
  *
  * ⚠️ NOT MODAL (2026-09-10, Michael: the chevron beside Swap took two taps on the phone). With the keypad open,
  * the drawer's overlay ate the first tap on anything behind it. Non-modal, Vaul draws no overlay and leaves the
- * page's pointer events alone; the tap outside closes the keypad without saving (Vaul hands the outside press to
+ * page's pointer events alone; the tap outside closes the keypad (Vaul hands the outside press to
  * `onPointerDownOutside` and then stops its own close, so it is closed here) AND lands where the athlete aimed
- * it — tap another cell, the keypad follows. Drag-down closes without saving too.
+ * it — tap another cell, the keypad follows. Since 2026-09-28 the logger saves a changed box on that close
+ * (`StrengthLogger` `onOpenChange`), as Strong and Hevy keep a typed number.
  */
 type Props = {
   open: boolean;

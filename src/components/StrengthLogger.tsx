@@ -935,7 +935,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    * above the panel (`setRowRefs`). `title` survives only as the panel's screen-reader name.
    */
   type KeypadStep = { field: KeypadField; title: string; initialValue: string; allowDecimal?: boolean; hint?: string; plates?: boolean };
-  const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean; next?: KeypadStep[] } | null>(null);
+  const keypadCtxRef = useRef<{ exerciseId: string; setIndex: number; field: KeypadField; alsoComplete?: boolean; next?: KeypadStep[]; initialValue?: string } | null>(null);
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [keypadTitle, setKeypadTitle] = useState<string>('');
   const [keypadValue, setKeypadValue] = useState<string>('');
@@ -1045,6 +1045,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       field: opts.field,
       alsoComplete: opts.alsoComplete,
       next,
+      initialValue: opts.initialValue,
     };
     setKeypadTitle(opts.title);
     setKeypadValue(opts.initialValue);
@@ -1080,7 +1081,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch {}
   }, [targetDate, scheduledWorkout?.date]);
 
-  const commitKeypad = (rawOverride?: string) => {
+  const commitKeypad = (rawOverride?: string, opts?: { noChain?: boolean }) => {
     const ctx = keypadCtxRef.current;
     if (!ctx) {
       closeKeypad();
@@ -1134,12 +1135,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // Q-039: RIR scale is 0–5+; clamp manual entry to 0–5 (5 = "5+", far from failure).
       const rirVal = isValidNumber ? Math.max(0, Math.min(5, Math.round(n))) : undefined;
       updateSet(ctx.exerciseId, ctx.setIndex, { rir: rirVal, ...(ctx.alsoComplete ? { completed: true } : null) });
+      // A reserve typed into the box answers the adjust strip's question: the strip closes (2026-09-28).
+      if (rirVal !== undefined && rirConfirm && rirConfirm.exerciseId === ctx.exerciseId && rirConfirm.setIndex === ctx.setIndex) {
+        setRirConfirm(null);
+      }
     }
 
     // §1: "Next" — the box is committed above; the same sheet now opens the row's next box. The step's initial
     // value was read by the row when the first box was tapped; it is another field's number, so the commit
     // above did not move it. The last box's confirm ("Save") falls through and closes.
-    const [step, ...rest] = ctx.next ?? [];
+    const [step, ...rest] = opts?.noChain ? [] : (ctx.next ?? []);
     if (step) {
       openKeypadForSet({ exerciseId: ctx.exerciseId, setIndex: ctx.setIndex, ...step, next: rest });
       return;
@@ -7123,7 +7128,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           : null}
         onConfirm={(raw) => commitKeypad(raw)}
         onOpenChange={(open) => {
-          if (open) setKeypadOpen(true);
+          if (open) { setKeypadOpen(true); return; }
+          /**
+           * ⛔ A TAP OUTSIDE KEEPS WHAT WAS TYPED (2026-09-28, Michael: the RIR strip "still pops up even if you enter
+           * manually"). It closed without saving, so a reserve typed and then the check tapped was thrown away, and
+           * the check, seeing no reserve, opened the strip. Strong and Hevy keep a typed number when you tap away.
+           * Only a changed box is written (an untouched one stays as it was, its flags too); the row's Next chain
+           * does not open on a tap outside.
+           */
+          const ctx = keypadCtxRef.current;
+          if (ctx && String(keypadValue ?? '').trim() !== String(ctx.initialValue ?? '').trim()) commitKeypad(undefined, { noChain: true });
           else closeKeypad();
         }}
       />
