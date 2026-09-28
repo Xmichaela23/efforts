@@ -45,9 +45,10 @@ Deno.test('zone rows: the words are formZone\'s, and exactly the current zone is
   assertEquals(formZoneRows(null).filter((r) => r.current), []);
 });
 
-Deno.test('zone rows: one on-screen name per zone, approved 2026-09-26, in table order', () => {
+Deno.test('zone rows: one on-screen name per zone, approved 2026-09-28, in table order', () => {
   assertEquals(FORM_ZONE_TABLE.map((r) => r.meaning), [
-    'fitness fading', 'fresh, race shape', 'not building, not sharp', 'building', 'injury and illness risk rises',
+    'very rested · fitness fades if it lasts', 'rested · race ready', 'in between · not rested, not loaded',
+    'loaded · the range that builds fitness', 'overloaded · injury and illness risk rises',
   ]);
 });
 
@@ -63,9 +64,9 @@ Deno.test('key: the approved words, the athlete\'s readings in the titles, a mis
 Deno.test('headline: only in high risk, and the form sentence in every week, light weeks included', () => {
   // ⛔ The exact words, with a real minus sign and no source on the screen (Michael, 2026-09-10); since 2026-09-26 the
   // zone's one on-screen name (`FORM_ZONE_TEXT`), not Friel's "high risk".
-  assertEquals(formHeadline(-32.4), 'Form −32 · injury and illness risk rises');
+  assertEquals(formHeadline(-32.4), 'Form −32 · overloaded · injury and illness risk rises');
   // ⛔ The function takes no week, so a recovery or taper week gets the same line — never "Recovery • …".
-  assertEquals(formHeadline(-40), 'Form −40 · injury and illness risk rises');
+  assertEquals(formHeadline(-40), 'Form −40 · overloaded · injury and illness risk rises');
   assertEquals(formHeadline(-30), null, '−30 is optimal, not high risk');
   assertEquals(formHeadline(null), null);
   assertEquals(formKicker(12.2, 'fresh'), 'Form +12 — fresh (TrainingPeaks)');

@@ -167,7 +167,11 @@ export function computeFitnessFatigue(
 export type FormZone = 'transitional' | 'fresh' | 'grey zone' | 'optimal' | 'high risk';
 
 /**
- * ⛔ WHAT EACH ZONE IS CALLED ON SCREEN — ONE NAME PER ZONE (Michael approved 2026-09-26). The five Friel words above
+ * ⛔ WHAT EACH ZONE IS CALLED ON SCREEN — ONE NAME PER ZONE (Michael approved 2026-09-26; reworded 2026-09-28). The
+ * 2026-09-26 names read as a verdict on the block ("not building, not sharp" beside a fitness line that rose 35 → 55 —
+ * Michael the day after a rest day). Form is one day's balance of training and rest, so each name now says how rested
+ * or loaded the athlete is today, then what that range means. Our words; the ranges and meanings are the sources'
+ * below, TrainingPeaks' own zone names are not printed. The five Friel words above
  * stay as the zone's key (colour, tests, the coach's checks); the athlete reads only these, on every surface that
  * names the zone (State's LOAD card and table, Today's form line, State's glance headline, the loaded-legs Why).
  * FIELD — Friel, "Managing Training Using TSB" (joefrieltraining.com; Friel co-founded TrainingPeaks): transitional
@@ -176,11 +180,11 @@ export type FormZone = 'transitional' | 'fresh' | 'grey zone' | 'optimal' | 'hig
  * Part 3: Training Stress Balance": "increased injury/illness risk".
  */
 export const FORM_ZONE_TEXT: Record<FormZone, string> = {
-  'transitional': 'fitness fading',
-  'fresh': 'fresh, race shape',
-  'grey zone': 'not building, not sharp',
-  'optimal': 'building',
-  'high risk': 'injury and illness risk rises',
+  'transitional': 'very rested · fitness fades if it lasts',
+  'fresh': 'rested · race ready',
+  'grey zone': 'in between · not rested, not loaded',
+  'optimal': 'loaded · the range that builds fitness',
+  'high risk': 'overloaded · injury and illness risk rises',
 };
 
 /** The on-screen name of the zone `form` sits in (`FORM_ZONE_TEXT`); null when there is no form. */
