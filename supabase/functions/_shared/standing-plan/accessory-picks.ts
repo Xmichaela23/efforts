@@ -40,7 +40,7 @@ import {
   type ViadaCategory,
   type ViadaPattern,
 } from '../strength-grid/index.ts';
-import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
+import { ownsLoadingImplement, athleteEquipmentToKeys, gearRoutesFor } from '../../../../src/lib/strength-gear.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { FRAMES, type ColumnKind, type FrameId } from './frames.ts';
 // ⚠️ `WEEKDAYS` left with `dialSentence` (the week-order sort went to `src/lib/dial-copy.ts`).
@@ -1163,6 +1163,91 @@ export function focusedArmFit(pattern: string, inSuperset: boolean, name: string
 export function onTheBar(name: string, equipment: string[] | null | undefined): number {
   return implementOnKit(name, equipment) === 'barbell' ? 1 : 0;
 }
+/**
+ * ⛔ NO SUPERSET NEEDS THE BENCH AT TWO SETTINGS (Michael, 2026-09-28: "this is a stupid superset" — Tate press, lying
+ * face up on a flat bench, paired with the spider curl, chest down on a bench at 45 degrees: every round resets the
+ * bench and turns the athlete over). Which bench setting this movement takes on this kit — the kit's own route for it,
+ * read the way `implementOnKit` reads it: `incline` when the route holds the incline bench, `flat` when it holds the
+ * bench, null when it needs no bench (or the kit is not declared). OURS — the page prints the pair and names no bench;
+ * ledger row "Superset bench setting" in docs/STATE-SOURCES.md.
+ */
+export type BenchSetting = 'flat' | 'incline';
+export function benchSetting(name: string, equipment: string[] | null | undefined): BenchSetting | null {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return null;
+  const routes = gearRoutesFor(name);
+  if (routes.length === 0) return null;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  const station = routes.find((r) => r.includes('machine') && r.every((k) => keys.has(k)));
+  const route = station ?? routes.find((r) => r.every((k) => keys.has(k)));
+  if (!route) return null;
+  if (route.includes('incline_bench')) return 'incline';
+  if (route.includes('bench')) return 'flat';
+  return null;
+}
+/** 1 when this movement needs the bench at a different setting from its superset partner's, 0 otherwise — a sort key. */
+export function benchClash(name: string, equipment: string[] | null | undefined, partner: BenchSetting | null | undefined): number {
+  if (!partner) return 0;
+  const mine = benchSetting(name, equipment);
+  return mine != null && mine !== partner ? 1 : 0;
+}
+
+/**
+ * The pick keys that share a printed superset with this one on this frame — p274's arms pair, the braced hinge / braced
+ * lower push pair, the focused quadriceps / hamstring pair — read off the frame's own rows, so every frame and every
+ * pair is covered without a hand-kept list.
+ */
+export function supersetPartnersForPick(key: ViadaPickKey, frame: FrameId, column: ColumnKind = 'standard'): ViadaPickKey[] {
+  const out = new Set<ViadaPickKey>();
+  for (const day of FRAMES[frame]?.columns[column] ?? []) {
+    const groups = new Map<string, ViadaPickKey[]>();
+    for (const s of day.strength) {
+      if (!/superset/i.test(String(s.sourceText ?? ''))) continue;
+      const k = pickKeyForSlot(s.category as ViadaCategory, s.pattern as ViadaPattern, day.day, frame,
+        /\(arms\)/i.test(String(s.sourceText ?? '')), (s.intent as 'HYP' | 'DE' | 'SKILL') ?? 'HYP');
+      if (!k) continue;
+      const g = String(s.sourceText).toLowerCase();
+      groups.set(g, [...(groups.get(g) ?? []), k]);
+    }
+    for (const ks of groups.values()) if (ks.includes(key)) for (const k of ks) if (k !== key) out.add(k);
+  }
+  return [...out];
+}
+
+/**
+ * The pick for `key` once its superset partners are chosen: `chosen` when it takes the bench as they do (or no bench);
+ * else the first option of the cell that does — never one `avoid` rules out (already on the day), and off the bar
+ * when a partner is on it or the pair is the arms one, as the composer ranks it. No such option: `chosen`.
+ */
+export function benchSafePick(
+  key: ViadaPickKey,
+  chosen: string,
+  partnerNames: string[],
+  equipment: string[] | null | undefined,
+  frame: FrameId,
+  avoid: (name: string) => boolean = () => false,
+): string {
+  const partners = partnerNames.filter((n) => !!String(n || '').trim());
+  if (partners.length === 0) return chosen;
+  const partnerBench = partners.map((n) => benchSetting(n, equipment)).find((b) => b != null) ?? null;
+  if (!benchClash(chosen, equipment, partnerBench)) return chosen;
+  const avoidBar = VIADA_PICKS[key].slot?.arms === true || partners.some((n) => onTheBar(n, equipment) === 1);
+  const opts = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
+    .map((o) => o.name)
+    .filter((n) => !avoid(n) && !benchClash(n, equipment, partnerBench));
+  // The arms pair keeps arm work (`focusedArmFit`, the composer's first key there) ahead of the bar rule.
+  const slot = VIADA_PICKS[key].slot;
+  const armsPair = slot?.arms === true && slot.pattern != null;
+  const rank = (n: string): number[] => [
+    armsPair ? focusedArmFit(String(slot!.pattern), true, n) : 0,
+    avoidBar ? onTheBar(n, equipment) : 0,
+  ];
+  const best = opts
+    .map((n, i) => ({ n, i, r: rank(n) }))
+    .sort((a, b) => (a.r[0] - b.r[0]) || (a.r[1] - b.r[1]) || (a.i - b.i))[0];
+  return best?.n ?? chosen;
+}
+
 /** The arms-row reading of `onTheBar` (the 2026-09-24 arms work order's name for it). */
 export const armsOnTheBar = onTheBar;
 
@@ -2153,6 +2238,10 @@ export function defaultViadaPicks(
       // resolve anyway.
       chosen = alt ?? first;
     }
+    // ⛔ NOT THE BENCH AT TWO SETTINGS INSIDE ONE SUPERSET (2026-09-28, `benchClash`): the second key of a printed pair
+    // moves to the first option that takes the bench as its partner does (or no bench), not twice today, and — as the
+    // composer ranks it — off the bar when the partner is on it or the pair is the arms one. No such option: kept.
+    chosen = benchSafePick(key, chosen, supersetPartnersForPick(key, frame).map((k) => out[k] ?? ''), equipment, frame, clash);
     out[key] = chosen;
     for (const d of days) {
       const set = takenByDay.get(d) ?? new Set<string>();

@@ -53,6 +53,9 @@ import {
   type ViadaPickKey,
   focusedArmFit,
   onTheBar,
+  benchClash,
+  benchSetting,
+  type BenchSetting,
   frameHasArmsSuperset,
   picksForFrame,
 } from './accessory-picks.ts';
@@ -1384,6 +1387,12 @@ function exerciseForSlot(
    */
   supersetOnBar: Set<string> = new Set(),
   /**
+   * ⛔ THE BENCH SETTING THE FIRST ROW OF EACH PRINTED SUPERSET TOOK TODAY (2026-09-28, `benchClash`) — keyed by the
+   * row's `superset_group` text, filled by the day loop beside `supersetOnBar`. The second row ranks every option that
+   * needs the bench at another setting last.
+   */
+  supersetBench: Map<string, BenchSetting> = new Map(),
+  /**
    * ⛔ NULL WHEN THE DAY HAS NO MOVEMENT LEFT FOR THIS SLOT — see the drop branch below. The caller
    * skips the slot and says so; it does not print the row above twice.
    */
@@ -1777,6 +1786,9 @@ function exerciseForSlot(
         // ⛔ NEVER BOTH ON THE BARBELL, NEVER A SKULL CRUSHER ON THE STRAIGHT BAR (2026-09-24, `onTheBar`): a
         // barbell-held option ranks last in the two "(arms)" rows, and in any superset whose first row is on the bar.
         (armsCell && inSuperset) || partnerOnBar ? onTheBar(name, args.equipment ?? null) : 0,
+        // ⛔ NOT THE BENCH AT TWO SETTINGS IN ONE SUPERSET (2026-09-28, `benchClash`): flat after incline, or incline
+        // after flat, ranks last — the Tate press is not followed by the spider curl.
+        printedSuperset ? benchClash(name, args.equipment ?? null, supersetBench.get(noteForWeek(slot, args.week))) : 0,
         his.has(canonicalize(name)) ? 0 : 1,
         // ⛔ PRINTED ON ANOTHER PAGE FOR THIS PATTERN (`alsoHis`, 2026-09-24): behind his own list, ahead of every
         // stand-in — the picker ranks it the same way, so the built week and the dropdown's default agree.
@@ -3544,18 +3556,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         const takenToday = new Set<string>();
         // The printed supersets whose first row today took the bar (2026-09-24, B1) — see `exerciseForSlot`.
         const supersetOnBar = new Set<string>();
+        // …and the bench setting each printed superset's first row took (2026-09-28, `benchClash`).
+        const supersetBench = new Map<string, BenchSetting>();
         let droppedHere = 0;
         // p247 — the rows whose weight the lower-body reduction touched today (see `exerciseForSlot`).
         const reducedRows = new Set<StrengthExercise>();
         for (const slot of day.strength) {
           const built = exerciseForSlot(
             slot, args, notes, hardRunBeforeLowerOn(day.day), takenToday, picks, focusMuscles,
-            dialMuscles, day.day, supersetOnBar);
+            dialMuscles, day.day, supersetOnBar, supersetBench);
           // ⛔ THE DAY RAN OUT OF MOVEMENTS FOR THIS PATTERN — see `exerciseForSlot`'s drop branch.
           if (!built) { droppedHere += 1; continue; }
           const { exercise, movement, sets, pattern } = built;
           if (exercise.superset_group && implementOnKit(movement, args.equipment ?? null) === 'barbell') {
             supersetOnBar.add(String(exercise.superset_group));
+          }
+          if (exercise.superset_group && !supersetBench.has(String(exercise.superset_group))) {
+            const bench = benchSetting(movement, args.equipment ?? null);
+            if (bench) supersetBench.set(String(exercise.superset_group), bench);
           }
           if (built.reduced) reducedRows.add(exercise);
           exercises.push(exercise);

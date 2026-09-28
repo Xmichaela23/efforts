@@ -75,7 +75,9 @@ Deno.test('⛔ never both on the barbell, never a skull crusher on the straight 
 Deno.test('⛔ the pairs as picked: a gym\'s day 1 is Triceps Pushdown + Preacher Curl; a dumbbell kit is DB Skull Crusher + Dumbbell Curl', () => {
   const gym = armsPairs('all_rounder', KITS['commercial gym'], true);
   assertEquals(gym[0].map(shown), ['Triceps Pushdown', 'Preacher Curl']);
-  assertEquals(gym[1].map(shown), ['DB Skull Crusher', 'DB Spider Curl']);
+  // ⛔ NOT THE BENCH AT TWO SETTINGS (2026-09-28, `benchClash`): the skull crusher lies flat, so day 4's curl is no longer
+  // the spider curl (chest down on an incline) — the preacher curl, the next arm movement of his list the gym reaches.
+  assertEquals(gym[1].map(shown), ['DB Skull Crusher', 'Preacher Curl']);
   const home = armsPairs('all_rounder', KITS['minimum kit'], true);
   assertEquals(home[0].map(shown), ['DB Skull Crusher', 'Dumbbell Curl']);
   assertEquals(home[1].map(shown), ['DB Skull Crusher', 'Dumbbell Curl']);
@@ -88,9 +90,10 @@ Deno.test('⛔ the pairs as picked: a gym\'s day 1 is Triceps Pushdown + Preache
   const cable = armsPairs('all_rounder', KITS['minimum + cable'], true);
   assertEquals(cable[0].map(shown), ['Triceps Pushdown', 'Dumbbell Curl']);
   assertEquals(cable[1].map(shown), ['DB Skull Crusher', 'Dumbbell Curl']);
-  // An incline bench on the minimum kit: the spider curl (p222) is reachable and his, and it is off the bar.
+  // An incline bench on the minimum kit: the spider curl (p222) is reachable and his, but it takes the incline bench
+  // while the skull crusher lies flat — so the pair keeps the dumbbell curl (2026-09-28, `benchClash`).
   const incline = armsPairs('all_rounder', KITS['minimum + incline bench'], true);
-  assertEquals(incline[0].map(shown), ['DB Skull Crusher', 'DB Spider Curl']);
+  assertEquals(incline[0].map(shown), ['DB Skull Crusher', 'Dumbbell Curl']);
 });
 
 Deno.test('⛔ the skull crusher and spider curl say what they are held with; the drag curl needs no implement in its name', () => {

@@ -34,7 +34,11 @@
  * path a rebuilt cell already takes (2026-09-08 / 2026-09-20). From today on; a done session is never touched.
  */
 import {
+  benchSafePick,
   defaultViadaPicks,
+  frameDaysForPick,
+  PICK_KEYS_BY_FRAME,
+  supersetPartnersForPick,
   frameAdmitsForPick,
   frameMuscleForPick,
   isDialChip,
@@ -100,6 +104,33 @@ export function picksOnNewKit(args: {
     if (!printedForCell(key, to, args.currentKit, args.frame)) continue;
     picks[key] = to;
     changed.push({ key, from, to });
+  }
+  /**
+   * ⛔ AND A DEFAULTED PICK THAT NEEDS THE BENCH AT ANOTHER SETTING FROM ITS SUPERSET PARTNER GIVES WAY (2026-09-28,
+   * owner: "this is a stupid superset" — the Tate press stored beside the spider curl the 2026-09-28 rebuild defaulted
+   * in). `benchSafePick`, the rule the picking screen's defaults now follow. A pick the athlete is recorded as having
+   * set stays; of two unrecorded picks the second in the frame's order moves, as `defaultViadaPicks` moves it.
+   */
+  // The frame's own key order, as `defaultViadaPicks` walks it (the stored object's order is not the frame's).
+  const order = (PICK_KEYS_BY_FRAME[args.frame] ?? []).filter((k) => picks[k] != null) as ViadaPickKey[];
+  for (const key of order) {
+    if (!VIADA_PICKS[key]) continue;
+    if (chosen && chosen.has(key)) continue;
+    const from = String(picks[key] ?? '').trim();
+    if (!from) continue;
+    const partnerKeys = supersetPartnersForPick(key, args.frame);
+    // Only the SECOND of the pair moves, unless the first is the athlete's and this one is not.
+    const partnerFirst = partnerKeys.some((k) => (chosen && chosen.has(k)) || order.indexOf(k) < order.indexOf(key));
+    if (!partnerFirst) continue;
+    const days = frameDaysForPick(key, args.frame);
+    const onDay = new Set(order.filter((k) => k !== key && frameDaysForPick(k, args.frame).some((d) => days.includes(d)))
+      .map((k) => canonicalize(String(picks[k] ?? ''))));
+    const to = benchSafePick(key, from, partnerKeys.map((k) => String(picks[k] ?? '')), args.currentKit, args.frame,
+      (n) => onDay.has(canonicalize(n)));
+    if (canonicalize(to) === canonicalize(from)) continue;
+    picks[key] = to;
+    const prior = changed.find((c) => c.key === key);
+    if (prior) prior.to = to; else changed.push({ key, from, to });
   }
   return { picks, changed };
 }
