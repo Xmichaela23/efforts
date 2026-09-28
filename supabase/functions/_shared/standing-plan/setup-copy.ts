@@ -286,6 +286,7 @@ export const JOINED_ROW = '{first}, then {second}';  // not-instruction: a sessi
 export const LENGTH_OFFER_COPY: { line: Record<'easy' | 'long' | 'hard', string | null>; accept: string; keep: string } = {
   line: {
     long: 'Your long ride can go from {from} to {to}.',
+    // p281 (the midweek rides step up month to month), p148 (at most 5% of the week's easy minutes)
     easy: 'Your midweek easy rides can go from {from} to {to}.',
     hard: null,
   },
@@ -297,6 +298,7 @@ export const LENGTH_OFFER_COPY: { line: Record<'easy' | 'long' | 'hard', string 
 
 export const RIDES_COPY = {
   // ⛔ THE RIDES SCREEN IS SHAPED LIKE THE RUNS SCREEN (Michael, 2026-09-27): the one length asked is the long ride's.
+  // p239 (the endurance ride lengths), p281 (the long ride and the midweek rides)
   sub: 'Pick how long the long ride and the midweek easy rides are.',  // Michael approved 2026-09-27
   row: 'Day {day} · {name}',
   // ⛔ ON A RIDE HELD TO ANOTHER'S LENGTH (p281's Friday = Tuesday; Michael approved 2026-09-27). {day} is the other ride's.
@@ -304,6 +306,7 @@ export const RIDES_COPY = {
   // ⛔ AN OPTIONAL RIDE'S SWITCH (Michael, 2026-09-27; `EnduranceSlot.optional`). Replaces the six/seven count chips.
   optional_label: 'Easy ride on Day {day}',  // not-instruction: a switch label (name)
   optional_line_by_frame: {
+    // p278 (Day 2's easy ride between Day 1 and Day 3), p134 (easy work is cut before hard work)
     cycling_base: 'Optional. An easy ride between the hard days.',  // Michael approved the words 2026-09-27
   } as Partial<Record<FrameId, string>>,
   /**
