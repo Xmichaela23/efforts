@@ -11,6 +11,8 @@
  *                      is a floor because some recoveries carry no stated length (`weekBounds`).
  *   run_strength_week  the Run + Strength screen's long-run chips, their default and the easy run's
  *                      length — the frame's numbers (`Frame.runStrengthWeek`) on the `run_lsd` ladder.
+ *   ride_strength_week the Ride + Strength screen: its rows, the length chips (`Frame.rideWeek`) and
+ *                      the switch on each optional ride — read off the frame's own slots and roles.
  *   tier_line          the history sentence, from the same demonstrated run volume the composer reads.
  *
  * Every number comes from the functions the composer sizes and builds with, so the screen and the
@@ -39,7 +41,9 @@ import { FRAMES, isJoinedSlot, type EnduranceExperience, type FrameId } from './
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
 import { frameRotatedArchetype } from './compose.ts';
-import { fill, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
+import { fill, JOINED_ROW, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
+import { ladderOf } from './volume-bounds.ts';
+import { resolveEnduranceAnchors } from '../endurance-library/index.ts';
 
 export type IntakeRow = {
   /** The sport these numbers were worked out for — the phone uses a row only while it still matches. */
@@ -121,12 +125,31 @@ export type EnduranceIntakeReadout = {
       options?: number[]; option_labels?: Record<string, string>; default_minutes?: number;
     }>;
   } | null;
-  /** ⛔ RIDE + STRENGTH'S RIDES SCREEN (2026-09-13): the question, its answers and the rides each count holds. */
+  /**
+   * ⛔ THE RIDES SCREEN, SHAPED LIKE THE RUNS SCREEN (Michael, 2026-09-27): one row per ride (a joined ride named
+   * "{first}, then {second}"), the length chips (the long ride, and the midweek easy ride that Friday's follows), and a
+   * switch on each optional ride. Built off the frame's
+   * own slots and roles, so a cycling frame that declares `rideWeek` gets it by adding the frame only.
+   */
   ride_strength_week: {
-    count_label: string;
-    counts: Array<{ count: number; label: string; rows: Array<{ key: SlotKey; line: string }> }>;
-    /** The page's own count, shown selected until the athlete picks. */
-    default_count: number;
+    sub_line: string;
+    length_label: string;
+    /**
+     * `length` — the chips on a ride whose length the rider picks (`Frame.rideWeek`). `key` is the row the pick is stored
+     * under; a ride that follows another's length (`sameLengthAs`, p281's Friday = Tuesday) carries the leader's key, so
+     * the phone shows the chips once, on the first of those rows still in the week. `default` is the first chip at the
+     * ride's own printed level, selected until the rider picks.
+     */
+    rows: Array<{
+      key: SlotKey; line: string; is_long: boolean; optional: boolean;
+      length: {
+        key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null;
+        /** On a ride held to another's length: "Same length as Day N." — shown while that ride is in the week. */
+        same_as: string | null;
+      } | null;
+    }>;
+    /** One switch per optional ride, on by default (the week as printed). */
+    optional: Array<{ key: SlotKey; label: string; line: string | null }>;
     easy_line: string;
   } | null;
   tier_line: string | null;
@@ -143,6 +166,13 @@ export function rowKeyedFromFrameKeys<T>(
     if (byFrameKey[s.frameKey] !== undefined) out[s.key] = byFrameKey[s.frameKey];
   }
   return out;
+}
+
+/** The joined second part that follows this frame slot in the standard column, when there is one. */
+function joinedPartOf(frame: FrameId, frameKey: string) {
+  const [fd, idx] = frameKey.split(':').map(Number);
+  const next = FRAMES[frame].columns.standard.find((d) => d.day === fd)?.endurance[idx + 1];
+  return isJoinedSlot(next) ? next! : null;
 }
 
 export function enduranceIntakeReadout(args: {
@@ -232,16 +262,15 @@ export function enduranceIntakeReadout(args: {
         key: row.key,
         title: fill(RUNS_COPY.row, { day: row.frameDay, label }),
         session: (() => {
-          // ⛔ ONE RUN OF TWO PARTS (p245 / p253): the second part is named on the first part's row.
-          const [fd, idx] = row.frameKey.split(':').map(Number);
-          const next = FRAMES[frame].columns.standard.find((d) => d.day === fd)?.endurance[idx + 1];
-          if (!isJoinedSlot(next)) return sessionName(row.family, row.archetype ?? null);
+          // ⛔ ONE SESSION OF TWO PARTS (p245 / p253): the second part is named on the first part's row.
+          const next = joinedPartOf(frame, row.frameKey);
+          if (!next) return sessionName(row.family, row.archetype ?? null);
           // ⛔ AND ITS FIRST PART IS THE SAMPLE WEEK'S OWN SESSION where the frame rotates it (Your week shows week two;
           // Michael, 2026-09-24: "use that week's sprint name").
           const own = sessionName(row.family,
             frameRotatedArchetype({ archetypes: row.archetypes }, { family: row.family }, row.level, 2) ?? row.archetype ?? null);
-          const second = next!.family === 'run_vt1' ? RUNS_COPY.joined_easy : sessionName(next!.family, next!.archetype ?? null);
-          return fill(RUNS_COPY.joined_row, { first: own, second });
+          const second = next.family === 'run_vt1' ? RUNS_COPY.joined_easy : sessionName(next.family, next.archetype ?? null);
+          return fill(JOINED_ROW, { first: own, second });
         })(),
         length: row.role === 'long' ? null : row.role === 'easy'
           ? (rsw.easyRunRangeByLevel?.[row.level]
@@ -300,19 +329,66 @@ export function enduranceIntakeReadout(args: {
   };
   const rideStrengthWeek = (() => {
     const f = FRAMES[frame];
-    const fewer = f?.fewerRidesDropsSlot;
-    if (!f?.printedWeekOnly || !fewer) return null;
+    if (!f?.printedWeekOnly || !f.rideWeek) return null;
     const all = frameSlots(frame);
-    const forCount = (count: number) => all
-      .filter((row) => !(count === fewer.rideCount && row.frameKey === `${fewer.day}:${fewer.index}`))
-      .map((row) => ({
+    const slotOf = (frameKey: string) => {
+      const [fd, idx] = frameKey.split(':').map(Number);
+      return f.columns.standard.find((d) => d.day === fd)?.endurance[idx];
+    };
+    // ⛔ THE CHIPS A SLOT CAN BUILD — inside its ladder from its smaller tier (`lengthFromLevel`) up — and the first one at
+    // its own printed level opens selected (the runs screen's "first chip selected", 2026-09-23).
+    const anchors = resolveEnduranceAnchors(baselines as never);
+    const lengthFor = (frameKey: string) => {
+      const slot = slotOf(frameKey);
+      const chips = f.rideWeek!.chips[frameKey];
+      const owner = all.find((r) => r.frameKey === frameKey);
+      if (!slot || !chips || !owner) return null;
+      const ladder = (level: number) => ladderOf({
+        family: slot.family as never, level: level as never, role: slot.role,
+        sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
+      } as never, anchors);
+      const pick = ladder(slot.lengthFromLevel ?? slot.level);
+      const own = ladder(slot.level);
+      const options = chips.filter((m) => pick.some((r) => m >= Math.round(r.lo) && m <= Math.round(r.hi)));
+      const ownFloor = own.length > 0 ? Math.round(own[0].lo) : null;
+      return {
+        key: owner.key,
+        options,
+        labels: Object.fromEntries(options.map((m) => [String(m), lengthWords(m)])),
+        default: options.find((m) => ownFloor != null && m >= ownFloor) ?? options[0] ?? null,
+        same_as: null as string | null,
+      };
+    };
+    const rows = all.map((row) => {
+      const next = joinedPartOf(frame, row.frameKey);
+      const name = rideRowName(row.family, row.archetype ?? null);
+      // A ride's own chips, or the chips of the ride its (joined) length follows.
+      const leads = f.rideWeek!.chips[row.frameKey] ? row.frameKey : next?.sameLengthAs ?? slotOf(row.frameKey)?.sameLengthAs ?? null;
+      return {
         key: row.key,
-        line: fill(RIDES_COPY.row, { day: row.frameDay, name: rideRowName(row.family, row.archetype ?? null) }),
-      }));
+        line: fill(RIDES_COPY.row, {
+          day: row.frameDay,
+          name: next ? fill(JOINED_ROW, { first: name, second: rideRowName(next.family, next.archetype ?? null) }) : name,
+        }),
+        is_long: row.role === 'long',
+        optional: slotOf(row.frameKey)?.optional === true,
+        length: (() => {
+          const l = leads ? lengthFor(leads) : null;
+          if (!l || leads === row.frameKey) return l;
+          const leader = all.find((r) => r.frameKey === leads);
+          return { ...l, same_as: leader ? fill(RIDES_COPY.same_length, { day: leader.frameDay }) : null };
+        })(),
+      };
+    });
     return {
-      count_label: RIDES_COPY.count_label,
-      counts: [fewer.rideCount, all.length].map((count) => ({ count, label: RIDES_COPY.count_chip[count] ?? String(count), rows: forCount(count) })),
-      default_count: all.length,
+      sub_line: RIDES_COPY.sub,
+      length_label: RUNS_COPY.length_label,
+      rows,
+      optional: all.filter((row) => slotOf(row.frameKey)?.optional === true).map((row) => ({
+        key: row.key,
+        label: fill(RIDES_COPY.optional_label, { day: row.frameDay }),
+        line: RIDES_COPY.optional_line_by_frame[frame] ?? null,
+      })),
       easy_line: RIDES_COPY.easy_line,
     };
   })();

@@ -33,6 +33,8 @@ import { resolveCurrentFtp, pendingFtpProposal } from '../../../src/lib/resolve-
 import { pendingRunThresholdProposal } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { displayFormat, M_PER_MI } from '../_shared/display-format.ts';
+import { lengthStepOffers, type LengthStep } from '../_shared/standing-plan/length-step.ts';
+import { LENGTH_OFFER_COPY, fill, lengthWords } from '../_shared/standing-plan/setup-copy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,6 +100,70 @@ Deno.serve(async (req: Request) => {
         return json({ success: false, reason: 'refresh_not_queued', details: q.reason }, 500);
       }
       return json({ success: true, queued: true, rows_pending: pending });
+    }
+
+    /**
+     * ⛔ THE LONGER-SESSION OFFER (Michael, 2026-09-27; `_shared/standing-plan/length-step.ts`): the session gets longer
+     * at the book's timing, by at most 5% of the week's easy minutes (p148), inside its level's printed range (p239) —
+     * offered, never applied on its own. `length_offer: true` is the dry run; `length_offer_answer: {slot, to, decision}`
+     * is the rider's tap. Accept writes the slot's length and queues the same plan refresh every re-price uses; keep
+     * records the answer, and the offer returns at the slot's next interval. Independent of the week-6 checkpoint.
+     */
+    if (p?.length_offer === true || (p?.length_offer_answer && typeof p.length_offer_answer === 'object')) {
+      const blockStart = String(config?.user_selected_start_date || config?.start_date || '').slice(0, 10);
+      const history: LengthStep[] = Array.isArray(sp.length_steps) ? sp.length_steps : [];
+      const offers = blockStart ? lengthStepOffers({
+        frame: sp.frame, minutes: sp.sport_mix?.minutes ?? null,
+        weekEasyMinutes: sp.week_ledgers?.[String(currentWeek)]?.minutes?.easy ?? null,
+        history, blockStart, today,
+      }) : [];
+      // ⚠️ AN OFFER WHOSE WORDS ARE NOT APPROVED CARRIES NO LINE, and the phone draws nothing for it (`LENGTH_OFFER_COPY`).
+      const worded = offers.map((o) => {
+        const line = LENGTH_OFFER_COPY.line[o.role];
+        return {
+          ...o,
+          line: line ? fill(line, { from: lengthWords(o.from), to: lengthWords(o.to) }) : null,
+          accept: LENGTH_OFFER_COPY.accept, keep: LENGTH_OFFER_COPY.keep,
+        };
+      });
+      if (!p?.length_offer_answer) return json({ success: true, length_offers: worded, current_week: currentWeek });
+
+      const ans = p.length_offer_answer as { slot?: string; to?: number; decision?: string };
+      const offer = offers.find((o) => o.slot === String(ans.slot ?? ''));
+      // ⛔ ONLY THE OFFER STANDING NOW, AT ITS OWN LENGTH — a stale screen cannot write another number.
+      if (!offer || Number(ans.to) !== offer.to) return json({ success: false, reason: 'offer_changed', length_offers: worded }, 409);
+      const answer: LengthStep = {
+        slot: offer.slot, at: today, from: offer.from, to: ans.decision === 'keep' ? null : offer.to,
+        decision: ans.decision === 'keep' ? 'keep' : 'accept',
+      };
+      // ⚠️ RE-READ FIRST, then write, then queue — a refresh already running spreads the config it read.
+      const { data: cfgNow } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
+      const base = (cfgNow?.config && typeof cfgNow.config === 'object') ? cfgNow.config : config;
+      const spNow = base?.standing_plan ?? sp;
+      const sportMix = answer.decision === 'accept'
+        ? { ...(spNow.sport_mix ?? {}), minutes: { ...(spNow.sport_mix?.minutes ?? {}), [offer.slot]: offer.to } }
+        : spNow.sport_mix;
+      const { error: wErr } = await supabase.from('plans').update({
+        config: {
+          ...base,
+          standing_plan: {
+            ...spNow, sport_mix: sportMix,
+            length_steps: [...(Array.isArray(spNow.length_steps) ? spNow.length_steps : []), answer],
+          },
+        },
+      }).eq('id', plan.id).eq('user_id', userId);
+      if (wErr) return json({ success: false, reason: 'not_recorded', details: wErr.message }, 500);
+      let queued = false;
+      if (answer.decision === 'accept') {
+        const { data: rows } = await supabase.from('planned_workouts')
+          .select('id, date, workout_status, completed_workout_id').eq('training_plan_id', plan.id).eq('user_id', userId);
+        const q = await queuePlanRefresh(supabase, {
+          userId, planId: String(plan.id), why: 'reprice',
+          rowsPending: (rows ?? []).filter((r: any) => isRefreshable(r, today)).length,
+        });
+        queued = q.queued || q.reason === 'already_queued';
+      }
+      return json({ success: true, applied: true, answer, queued });
     }
 
     const due = checkpointDue(currentWeek, weeks, answered);

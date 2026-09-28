@@ -26,6 +26,8 @@ type Session = {
   id: string; name: string | null; type: string | null; from: string; to: string; movable: boolean; dropped?: boolean; notes: string[];
   /** The lost day this session belongs to — every session a lost day touches is saved with its mark. */
   lost_day?: string | null;
+  /** A joined session's second half (2026-09-27): not a card of its own — it rides with `joined_to` and is still saved. */
+  joined_to?: string | null;
   /** An earlier lost day took it off; placed now, Save puts it back on the plan. */
   was_dropped?: boolean;
 };
@@ -149,7 +151,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
   const days = plan ? [...new Set([...plan.week, ...plan.sessions.map((s) => s.to)])].sort() : [];
   const byDay: Record<string, string[]> = {};
   for (const s of plan?.sessions ?? []) {
-    if (s.dropped || !plan!.week.includes(s.to)) continue;
+    if (s.dropped || s.joined_to || !plan!.week.includes(s.to)) continue;
     (byDay[weekdayOf(s.to)] ??= []).push(sportOf(s, tags));
   }
 
@@ -212,7 +214,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
         {plan ? (
           <div className={`rounded-xl border border-white/10 overflow-hidden ${busy ? 'opacity-50' : ''} transition-opacity`}>
             {days.map((d) => {
-              const on = dayOrder(plan.sessions.filter((s) => s.to === d && !s.dropped));
+              const on = dayOrder(plan.sessions.filter((s) => s.to === d && !s.dropped && !s.joined_to));
               const lost = d === plan.lostDate;
               const dayNote = on.flatMap((s) => s.notes).find(isDayNote) ?? null;
               return (
@@ -275,7 +277,7 @@ export default function LostDaySheet({ date, onClose }: { date: string; onClose:
         {/* ⛔ WHAT COMES OFF THIS WEEK (2026-09-22) — approved words, one line per session; skipped on Save. */}
         {plan && plan.sessions.some((s) => s.dropped) ? (
           <div className="mt-3 space-y-1.5">
-            {plan.sessions.filter((s) => s.dropped).map((s) => (
+            {plan.sessions.filter((s) => s.dropped && !s.joined_to).map((s) => (
               <p key={s.id} className="text-[13px] font-light" style={{ color: 'rgba(242,240,236,0.62)' }}>
                 {s.name} comes off this week. There&apos;s no day left for it.
               </p>

@@ -29,6 +29,7 @@ import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 // ⛔ THE SWAP'S OWN READER for the sport the plan wrote under a swapped row (2026-09-19) — `swapped_from:`.
 import { originOf } from '../session-swap/swap.ts';
 import { PLYO_FAMILIES } from './plyo.ts';
+import { JOINED_PART_TAG, JOINED_TAG } from './frames.ts';
 
 /** ⚠️ DB shape, deliberately loose — a materialized calendar row as this reader sees it. */
 export type PlannedRowish = {
@@ -640,6 +641,13 @@ const planSportOf = (x: { type?: unknown; tags?: unknown }): string =>
 /** The tags that say what a swap did — compared on their own, because a machine changes nothing else. */
 const SWAP_MARK = /^(discipline_swapped$|swapped_from:|swapped_name:|workout_from:|venue:)/;
 const swapMarksOf = (tags: unknown): string => tokensOf(tags).filter((t) => SWAP_MARK.test(t)).sort().join(' ');
+/**
+ * ⛔ THE TAGS THAT SAY WHICH FRAME SLOT A ROW IS AND WHETHER IT IS HALF OF ONE SESSION (2026-09-27). Compared on their
+ * own: when a frame joins two workouts into one session (p278's Day 3 and Day 5), the first half's tokens and name do
+ * not move, and without this its row would never gain `JOINED_TAG` — so the pair would not move together.
+ */
+const joinMarksOf = (tags: unknown): string =>
+  tokensOf(tags).filter((t) => t === JOINED_TAG || t === JOINED_PART_TAG || t.startsWith('slot:')).sort().join(' ');
 const TEST_ROW_TAGS = new Set(['assessment', 'run_test', 'ftp_test', 'ftp_test_5min', '1rm_test', 'retest']);
 
 export type EndurancePlannedRowish = PlannedRowish & {
@@ -746,7 +754,8 @@ export function restateEndurance(args: {
       const nameMoved = String(fresh.name ?? '') !== String(row.name ?? '');
       const descMoved = String(fresh.description ?? '') !== String(row.description ?? '');
       const typeMoved = String(fresh.type ?? '') !== String(row.type ?? '');
-      const marksMoved = swapMarksOf(fresh.tags) !== swapMarksOf(row.tags);
+      const marksMoved = swapMarksOf(fresh.tags) !== swapMarksOf(row.tags)
+        || joinMarksOf(fresh.tags) !== joinMarksOf(row.tags);
       /**
        * ⛔⛔ THE MINUTES ARE NOT A CHANGE OF THEIR OWN (2026-09-10). A stored row's `duration` is what
        * materialize-plan expanded its tokens to — a long run of `longrun_91min_easypace` + `round_4x_135s115`

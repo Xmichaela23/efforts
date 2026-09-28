@@ -11,6 +11,24 @@ import { strengthSessionsShareTheWork } from '../_shared/strength/match-exercise
 import { resolveAnalyzeEdgeFn } from '../_shared/analyze-routing.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { unattachedPlannedIds, withoutUnattached } from '../_shared/unattached-planned.ts';
+import { joinedPartnerIds } from '../_shared/joined-session.ts';
+import { joinedPartners, mergeJoinedRow } from '../_shared/calendar-sync/plan.ts';
+
+/**
+ * ⛔ ONE RECORDED SESSION DONE ON A JOINED SESSION MARKS BOTH HALVES DONE (Michael, 2026-09-27). `workouts.planned_id`
+ * and `planned_workouts.completed_workout_id` are one-to-one (unique), so the link sits on the row that was matched and
+ * the other half is marked completed with no link of its own. `detach-planned` puts it back.
+ */
+async function markJoinedPartnersDone(supabase: any, row: any, userId: string): Promise<void> {
+  try {
+    const ids = await joinedPartnerIds(supabase, row);
+    if (!ids.length) return;
+    await supabase.from('planned_workouts').update({ workout_status: 'completed' }).in('id', ids).eq('user_id', userId)
+      .is('completed_workout_id', null);
+  } catch (e) {
+    console.error('[auto-attach-planned] joined half not marked done:', e);
+  }
+}
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -161,7 +179,7 @@ Deno.serve(async (req) => {
         // Validate same user and fetch planned row
         const { data: plannedRow, error: plannedErr } = await supabase
           .from('planned_workouts')
-          .select('id,user_id,type,date,computed,pool_length_m,pool_unit,pool_label,environment,workout_status,completed_workout_id')
+          .select('id,user_id,type,date,computed,pool_length_m,pool_unit,pool_label,environment,workout_status,completed_workout_id,tags,training_plan_id')
           .eq('id', String(explicitPlannedId))
           .maybeSingle();
         
@@ -228,6 +246,7 @@ Deno.serve(async (req) => {
           console.error('[auto-attach-planned] Failed to update planned_workouts:', plannedUpdateErr);
           throw new Error(`Failed to link planned workout: ${plannedUpdateErr.message}`);
         }
+        await markJoinedPartnersDone(supabase, plannedRow, String(w.user_id));
         
         // Update planned_id and clear old analysis to force fresh recalculation
         // compute-workout-summary will detect the new planned_id and regenerate intervals
@@ -337,7 +356,7 @@ Deno.serve(async (req) => {
         const pid = String(currentPlannedId);
         const { data: plannedRow, error: pErr } = await supabase
           .from('planned_workouts')
-          .select('id,user_id,completed_workout_id,workout_status')
+          .select('id,user_id,completed_workout_id,workout_status,date,tags,training_plan_id')
           .eq('id', pid)
           .maybeSingle();
         if (!plannedRow || String(plannedRow.user_id) !== String(w.user_id)) {
@@ -361,6 +380,7 @@ Deno.serve(async (req) => {
           console.error('[auto-attach-planned] Sync update planned_workouts error:', upErr);
           return new Response(JSON.stringify({ success: false, attached: false, reason: 'sync_failed', details: upErr }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
         }
+        await markJoinedPartnersDone(supabase, plannedRow, String(w.user_id));
 
         // Also clear computed mapping so UI doesn't show a stale planned snapshot.
         // Preserve computed.analysis.series produced by compute-workout-analysis.
@@ -416,7 +436,7 @@ Deno.serve(async (req) => {
 
     // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
     const day = String(w.date || '').slice(0,10);
-    const PLANNED_COLS = 'id,user_id,type,date,name,computed,intervals,duration,total_duration_seconds,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises,tags';
+    const PLANNED_COLS = 'id,user_id,type,date,name,computed,intervals,duration,total_duration_seconds,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises,tags,training_plan_id';
     const { data: plannedList } = await supabase
       .from('planned_workouts')
       // `duration` + `total_duration_seconds` are the unstructured session's ONLY statement of length —
@@ -707,6 +727,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    /**
+     * ⛔ A JOINED SESSION IS ONE CANDIDATE (2026-09-27): the first half stands for both, measured on both halves' steps
+     * (`mergeJoinedRow`), and the second half leaves the list — so a ride covering both parts matches the whole ride
+     * rather than looking twice as long as either half, and the two halves never compete in the ambiguity gate.
+     */
+    {
+      const pairs = joinedPartners(candidates as any[]);
+      const dropped = new Set<string>();
+      candidates = candidates.map((p: any) => {
+        const part = pairs.get(String(p.id));
+        if (!part) return p;
+        try {
+          const whole = mergeJoinedRow(p, part);
+          dropped.add(String(part.id));
+          return whole;
+        } catch { return p; }
+      }).filter((p: any) => !dropped.has(String(p.id)));
+    }
+
     for (const p of candidates) {
       const pdate = String((p as any).date || '').slice(0,10);
       const plannedTypeNormalized = sportSubtype((p as any).type).sport;
@@ -793,6 +832,7 @@ Deno.serve(async (req) => {
       .update({ workout_status: 'completed', completed_workout_id: w.id })
       .eq('id', best.id)
       .eq('user_id', w.user_id);
+    await markJoinedPartnersDone(supabase, best, String(w.user_id));
     // Copy swim context from plan to workout if applicable
     try {
       const env = (best as any)?.environment as string | undefined;

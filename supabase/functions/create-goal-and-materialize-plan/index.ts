@@ -3150,13 +3150,14 @@ Deno.serve(async (req: Request) => {
               ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half'
                 || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? { focus: gsTp.focus } : {}),
               /**
-               * ⛔ THE RIDE COUNT (Ride + Strength, p278's 4 or 5, 2026-09-13). Same allowlist, same
-               * failure: `generate-strength-plan` reads `ride_count` off its own body, so a hop that drops
-               * it builds five rides under a screen that said four. Whole numbers above zero only.
+               * ⛔ THE OPTIONAL SESSIONS SWITCHED OFF (Ride + Strength's Day 2 easy ride, 2026-09-27). Same allowlist, same
+               * failure: `generate-strength-plan` reads `endurance_slots_off` off its own body, so a hop that drops it builds
+               * the ride the athlete switched off. Frame keys only.
                */
               ...(() => {
-                const n = Number((gsTp as Record<string, unknown>).ride_count);
-                return Number.isInteger(n) && n > 0 ? { ride_count: n } : {};
+                const raw = (gsTp as Record<string, unknown>).endurance_slots_off;
+                if (!Array.isArray(raw) || raw.length === 0) return {};
+                return raw.every((k) => typeof k === 'string' && /^\d+:\d+$/.test(k)) ? { endurance_slots_off: raw } : {};
               })(),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {

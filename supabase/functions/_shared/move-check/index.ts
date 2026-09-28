@@ -15,6 +15,7 @@
 
 import { movedOrigin, planDateOf } from '../moved-from.ts';
 import { conflictsOfTyped, typedRowsOf } from '../standing-plan/week-conflicts.ts';
+import { JOINED_PART_TAG, JOINED_TAG } from '../standing-plan/frames.ts';
 
 export type MoveRow = {
   id: string;
@@ -63,25 +64,25 @@ export const isPlyo = (r: MoveRow): boolean =>
   Array.isArray(r.tags) && (r.tags as unknown[]).some((t) => String(t).toLowerCase() === 'plyo');
 
 /**
- * ⛔ ONE RUN OF TWO PARTS MOVES AS ONE (2026-09-23, Stage 1). Viada p245 (Hypertrophy + 5K day 1: "a single run with
- * two components") and p253 (Hypertrophy + Half-Marathon day 1: the MLSS+ "should flow directly into the VT1 work") —
- * the builder writes them as two rows tagged `one_run`, the second also `one_run_part2`, on adjacent `slot:` keys of one
- * frame day. Moving either part moves both, and the second part is not a session of its own on the day (like `isPlyo`).
+ * ⛔ ONE SESSION OF TWO PARTS MOVES AS ONE (2026-09-23, Stage 1; rides 2026-09-27). Viada p245 (Hypertrophy + 5K day 1:
+ * "a single run with two components"), p253 (Hypertrophy + Half-Marathon day 1: the MLSS+ "should flow directly into the
+ * VT1 work") and p278's two-workout ride days (p269: "intended to be combined") — the builder writes them as two rows
+ * tagged `JOINED_TAG`, the second also `JOINED_PART_TAG`, on adjacent `slot:` keys of one frame day. Moving either part moves both, and the second part is not a session of its own on the day (like `isPlyo`).
  */
 const tagList = (r: MoveRow): string[] => (Array.isArray(r.tags) ? (r.tags as unknown[]).map(String) : []);
-export const isJoinedPart = (r: MoveRow): boolean => tagList(r).includes('one_run_part2');
+export const isJoinedPart = (r: MoveRow): boolean => tagList(r).includes(JOINED_PART_TAG);
 const slotOf = (r: MoveRow): [number, number] | null => {
   const t = tagList(r).find((x) => x.startsWith('slot:'));
   const m = t?.match(/^slot:(\d+):(\d+)$/);
   return m ? [Number(m[1]), Number(m[2])] : null;
 };
-/** The other part of a joined run, when `session` is one part: same plan, same plan day, adjacent slot of one frame day. */
+/** The other part of a joined session, when `session` is one part: same plan, same plan day, adjacent slot of one frame day. */
 export function movesWith(session: MoveRow, rows: MoveRow[]): MoveRow[] {
-  if (!tagList(session).includes('one_run')) return [];
+  if (!tagList(session).includes(JOINED_TAG)) return [];
   const mine = slotOf(session);
   if (!mine) return [];
   const want = isJoinedPart(session) ? mine[1] - 1 : mine[1] + 1;
-  return rows.filter((r) => r.id !== session.id && !isSkipped(r) && tagList(r).includes('one_run')
+  return rows.filter((r) => r.id !== session.id && !isSkipped(r) && tagList(r).includes(JOINED_TAG)
     && isJoinedPart(r) !== isJoinedPart(session)
     && (r.training_plan_id ?? null) === (session.training_plan_id ?? null)
     && planDateOf(r) === planDateOf(session)
@@ -161,7 +162,7 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
     return { refused: true, notes: [{ rule: 'day_off', page: null, text: `${day} is a day off.` }] };
   }
   const notes: MoveNote[] = [];
-  // ⛔ The other part of a joined run goes to the same day (`movesWith`), so the check reads the week with both moved.
+  // ⛔ The other part of a joined session goes to the same day (`movesWith`), so the check reads the week with both moved.
   const withIds = new Set(movesWith(args.session, args.rows).map((r) => r.id));
   // Viada p108: 6–8 h between two-a-days, 4–6 h when the first is an easy session under an hour, a full meal between.
   // ⛔ ONLY WHEN A LIFT IS ONE OF THE TWO (2026-09-21): p108 is about the gap before the resistance session. A run and
@@ -209,7 +210,7 @@ export function weekRuleNotes(session: MoveRow, to: string, rows: MoveRow[], mov
   const typed = (xs: MoveRow[]) => typedRowsOf(xs.map((r) => ({ ...r, day: weekdayName(iso(r.date)) })));
   const live = rows.filter((r) => r.id !== session.id && !isSkipped(r) && inWeek(iso(r.date)));
   const before = live.concat(inWeek(iso(session.date)) && !isSkipped(session) ? [session] : []);
-  // ⛔ The other part of a joined run lands on `to` with it (`movesWith`).
+  // ⛔ The other part of a joined session lands on `to` with it (`movesWith`).
   const after = rows
     .filter((r) => r.id !== session.id && !isSkipped(r))
     .map((r) => (movesWithIds.has(r.id) ? { ...r, date: to } : r))

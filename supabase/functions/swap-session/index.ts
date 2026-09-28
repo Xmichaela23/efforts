@@ -38,6 +38,7 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { applySwap, describeSheet, hasSportSwap } from '../_shared/session-swap/sheet.ts';
 import { loadWorkoutMinutes } from '../_shared/session-swap/workout-choice.ts';
+import { joinedPartnerIds, swapReachesJoinedHalf } from '../_shared/joined-session.ts';
 // ⛔ A SWAP ON A STANDING PLAN BLOCK IS A `plan_adjustments` ROW AND THE PLAN REWRITES ITSELF (2026-09-19).
 import { isStandingPlanConfig } from '../_shared/plan-refresh.ts';
 import { enduranceSlotName, swapClassOf, writeSwapAdjustment } from '../_shared/session-swap/plan-adjustments.ts';
@@ -213,12 +214,13 @@ Deno.serve(async (req) => {
      * rewrite, so a swap written only onto the rows was undone by the next one. There the tap is a `plan_adjustments`
      * row — the list the lift swap already uses — and `rematerialize-standing-block` writes the sessions it reaches.
      */
+    const swapOne = async (row: any, rowCtx: any) => {
     let rewrite;
-    if (session.training_plan_id) {
-      const { data: plan } = await db.from('plans').select('id, config').eq('id', session.training_plan_id).eq('user_id', userId).maybeSingle();
+    if (row.training_plan_id) {
+      const { data: plan } = await db.from('plans').select('id, config').eq('id', row.training_plan_id).eq('user_id', userId).maybeSingle();
       // ⛔ The plan's date (`_shared/moved-from.ts`): a swap names the plan's slot, so a moved session keeps its slot.
-      const date = planDateOf(session);
-      const slot = enduranceSlotName(date, session);
+      const date = planDateOf(row);
+      const slot = enduranceSlotName(date, row);
       if (plan && slot && isStandingPlanConfig(plan.config)) {
         rewrite = async (swap) => {
           const cls = swap.revert ?? swapClassOf(swap.option);
@@ -235,7 +237,7 @@ Deno.serve(async (req) => {
               headers: { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
               body: JSON.stringify({
                 user_id: userId, plan_id: plan.id,
-                swap: { planned_id: String(session.id), slot, cls, from: date, until: swap.scope === 'today' ? date : null },
+                swap: { planned_id: String(row.id), slot, cls, from: date, until: swap.scope === 'today' ? date : null },
               }),
             });
             const out = await r.json().catch(() => ({}));
@@ -250,14 +252,38 @@ Deno.serve(async (req) => {
         };
       }
     }
-    const result = await applySwap({
-      db, userId, ctx,
+    return applySwap({
+      db, userId, ctx: rowCtx,
       optionId: String(body.option_id),
       restOfPlan: body?.scope === 'rest_of_plan',
       materialize,
       rewrite,
     });
+    };
+    const result = await swapOne(session, ctx);
     if (!result.ok) return json({ success: false, error: result.error });
+    /**
+     * ⛔ A JOINED SESSION IS SWAPPED WHOLE (Michael, 2026-09-27: "a swap on a joined ride applies to the whole ride"). The
+     * card is one session (`get-week/joined-fold.ts`), so the same choice goes to the other half — the trainer, the other
+     * sport, the way back. ⚠️ A WORKOUT PICK (`workout:`) IS THE TAPPED HALF'S OWN: it names one of that half's printed
+     * workouts, which the other half's family does not have. The other half takes the choice only where its own sheet
+     * offers the same option.
+     */
+    {
+      for (const pid of await joinedPartnerIds(db, session)) {
+        const { data: part } = await db.from('planned_workouts').select('*').eq('id', pid).eq('user_id', userId).maybeSingle();
+        if (!part) continue;
+        const partCtx = {
+          ...(await contextFor(db, userId, part, weeks, posture, ftp, baselines, pricing)),
+          workoutMinutes: await loadWorkoutMinutes(db, userId, part),
+        };
+        const sheet = await describeSheet(db, userId, partCtx);
+        if (!swapReachesJoinedHalf(String(body.option_id), (sheet?.options ?? []).map((o) => o.id))) { console.warn('[swap-session] joined half does not offer', body.option_id, pid); continue; }
+        const r2 = await swapOne(part, partCtx);
+        if (r2.ok) result.ids.push(...r2.ids);
+        else console.warn('[swap-session] joined half not swapped:', pid, r2.error);
+      }
+    }
     const { data: rows } = await db.from('planned_workouts').select('*').eq('user_id', userId).in('id', result.ids);
     return json({ success: true, receipt: result.receipt, also_written: result.alsoWritten, rows: rows ?? [] });
   } catch (e) {

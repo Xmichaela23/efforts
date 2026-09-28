@@ -254,7 +254,7 @@ Deno.test('Back to the plan on a chosen workout restores the row the plan author
  * trainer (`venue:trainer`) offers the page's other two. The filter is the composer's own (`archetypesForVenue`).
  */
 Deno.test('an untagged VO2 ride offers one workout (Long VO2 Repeats); on the trainer, three', () => {
-  const row = rowOf({ ...home, frame: 'cycling_base', sportMix: { rideCount: 7 } }, 'ride_vo2', 1);
+  const row = rowOf({ ...home, frame: 'cycling_base' }, 'ride_vo2', 1);
   assertEquals(archetypeOf(row), 'long_vo2');
   const road = hardSlotOf(row)!;
   assertEquals(road.venue, 'road');
@@ -268,7 +268,7 @@ Deno.test('an untagged VO2 ride offers one workout (Long VO2 Repeats); on the tr
   assertEquals(workoutChoiceOptions(onTrainer, [onTrainer], NO_THRESHOLD as never).map((o) => o.archetype), ['short_vo2', 'micro']);
 
   // A sweet-spot ride: the road offers the page's three two-minute-plus shapes, the trainer all four.
-  const ss = rowOf({ ...home, frame: 'cycling_base', sportMix: { rideCount: 7 } }, 'ride_sweet_spot', 1);
+  const ss = rowOf({ ...home, frame: 'cycling_base' }, 'ride_sweet_spot', 1);
   assertEquals(workoutsForSlot(hardSlotOf(ss)!).map((w) => w.id), ['medium', 'long', 'tempo']);
   assertEquals(workoutsForSlot(hardSlotOf({ ...ss, tags: [...ss.tags, 'venue:trainer'] })!).map((w) => w.id), ['minute_surge', 'medium', 'long', 'tempo']);
 

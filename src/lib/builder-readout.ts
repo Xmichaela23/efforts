@@ -93,10 +93,16 @@ export type EnduranceIntakeReadout = {
       rows: Array<{ title: string; session: string; length: string; card?: string }>;
     };
   } | null;
+  /** The rides screen (2026-09-27): rows, the long ride's chips and a switch per optional ride. */
   ride_strength_week: {
-    count_label: string;
-    counts: Array<{ count: number; label: string; rows: Array<{ key: SlotKey; line: string }> }>;
-    default_count: number;
+    sub_line: string;
+    length_label: string;
+    /** `length`: the chips on a ride whose length the rider picks, stored under `length.key` (shared by rides held to one length). */
+    rows: Array<{
+      key: SlotKey; line: string; is_long: boolean; optional: boolean;
+      length: { key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null; same_as?: string | null } | null;
+    }>;
+    optional: Array<{ key: SlotKey; label: string; line: string | null }>;
     easy_line: string;
   } | null;
   tier_line: string | null;

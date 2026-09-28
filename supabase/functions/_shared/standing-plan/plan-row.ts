@@ -19,7 +19,7 @@ import {
   type ComposedWeek,
   type PlanSession,
 } from './compose.ts';
-import { FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FRAMES, JOINED_PART_TAG, type EnduranceExperience, type FrameId } from './frames.ts';
 import type { ConflictRule, WeekConflict } from './week-conflicts.ts';
 import { TEST_WEEK_INDEX, type TestedLift, type WorkingNumber } from './working-number.ts';
 import { type DayMap } from './day-map.ts';
@@ -146,8 +146,8 @@ export type StandingPlanConfig = {
      *  calendar than the one that exists. */
     slots?: Record<string, string> | null;
     archetypes?: Record<string, string> | null;
-    /** ⛔ The ride count rides along too (p278's 4-ride week) — dropped here, the restate rebuilds 5 rides. */
-    rideCount?: number | null;
+    /** ⛔ The optional sessions switched off ride along too (p278's Day 2) — dropped here, the restate rebuilds them. */
+    slotsOff?: string[] | null;
     /**
      * ⛔⛔ THE PER-SESSION LENGTHS RIDE ALONG TOO (Michael, 2026-08-30) — see `SportMix.minutes`.
      * **THIS OBJECT IS REBUILT FIELD BY FIELD BELOW, so a field not named here is DROPPED**, and
@@ -378,7 +378,7 @@ export function buildStandingPlanRow(args: {
             archetypes: args.compose.sportMix.archetypes ?? null,
             // ⛔ SEE THE FIELD'S NOTE ABOVE — omitted here, the restate rebuilds a different week.
             minutes: args.compose.sportMix.minutes ?? null,
-            ...(args.compose.sportMix.rideCount != null ? { rideCount: args.compose.sportMix.rideCount } : {}),
+            ...((args.compose.sportMix.slotsOff ?? []).length > 0 ? { slotsOff: [...args.compose.sportMix.slotsOff!] } : {}),
           }
         : null,
       // OURS — `buildStandingPlanRow` at most 2 easy swims a week (Michael, 2026-08-24), the same clamp as compose.ts; no page.
@@ -520,6 +520,8 @@ export function weekShapeOf(wk: ComposedWeek | undefined): WeekShape | null {
   const out: WeekShape = { lifting: 0, run: 0, ride: 0, swim: 0, plyo: false, rest: 0 };
   for (const s of wk.sessions) {
     busy.add(s.day);
+    // ⛔ The second half of a joined session is not a session of its own (`EnduranceSlot.joinsPrevious`, 2026-09-27).
+    if ((s.tags ?? []).includes(JOINED_PART_TAG)) continue;
     if (s.type === 'run' || s.type === 'ride' || s.type === 'swim') out[s.type] += 1;
     else if (s.type === 'strength') {
       if (isPlyo(s)) out.plyo = true;

@@ -4,6 +4,7 @@
 //           (pace, GAP, HR, cadence, power) and persist to workouts.computed.
 //           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { plannedWhole } from '../_shared/joined-session.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { DRIFT_LINE_PCT, gapSecPerMiBetween, movingSecondsBetween, runDecouplingPct, runGrades, runMovingSeconds, secondsInPaceRangeBetween } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
@@ -690,10 +691,11 @@ Deno.serve(async (req) => {
       const { data: p } = await supabase
         .from('planned_workouts')
         // `tags` (2026-09-24): the row's `family:` tag names the ride type whose work floor the effort finder reads.
-        .select('id,computed,intervals,tags')
+        .select('id,computed,intervals,tags,date,training_plan_id,workout_status')
         .eq('id', w.planned_id)
         .maybeSingle();
-      planned = p || null;
+      // ⛔ Half of a joined session is compared as the whole session (2026-09-27, `plannedWhole`).
+      planned = await plannedWhole(supabase, p || null, 'id,computed,intervals,tags,date,training_plan_id,workout_status');
     }
     // ---- MAIN PROCESSING BLOCK ----
     try {

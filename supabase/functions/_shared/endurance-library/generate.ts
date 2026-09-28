@@ -98,7 +98,8 @@ export type SessionRequest = {
   /**
    * ⛔ ONE RUN BUILT FROM TWO SESSIONS (Viada p245, Hypertrophy + 5K day 1): *"A sprint workout should be chosen
    * (level 1), and the cooldown removed. The second section of the run should be chosen from the MLSS+ workouts, with
-   * the warm-up removed."* p253 joins Hypertrophy + Half-Marathon's MLSS+ to its VT1 the same way. Absent = both kept.
+   * the warm-up removed."* p253 joins Hypertrophy + Half-Marathon's MLSS+ to its VT1 the same way, and p278's two-workout
+   * ride days are joined the same way (p269, 2026-09-27). Any sport. Absent = both kept.
    */
   omit?: { warmup?: boolean; cooldown?: boolean };
 };
@@ -1057,7 +1058,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       case 'descending': blocks = buildDescending(ctx); break;
     }
 
-    // Viada p245 / p253 — the half of a joined run that loses its warm-up or cooldown (`SessionRequest.omit`).
+    // Viada p245 / p253 — the half of a joined session that loses its warm-up or cooldown (`SessionRequest.omit`).
     const warmup: Step[] = req.omit?.warmup ? []
       : wrapper.warmup.map((w) => step('warmup', w.label, w.seconds, w.intensity, sport, anchor));
     const cooldown: Step[] = req.omit?.cooldown ? []
