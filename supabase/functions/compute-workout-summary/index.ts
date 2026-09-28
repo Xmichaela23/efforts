@@ -1821,7 +1821,23 @@ Deno.serve(async (req) => {
             for (const stND of plannedSteps.slice(jStar)) laidOut.push(notDoneRow(stND));
             return laidOut;
           };
-          const ordered = (sport === 'run' || sport === 'walk') ? layoutLapsByOrder() : null;
+          /**
+           * ⛔ ONE LAP PER STEP IS THE WATCH'S OWN LAYOUT (2026-09-28, Q-311, Michael's Surge and Float): 29 laps on 29 steps,
+           * the watch ran the plan step by step. He pressed at the end of the Cossack squats and was still standing through
+           * the first 0:15 surge (6 m in 15 s), so that lap held 4 moving seconds — under half its step, so the order
+           * layout could only call it a stray, and then no layout fitted; the pairing gave round 1's steps to round 2's
+           * laps and the run read "14 of 16" with all 16 run. When the laps number the steps exactly, lap i IS step i,
+           * before any length or walk test: a rep run badly reads as run badly, on its own step. At least one lap must fit
+           * its step by the tolerance (the one-fit threshold above), so automatic laps that happen to number the steps
+           * do not qualify. Runs and walks only, like the order layout. ⚠️ NO NEW NUMBER.
+           */
+          const oneForOne = (): any[] | null => {
+            if (lapWins.length !== plannedSteps.length) return null;
+            const anyFit = lapWins.some((_, i) => plannedSteps[i]?.lap_button !== true && stepLapWithinTolerance(plannedSteps[i], measuredLap(i)));
+            if (!anyFit) return null;
+            return lapWins.map(([a, b], i) => ({ ...execIntervalFromWindow(plannedSteps[i], a, b), lap_number: placed[i].L.number, sample_idx_start: a, sample_idx_end: b }));
+          };
+          const ordered = (sport === 'run' || sport === 'walk') ? (oneForOne() ?? layoutLapsByOrder()) : null;
           if (ordered) {
             snapped = ordered;
             snapMode = 'laps-in-order';

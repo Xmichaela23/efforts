@@ -539,3 +539,40 @@ Deno.test('run · the drills done inside the warm-up (no press for them) → the
   assertEquals(workRows(r.computed).map((w) => w.executed.duration_s), [356, 356, 356, 356, 329]);
 });
 
+
+// ── runs: one lap per step is the watch's own layout (2026-09-28, Q-311, Michael's Surge and Float) ─────────────
+/** Surge and Float L2 as materialize-plan saves it: 10:00 jog, two lap-button drills, 8 × (0:15 · 0:45 · 1:00) with a
+ *  2:00 walk/jog after round 4, 8:00 jog. Twenty-nine steps. */
+function surgeFloatRun() {
+  const steps: Record<string, unknown>[] = [
+    { id: 'w0', kind: 'warmup', duration_s: 600, label: '10-minute easy jog', page_label: true, watch_target: 'none' },
+    { id: 'w1', kind: 'warmup', label: '3 sets of 20m walking lunges', page_label: true, watch_target: 'none', lap_button: true },
+    { id: 'w2', kind: 'warmup', label: '2 sets of 10 per side Cossack squats', page_label: true, watch_target: 'none', lap_button: true },
+  ];
+  for (let k = 1; k <= 8; k += 1) {
+    steps.push({ id: `s${k}`, kind: 'work', seconds: 15, distanceMeters: 55, distanceDerived: true, pace_range: { lower: 398, upper: 486 } });
+    steps.push({ id: `f${k}`, kind: 'work', seconds: 45, distanceMeters: 132, distanceDerived: true, pace_range: { lower: 493, upper: 603 } });
+    steps.push({ id: `r${k}`, kind: 'recovery', seconds: 60, distanceMeters: 138, distanceDerived: true, pace_range: { lower: 656, upper: 742 } });
+    if (k === 4) steps.push({ id: 'rw', kind: 'recovery', seconds: 120, label: 'recovery walk/jog', pace_range: { lower: 656, upper: 742 } });
+  }
+  steps.push({ id: 'c0', kind: 'cooldown', duration_s: 480, label: '8-minute easy jog', page_label: true, watch_target: 'none' });
+  return { id: 'p-surge-float', intervals: null, tags: ['family:run_mlss', 'archetype:surge_float'], computed: { normalization_version: 'v3', steps, total_duration_seconds: 2400 } };
+}
+Deno.test('run · 29 laps on 29 steps, still standing through the first 0:15 surge → laps-in-order, 16 work rows, none not done', async () => {
+  const segs: Seg[] = [{ sec: 600, mps: 2.5, hr: 145 }, { sec: 124, mps: 0.7, hr: 140 }, { sec: 55, mps: 0.1, hr: 115 }];
+  for (let k = 1; k <= 8; k += 1) {
+    segs.push(k === 1 ? { sec: 15, mps: 0.2, hr: 118 } : { sec: 15, mps: mps(420), hr: 150 });
+    segs.push({ sec: 45, mps: mps(540), hr: 155 }, { sec: 60, mps: mps(700), hr: 150 });
+    if (k === 4) segs.push({ sec: 120, mps: mps(720), hr: 140 });
+  }
+  segs.push({ sec: 480, mps: 2.5, hr: 140 });
+  const r = await compute('run-surge-float-standing-start', workout('run', segs, garminLaps(boundsOf(segs).slice(0, -1))), surgeFloatRun());
+  assertEquals(r.computed.alignment_mode, 'laps-in-order');
+  assertEquals(r.computed.intervals.length, 29);
+  assertEquals(r.computed.steps_not_done, 0);
+  assertEquals((r.computed.intervals as any[]).map((x) => x.lap_number), Array.from({ length: 29 }, (_, i) => i + 1));
+  const work = workRows(r.computed);
+  assertEquals(work.length, 16);
+  assertEquals(work.map((w) => w.planned_step_id), [1, 2, 3, 4, 5, 6, 7, 8].flatMap((k) => [`s${k}`, `f${k}`]));
+  assert(!work.some((w) => w.not_done), 'no work row is not done');
+});

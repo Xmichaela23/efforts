@@ -1521,7 +1521,7 @@ Michael's block still stores `ham_iso: 'hip thrust'` (the deleted stand-in). The
 
 A lifter reads it as nothing. A plain word ("Hinge") was suggested; Michael has not ruled.
 
-## Q-311 — A surge right after standing drills reads as a 4-second lap and moves every later round back one — **open** (2026-09-28)
+## Q-311 — A surge right after standing drills reads as a 4-second lap and moves every later round back one — **fixed, not yet deployed** (2026-09-28)
 
 Michael's 28 Sep Surge and Float (workout `6d420a73`). The watch's own laps (`laps[].startTimeInSeconds`) are clean:
 600 · 124 · 55 · 15 · 45 · 60, then the rest of the 8 rounds as planned. No early press. The app's rows for the same laps
@@ -1529,6 +1529,23 @@ read 600/575 · 123/77 · 27/2 · 13/4 (seconds / moving seconds): the Cossack l
 surge 13 s with 4 moving. Laps are judged on moving time (ALIGN tolerance, STATE-SOURCES row 175), so the surge fell under
 the floor, `layoutLapsByOrder` laid rounds 2–8 on steps 1–7 and marked round 8 "not matched": "14 of 16 reps done"
 where 16 were run. Why the app's lap windows differ from the watch's lap starts is not yet traced. Fix waits on Michael's go.
+
+**Traced 2026-09-28 (read-only, his recorded seconds + stored rows).** Corrects the entry above:
+- The app's windows DO start on the watch's lap starts (600 · 724 · 779 · 794 · 839 · 899 …). `windowIdxFromT` only trims
+  standing seconds off each end: the Cossack lap loses its standing tail (seconds 752–779, 0.1 m moved) → 27 s; the
+  first surge lap loses 2 s at its start → 13 s.
+- The first 15 s surge step (seconds 779–794) WAS recorded standing: 6 m in 15 s, speed empty or ≤ 0.33 m/s. He starts
+  moving ~793 and is at surge speed from 802 (2.9 → 4.5 m/s) to 838 — inside the watch's 45 s step. Rounds 2–8 are clean.
+- The watch ran the plan one for one: 29 laps on 29 steps (warm-up, two lap-button drills, 8 rounds + the 2:00 walk/jog,
+  cool-down). `layoutLapsByOrder` returned nothing: lap 4 (4 moving s) is under half its 15 s step, so it can only be a
+  stray, and then lap 5 (45 s) cannot take the 15 s step (over twice its length). The pairing rung fired (`laps-paired`):
+  each work step took the next lap that fits, so round 1's steps took round 2's laps and round 8's two steps read
+  "not matched". Not the order rung, as written above.
+- **Fix (Michael's go, 2026-09-28):** when the laps number the steps exactly and at least one lap fits its step, lap i
+  is step i, before any length or walk test (`oneForOne` in compute-workout-summary, ahead of `layoutLapsByOrder`).
+  Round 1's 0:15 now reads as run far off its range (13 s, 7 m) on its own step; the run reads 16 of 16. New fixture in
+  `compute-workout-summary/index.test.ts` (36 pass). Replayed all 25 of his planned runs since 2026-07-01 through the
+  function with the database stubbed (incl. 09-14, 09-16, 09-21, 09-25): only 09-28 changed, the other 24 byte-identical.
 
 ## Q-312 — The off-range sentence names one range when the reps had two — **noted** (2026-09-28)
 
