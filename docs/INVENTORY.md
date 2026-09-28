@@ -519,7 +519,7 @@ no-deploy.**
 | `line.ts` | `compute-session-boom` |
 | `types.ts` | `compute-session-boom` · `workout-detail` |
 
-### `supabase/functions/_shared/session-detail/` — 14 files · anything in it → 7 functions
+### `supabase/functions/_shared/session-detail/` — 15 files · anything in it → 7 functions
 
 `analyze-cycling-workout` · `analyze-running-workout` · `compute-session-boom` · `compute-snapshot` · `get-week` · `ingest-phone-workout` · `workout-detail`
 
@@ -538,6 +538,7 @@ no-deploy.**
 | `session-times.ts` | `get-week` · `workout-detail` |
 | `strength-slots.ts` | `workout-detail` |
 | `swim-plan-share.ts` | `workout-detail` |
+| `top-tiles.ts` | `get-week` · `workout-detail` |
 | `types.ts` | `ingest-phone-workout` · `workout-detail` |
 
 ### `supabase/functions/_shared/session-swap/` — 8 files · anything in it → 6 functions
