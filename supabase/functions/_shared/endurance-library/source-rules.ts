@@ -128,9 +128,10 @@ export const VT1_IS_TOP_OF_ZONE_2 = true;
 // clock rather than steps with an invented one.
 
 /**
- * `lapButton` (2026-09-24, rides): the line keeps its seconds for the card, the pop-up, the minutes and the step walk,
- * and reaches the watch as the lap-button step (`materialize-plan expandBikeToken` → `lap_button: true` →
- * `garmin/convert-workout.ts` durationType `OPEN`), so the Edge shows the warm-up until the athlete presses lap.
+ * `lapButton` (2026-09-24, rides; 2026-09-28, runs): the line keeps its seconds for the card, the pop-up, the minutes
+ * and the step walk, and reaches the watch as the lap-button step (`materialize-plan expandBikeToken` /
+ * `expandRunToken` → `lap_button: true` → `garmin/convert-workout.ts` durationType `OPEN`), so the device shows the
+ * warm-up until the athlete presses lap.
  */
 export type WrapperSpec = {
   warmup: { label: string; seconds: number | null; intensity: Intensity; lapButton?: true }[];
@@ -149,10 +150,17 @@ const drill: Intensity = { kind: 'drill' };
  * below), with these words on the screen and the watch.
  */
 
+/**
+ * ⛔ A RUN'S EASY-JOG WARM-UP ENDS ON THE LAP PRESS (Michael, 2026-09-28: "more to extend warm ups"). Same rule and
+ * same field source as the ride boxes below — TrainingPeaks' open-ended steps (help.trainingpeaks.com/hc/en-us/articles/
+ * 115003385172) and Garmin Connect's "Lap Button Press" step duration. The page's minutes stay on the card, the
+ * pop-up, the planned minutes and the step walk; only the watch step is open. The cool-down jogs stay timed.
+ */
+
 /** p229 — the running sprint/power box. */
 const RUN_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy },  // p229 — the box, as printed
+    { label: '5-minute easy jog', seconds: 5 * 60, intensity: easy, lapButton: true },  // p229 — the box, as printed; open on the watch (above)
     { label: '3 sets of 20 meter walking lunges', seconds: null, intensity: drill },  // p229 — the box, as printed
     { label: '2 x 30-second rounds of butt kicks', seconds: 2 * 30, intensity: drill },
     { label: 'Perform 3 rounds of the following: 10 seconds seated arm pump drill, 10 seconds standing arm pump drill, 10 seconds "high elbows"',  // p229 — the box, as printed
@@ -165,7 +173,7 @@ const RUN_SPRINT_WRAPPER: WrapperSpec = {
 /** p231 (MLSS). */
 const RUN_MLSS_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },  // p231 — the box, as printed
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy, lapButton: true },  // p231 — the box, as printed; open on the watch (above)
     { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },  // p231 — the box, as printed
     { label: '2 sets of 10 per side Cossack squats', seconds: null, intensity: drill },  // p231 — the box, as printed
   ],
@@ -176,7 +184,7 @@ const RUN_MLSS_WRAPPER: WrapperSpec = {
 /** p233 (near-threshold) prints the same box, with "(per side)" in brackets. */
 const RUN_NT_WRAPPER: WrapperSpec = {
   warmup: [
-    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy },  // p233 — the box, as printed
+    { label: '10-minute easy jog', seconds: 10 * 60, intensity: easy, lapButton: true },  // p233 — the box, as printed; open on the watch (above)
     { label: '3 sets of 20m walking lunges', seconds: null, intensity: drill },  // p233 — the box, as printed
     { label: '2 sets of 10 (per side) Cossack squats', seconds: null, intensity: drill },  // p233 — the box, as printed
   ],
@@ -203,7 +211,8 @@ const NO_WRAPPER: WrapperSpec = { warmup: [], cooldown: [], cite: 'Viada p235 �
  * FIELD — TrainingPeaks, "Open-ended steps for Structured Workouts" (help.trainingpeaks.com/hc/en-us/articles/
  * 115003385172): an open-ended step ends on the lap button. ⚠️ OURS — choosing the open step over the page's
  * stated range ("10- to 15-minute"); ledger row in docs/STATE-SOURCES.md. A timed effort inside a box (p238's
- * "5 minutes @ 95%") and p236's cadence sprints stay timed. Runs and swims are untouched.
+ * "5 minutes @ 95%") and p236's cadence sprints stay timed. Runs follow the same rule since 2026-09-28 (above); swims
+ * are untouched.
  */
 const RIDE_SPRINT_WRAPPER: WrapperSpec = {
   warmup: [

@@ -64,15 +64,17 @@ Deno.test('the sprint box: the easy spin is open, the cadence-sprint line stays 
   assertEquals(flat[1].durationType, 'TIME'); assertEquals(flat[1].durationValue, 600);
 });
 
-Deno.test('the wrapper owns it: every ride easy-spin warm-up line carries lapButton; no run or cool-down line does', () => {
-  for (const tok of ['wrap_ride_anaerobic_warm0', 'wrap_ride_sweet_spot_warm0', 'wrap_ride_sprints_warm0', 'wrap_ride_vo2_warm0', 'wrap_ride_vo2_warm2']) assertEquals(wrapperStepForToken(tok)?.lapButton, true, tok);
-  for (const tok of ['wrap_ride_vo2_warm1', 'wrap_ride_sprints_warm1', 'wrap_run_near_threshold_warm0', 'wrap_run_near_threshold_cool0', 'wrap_run_mlss_warm0', 'wrap_run_sprint_power_warm0']) assertEquals(wrapperStepForToken(tok)?.lapButton, undefined, tok);
+Deno.test('the wrapper owns it: every easy warm-up line (ride spin, run jog) carries lapButton; no timed effort or cool-down line does', () => {
+  for (const tok of ['wrap_ride_anaerobic_warm0', 'wrap_ride_sweet_spot_warm0', 'wrap_ride_sprints_warm0', 'wrap_ride_vo2_warm0', 'wrap_ride_vo2_warm2', 'wrap_run_near_threshold_warm0', 'wrap_run_mlss_warm0', 'wrap_run_sprint_power_warm0']) assertEquals(wrapperStepForToken(tok)?.lapButton, true, tok);
+  for (const tok of ['wrap_ride_vo2_warm1', 'wrap_ride_sprints_warm1', 'wrap_run_near_threshold_cool0', 'wrap_run_mlss_cool0']) assertEquals(wrapperStepForToken(tok)?.lapButton, undefined, tok);
 });
 
-Deno.test('a run is untouched: the near-threshold warm-up is a TIME step, as before', () => {
+/** ⛔ RUNS FOLLOW THE RIDE RULE SINCE 2026-09-28 (Michael: "more to extend warm ups"): the jog is open on the watch, keeps its 600 s. */
+Deno.test('a run: the near-threshold easy-jog warm-up is OPEN on the watch and keeps its 600 s; the cool-down stays timed', () => {
   const { steps, flat } = build({ type: 'run', name: 'Near-threshold', tags: ['family:run_near_threshold'], steps_preset: ['wrap_run_near_threshold_warm0', 'interval_6x240s_90pct_R60s', 'wrap_run_near_threshold_cool0'] });
-  assertEquals(steps[0].lap_button, undefined);
-  assertEquals(flat[0].durationType, 'TIME'); assertEquals(flat[0].durationValue, 600);
+  assertEquals(steps[0].lap_button, true);
+  assertEquals(steps[0].seconds, 600);
+  assertEquals(flat[0].durationType, 'OPEN');
   assertEquals(flat[flat.length - 1].durationType, 'TIME'); assertEquals(flat[flat.length - 1].durationValue, 480);
 });
 

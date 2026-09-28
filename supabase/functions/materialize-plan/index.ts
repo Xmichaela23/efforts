@@ -1557,6 +1557,9 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     out.push({
       id: uid(), kind: wrapRun.kind, label: wrapRun.label, page_label: true, watch_target: 'none',
       ...(wrapRun.seconds != null && wrapRun.seconds > 0 ? { duration_s: wrapRun.seconds } : { lap_button: true }),
+      // ⛔ THE EASY-JOG WARM-UP CARRIES BOTH (2026-09-28, as rides do since 2026-09-24): its seconds for the card and the
+      // step walk, and the lap-button step on the watch (`source-rules.ts` RUN_* wrappers, `lapButton`).
+      ...(wrapRun.lapButton ? { lap_button: true } : {}),
     });
     return out;
   }

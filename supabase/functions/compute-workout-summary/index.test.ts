@@ -481,6 +481,19 @@ Deno.test('run · 13 laps on 13 steps, two reps off the tolerance (5:56, 5:29) �
   assertEquals((r.computed.intervals as any[]).map((x) => x.lap_number), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 });
 
+/** ⛔ THE EASY-JOG WARM-UP IS OPEN ON THE WATCH (2026-09-28): a 17:00 warm-up lap is still the warm-up row, printed "10:00". */
+Deno.test('run · an open warm-up jog run long (17:00) → still the warm-up row, "10:00" printed, every rep lands', async () => {
+  const plan = fiveBySixRun();
+  plan.computed.steps[0] = { ...plan.computed.steps[0], lap_button: true };
+  const segs: Seg[] = [{ sec: 1020, mps: mps(750), hr: 135 }, ...OWNER_SEGS.slice(1)];
+  const r = await compute('run-5x6-open-warmup', workout('run', segs, lapsAt(boundsOf(segs))), plan);
+  assertEquals(r.computed.intervals.length, 13);
+  assertEquals(r.computed.steps_not_done, 0);
+  assertEquals(labels(r.computed)[0], '10:00');
+  assertEquals(r.computed.intervals[0].role, 'warmup');
+  assertEquals(workRows(r.computed).map((w) => w.executed.duration_s), [360, 360, 360, 356, 329]);
+});
+
 Deno.test('run · the same laps against the plan without the drill steps → the 0:14 and 0:23 are strays ("Lap 2", "Lap 3"), the 0:24 is still the rest', async () => {
   const r = await compute('run-5x6-strays', workout('run', OWNER_SEGS, lapsAt(boundsOf(OWNER_SEGS))), fiveBySixRun({ drills: false }));
   assertEquals(r.computed.alignment_mode, 'laps-in-order');

@@ -281,9 +281,10 @@ function formatPlannedLabel(st: any, sport?: string): string | null {
     // A step the page prints without a clock (a drill, p233's "3 sets of 20m walking lunges") has no time or distance
     // to print — the "20m" in its words is not one — so its row carries the page's own words (2026-09-25, the first
     // time such a step took a lap on a run).
-    if (st?.lap_button === true && typeof st?.label === 'string' && st.label.trim()) return st.label.trim();
+    // A lap-button step WITH a clock (the easy-jog warm-up, open on the watch since 2026-09-28) prints its time as before.
     const meters = st?.distanceDerived === true ? null : deriveMetersFromPlannedStep(st);
     const seconds = deriveSecondsFromPlannedStep(st);
+    if (st?.lap_button === true && !(seconds && seconds > 0) && typeof st?.label === 'string' && st.label.trim()) return st.label.trim();
     
     // Priority 1: If it's a DISTANCE-based step, show distance
     if (meters && meters > 0) {
