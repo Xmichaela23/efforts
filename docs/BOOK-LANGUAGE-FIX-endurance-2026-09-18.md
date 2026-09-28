@@ -368,6 +368,7 @@ From the regenerated `docs/INVENTORY.md` (import closures), plus the functions e
    - So the description now says what the test does: the page's 12-minute clause. Offering 10 or 8 minutes needs a question and a learner change.
 6. **Where the long run's sets and the fartlek's efforts sit.** They are spread evenly through the easy running (OURS). The page says "at any point" / "during the session" / "in the middle".
 7. **p281's ride-length progression.** The rides screen prints the page's sentence, but no length is built, because the page prints no amount.
+   > ⛔ SUPERSEDED 2026-09-27 (Michael): rides DO get longer, offered and accepted by the rider, never applied on their own — at the book's timing (p281: Base's long ride every 1 to 2 weeks; midweek endurance rides step up monthly), by at most 5% of the week's easy minutes (p148), inside the level's printed range (p239). Code: `_shared/standing-plan/length-step.ts`, `EnduranceSlot.growth`, `endurance-checkpoint` `length_offer`.
 8. **The strides add-on on the easy run** (6 × 30 s, labelled OURS; p109 says "a handful"). Also the strides' untimed recovery label "Walk/Jog — as long as you need", which is on no page. Left as they are, because they come from Michael's constraint that the strides reach Garmin.
 9. **Swim:**
    - The subtitle ("WU … • Aerobic …", `swim-plan-summary.ts`) is ours.

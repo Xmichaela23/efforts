@@ -71,25 +71,43 @@ Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the a
 
 Deno.test('⛔ Rides screen and runs screen — rows and words from the server', () => {
   const ride = enduranceIntakeReadout({ frame: 'cycling_base', answers: {} }).ride_strength_week!;
-  assertEquals(ride.count_label, 'Rides a week');
-  // ⛔ p278's Standard column (2026-09-18, book-language pass 4): seven rides; one fewer drops Day 2's easy ride.
-  assertEquals(ride.default_count, 7);
-  assertEquals(ride.counts.map((c) => [c.label, c.rows.map((r) => r.line)]), [
-    ['Six rides', ['Day 1 · Sweet Spot', 'Day 3 · VO2', 'Day 3 · Sweet Spot', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
-    ['Seven rides', ['Day 1 · Sweet Spot', 'Day 2 · Ride', 'Day 3 · VO2', 'Day 3 · Sweet Spot', 'Day 5 · Ride', 'Day 5 · Sprint Ride', 'Day 6 · Ride']],
+  // ⛔ SHAPED LIKE THE RUNS SCREEN (Michael, 2026-09-27): five rides, a day's two workouts named as one ride.
+  assertEquals(ride.sub_line, 'Pick how long the long ride and the midweek easy rides are.');
+  assertEquals(ride.length_label, 'Length');
+  assertEquals(ride.rows.map((r) => r.line), [
+    'Day 1 · Sweet Spot', 'Day 2 · Ride', 'Day 3 · VO2, then Sweet Spot', 'Day 5 · Sprint Ride, then Ride', 'Day 6 · Ride',
   ]);
-  // The screen and the composed week agree, both counts (this pin moved here from the phone's test).
+  assertEquals(ride.rows.filter((r) => r.is_long).map((r) => r.key), ['long']);
+  // p239: level 1 "60- to 100-minute", level 2 "2.5- to 3.5-hour" — printed ends only; each ride's own level opens selected.
+  const long = ride.rows.find((r) => r.key === 'long')!.length!;
+  assertEquals([long.key, long.options, long.default], ['long', [60, 100, 150, 210], 150]);
+  assertEquals(long.labels, { 60: '1h', 100: '1h40', 150: '2h30', 210: '3h30' });
+  // ⛔ The midweek easy ride: 1h or 1h40, and Friday's ride carries the same pick (p281, Tuesday = Friday).
+  const tue = ride.rows.find((r) => r.key === 'easy')!.length!;
+  assertEquals([tue.key, tue.options, tue.default], ['easy', [60, 100], 60]);
+  assertEquals(ride.rows.find((r) => r.line.startsWith('Day 5'))!.length!.key, 'easy');
+  assertEquals(ride.rows.find((r) => r.line.startsWith('Day 5'))!.length!.same_as, 'Same length as Day 2.');
+  assertEquals(tue.same_as, null);
+  assertEquals(ride.rows.filter((r) => r.length).map((r) => r.key), ['easy', 'hard3', 'long']);
+  assertEquals(ride.optional, [{ key: 'easy', label: 'Easy ride on Day 2', line: 'Optional. An easy ride between the hard days.' }]);
+  assertEquals(ride.rows.filter((r) => r.optional).map((r) => r.key), ['easy']);
+  // The screen and the composed week agree, the switch on and off (this pin moved here from the phone's test).
   const KIT = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)', 'Pull-up bar'];
-  for (const c of ride.counts) {
+  for (const off of [[], ['2:0']]) {
     const w = composeWeek({
       frame: 'cycling_base', column: 'standard', week: 2, roundTo: 5, equipment: KIT,
       competitionLifts: { push_upper: 'Bench Press', press_lower: 'Back Squat', hinge_lower: 'Deadlift' },
       workingNumbers: {}, baselines: { performance_numbers: { ftp: 250 } },
-      sportMix: { runs: 0, rides: 5, swimDays: 0, rideCount: c.count },
+      sportMix: { runs: 0, rides: 5, swimDays: 0, slotsOff: off },
     } as never);
     // The hard rides are titled by their workout's own name, which rotates week to week (2026-09-19); the wizard row names
-    // the type, so a hard ride is compared by its type.
-    assertEquals(w.sessions.filter((s) => s.type === 'ride').map((s) => sessionTypeFor(s) ?? s.name), c.rows.map((r) => r.line.split(' · ')[1]));
+    // the type, so a hard ride is compared by its type. A joined ride's two rows are the row's two names.
+    const byDay = new Map<string, string[]>();
+    for (const s of w.sessions.filter((x) => x.type === 'ride')) {
+      byDay.set(s.day, [...(byDay.get(s.day) ?? []), sessionTypeFor(s) ?? String(s.name)]);
+    }
+    const screen = ride.rows.filter((r) => !(off.length && r.optional)).map((r) => r.line.split(' · ')[1]);
+    assertEquals([...byDay.values()].map((names) => names.join(', then ')), screen, `off ${off.join(',')}`);
   }
   assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).ride_strength_week, null);
   const run = enduranceIntakeReadout({ frame: 'strength_5k', answers: {} }).run_strength_week!;

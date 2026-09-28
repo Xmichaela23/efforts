@@ -1,5 +1,6 @@
 import { rowsComeFromTheWatch } from './lib/interval-display.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { plannedWhole } from '../_shared/joined-session.ts';
 import { withAlarm } from '../_shared/alarm.ts';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
@@ -496,7 +497,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     if (workout.planned_id) {
       const { data: planned, error: plannedError } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, user_id')
+        .select('id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, user_id, date, workout_status')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id) // Authorization: verify planned workout belongs to user
         .single();
@@ -504,7 +505,9 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       if (plannedError) {
         console.warn('⚠️ Could not load planned workout:', plannedError.message);
       } else {
-        plannedWorkout = planned;
+        // ⛔ Half of a joined run is compared as the whole run (2026-09-27, `plannedWhole`).
+        plannedWorkout = await plannedWhole(supabase, planned,
+          'id, intervals, steps_preset, computed, total_duration_seconds, description, tags, training_plan_id, user_id, date, workout_status');
         intervals = await getWorkIntervals(workout, plannedWorkout, baselines);
       }
     }

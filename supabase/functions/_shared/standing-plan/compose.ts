@@ -69,6 +69,7 @@ import {
   PLYO_DOSE,
   type ColumnKind,
   type EnduranceExperience,
+  type Frame,
   type FrameDay,
   type FrameId,
   type StrengthSlot,
@@ -600,7 +601,7 @@ export function placeEnduranceDays(
     let n = 0;
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
-        // ⛔ The second half of a joined run takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
+        // ⛔ The second half of a joined session takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
         if (isJoinedSlot(slot)) return;
         if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
       });
@@ -644,7 +645,7 @@ export function placeEnduranceDays(
       });
     }
   }
-  // ⛔ ONE RUN, ONE DAY (p245 / p253): the second half of a joined run lands where the first half did.
+  // ⛔ ONE SESSION, ONE DAY (p245 / p253 / p269): the second half of a joined session lands where the first half did.
   for (const d of days) {
     d.endurance.forEach((slot, i) => {
       if (!isJoinedSlot(slot) || i === 0) return;
@@ -2903,6 +2904,38 @@ function testRegionOf(name: string): 'upper' | 'lower' | null {
   return null;
 }
 
+/**
+ * ⛔ THE LENGTHS A PRINTED-WEEK FRAME TAKES FROM THE ATHLETE (`Frame.rideWeek`, Michael 2026-09-27): the slots it offers
+ * chips for, and the slots that follow one of them (`EnduranceSlot.sameLengthAs`, p281's Tuesday = Friday). Every other
+ * key is dropped, so no other session climbs off the page's level. ⛔ IN THE DELOAD COLUMN a pick is kept only where it
+ * sits inside the level that column prints (p278): a 2h30 long ride does not climb the deload's level-1 ride.
+ */
+function pickedLengths(
+  frame: Frame, column: ColumnKind, minutes: Record<string, number> | null | undefined,
+  anchors: ReturnType<typeof resolveEnduranceAnchors>,
+): Record<string, number> | null {
+  const chips = frame.rideWeek?.chips;
+  if (!minutes || !chips) return null;
+  const out: Record<string, number> = {};
+  for (const d of frame.columns[column]) {
+    d.endurance.forEach((slot, i) => {
+      const k = `${d.day}:${i}`;
+      const from = chips[k] ? k : slot.sameLengthAs && chips[slot.sameLengthAs] ? slot.sameLengthAs : null;
+      const v = from ? Number(minutes[from]) : NaN;
+      if (!Number.isFinite(v)) return;
+      if (column !== 'standard') {
+        const own = ladderOf({
+          family: slot.family, level: slot.level, role: slotRoleOf(slot),
+          sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
+        } as SlotSpec, anchors)[0];
+        if (!own || v > Math.round(own.hi)) return;
+      }
+      out[k] = v;
+    });
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
   if (!frame) throw new Error(`unknown frame: ${args.frame}`);
@@ -2912,6 +2945,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * can act on it: hours asks and per-session minutes (they climb the ladder), a stated day count
    * (it adds easy fills), the advanced tier (it adds runs) and the swim add-on. The week is the
    * page's sessions at the page's levels. ⚠️ Every other frame is untouched by construction.
+   * ⛔ THE PICKED LENGTHS STAY (Michael, 2026-09-27; `Frame.rideWeek`, `pickedLengths`) — in the Deload column only
+   * inside the level it prints (p278).
    */
   if (frame.printedWeekOnly) {
     args = {
@@ -2924,7 +2959,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       demonstratedWeeklyMiles: null,
       swimEasySessions: 0,
       levelOverrides: undefined,
-      sportMix: args.sportMix ? { ...args.sportMix, minutes: null } : args.sportMix,
+      sportMix: args.sportMix
+        ? {
+          ...args.sportMix,
+          minutes: pickedLengths(frame, args.column, args.sportMix.minutes, resolveEnduranceAnchors(args.baselines)),
+        }
+        : args.sportMix,
     };
   }
   const days = frame.columns[args.column];
@@ -2938,7 +2978,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     let n = 0;
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
-        // ⛔ The second half of a joined run takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
+        // ⛔ The second half of a joined session takes no hard pick of its own (`EnduranceSlot.joinsPrevious`).
         if (isJoinedSlot(slot)) return;
         if (anchorRoleOf(slot.family, slot.role) === 'hard') hardSlotIndex.set(`${d.day}:${i}`, n++);
       });
@@ -3058,10 +3098,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   const droppedSlots: Set<string> = (() => {
     const drop = new Set<string>();
-    // ⛔ THE SHORTER WEEK THE FRAME DECLARES — `Frame.fewerRidesDropsSlot`. Both columns: the athlete's
-    // ride count is a fact about their week, deload or not.
-    const fewer = frame.fewerRidesDropsSlot;
-    if (fewer && Number(args.sportMix?.rideCount) === fewer.rideCount) drop.add(`${fewer.day}:${fewer.index}`);
+    // ⛔ AN OPTIONAL SESSION THE ATHLETE SWITCHED OFF — `EnduranceSlot.optional`. Both columns: the switch is a fact
+    // about their week, deload or not. A key the frame does not mark optional is ignored.
+    const off = new Set(args.sportMix?.slotsOff ?? []);
+    for (const dd of days) {
+      dd.endurance.forEach((slot, i) => {
+        if (slot.optional && off.has(`${dd.day}:${i}`)) drop.add(`${dd.day}:${i}`);
+      });
+    }
     if (args.column !== 'standard') return drop;
     for (const sport of ['run', 'ride'] as const) {
       const raw = args.enduranceDaysBySport?.[sport];
@@ -3070,7 +3114,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const mine: { key: string; rank: number }[] = [];
       for (const dd of days) {
         dd.endurance.forEach((slot, i) => {
-          if (isJoinedSlot(slot)) return; // ⛔ the second half of one run is not a day of its own
+          if (isJoinedSlot(slot)) return; // ⛔ the second half of one session is not a day of its own
           const a = assignedSlot(sportAssignment, dd.day, i, slot);
           if (a.sport !== sport) return;
           const role = anchorRoleOf(slot.family, slot.role);
@@ -3083,7 +3127,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       mine.sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key));
       for (let i = 0; i < surplus; i++) drop.add(mine[i].key);
     }
-    // ⛔ A dropped head takes its joined second half with it — one run.
+    // ⛔ A dropped head takes its joined second half with it — one session.
     for (const dd of days) {
       dd.endurance.forEach((slot, i) => {
         if (isJoinedSlot(slot) && i > 0 && drop.has(`${dd.day}:${i - 1}`)) drop.add(`${dd.day}:${i}`);
@@ -3333,6 +3377,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     minutesAsked?: number | null,
     /** The slot's role — the easy ride's ceiling is not the long ride's (`ladderCeilingFor`). */
     role?: 'hard' | 'long' | 'easy',
+    /** The lowest level a picked length may reach — `EnduranceSlot.lengthFromLevel`. Read only with a pick. */
+    fromLevel?: Level,
   ): { level: Level; size: number } => {
     const override = args.levelOverrides?.[family] as Level | undefined;
     if (override != null) return { level: override, size: dialForSport(sport) };
@@ -3355,14 +3401,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       ? FRAMES[args.frame]?.runStrengthWeek?.longRunCeilingMinutes
       : undefined;
     const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
+    // ⛔ A PICKED LENGTH MAY REACH DOWN TO THE SLOT'S SMALLER TIER (`EnduranceSlot.lengthFromLevel`, Michael 2026-09-27).
+    const pickRungs = fromLevel != null && fromLevel < level
+      ? ladderOf({ family: family as never, level: fromLevel, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors)
+      : rungs;
     /**
      * ⛔⛔ THE ATHLETE'S OWN ANSWER FIRST, AND BEFORE THE `no_target` BRANCH. A screen that asks per
      * session sends no weekly hours at all, so the verdict there is always `no_target` — reading it
      * first would drop every minutes pick on the floor and build the frame's midpoint instead, with
      * nothing said. **The silent shape of every defect in this area.**
      */
-    if (minutesAsked != null && Number.isFinite(Number(minutesAsked)) && rungs.length > 0) {
-      const at = rungForMinutes(rungs, Number(minutesAsked));
+    if (minutesAsked != null && Number.isFinite(Number(minutesAsked)) && pickRungs.length > 0) {
+      const at = rungForMinutes(pickRungs, Number(minutesAsked));
       return { level: at.level, size: at.size };
     }
     if (verdict === 'no_target') return { level, size: DEFAULT_SIZE };
@@ -3688,6 +3738,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         assigned.family, assigned.level, slotArchetype, assigned.sport,
         Number.isFinite(askedMinutes) ? askedMinutes : null,
         slotRoleOf(slot),
+        slot.lengthFromLevel,
       );
       const level = rung.level;
       /**
@@ -3721,7 +3772,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * runs are appended elsewhere in this file and carry none — one stride block a week.
        */
       const carriesStrides = slot.carriesStrides === true && assigned.sport === 'run';
-      // ⛔ ONE RUN OF TWO PARTS (p245 / p253, `EnduranceSlot.joinsPrevious`): the first half loses its cooldown, the
+      // ⛔ ONE SESSION OF TWO PARTS (p245 / p253 / p269, `EnduranceSlot.joinsPrevious`): the first half loses its cooldown, the
       // second its warm-up. A half whose partner was dropped is built whole.
       const joinsNext = isJoinedSlot(day.endurance[i + 1]) && !droppedSlots.has(`${day.day}:${i + 1}`);
       const joinedPart = isJoinedSlot(slot) && i > 0 && !droppedSlots.has(`${day.day}:${i - 1}`);
@@ -4644,10 +4695,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
   for (const sport of ['run', 'ride'] as const) {
     const perDay = new Map<string, number>();
-    // ⛔ One run of two parts (p245 / p253) is one run — its second half is not counted.
+    // ⛔ One session of two parts (p245 / p253 / p269) is one session — its second half is not counted.
     // ⛔ AND RUNS THE PAGE ITSELF PRINTS TOGETHER ON ONE DAY, STILL ON THAT DAY, ARE NOT COUNTED AGAINST IT (2026-09-23) —
     // the same rule as a warning the page's own week carries. p252's deload day 3 prints NT (level 1) and VT1 (level 1).
-    // ⚠️ RUNS ONLY: p278 prints two rides on days 3 and 5 and Ride + Strength's week keeps its line; that is the PM's call.
+    // ⚠️ RUNS ONLY: p278's two-workout ride days are joined sessions (2026-09-27), so the filter above already covers them.
     const printedTogether = (x: PlanSession): boolean => {
       if (sport !== 'run') return false;
       const m = (x.tags ?? []).find((t) => t.startsWith('slot:'))?.match(/^slot:(\d+):\d+$/);

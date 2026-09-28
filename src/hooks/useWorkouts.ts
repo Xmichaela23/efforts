@@ -5,6 +5,8 @@ import { safeParseJSONB } from "@/utils/jsonb";
 // The one completed-set/exercise shape, shared with the server hydrators (2026-08-11).
 import { normalizeCompletedStrengthExercise } from "@/lib/normalize-strength-set";
 import { WORKOUT_LIST_JSON_SELECT, rebuildWorkoutListRow } from "../../supabase/functions/_shared/workout-list-select.ts";
+import { movesWith } from "../../supabase/functions/_shared/move-check/index.ts";
+import { JOINED_TAG } from "../../supabase/functions/_shared/standing-plan/frames.ts";
 
 /** Fire-and-forget full pipeline for completed workouts (see `recompute-workout` edge). */
 function fireRecomputeWorkout(workoutId: string) {
@@ -1577,7 +1579,7 @@ export const useWorkouts = () => {
       // Query before the delete in case an FK clears completed_workout_id on delete.
       const { data: linkedPlanned } = await supabase
         .from('planned_workouts')
-        .select('id,training_plan_id,week_number,day_number')
+        .select('id,training_plan_id,week_number,day_number,date,tags,workout_status')
         .eq('user_id', userId)
         .eq('completed_workout_id', id);
 
@@ -1628,6 +1630,23 @@ export const useWorkouts = () => {
         let reverted = 0;
         if (Array.isArray(linkedPlanned) && linkedPlanned.length) {
           for (const row of linkedPlanned) { await revertRow(row); reverted += 1; }
+          // ⛔ A joined session's other half was marked done with this link (2026-09-27, auto-attach-planned); it goes
+          // back to planned too — the pairing is `movesWith`'s, the calendar move's own rule.
+          for (const row of linkedPlanned as any[]) {
+            if (!row?.training_plan_id || !(Array.isArray(row.tags) && row.tags.includes(JOINED_TAG))) continue;
+            const { data: sameDay } = await supabase
+              .from('planned_workouts')
+              .select('id,date,type,workout_status,training_plan_id,tags,completed_workout_id')
+              .eq('user_id', userId)
+              .eq('training_plan_id', row.training_plan_id)
+              .eq('date', row.date)
+              .contains('tags', [JOINED_TAG]);
+            for (const part of movesWith(row, (sameDay ?? []) as any[])) {
+              if (String((part as any).workout_status) === 'completed' && !(part as any).completed_workout_id) {
+                await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', part.id).eq('user_id', userId);
+              }
+            }
+          }
         }
 
         // Fallback (legacy completions with no completed_workout_id link): match by date+type.

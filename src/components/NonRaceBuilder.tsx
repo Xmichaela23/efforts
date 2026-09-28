@@ -451,12 +451,12 @@ const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' |
 const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
 
 /**
- * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4). The page
- * fixes every ride at level 1 and the athlete's one answer is four rides or five. Keyed on what the
- * frame DECLARES (`printedWeekOnly` and a `fewerRidesDropsSlot`), never on its id.
+ * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4; reshaped 2026-09-27). The page
+ * fixes every ride; the athlete picks the long ride's length and may switch an optional ride off. Keyed on what the
+ * frame DECLARES (`printedWeekOnly` and a `rideWeek`), never on its id.
  */
 const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
-  st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.fewerRidesDropsSlot != null;
+  st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.rideWeek != null;
 
 /**
  * ⛔⛔ THE ROTATE-ONLY RUN PATH — Run + Strength (Michael, 2026-09-07 evening,
@@ -919,10 +919,10 @@ export type NonRaceState = {
    */
   focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
-   * ⛔ RIDE + STRENGTH'S ONE ENDURANCE ANSWER — four rides or five (p278; the 4-ride week leaves out
-   * the Day 2 easy ride). Absent = the page's five.
+   * ⛔ THE OPTIONAL RIDES SWITCHED OFF (Ride + Strength's Day 2 easy ride, 2026-09-27) — screen row keys. Absent = all
+   * on, the page's five rides.
    */
-  rideCount?: number;
+  slotsOff?: SlotKey[];
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
    * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is
@@ -1654,8 +1654,12 @@ function assemblePayload(
           // ⛔ Build muscle (p244, p252), 2026-09-23 — the same forward.
           ...(isStrengthFocusPath && state.focus === 'run_hyp' ? { focus: 'run_hyp' } : {}),
           ...(isStrengthFocusPath && state.focus === 'run_half_hyp' ? { focus: 'run_half_hyp' } : {}),
-          // ⚠️ ONLY WHEN THE ATHLETE PICKED (2026-09-13): the build keeps the page's own count otherwise.
-          ...(printedRideWeekPath(state) && state.rideCount != null ? { ride_count: state.rideCount } : {}),
+          // ⛔ THE OPTIONAL RIDES SWITCHED OFF (2026-09-27), keyed the engine's way like `endurance_slot_minutes`.
+          ...(() => {
+            if (!printedRideWeekPath(state) || !(state.slotsOff ?? []).length) return {};
+            const off = frameSlots(wizardFrame).filter((r) => state.slotsOff!.includes(r.key)).map((r) => r.frameKey);
+            return off.length > 0 ? { endurance_slots_off: off } : {};
+          })(),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
           // test week. The endurance answers travel as data; create-goal inserts the week-one tests with the plan.
@@ -3613,6 +3617,37 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runStrengthWeek?.easy_run_minutes, runStrengthWeek?.long_run_default, runStrengthWeek?.rows]);
+  /**
+   * ⛔ THE RIDES SCREEN'S LENGTHS, SEEDED THE SAME WAY (2026-09-27): each length's default chip from the server, only
+   * where the value is missing or is not one of the chips (a long run's length carried over from another plan), so an
+   * athlete who picked another chip and walked back keeps it.
+   */
+  const rideStrengthWeek = printedRideWeekPath(state)
+    ? intakeFresh?.ride_strength_week ?? readout?.intake?.ride_strength_week ?? null
+    : null;
+  // Every length the screen asks, once per key (rides held to one length share it).
+  const rideLengths = React.useMemo(() => {
+    const byKey = new Map<SlotKey, { options: number[]; default: number | null }>();
+    for (const row of rideStrengthWeek?.rows ?? []) {
+      if (row.length && !byKey.has(row.length.key)) byKey.set(row.length.key, { options: row.length.options, default: row.length.default });
+    }
+    return byKey;
+  }, [rideStrengthWeek]);
+  const rideLengthsKey = [...rideLengths].map(([k, v]) => `${k}:${v.options.join('/')}:${v.default}`).join(',');
+  React.useEffect(() => {
+    if (rideLengths.size === 0) return;
+    setState((st) => {
+      const now = st.slotMinutes ?? {};
+      const seed: Partial<Record<SlotKey, number>> = {};
+      for (const [key, l] of rideLengths) {
+        if (l.default != null && !l.options.includes(Number(now[key]))) seed[key] = l.default;
+      }
+      return Object.keys(seed).length === 0 ? st : { ...st, slotMinutes: { ...now, ...seed } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rideLengthsKey]);
+  const longRideAnswered = !rideStrengthWeek
+    || [...rideLengths].every(([key, l]) => l.options.includes(Number(state.slotMinutes?.[key])));
   /** ⛔ THE ONE GATE ON THAT SCREEN — a length the chips actually offer, so a stale value cannot pass. */
   const longRunAnswered = !rotateOnlyRun
     || (state.slotMinutes?.long != null
@@ -5731,19 +5766,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
-      {/* ⛔ RIDE + STRENGTH HAS ITS OWN ENDURANCE SCREEN (WORKORDER-ride-strength-2026-09-13 §4). The
-          page fixes every ride; the one answer is four rides or five, seeded at the page's five, so
-          Continue is never blocked here. See `RideStrengthWeekCard`. */}
+      {/* ⛔ RIDE + STRENGTH HAS ITS OWN ENDURANCE SCREEN, SHAPED LIKE THE RUNS SCREEN (2026-09-27). The page fixes
+          every ride; the athlete picks the long ride's length (seeded at the server's default, so Continue is not
+          blocked on arrival) and may switch an optional ride off. See `RideStrengthWeekCard`. */}
       {currentStep === 'endurance' && printedRideWeekPath(state) && (
         <StepLayout
           step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
           onBack={back} onContinue={next}
-          canContinue
+          canContinue={longRideAnswered}
         >
           <RideStrengthWeekCard
-            readout={intakeFresh?.ride_strength_week ?? readout?.intake?.ride_strength_week ?? null}
-            rideCount={state.rideCount ?? /* server-field: ride_strength_week.default_count */ (intakeFresh?.ride_strength_week ?? readout?.intake?.ride_strength_week)?.default_count ?? 0}
-            onRideCount={(n) => setState((st) => ({ ...st, rideCount: n }))}
+            readout={rideStrengthWeek}
+            slotMinutes={state.slotMinutes}
+            onSlotMinutes={(key, minutes) => setState((st) => ({ ...st, slotMinutes: { ...(st.slotMinutes ?? {}), [key]: minutes } }))}
+            slotsOff={state.slotsOff}
+            onSlotOn={(key, on) => setState((st) => ({
+              ...st,
+              slotsOff: on ? (st.slotsOff ?? []).filter((k) => k !== key) : [...new Set([...(st.slotsOff ?? []), key])],
+            }))}
           />
         </StepLayout>
       )}

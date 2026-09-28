@@ -7,7 +7,7 @@
 // Explicit failures: a workout that cannot be converted is reported by id and its earlier copy is left alone; a
 // provider whose credentials cannot be used is reported and nothing of that provider's is touched this run.
 
-import { destinationFor, diffDeliveries, syncWindow, contentHash, type Delivery, type Desired, type Destinations, type Provider } from './plan.ts';
+import { destinationFor, diffDeliveries, joinedPartners, mergeJoinedRow, syncWindow, contentHash, type Delivery, type Desired, type Destinations, type Provider } from './plan.ts';
 import { serializeRide } from '../intervals/serialize.ts';
 import { upsertEvents, deleteEventsByExternalId, type IntervalsAuth } from '../intervals/client.ts';
 import { convertWorkoutToGarmin } from '../garmin/convert-workout.ts';
@@ -88,18 +88,33 @@ export async function runCalendarSync(supabase: any, userId: string, now = new D
 
   const desired: WithPayload[] = [];
   const keep = new Set<string>();
+  // ⛔ A JOINED SESSION IS ONE WORKOUT ON EVERY CALENDAR (2026-09-27, `joinedPartners`, `mergeJoinedRow`): the first half
+  // carries both halves' steps and the second half is not sent, so any copy sent before is removed. Paired only when both
+  // halves go to the same provider.
+  const partners = joinedPartners((rows ?? []) as any[]);
+  const sentWithHead = new Set<string>();
+  for (const [headId, part] of partners) {
+    const head = (rows ?? []).find((r: any) => r.id === headId);
+    const to = head ? destinationFor(head, destinations, usable, today) : null;
+    if (to && destinationFor(part, destinations, usable, today) === to) sentWithHead.add(part.id);
+  }
   for (const row of rows ?? []) {
     const provider = destinationFor(row, destinations, usable, today);
     if (!provider) continue;
+    if (sentWithHead.has(row.id)) continue;
     try {
       let payload: any;
-      // The day's title in the book's terms rides on the row, as get-week sends it (2026-09-18).
-      const title = sessionTitle(row);
+      const part = partners.get(row.id);
+      const joined = part && sentWithHead.has(part.id);
+      const one = joined ? mergeJoinedRow(row, part) : row;
+      // The day's title in the book's terms rides on the row, as get-week sends it (2026-09-18); a joined session is
+      // "{first}, then {second}".
+      const title = sessionTitle(one);
       if (provider === 'intervals_icu') {
         if (String(row.type).toLowerCase() !== 'ride') throw new Error(`Intervals.icu sending covers rides only so far; this is a ${row.type}`);
-        payload = serializeRide({ ...row, name: title });
+        payload = serializeRide({ ...one, name: title });
       } else {
-        const copy = structuredClone(row);
+        const copy = structuredClone(one);
         copy.name = title;
         applyGarminBaselines(copy, baselines);
         payload = convertWorkoutToGarmin(copy);

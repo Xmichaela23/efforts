@@ -122,28 +122,29 @@ const tagValue = (s: PlanSession, prefix: string): string =>
  *      the frame's own hard slot counts as hard.
  *      ⚠️ A hard slot the athlete declined builds easy running of another family, so it still reads
  *      easy — the family has to match the slot's.
- *   2. **The six-ride week was zipped against seven slots** (`fewerRidesDropsSlot`), so every role
- *      after day 2 sat one session late and the long ride was classed as something else. The slot
- *      the composer drops is dropped here too, when the week carries exactly one session fewer.
+ *   2. **The six-ride week was zipped against seven slots**, so every role after day 2 sat one session
+ *      late and the long ride was classed as something else. The slots the athlete can switch off
+ *      (`EnduranceSlot.optional`, 2026-09-27) are dropped here too, when the week carries exactly that
+ *      many sessions fewer.
  */
 function frameEnduranceSlots(
   frame: FrameId,
   column: ColumnKind,
   builtCount?: number,
 ): Array<{ role: 'long' | 'hard' | null; family: string }> {
-  const all: Array<{ role: 'long' | 'hard' | null; family: string; key: string }> = [];
+  const all: Array<{ role: 'long' | 'hard' | null; family: string; optional: boolean }> = [];
   for (const d of FRAMES[frame].columns[column]) {
-    d.endurance.forEach((slot, i) => {
+    d.endurance.forEach((slot) => {
       all.push({
         role: isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : null,
         family: String(slot.family),
-        key: `${d.day}:${i}`,
+        optional: slot.optional === true,
       });
     });
   }
-  const drop = FRAMES[frame].fewerRidesDropsSlot;
-  if (drop && builtCount != null && builtCount === all.length - 1) {
-    return all.filter((x) => x.key !== `${drop.day}:${drop.index}`);
+  const optional = all.filter((x) => x.optional).length;
+  if (optional > 0 && builtCount != null && builtCount === all.length - optional) {
+    return all.filter((x) => !x.optional);
   }
   return all;
 }
@@ -469,7 +470,7 @@ export function conflictsOfTyped(
   typedIn: TypedSession[],
   ctx: { frame: FrameId; column: ColumnKind; dayOffset: DayArrangement } | null,
 ): WeekConflict[] {
-  // ⛔ ONE RUN OF TWO PARTS IS ONE SESSION (p245 / p253, `EnduranceSlot.joinsPrevious`): its second half is not
+  // ⛔ ONE SESSION OF TWO PARTS IS ONE SESSION (p245 / p253 / p269, `EnduranceSlot.joinsPrevious`): its second half is not
   // counted as another session on the day, and its first half speaks for it.
   const typed = typedIn.filter((t) => !(t.s.tags ?? []).includes(JOINED_PART_TAG));
   const { placements, dayOfLabel, nameOfLabel } = placementsOf(typed);

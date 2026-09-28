@@ -4,6 +4,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import { withUnattached } from '../_shared/unattached-planned.ts';
+import { joinedPartnerIds } from '../_shared/joined-session.ts';
 
 /**
  * ⛔ UNATTACH RE-RUNS THE CHAIN, AS ATTACH DOES (2026-09-13, Michael, on a ride he had just unattached
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
     // Verify planned row belongs to same user.
     const { data: p, error: pErr } = await supabase
       .from('planned_workouts')
-      .select('id,user_id,completed_workout_id,workout_status')
+      .select('id,user_id,completed_workout_id,workout_status,date,tags,training_plan_id')
       .eq('id', pid)
       .maybeSingle();
 
@@ -156,6 +157,19 @@ Deno.serve(async (req) => {
           .eq('id', pid)
           .eq('user_id', w.user_id);
       }
+    }
+
+    // 3) ⛔ A joined session's other half was marked done with this link (2026-09-27, `auto-attach-planned`); it goes back
+    //    to planned with it. Only a half with no link of its own.
+    const partners = await joinedPartnerIds(supabase, p);
+    if (partners.length) {
+      await supabase
+        .from('planned_workouts')
+        .update({ workout_status: 'planned' })
+        .in('id', partners)
+        .eq('user_id', w.user_id)
+        .eq('workout_status', 'completed')
+        .is('completed_workout_id', null);
     }
 
     fireRecompute(String(w.id), String(w.user_id));

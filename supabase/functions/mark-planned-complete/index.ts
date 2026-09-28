@@ -27,6 +27,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
+import { joinedPartnerIds, plannedWhole } from '../_shared/joined-session.ts';
 
 /** The types that get a finished row (they are the ones the effort prompt follows). */
 const FINISHED_ROW_TYPES = ['run', 'running', 'walk', 'ride', 'bike', 'cycling'];
@@ -62,7 +63,11 @@ Deno.serve(async (req) => {
     let workoutId: string | null = null;
     let minutes: number | null = null;
 
-    const seconds = FINISHED_ROW_TYPES.includes(type) ? resolvePlannedDurationSeconds(planned) : null;
+    // ⛔ A JOINED SESSION IS ONE SESSION (2026-09-27, `_shared/joined-session.ts`): marking it done marks both halves, and
+    // the finished row is the length of both.
+    const partnerIds = await joinedPartnerIds(supabase, planned);
+    const whole = await plannedWhole(supabase, planned, '*');
+    const seconds = FINISHED_ROW_TYPES.includes(type) ? resolvePlannedDurationSeconds(whole) : null;
     if (seconds != null) {
       minutes = Math.max(1, Math.round(seconds / 60));
       const { data: created, error: insertErr } = await supabase
@@ -91,7 +96,7 @@ Deno.serve(async (req) => {
     const { error: updateErr } = await supabase
       .from('planned_workouts')
       .update({ workout_status: 'completed', skip_reason: null, skip_note: null })
-      .eq('id', plannedId)
+      .in('id', [plannedId, ...partnerIds])
       .eq('user_id', userId);
     if (updateErr) {
       // With a finished row created the tap has landed (the phone logged this and carried on); without

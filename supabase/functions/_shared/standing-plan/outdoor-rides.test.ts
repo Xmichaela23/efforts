@@ -37,13 +37,13 @@ const CASES: Array<{ label: string; args: Record<string, unknown> }> = [
   { label: 'All Rounder, rides, newer', args: { ...newer, enduranceExperience: { run: 'newer', ride: 'newer' }, sportMix: AR_RIDES } },
   { label: 'All Rounder, rides, level 2', args: { ...home, baselines: BASELINES, enduranceExperience: { run: 'experienced', ride: 'experienced' }, levelOverrides: levels(2), sportMix: AR_RIDES } },
   { label: 'All Rounder, rides, level 3', args: { ...home, baselines: BASELINES, enduranceExperience: { run: 'experienced', ride: 'experienced' }, levelOverrides: levels(3), sportMix: AR_RIDES } },
-  { label: 'Ride + Strength, seven rides', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, sportMix: { rideCount: 7 } } },
-  { label: 'Ride + Strength, six rides', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, sportMix: { rideCount: 6 } } },
-  { label: 'Ride + Strength, newer, seven', args: { ...newer, frame: 'cycling_base', enduranceExperience: { ride: 'newer' }, sportMix: { rideCount: 7 } } },
-  { label: 'Ride + Strength, newer, six', args: { ...newer, frame: 'cycling_base', enduranceExperience: { ride: 'newer' }, sportMix: { rideCount: 6 } } },
-  { label: 'Ride + Strength, level 2', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(2), sportMix: { rideCount: 7 } } },
-  { label: 'Ride + Strength, level 3', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(3), sportMix: { rideCount: 7 } } },
-  { label: 'Ride + Strength, level 3, no FTP', args: { ...home, frame: 'cycling_base', enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(3), sportMix: { rideCount: 6 } } },
+  { label: 'Ride + Strength, five rides', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, sportMix: {} } },
+  { label: 'Ride + Strength, Day 2 off', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, sportMix: { slotsOff: ['2:0'] } } },
+  { label: 'Ride + Strength, newer, five', args: { ...newer, frame: 'cycling_base', enduranceExperience: { ride: 'newer' }, sportMix: {} } },
+  { label: 'Ride + Strength, newer, Day 2 off', args: { ...newer, frame: 'cycling_base', enduranceExperience: { ride: 'newer' }, sportMix: { slotsOff: ['2:0'] } } },
+  { label: 'Ride + Strength, level 2', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(2), sportMix: {} } },
+  { label: 'Ride + Strength, level 3', args: { ...home, frame: 'cycling_base', baselines: BASELINES, enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(3), sportMix: {} } },
+  { label: 'Ride + Strength, level 3, no FTP', args: { ...home, frame: 'cycling_base', enduranceExperience: { ride: 'experienced' }, levelOverrides: levels(3), sportMix: { slotsOff: ['2:0'] } } },
 ];
 
 const WEEKS = 12;
@@ -71,19 +71,21 @@ Deno.test('⛔ §6.2 — no venue tag: no built ride carries a trainer shape, in
   for (const f of RIDE_FAMILIES) assert(families.has(f), `the sweep built no ${f}`);
 });
 
-Deno.test('⛔ §6.2 — easy and long rides unchanged: steady / mixed, the same minutes as before the road rule', () => {
+Deno.test('⛔ §6.2 — easy and long rides: steady / mixed, the same minutes as before the road rule (Ride + Strength\'s midweek rides steady, 2026-09-27)', () => {
   // The sequences the composer built before 2026-09-24 (snapshot), per easy or long slot.
   const alternating = (a: string, b: string) => Array.from({ length: WEEKS }, (_, i) => (i % 2 === 0 ? a : b));
   const want: Record<string, Record<string, string[]>> = {
     'All Rounder, rides': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
     'All Rounder, newer': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
-    'Ride + Strength, seven rides': {
-      'Tuesday 2:0': alternating('steady/80', 'mixed/85'),
-      'Friday 5:0': alternating('steady/80', 'mixed/85'),
+    // ⛔ The Tuesday and Friday rides are p239's plain easy ride every week (Michael, 2026-09-27, option A); the long
+    // ride with no length picked still rotates p239's two level-2 rides.
+    'Ride + Strength, five rides': {
+      'Tuesday 2:0': Array.from({ length: WEEKS }, () => 'steady/80'),
+      'Friday 5:1': Array.from({ length: WEEKS }, () => 'steady/80'),
       'Saturday 6:0': alternating('steady/170', 'mixed/125'),
     },
-    'Ride + Strength, six rides': {
-      'Friday 5:0': alternating('steady/80', 'mixed/85'),
+    'Ride + Strength, Day 2 off': {
+      'Friday 5:1': Array.from({ length: WEEKS }, () => 'steady/80'),
       'Saturday 6:0': alternating('steady/170', 'mixed/125'),
     },
   };
@@ -101,7 +103,7 @@ Deno.test('⛔ §6.2 — easy and long rides unchanged: steady / mixed, the same
 Deno.test('⛔ §6.2 — hard rides: the road rotation, and VO2 is the one road shape every week', () => {
   // Ride + Strength at level 1: sweet spot walks medium / long / tempo (pp238-239's two-minute-plus shapes),
   // VO2 is p238's long repeats every week, sprints keep the frame's own road pins.
-  const c = CASES.find((x) => x.label === 'Ride + Strength, seven rides')!;
+  const c = CASES.find((x) => x.label === 'Ride + Strength, five rides')!;
   const got: Record<string, string[]> = {};
   for (const { s } of rides(block(c.args))) {
     if (tag(s, 'family:') === 'ride_endurance') continue;
@@ -112,7 +114,7 @@ Deno.test('⛔ §6.2 — hard rides: the road rotation, and VO2 is the one road 
     'Monday 1:0 ride_sweet_spot': cycle(['medium', 'long', 'tempo']),
     'Wednesday 3:0 ride_vo2': cycle(['long_vo2']),
     'Wednesday 3:1 ride_sweet_spot': cycle(['medium', 'long', 'tempo']),
-    'Friday 5:1 ride_sprints': cycle(['max_effort', 'flying_surge']),
+    'Friday 5:0 ride_sprints': cycle(['max_effort', 'flying_surge']),
   });
   // And the All Rounder's own anaerobic ride (p274 day 2) rotates p237's three by-feel shapes, all road.
   const ar = CASES.find((x) => x.label === 'All Rounder, runs')!;
@@ -127,7 +129,7 @@ Deno.test('⛔ §6.2 — hard rides: the road rotation, and VO2 is the one road 
  * the weeks before keep the road; every other ride keeps the road.
  */
 Deno.test('⛔ §6.3 — a trainer slot rotates every shape on that slot only, from the week it is listed', () => {
-  const c = CASES.find((x) => x.label === 'Ride + Strength, seven rides')!;
+  const c = CASES.find((x) => x.label === 'Ride + Strength, five rides')!;
   const from = 4; // the tag landed in week 3; the rewrite lists weeks 4 on
   const listed = Object.fromEntries(Array.from({ length: WEEKS - from + 1 }, (_, i) => [from + i, ['3:0']]));
   const road = rides(block(c.args));
@@ -167,7 +169,7 @@ const row = (over: Partial<{ exercise_name: string; substitute_exercise_name: st
 });
 
 Deno.test('⛔ §3B — the rewrite lists the trainer slot for the weeks after the tag, that slot only; today and revert list nothing', () => {
-  const c = CASES.find((x) => x.label === 'Ride + Strength, seven rides')!;
+  const c = CASES.find((x) => x.label === 'Ride + Strength, five rides')!;
   const composed = block(c.args);
   // Rest of plan from week 3's Wednesday: weeks 4-12, the first ride of Wednesday (VO2, slot 3:0) and nothing else.
   const restOfPlan = trainerSlotsByWeek(composed, [row({})], dateOf);

@@ -71,16 +71,18 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
     'the resolver default is no longer the 5K frame');
 });
 
-Deno.test('⛔ RIDE + STRENGTH — the focus and the ride count survive every hop (2026-09-13)', () => {
-  // Hop 1: the programme card carries `ride`, and the payload sends it and the ride count.
+Deno.test('⛔ RIDE + STRENGTH — the focus, the switched-off rides and the long ride\'s length survive every hop', () => {
+  // Hop 1: the programme card carries `ride`, and the payload sends it, the rides switched off and the lengths.
   assert(/goal: 'get_stronger', focus: 'ride'/.test(WIZARD), 'the Ride + Strength card no longer seeds its focus');
   assert(/state\.focus === 'ride' \? \{ focus: 'ride' \} : \{\}/.test(WIZARD), 'the payload no longer sends the ride focus');
-  assert(/printedRideWeekPath\(state\) && state\.rideCount != null \? \{ ride_count:/.test(WIZARD), 'the payload no longer sends the ride count');
-  // Hop 2: create-goal forwards both through its allowlist.
+  assert(/\{ endurance_slots_off: off \}/.test(WIZARD), 'the payload no longer sends the switched-off rides');
+  assert(/\{ endurance_slot_minutes: out \}/.test(WIZARD), 'the payload no longer sends the session lengths');
+  // Hop 2: create-goal forwards them through its allowlist.
   assert(/gsTp\.focus === 'ride'/.test(CREATE_GOAL), 'create-goal no longer forwards the ride focus');
-  assert(/\{ ride_count: n \}/.test(CREATE_GOAL), 'create-goal drops the ride count — a four-ride answer builds five');
-  // Hop 3: the builder reads the count off its body.
-  assert(/\(body as Record<string, unknown>\)\.ride_count/.test(GENERATE), 'generate-strength-plan no longer reads the ride count');
+  assert(/\{ endurance_slots_off: raw \}/.test(CREATE_GOAL), 'create-goal drops the switched-off rides — a ride switched off is built');
+  assert(/endurance_slot_minutes/.test(CREATE_GOAL), 'create-goal drops the session lengths');
+  // Hop 3: the builder reads them off its body.
+  assert(/\(body as Record<string, unknown>\)\.endurance_slots_off/.test(GENERATE), 'generate-strength-plan no longer reads the switched-off rides');
 });
 
 Deno.test('⛔ MULTISPORT FOCUS — the Run + Ride + Strength card opens today\'s Standard Focus setup (2026-09-13)', () => {

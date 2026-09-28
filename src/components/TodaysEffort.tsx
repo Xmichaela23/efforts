@@ -687,7 +687,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         skip_reason: reason && reason.trim() ? reason.trim() : null,
         skip_note: note && note.trim() ? note.trim() : null,
       };
-      const { error } = await supabase.from('planned_workouts').update(patch).eq('id', workout.id).eq('user_id', userId);
+      // ⛔ A joined session is one card (2026-09-27): skipping it skips both halves (`joined_part_ids`, get-week).
+      const ids = [String(workout.id), ...(Array.isArray(workout.joined_part_ids) ? workout.joined_part_ids.map(String) : [])];
+      const { error } = await supabase.from('planned_workouts').update(patch).in('id', ids).eq('user_id', userId);
       if (error) throw error;
       toast({ title: 'Session skipped', variant: 'default' });
       setSelectedPlannedWorkout(null);

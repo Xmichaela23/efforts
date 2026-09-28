@@ -4,8 +4,8 @@
 //
 // ⛔ WHAT IT ASKS. Not "is the week sound" (`fuzz-builder.test.ts` asks that, on `strength_5k`), but
 // "did the athlete get what they tapped": the long day, the hard days, the days off, run or ride
-// per row, the workout picked for a hard row, the length picked for an easy or long row, six or
-// seven rides, test week or current numbers, and each lift pick.
+// per row, the workout picked for a hard row, the length picked for an easy or long row, an optional
+// ride switched off, test week or current numbers, and each lift pick.
 //
 // ⛔ WHAT IT RUNS AGAINST. The same assembly `generate-strength-plan/index.ts` performs, in its own
 // order: the mix → `fenceMixToFrame` → `assignSports` → which sport holds the long slot →
@@ -41,6 +41,7 @@ import {
   type PlanSession,
   type Weekday,
 } from './index.ts';
+import { isJoinedSlot } from './frames.ts';
 import { slotVariantOptions } from '../../../../src/lib/hard-slot-choices.ts';
 import { slotLengthOptions } from '../../../../src/lib/standing-plan-week-bounds.ts';
 import { frameSlots, forcedSportFor } from '../../../../src/lib/standing-plan-week-copy.ts';
@@ -71,24 +72,28 @@ const HOME = [
 
 // ── THE FRAME'S SLOTS ────────────────────────────────────────────────────────────────────────────
 
-type Slot = { key: string; family: string; role: 'long' | 'hard' | 'easy' };
+/** `joined` = the second half of a joined session (`EnduranceSlot.joinsPrevious`): its head's day, no pin of its own. */
+type Slot = { key: string; family: string; role: 'long' | 'hard' | 'easy'; joined: boolean; follows: string | null };
 
-/** The frame's endurance slots in emit order, less the one a six-ride week drops. */
-function slotsOf(frame: FrameId, rideCount: number | null): Slot[] {
-  const drop = FRAMES[frame].fewerRidesDropsSlot;
+/** The frame's endurance slots in emit order, less the optional ones switched off. */
+function slotsOf(frame: FrameId, off: string[]): Slot[] {
   const out: Slot[] = [];
   for (const d of FRAMES[frame].columns.standard) {
     d.endurance.forEach((s, i) => {
-      if (drop && rideCount === drop.rideCount && d.day === drop.day && i === drop.index) return;
+      if (s.optional && off.includes(`${d.day}:${i}`)) return;
       out.push({
         key: `${d.day}:${i}`,
         family: String(s.family),
         role: isLongSlot(s) ? 'long' : isHardSlot(s) ? 'hard' : 'easy',
+        joined: isJoinedSlot(s),
+        follows: s.sameLengthAs ?? null,
       });
     });
   }
   return out;
 }
+/** The hard rows a pin can name — a joined second half has none of its own. */
+const pinnableHard = (slots: Slot[]) => slots.filter((s) => s.role === 'hard' && !s.joined);
 
 /** The sports the builder offers on a slot: one when the page fixes it, two when it does not. */
 function sportsOffered(frame: FrameId, slot: Slot): Array<'run' | 'ride'> {
@@ -107,7 +112,7 @@ type Case = {
   sports: Record<string, 'run' | 'ride'>;
   archetypes?: Record<string, string>;
   minutes?: Record<string, number>;
-  rideCount?: number | null;
+  slotsOff?: string[];
   longDay: Weekday | null;
   hardDays: Array<Weekday | null>;
   blocked: Weekday[];
@@ -120,7 +125,7 @@ type Case = {
 };
 
 const describe = (c: Case): string => JSON.stringify({
-  frame: c.frame, sports: c.sports, arch: c.archetypes, min: c.minutes, rides: c.rideCount,
+  frame: c.frame, sports: c.sports, arch: c.archetypes, min: c.minutes, off: c.slotsOff,
   long: c.longDay, hard: c.hardDays, off: c.blocked, skip: c.skipTest,
 });
 
@@ -129,7 +134,7 @@ function build(c: Case) {
   const rides = Object.values(c.sports).filter((s) => s === 'ride').length;
   const mix = fenceMixToFrame(c.frame, {
     runs, rides, swimDays: 0,
-    rideCount: c.rideCount ?? null,
+    slotsOff: c.slotsOff ?? null,
     slots: c.sports,
     archetypes: c.archetypes ?? null,
     minutes: c.minutes ?? null,
@@ -181,8 +186,6 @@ const isAddOn = (s: PlanSession) =>
 const tagOf = (s: PlanSession, prefix: string) =>
   (s.tags ?? []).find((t) => t.startsWith(prefix))?.slice(prefix.length) ?? null;
 
-/** True when no pin of the athlete's names this day — what sits there is the programme's own week. */
-const pinsNothingOn = (c: Case, day: string) => c.longDay !== day && !c.hardDays.includes(day as Weekday);
 
 /** Every way a built block can fail to carry the athlete's answers. Returns sentences; never throws. */
 function check(c: Case, built: ReturnType<typeof build>): string[] {
@@ -192,8 +195,8 @@ function check(c: Case, built: ReturnType<typeof build>): string[] {
     ...built.row.notes.map((n) => n.text),
   ];
   const namesDay = (d: string) => spoken.some((t) => t.includes(d));
-  const slots = slotsOf(c.frame, c.rideCount ?? null);
-  const hardSlots = slots.filter((s) => s.role === 'hard');
+  const slots = slotsOf(c.frame, c.slotsOff ?? []);
+  const hardSlots = pinnableHard(slots);
 
   for (const [wk, ss] of Object.entries(built.row.sessions_by_week)) {
     if (!ss || ss.length === 0) { fails.push(`week ${wk}: NOTHING BUILT`); continue; }
@@ -222,8 +225,13 @@ function check(c: Case, built: ReturnType<typeof build>): string[] {
         fails.push(`week ${wk}: SPORT — row ${slot.key} answered ${sport}, built ${s.type} "${s.name}"`);
       }
 
+      // 4b ── ONE SESSION OF TWO PARTS STAYS ONE: the second half lands on its first half's day.
+      if (slot.joined && (i === 0 || s.day !== endurance[i - 1].day)) {
+        fails.push(`week ${wk}: JOINED — row ${slot.key} built ${s.day}, its first half ${endurance[i - 1]?.day}`);
+      }
+
       // 4 ── THE PINNED DAY. A pin on a day off cannot be honoured; it must move AND be said.
-      const pin = slot.role === 'long'
+      const pin = slot.joined ? null : slot.role === 'long'
         ? c.longDay
         : slot.role === 'hard' ? c.hardDays[hardSlots.indexOf(slot)] ?? null : null;
       if (pin) {
@@ -241,7 +249,8 @@ function check(c: Case, built: ReturnType<typeof build>): string[] {
       }
 
       // 6 ── THE LENGTH PICKED FOR AN EASY OR LONG ROW.
-      const mins = c.minutes?.[slot.key];
+      // A ride held to another's length (`sameLengthAs`, p281) builds that pick too.
+      const mins = c.minutes?.[slot.key] ?? (slot.follows ? c.minutes?.[slot.follows] : undefined);
       // ⛔ EVERY WEEK, the alternate one included. 2026-09-20: the easy ride's even weeks built p239's
       // printed 85-minute mixed ride whatever was picked; `archetypeForSlot` (compose.ts) closed it.
       if (mins && s.duration !== mins) {
@@ -252,15 +261,13 @@ function check(c: Case, built: ReturnType<typeof build>): string[] {
     // 7 ── TWO OF THE WEEK'S BIG SESSIONS ON ONE DAY ARE BUILT, AND SAID. Warn, never block: the
     //      week the athlete tapped is only honest if the note about that day always appears.
     const bigByDay = new Map<string, string[]>();
+    // ⚠️ A joined second half is part of its first half's session, not a second one (p278 days 3 and 5).
     endurance.forEach((s, i) => {
-      if (slots[i].role === 'easy') return;
+      if (slots[i].role === 'easy' || slots[i].joined) return;
       bigByDay.set(s.day, [...(bigByDay.get(s.day) ?? []), s.name]);
     });
     for (const [day, names] of bigByDay) {
       if (names.length < 2 || namesDay(day)) continue;
-      // ⚠️ Ride + Strength PRINTS two hard rides on one day (p278 days 3 and 5); the page's own
-      // week is not the athlete's doing and carries its own line.
-      if (spoken.some((t) => /Two rides land on one day/i.test(t)) && pinsNothingOn(c, day)) continue;
       fails.push(`week ${wk}: STACKED IN SILENCE — ${day} carries ${names.join(' + ')} and no note names ${day}`);
     }
 
@@ -309,9 +316,9 @@ function run(title: string, cases: Iterable<Case>) {
 // ── THE SPACE ────────────────────────────────────────────────────────────────────────────────────
 
 /** Every run-or-ride answer the builder offers on the frame. */
-function sportAnswers(frame: FrameId, rideCount: number | null): Array<Record<string, 'run' | 'ride'>> {
+function sportAnswers(frame: FrameId, off: string[]): Array<Record<string, 'run' | 'ride'>> {
   let out: Array<Record<string, 'run' | 'ride'>> = [{}];
-  for (const slot of slotsOf(frame, rideCount)) {
+  for (const slot of slotsOf(frame, off)) {
     const next: Array<Record<string, 'run' | 'ride'>> = [];
     for (const partial of out) for (const sp of sportsOffered(frame, slot)) next.push({ ...partial, [slot.key]: sp });
     out = next;
@@ -328,8 +335,10 @@ function subsets<T>(xs: T[], maxSize: number): T[][] {
   return out;
 }
 
-const RIDE_COUNTS: Record<FrameId, Array<number | null>> = {
-  strength_5k: [null], all_rounder: [null], cycling_base: [6, 7],
+/** The optional-session answers per frame: every optional slot on, and each switched off. */
+const OFF_CHOICES = (frame: FrameId): string[][] => {
+  const optional = FRAMES[frame].columns.standard.flatMap((d) => d.endurance.flatMap((e, i) => (e.optional ? [`${d.day}:${i}`] : [])));
+  return [[], ...optional.map((k) => [k])];
 };
 const DAY_OR_NONE: Array<Weekday | null> = [null, ...DAYS];
 
@@ -338,11 +347,11 @@ const DAY_OR_NONE: Array<Weekday | null> = [null, ...DAYS];
 for (const frame of FRAME_IDS) {
   Deno.test(`SWEEP 1 — ${frame}: every set of days off × every long day × every run-or-ride answer`, () => {
     function* cases(): Iterable<Case> {
-      for (const rideCount of RIDE_COUNTS[frame]) {
-        for (const sports of sportAnswers(frame, rideCount)) {
+      for (const slotsOff of OFF_CHOICES(frame)) {
+        for (const sports of sportAnswers(frame, slotsOff)) {
           for (const blocked of subsets(DAYS, 6)) {
             for (const longDay of DAY_OR_NONE) {
-              yield { frame, sports, rideCount, longDay, hardDays: [], blocked };
+              yield { frame, sports, slotsOff, longDay, hardDays: [], blocked };
             }
           }
         }
@@ -353,11 +362,11 @@ for (const frame of FRAME_IDS) {
 
   Deno.test(`SWEEP 2 — ${frame}: every long day × every hard-day pick, including all on one day`, () => {
     function* cases(): Iterable<Case> {
-      // ⚠️ The six-ride week drops one EASY row, which no long or hard pin touches; it is crossed
-      // with days off and pins in SWEEPS 1 and 3. Here the last ride count stands for both.
-      for (const rideCount of RIDE_COUNTS[frame].slice(-1)) {
-        const nHard = slotsOf(frame, rideCount).filter((s) => s.role === 'hard').length;
-        const all = sportAnswers(frame, rideCount);
+      // ⚠️ An optional session switched off drops one EASY row, which no long or hard pin touches; it is
+      // crossed with days off and pins in SWEEPS 1 and 3. Here every optional session on stands for both.
+      for (const slotsOff of OFF_CHOICES(frame).slice(0, 1)) {
+        const nHard = pinnableHard(slotsOf(frame, slotsOff)).length;
+        const all = sportAnswers(frame, slotsOff);
         // ⚠️ The two ends of the sport answers — every row a run where offered, every row a ride.
         // The middle is crossed with days in SWEEP 1 and with days off in SWEEP 3.
         const ends = all.length > 1 ? [all[0], all[all.length - 1]] : all;
@@ -368,7 +377,7 @@ for (const frame of FRAME_IDS) {
           };
           for (const longDay of DAY_OR_NONE) {
             for (const hardDays of walk(0, [])) {
-              yield { frame, sports, rideCount, longDay, hardDays, blocked: [] };
+              yield { frame, sports, slotsOff, longDay, hardDays, blocked: [] };
             }
           }
         }
@@ -379,9 +388,9 @@ for (const frame of FRAME_IDS) {
 
   Deno.test(`SWEEP 3 — ${frame}: days off (none, one, two) × every pin on and off those days`, () => {
     function* cases(): Iterable<Case> {
-      for (const rideCount of RIDE_COUNTS[frame]) {
-        const nHard = slotsOf(frame, rideCount).filter((s) => s.role === 'hard').length;
-        for (const sports of sportAnswers(frame, rideCount)) {
+      for (const slotsOff of OFF_CHOICES(frame)) {
+        const nHard = pinnableHard(slotsOf(frame, slotsOff)).length;
+        for (const sports of sportAnswers(frame, slotsOff)) {
           for (const blocked of subsets(DAYS, 2)) {
             for (const longDay of DAY_OR_NONE) {
               // One hard row pinned at a time, every day; the others left to the programme.
@@ -389,7 +398,7 @@ for (const frame of FRAME_IDS) {
                 for (const d of DAYS) {
                   const hardDays: Array<Weekday | null> = Array.from({ length: nHard }, () => null);
                   hardDays[h] = d;
-                  yield { frame, sports, rideCount, longDay, hardDays, blocked };
+                  yield { frame, sports, slotsOff, longDay, hardDays, blocked };
                 }
               }
             }
@@ -400,13 +409,13 @@ for (const frame of FRAME_IDS) {
     run(`${frame} days off × pins`, cases());
   });
 
-  // ⚠️ Ride + Strength asks no workout and no length — only six or seven rides, which SWEEP 1's
-  // row count checks on every build.
-  if (frame !== 'cycling_base') Deno.test(`SWEEP 4 — ${frame}: every workout offered on every hard row, every length on every easy and long row`, () => {
+  // ⚠️ Ride + Strength asks no workout; it asks the long ride's length (`rideWeek`, 2026-09-27) and the switch, which
+  // SWEEP 1's row count checks on every build.
+  Deno.test(`SWEEP 4 — ${frame}: every workout offered on every hard row, every length on every easy and long row`, () => {
     function* cases(): Iterable<Case> {
-      for (const rideCount of RIDE_COUNTS[frame]) {
-        for (const sports of sportAnswers(frame, rideCount)) {
-          for (const slot of slotsOf(frame, rideCount)) {
+      for (const slotsOff of OFF_CHOICES(frame)) {
+        for (const sports of sportAnswers(frame, slotsOff)) {
+          for (const slot of slotsOf(frame, slotsOff)) {
             const sport = sports[slot.key];
             // ⚠️ Run + Strength rotates its hard runs and Ride + Strength prints its own; only the
             // Run + Ride + Strength screen offers a workout per hard row.
@@ -417,7 +426,13 @@ for (const frame of FRAME_IDS) {
               const offered = hardRow ? slotVariantOptions(hardRow.key as never, sport, frame) : [];
               if (offered.length === 0) throw new Error(`${frame} ${slot.key} ${sport}: the screen offers no workout`);
               for (const a of offered) {
-                yield { frame, sports, rideCount, longDay: null, hardDays: [], blocked: [], archetypes: { [slot.key]: a.id } };
+                yield { frame, sports, slotsOff, longDay: null, hardDays: [], blocked: [], archetypes: { [slot.key]: a.id } };
+              }
+            }
+            // ⛔ Every length the rides screen offers (the long ride; the midweek ride Friday's follows).
+            if (FRAMES[frame].rideWeek?.chips[slot.key]) {
+              for (const minutes of FRAMES[frame].rideWeek!.chips[slot.key]) {
+                yield { frame, sports, slotsOff, longDay: null, hardDays: [], blocked: [], minutes: { [slot.key]: minutes } };
               }
             }
             if (slot.role !== 'hard' && frame !== 'cycling_base') {
@@ -431,7 +446,7 @@ for (const frame of FRAME_IDS) {
                 ? (slot.role === 'long' ? [68, 75, 90] : [])
                 : (row ? slotLengthOptions(row.key, rowAnswers as never, { baselines: BASELINES as never, frame, tier: 'experienced' })?.options ?? [] : []);
               for (const minutes of lengths) {
-                yield { frame, sports, rideCount, longDay: null, hardDays: [], blocked: [], minutes: { [slot.key]: minutes } };
+                yield { frame, sports, slotsOff, longDay: null, hardDays: [], blocked: [], minutes: { [slot.key]: minutes } };
               }
             }
           }
@@ -443,12 +458,12 @@ for (const frame of FRAME_IDS) {
 
   Deno.test(`SWEEP 5 — ${frame}: test week or current numbers × a pinned, blocked week`, () => {
     function* cases(): Iterable<Case> {
-      for (const rideCount of RIDE_COUNTS[frame]) {
-        const sports = sportAnswers(frame, rideCount)[0];
+      for (const slotsOff of OFF_CHOICES(frame)) {
+        const sports = sportAnswers(frame, slotsOff)[0];
         for (const skipTest of [false, true]) {
           for (const longDay of DAY_OR_NONE) {
             for (const blocked of subsets(DAYS, 1)) {
-              yield { frame, sports, rideCount, longDay, hardDays: [], blocked, skipTest };
+              yield { frame, sports, slotsOff, longDay, hardDays: [], blocked, skipTest };
             }
           }
         }
@@ -471,9 +486,9 @@ for (const frame of FRAME_IDS) {
             { version: 1, picks: { [key]: o.name }, dial: [], dial_rows: {} }, kit, frame,
           );
           if (!prefs) { fails.push(`${key} = "${o.name}": the wire returned nothing`); continue; }
-          const sports = sportAnswers(frame, RIDE_COUNTS[frame][0])[0];
+          const sports = sportAnswers(frame, [])[0];
           const built = build({
-            frame, sports, rideCount: RIDE_COUNTS[frame][0], longDay: null, hardDays: [], blocked: [],
+            frame, sports, slotsOff: [], longDay: null, hardDays: [], blocked: [],
             skipTest: true, slotPicks: prefs.picks as Record<string, string>,
             accessoryPicks: flattenViadaPicks(prefs), equipment: kit, weeks: 2,
           });

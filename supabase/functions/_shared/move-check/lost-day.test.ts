@@ -248,3 +248,32 @@ Deno.test('p109 floor counts the kept week: with a speed session kept, a lost sp
   // One room left (Saturday): the longer session takes it — the speed ride is an extra.
   assertEquals([where(p, 'ez').to, where(p, 'sp').dropped], ['2026-09-26', true]);
 });
+
+/**
+ * ⛔ A JOINED RIDE MOVES WHOLE (Michael, 2026-09-27: "the lost-day drag moves the whole ride"). Tuesday's Progressive
+ * Repeats is made the first half of a joined ride with an easy second half; the placer and the athlete's drag of either
+ * half land both halves on one day.
+ */
+const JOINED_WEEK: MoveRow[] = [
+  ...WEEK.filter((r) => r.id !== 'ana'),
+  { ...S('ana', '2026-09-22', 'ride', 'Progressive Repeats', 'planned', 'above'), tags: ['standing_plan', 'band:above', 'slot:2:0', 'one_run'] },
+  { ...S('ana2', '2026-09-22', 'ride', 'Ride', 'planned', 'vt1_or_easier'), duration: 60, tags: ['standing_plan', 'band:vt1_or_easier', 'slot:2:1', 'one_run', 'one_run_part2'] },
+];
+Deno.test('⛔ a joined ride on the lost day moves as one — placed, or dragged by either half', () => {
+  for (const moves of [undefined, { ana: '2026-09-26' }, { ana2: '2026-09-26' }]) {
+    const p = plan(moves, JOINED_WEEK);
+    const a = where(p, 'ana');
+    const b = where(p, 'ana2');
+    assertEquals(a.to, b.to, JSON.stringify(moves));
+    assertEquals(a.to !== '2026-09-22', true, JSON.stringify(moves));
+    if (moves) assertEquals(a.to, '2026-09-26');
+  }
+});
+
+Deno.test('⛔ the lost-day screen shows a joined ride as one card: the first half named for both, the second half riding with it', () => {
+  const p = plan(undefined, JOINED_WEEK);
+  assertEquals(where(p, 'ana').name, 'Progressive Repeats, then Ride');
+  assertEquals(where(p, 'ana').joined_to, null);
+  assertEquals(where(p, 'ana2').joined_to, 'ana');
+  assertEquals(where(p, 'mlss').joined_to, null);
+});

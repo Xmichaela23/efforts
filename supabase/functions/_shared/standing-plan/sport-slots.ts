@@ -93,11 +93,11 @@ export type SportMix = {
    */
   minutes?: Record<string, number> | null;
   /**
-   * ⛔ HOW MANY RIDES A WEEK, ON A FRAME THAT DECLARES A RIDE THE ATHLETE MAY LEAVE OUT
-   * (`Frame.fewerRidesDropsSlot`, p278, 2026-09-13). The only count the athlete owns on that frame.
-   * Absent is the frame as printed.
+   * ⛔ THE OPTIONAL SESSIONS THE ATHLETE SWITCHED OFF (Michael, 2026-09-27) — frame keys (`${frameDay}:${index}`).
+   * Only a slot the frame marks `EnduranceSlot.optional` is honoured; any other key is ignored. Absent or empty is
+   * the week as printed. Replaces the ride count (p278's six-or-seven chips, 2026-09-13).
    */
-  rideCount?: number | null;
+  slotsOff?: string[] | null;
 };
 
 export type AssignedSlot = {

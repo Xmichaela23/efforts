@@ -27,6 +27,7 @@
 // =============================================================================
 
 import { planDateOf } from '../moved-from.ts';
+import { fill, JOINED_ROW } from '../standing-plan/setup-copy.ts';
 import { checkMove, daysBetween, daysThatFit, downDates, isJoinedPart, isPlyo, liftGaps, MAX_SESSIONS_A_DAY, movesWith, sessionsOn, weekdayName, type MoveRow } from './index.ts';
 
 export type LostDaySession = {
@@ -47,6 +48,11 @@ export type LostDaySession = {
   lost_day: string | null;
   /** True when an earlier lost day took it off (it is skipped now) — Save puts it back on the plan if it is placed. */
   was_dropped: boolean;
+  /**
+   * ⛔ THE SECOND HALF OF A JOINED SESSION (2026-09-27): the first half's id. The sheet shows the pair as one card (the
+   * first half, named "{first}, then {second}") and still saves this row, which always lands on the first half's day.
+   */
+  joined_to: string | null;
 };
 
 export type LostDayPlan = {
@@ -134,7 +140,7 @@ export function placeLostDay(args: {
     if (!(isPlanned(r) || lostOf.has(r.id))) continue;
     at.set(r.id, iso(to));
     pending.delete(r.id);
-    // ⛔ A joined run's other part goes with the drag (p245 / p253) unless it was dragged too.
+    // ⛔ A joined session's other part goes with the drag (p245 / p253 / p269) unless it was dragged too.
     for (const w of movesWith(r, args.rows)) if (!moves[w.id]) { at.set(w.id, iso(to)); pending.delete(w.id); }
   }
 
@@ -230,9 +236,14 @@ export function placeLostDay(args: {
       const to = off ? from : at.get(r.id) ?? from;
       const wasOff = status(r) === 'skipped';
       const notes = off || (to === from && !wasOff) ? [] : checkMove({ session: r, toDate: to, rows: final, daysOff: args.daysOff }).notes.map((n) => n.text);
+      const partner = movesWith(r, args.rows)[0] ?? null;
+      const name = partner && !isJoinedPart(r) && r.name && partner.name
+        ? fill(JOINED_ROW, { first: String(r.name), second: String(partner.name) })
+        : r.name ?? null;
       return {
-        id: r.id, name: r.name ?? null, type: r.type ?? null, from, to, movable: isPlanned(r) || lostOf.has(r.id),
+        id: r.id, name, type: r.type ?? null, from, to, movable: isPlanned(r) || lostOf.has(r.id),
         dropped: off, notes, lost_day: lostOf.get(r.id) ?? null, was_dropped: wasOff,
+        joined_to: partner && isJoinedPart(r) ? String(partner.id) : null,
       };
     })
     .sort((a, b) => a.to.localeCompare(b.to));

@@ -2,7 +2,8 @@
 // day-seq — which of a day's same-sport sessions a planned row is (2026-09-20)
 // =============================================================================
 //
-// ⛔ A DAY CAN HOLD TWO RIDES. Ride + Strength at seven rides prints two rides on days 3 and 5, and
+// ⛔ A DAY CAN HOLD TWO RIDES. Ride + Strength prints two workouts on days 3 and 5 (built as one joined ride of two rows
+// since 2026-09-27), and
 // `ux_planned_unique_key` allowed one row per (plan, week, day, date, type), so activate-plan dropped the
 // second in silence. `planned_workouts.day_seq` joins that index (20260921000000).
 //

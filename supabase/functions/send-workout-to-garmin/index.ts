@@ -5,6 +5,7 @@ import { recordProviderResult } from '../_shared/connection-health.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { convertWorkoutToGarmin, type PlannedWorkout } from '../_shared/garmin/convert-workout.ts'
 import { sessionTitle } from '../_shared/session-title.ts'
+import { joinedPartnerIds, plannedWhole } from '../_shared/joined-session.ts'
 import { applyGarminBaselines } from '../_shared/garmin/prepare.ts'
 import { ensureValidGarminAccessToken, sendToGarmin, scheduleWorkoutOnDate } from '../_shared/garmin/training-api.ts'
 
@@ -44,6 +45,11 @@ serve(async (req) => {
 
     // Do not early-return if intervals are missing; we can build from structured/computed below
 
+    // ⛔ A JOINED SESSION GOES AS ONE WORKOUT (2026-09-27): both halves' steps, "{first}, then {second}" — the calendar
+    // sync's own merge (`plannedWhole` → `mergeJoinedRow`) — and both rows are marked sent.
+    const partnerIds = await joinedPartnerIds(supabase, workout as any)
+    const whole = (await plannedWhole(supabase, workout as any, '*')) as PlannedWorkout
+
     // Fetch user's Garmin tokens
     const { data: conn, error: connErr } = await supabase
       .from('user_connections')
@@ -65,11 +71,11 @@ serve(async (req) => {
       .select('units, performance_numbers, learned_fitness')
       .eq('user_id', userId)
       .maybeSingle()
-    applyGarminBaselines(workout, ub)
+    applyGarminBaselines(whole, ub)
     // ⛔ THE SAME TITLE THE CALENDAR SYNC SENDS (2026-09-18, book-language pass 1) — `_shared/session-title.ts`.
-    ;(workout as any).name = sessionTitle(workout as any)
+    ;(whole as any).name = sessionTitle(whole as any)
 
-    const garminPayload = convertWorkoutToGarmin(workout)
+    const garminPayload = convertWorkoutToGarmin(whole)
     try {
       const firstSeg = (garminPayload as any)?.segments?.[0]
       const steps = Array.isArray(firstSeg?.steps) ? firstSeg.steps : []
@@ -110,7 +116,7 @@ serve(async (req) => {
         garmin_schedule_id: scheduleResult?.scheduleId ?? null,
         updated_at: new Date().toISOString()
       })
-      .eq('id', workoutId)
+      .in('id', [workoutId, ...partnerIds])
 
     const debugOut: any = {}
     try {

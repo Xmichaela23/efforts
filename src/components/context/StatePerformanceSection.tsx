@@ -37,6 +37,7 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 import { EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
+import LengthOfferCard from '@/components/context/LengthOfferCard';
 // ⛔ `LoadWeeksCard` WAS IMPORTED HERE AND NEVER RENDERED — a dead import, so the load bars have
 // never actually been on State. They render on Today now (work order 2026-09-09 §3b.2), via
 // `TodayWeekBlocks`. Recorded rather than silently deleted: §3b.2 says the card "moves from State",
@@ -1227,7 +1228,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       {withReorder && <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-caption tracking-wider uppercase text-label-secondary py-1 -my-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>}
     </div>
   ) : null;
-  if (loading || cards.length === 0) return <div className="pb-3">{headerRow(false)}<EnduranceCheckpointSheet enabled={hasActivePlan === true} /></div>;
+  if (loading || cards.length === 0) return <div className="pb-3">{headerRow(false)}<EnduranceCheckpointSheet enabled={hasActivePlan === true} /><LengthOfferCard enabled={hasActivePlan === true} /></div>;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
   // falls through to the standard card (adherence).
@@ -1352,7 +1353,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       {headerRow(true)}
       {/* ⛔ THE SIX-WEEK CHECKPOINT (D-462 follow-up) sits above the sport plates: it is plan-level
           (threshold pace, FTP, threshold HR), not one sport's. Renders only when the server says it is due. */}
-      <EnduranceCheckpointSheet enabled={hasActivePlan === true} />
+      <EnduranceCheckpointSheet enabled={hasActivePlan === true} /><LengthOfferCard enabled={hasActivePlan === true} />
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
       {/* ⛔ THE "Fitness / trends over recent weeks" HEADING IS REMOVED (2026-09-01, cosmetic) — it

@@ -42,6 +42,7 @@ import type {
   CyclingVsSimilarV1,
 } from '../_shared/cycling-v1/cross-workout-types.ts';
 import { runOnlyKeyScrub } from '../_shared/cross-sport-key-scrub.ts';
+import { plannedWhole } from '../_shared/joined-session.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1251,7 +1252,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       // UNPLANNED MODE for every planned ride. Mirrored run-side shape
       // (analyze-running-workout/index.ts:455-466): select existing
       // columns only AND capture + check `plannedError`.
-      const { data: planned, error: plannedError } = await supabase
+      const { data: plannedRow, error: plannedError } = await supabase
         .from('planned_workouts')
         // ⛔ `duration` IS IN THIS LIST FOR A REASON (2026-08-01). It is the ONLY place an unstructured
         // session states its length — "~108 min easy" carries computed: null, intervals: [],
@@ -1259,11 +1260,14 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         // resolvePlannedDurationSeconds has nothing to resolve and the ride scores 0% executed.
         // Third time one missing column caused this: the attach matcher's candidate query had the same
         // hole, and so did its post-materialize re-read.
-        .select('id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds, duration')
+        .select('id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds, duration, date, workout_status')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id)
         .single();
 
+      // ⛔ Half of a joined ride is compared as the whole ride (2026-09-27, `plannedWhole`).
+      const planned = plannedError ? null : await plannedWhole(supabase, plannedRow,
+        'id, type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, total_duration_seconds, duration, date, workout_status');
       if (plannedError) {
         console.warn('⚠️ Could not load planned workout (cycling):', plannedError.message);
       } else if (planned) {

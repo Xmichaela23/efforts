@@ -279,20 +279,54 @@ export type EnduranceSlot = {
    */
   carriesStrides?: boolean;
   /**
-   * ⛔ THIS SLOT IS THE SECOND HALF OF THE SLOT BEFORE IT — ONE RUN, NOT TWO (2026-09-23).
+   * ⛔ THIS SLOT IS THE SECOND HALF OF THE SLOT BEFORE IT — ONE SESSION, NOT TWO (2026-09-23; rides 2026-09-27).
    * p245 (Hypertrophy + 5K): *"Monday's session is a single run with two components. A sprint workout should be chosen
    * (level 1), and the cooldown removed. The second section of the run should be chosen from the MLSS+ workouts, with
    * the warm-up removed."* p253 (Hypertrophy + Half-Marathon): *"The MLSS+ session should flow directly into the VT1
    * work, with the latter serving as an extended 'cooldown' for the former."*
+   * ⛔ THE BOOK'S CONVENTION FOR ANY SPORT (Michael, 2026-09-27): two workouts printed in one day's box are one session.
+   * p269: *"the two workouts listed are intended to be combined"*; p263: *"The Monday sprint session should flow right
+   * into the VT1 with no break"*; p258 prints *"(separate sessions)"* when it means two. So p278's Day 3 and Day 5
+   * rides are one ride each.
    * ⚠️ BUILT AS TWO ROWS ON ONE DAY, TAGGED AS ONE (`JOINED_TAG`): the first loses its cooldown, this one its warm-up;
-   * this one always lands on the first one's day, takes no hard pick of its own, is not a row on the runs screen, and
-   * is not counted as a second session by the week's warnings. No existing slot builds two families as one row.
+   * this one always lands on the first one's day, takes no hard pick of its own, is not a row on the setup screen, and
+   * is not counted as a second session by the week's warnings. Calendar sync sends the pair as one workout
+   * (`calendar-sync/plan.ts`). No existing slot builds two families as one row.
    */
   joinsPrevious?: boolean;
+  /**
+   * ⛔ THE ATHLETE MAY SWITCH THIS SESSION OFF (Michael, 2026-09-27: p278's Day 2 easy ride is an optional switch).
+   * On by default — the week as printed. Switched off (`SportMix.slotsOff`), it is left out of both columns.
+   * Only an easy slot is ever marked: p119 — no kind of session disappears; p134 — easy volume is cut before quality.
+   */
+  optional?: boolean;
+  /**
+   * ⛔ THE LOWEST LEVEL THE ATHLETE'S LENGTH PICK MAY REACH ON THIS SLOT (Michael, 2026-09-27: the long ride is p278's
+   * level 2, with level 1 as the smaller tier). Read only when a length was picked; with no pick the slot builds at its
+   * own level. Absent = the slot's own level.
+   */
+  lengthFromLevel?: Level;
+  /**
+   * ⛔ HOW OFTEN THIS SESSION MAY GET LONGER, AS THE PAGE TIMES IT (Michael, 2026-09-27). The step is OFFERED and the
+   * rider accepts it (`length-step.ts`); it is never applied on its own. Its size is at most 5% of the week's easy
+   * minutes (p148) and it stays inside the level's printed range (p239). `weeks` counts 7-day weeks, `months` calendar
+   * months. Absent = the session holds its length.
+   */
+  growth?: { every: { weeks: number } | { months: number }; cite: string };
+  /**
+   * ⛔ THIS SESSION IS THE SAME LENGTH AS ANOTHER ONE, AND ONE ANSWER SETS BOTH (Michael, 2026-09-27; p281: "Over a
+   * 1-month cycle, the Tuesday and Friday endurance rides should be the same duration"). The named slot key holds the
+   * pick (`rideWeek.chips`) and its step-ups; this slot follows it.
+   */
+  sameLengthAs?: string;
   sourceText: string;
 };
 
-/** ⛔ The tag on both rows of a joined run (`EnduranceSlot.joinsPrevious`), and the one on its second half. */
+/**
+ * ⛔ The tag on both rows of a joined session (`EnduranceSlot.joinsPrevious`), and the one on its second half.
+ * ⚠️ THE VALUES SAY "run" FOR HISTORY ONLY: planned rows in the database already carry them, and joined rides use the
+ * same two values. Do not rename them.
+ */
 export const JOINED_TAG = 'one_run';
 export const JOINED_PART_TAG = 'one_run_part2';
 /** The slot key's second half, where the frame joins it to the slot before (`${day}:${i}`). */
@@ -430,17 +464,23 @@ export type Frame = {
   hardSessionsFixed?: boolean;
   /**
    * ⛔ THE WEEK IS THE PAGE'S SESSIONS AT THE PAGE'S LEVELS, AND NOTHING THE ATHLETE TYPES ADDS OR
-   * CLIMBS ONE (p278, Michael 2026-09-13: nothing is added to a week that p278 does not print; rides do
-   * not get longer week to week). Read once at the top of `composeWeek`.
+   * CLIMBS ONE (p278, Michael 2026-09-13: nothing is added to a week that p278 does not print). Read once at the top
+   * of `composeWeek`.
+   * ⛔ "RIDES DO NOT GET LONGER WEEK TO WEEK" (2026-09-13) IS SUPERSEDED (Michael, 2026-09-27): a session with
+   * `EnduranceSlot.growth` is OFFERED a longer length at the book's timing (p281), by at most 5% of the week's easy
+   * minutes (p148), inside its level's printed range (p239), and changes only when the rider accepts
+   * (`length-step.ts`). Nothing grows on its own.
+   * ⚠️ TWO ANSWERS STILL COUNT (Michael, 2026-09-27): the lengths the athlete picked (`rideWeek`) — in the Deload
+   * column only where the length sits inside the level that column prints — and an optional session switched off.
    */
   printedWeekOnly?: boolean;
   /**
-   * ⛔ THE ONE RIDE A SHORTER WEEK LEAVES OUT, AND HOW MANY RIDES TRIGGER IT (p278, Michael
-   * 2026-09-13: the Day 2 easy ride comes out of the 4-ride week). p119: no kind of session
-   * disappears; p109: at least one speed and one sub-threshold session stay; p134: easy volume is cut
-   * before quality. Read by `composeWeek` against `SportMix.rideCount`, in both columns.
+   * ⛔ THE RIDES SCREEN'S LENGTH CHOICES (Michael, 2026-09-27) — the Ride + Strength counterpart of
+   * `runStrengthWeek.longRunChips`, keyed by the slot the pick belongs to (`${frameDay}:${index}`). Each chip is a
+   * length p239 prints for its level (its printed ends, no middles), so the week builds the minutes on the chip. The
+   * first chip at the slot's own level opens selected. A slot with `sameLengthAs` takes the named slot's pick.
    */
-  fewerRidesDropsSlot?: { rideCount: number; day: number; index: number };
+  rideWeek?: { chips: Record<string, number[]> };
 };
 
 // ── the slot vocabulary, spelled once ───────────────────────────────────────────────────────────
@@ -1439,11 +1479,16 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
  * The page means the Standard column for the ordinary week and the Deload column for a deload week: p281's own Base
  * notes speak of "the Tuesday and Friday endurance rides" and "the Saturday long ride" — days 2, 5 and 6 — and only
  * the Standard column has an endurance ride on day 5 (SOURCE Part E2a, read off p278 by row shading; E2d, p281).
- * So the standard week is seven rides: sweet spot (level 1-2), endurance (1), VO2 (1) + sweet spot (1), endurance (1)
- * + sprint (1), endurance (2). `taper` is p278's Deload column on both sides — five rides at level 1.
- * ⚠️ p281 has the endurance rides lengthen ("gradually increase volume over two to three by 1-month cycles"; the long
- * ride "every 1 to 2 weeks") and prints no amount, so the rides are built at their printed level and the rides
- * screen prints p281's sentence; no step is invented.
+ * ⛔ FIVE RIDES ON FIVE DAYS (Michael, 2026-09-27): the two workouts in one day's box are ONE ride (the book's
+ * convention — see `EnduranceSlot.joinsPrevious`). Day 1 sweet spot (level 1-2); Day 2 endurance (1), optional;
+ * Day 3 VO2 (1) flowing into sweet spot (1); Day 5 sprint (1) flowing into endurance (1); Day 6 the long ride,
+ * endurance (2). `taper` is p278's Deload column on both sides — five rides at level 1, one a day.
+ * ⛔ p281 has the endurance rides lengthen ("gradually increase volume over two to three by 1-month cycles"; the long
+ * ride "every 1 to 2 weeks") and prints no amount. The long ride builds at the length the athlete picks (`rideWeek`)
+ * and is OFFERED a longer one every week after its last step (`growth`), at most 5% of the week's easy minutes (p148),
+ * inside p239's level range — the rider accepts or keeps (Michael, 2026-09-27, `length-step.ts`). The Tuesday and Friday
+ * endurance rides are p239's plain level-1 easy ride at one length the rider picks (1h or 1h40), held for the month and
+ * offered a step once a month, never past 100 min (Michael, 2026-09-27, option A).
  *
  * ⚠️ NO RUN SLOT AND NO SWIM (`enduranceSports: ['ride']`).
  * ⚠️ NO OVERHEAD PRESS IS NAMED — p278's push rows are categories. `testedLifts` is bench, squat and
@@ -1501,15 +1546,22 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
-    // p278 Standard column, day 2: "Cyc endurance (level 1)"
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+    // p278 Standard column, day 2: "Cyc endurance (level 1)". Optional (Michael, 2026-09-27) — `EnduranceSlot.optional`.
+    // ⛔ p239's PLAIN "60- to 100-minute easy ride below 75%" EVERY WEEK (Michael, 2026-09-27, option A): one length
+    // held for the month (p281), picked by the rider, a step offered once a month (`growth`). No alternation with
+    // p239's mixed ride, which is printed at one fixed length per level and so cannot hold or grow by 5% (p148).
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', {
+      role: 'easy', optional: true, archetypes: ['steady'],
+      growth: { every: { months: 1 }, cite: 'Viada p281 — the Tuesday and Friday endurance rides hold one duration over a 1-month cycle; each cycle can increase it' },
+    })],
   },
-  // p278 Standard column, day 3: "Cyc VO2 (level 1) · Cyc sweet spot (level 1)" — two rides.
+  // p278 Standard column, day 3: "Cyc VO2 (level 1) · Cyc sweet spot (level 1)" — ONE ride, VO2 flowing into the sweet
+  // spot (p269's "intended to be combined", the book's convention; Michael, 2026-09-27). Print order kept.
   {
     day: 3, label: null, strength: [], plyo: true,
     endurance: [
       E('ride_vo2', 1, 'Cyc VO2 (level 1)', { role: 'hard' }),
-      E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1)', { role: 'hard' }),
+      E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1)', { role: 'hard', joinsPrevious: true }),
     ],
   },
   {
@@ -1537,19 +1589,31 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
    * (2026-09-13): its effort has no printed length — an acceleration up to speed — and no step on a
    * watch file can carry a work step with no clock. Open for Michael.
    */
-  // p278 Standard column, day 5: "Cyc endurance (level 1) · Cyc sprint (level 1)" — two rides.
+  // p278 Standard column, day 5: "Cyc endurance (level 1) · Cyc sprint (level 1)" — ONE ride. ⚠️ THE SPRINT GOES FIRST
+  // AND FLOWS INTO THE ENDURANCE RIDE (Michael, 2026-09-27), the reverse of the page's print order: p263 "The Monday
+  // sprint session should flow right into the VT1 with no break"; p245 / p253 put the hard part first and the easy part
+  // after it. p278 and p281 say nothing about order within a day. The Deload column keeps the sprint, now index 0 in both.
   {
     day: 5, label: null, strength: [],
     endurance: [
-      E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' }),
       E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] }),
+      // The Friday endurance ride is Tuesday's length (p281) and the same plain easy ride.
+      E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', joinsPrevious: true, archetypes: ['steady'], sameLengthAs: '2:0' }),
     ],
   },
   /**
    * ⚠️ p281 CALLS THIS "THE SATURDAY LONG RIDE", so the frame states `long`. p278 Standard column, day 6:
-   * "Cyc endurance (level 2)".
+   * "Cyc endurance (level 2)". The athlete picks its length (`rideWeek`); level 1 is the smaller tier (Michael, 2026-09-27).
    */
-  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'long' })] },
+  {
+    day: 6, label: null, strength: [],
+    endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', {
+      role: 'long', lengthFromLevel: 1,
+      // p281: "The Saturday long ride can likewise progress, increasing the volume gradually over the entire base season
+      // every 1 to 2 weeks." Offered from one week after the last step.
+      growth: { every: { weeks: 1 }, cite: 'Viada p281 — the long ride progresses "every 1 to 2 weeks"' },
+    })],
+  },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
@@ -1578,8 +1642,9 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
-    // p278 Deload column, day 2 endurance cell: Cyc endurance (level 1)
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+    // p278 Deload column, day 2 endurance cell: Cyc endurance (level 1). The same switch, ride and length as the standard
+    // week's day 2.
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true, archetypes: ['steady'] })],
   },
   // p278 Deload column, day 3: "Cyc VO2 (level 1)".
   { day: 3, label: null, strength: [], plyo: true, endurance: [E('ride_vo2', 1, 'Cyc VO2 (level 1)', { role: 'hard' })] },
@@ -1779,9 +1844,10 @@ export const FRAMES: Record<FrameId, Frame> = {
     enduranceSports: ['ride'],
     hardSessionsFixed: true,
     printedWeekOnly: true,
-    // OURS — `fewerRidesDropsSlot` the one-fewer-ride week (Michael, 2026-09-13, as four of five rides; one fewer than
-    // p278's Standard seven since 2026-09-18); day 2's easy ride is the one that comes out
-    fewerRidesDropsSlot: { rideCount: 6, day: 2, index: 0 },
+    // Viada p239's endurance ride ladder: level 1 "60- to 100-minute easy ride", level 2 "2.5- to 3.5-hour easy ride".
+    // Each level's two printed ends (Michael, 2026-09-27): the long ride at level 2 with level 1 as the smaller tier;
+    // the Tuesday easy ride (and Friday's, `sameLengthAs`) at level 1.
+    rideWeek: { chips: { '6:0': [60, 100, 150, 210], '2:0': [60, 100] } },
   },
 };
 

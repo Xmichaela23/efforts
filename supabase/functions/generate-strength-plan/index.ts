@@ -537,12 +537,14 @@ Deno.serve(async (req: Request) => {
           ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
         swimDays: normalizeSwimDays(swim_days) ?? 0,
         /**
-         * ⛔ THE RIDE COUNT (p278's 4-or-5, 2026-09-13) — validated to a whole number; only a frame that
-         * declares `fewerRidesDropsSlot` reads it.
+         * ⛔ THE OPTIONAL SESSIONS SWITCHED OFF (Michael, 2026-09-27) — frame keys; only a slot the frame marks
+         * `optional` is honoured (`composeWeek`). A malformed list drops whole, the same discipline as the maps below.
          */
-        rideCount: (() => {
-          const n = Number((body as Record<string, unknown>).ride_count);
-          return Number.isInteger(n) && n > 0 ? n : null;
+        slotsOff: (() => {
+          const raw = (body as Record<string, unknown>).endurance_slots_off;
+          if (!Array.isArray(raw)) return null;
+          if (!raw.every((k) => typeof k === 'string' && /^\d+:\d+$/.test(k))) return null;
+          return raw.length > 0 ? [...raw] as string[] : null;
         })(),
         /**
          * ⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, when the wizard collected one. Counts alone do not

@@ -20,7 +20,7 @@ export async function movePatch(id: string, newDate: string): Promise<{ date: st
 
 /**
  * ⛔ A MOVE AND THE ROWS THAT GO WITH IT (2026-09-23). `validate-reschedule` names them (`moves_with`: the other part of
- * a joined run, Viada p245 / p253); the phone writes the same move for each. The phone decides nothing.
+ * a joined session, Viada p245 / p253 / p269); the phone writes the same move for each. The phone decides nothing.
  */
 export async function moveWithPartners(
   update: (id: string, patch: { date: string; tags: string[] }) => Promise<unknown>,

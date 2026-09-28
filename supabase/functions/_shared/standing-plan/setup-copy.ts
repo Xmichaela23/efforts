@@ -79,17 +79,18 @@ export const PROGRAM_COPY = {
     blurb: 'Built back from your race date.',
     requirement: '',
   },
-  // Viada p278: three lifting days and seven rides in the Standard column (the week table's count).
+  // Viada p278: three lifting days; the Standard column's seven workouts are five rides — Days 3 and 5 each print two
+  // workouts in one box, which the book's convention makes one ride (p269; Michael, 2026-09-27).
   // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
   // advanced cyclists".
-  // ⛔ OFF 2026-09-18 (round 3): "Six or seven rides" — p278 prints seven; the six-ride choice is the builder's
-  // (`RIDES_COPY.count_chip`), not the page's.
+  // ⛔ OFF 2026-09-18 (round 3): "Six or seven rides" — the six-ride choice was the builder's, not the page's.
+  // ⛔ "Seven rides" → "Five rides" (Michael, 2026-09-27): the two-workout days are one ride each.
   // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
   // strength progress together." (no page).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Options for intermediate and advanced cyclists. Seven rides, three lifting days.',
+    blurb: 'Options for intermediate and advanced cyclists. Five rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
@@ -270,19 +271,48 @@ export const BUILD_FOCUS_COPY = {
   list_last_join: ' and ',
 } as const;
 
+/**
+ * ⛔ ONE SESSION OF TWO PARTS ON ITS ROW — the runs screen and the rides screen (Viada p245 / p253 / p269; Michael
+ * approved the words 2026-09-24). {first} is the row's own session name (the sample week's sprint where the frame
+ * rotates it), {second} the second part's.
+ */
+export const JOINED_ROW = '{first}, then {second}';  // not-instruction: a session name joined from two names
+
+/**
+ * ⛔ THE LONGER-SESSION OFFER'S WORDS (2026-09-27, `length-step.ts`), per the session's role. The long ride's line and
+ * both buttons, and the midweek easy rides' line: Michael approved 2026-09-27. A role with no line draws no offer.
+ * {from}/{to}: `lengthWords`.
+ */
+export const LENGTH_OFFER_COPY: { line: Record<'easy' | 'long' | 'hard', string | null>; accept: string; keep: string } = {
+  line: {
+    long: 'Your long ride can go from {from} to {to}.',
+    easy: 'Your midweek easy rides can go from {from} to {to}.',
+    hard: null,
+  },
+  accept: 'Make it longer',
+  keep: 'Keep it as it is',
+};
+
 // ── Ride + Strength rides screen ─────────────────────────────────────────────────────────────
 
 export const RIDES_COPY = {
-  count_label: 'Rides a week',
-  // Viada p278 Standard column prints seven rides; OURS — `RIDES_COPY` the six-ride choice (see `PROGRAM_COPY`).
-  count_chip: { 6: 'Six rides', 7: 'Seven rides' } as Record<number, string>,
+  // ⛔ THE RIDES SCREEN IS SHAPED LIKE THE RUNS SCREEN (Michael, 2026-09-27): the one length asked is the long ride's.
+  sub: 'Pick how long the long ride and the midweek easy rides are.',  // Michael approved 2026-09-27
   row: 'Day {day} · {name}',
+  // ⛔ ON A RIDE HELD TO ANOTHER'S LENGTH (p281's Friday = Tuesday; Michael approved 2026-09-27). {day} is the other ride's.
+  same_length: 'Same length as Day {day}.',
+  // ⛔ AN OPTIONAL RIDE'S SWITCH (Michael, 2026-09-27; `EnduranceSlot.optional`). Replaces the six/seven count chips.
+  optional_label: 'Easy ride on Day {day}',  // not-instruction: a switch label (name)
+  optional_line_by_frame: {
+    cycling_base: 'Optional. An easy ride between the hard days.',  // Michael approved the words 2026-09-27
+  } as Partial<Record<FrameId, string>>,
   /**
    * Viada p281, the Base program's cycling note, reworded (Michael approved the words 2026-09-19); the page: "Over a 1-month cycle, the Tuesday and Friday endurance rides
    * should be the same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise
    * progress, increasing the volume gradually over the entire base season every 1 to 2 weeks." The weekday names are
    * cut (the athlete's week may not start on Monday). It replaces "If easy rides are kept conversational, use your own
-   * judgement to go longer." (2026-09-18, book-language pass 4) — p281 prescribes the progression; it prints no amount,
+   * judgement to go longer." (2026-09-18, book-language pass 4) — p281 prescribes the progression. ⛔ SUPERSEDED 2026-09-27:
+   * the progression is now offered (`length-step.ts`); what follows is history. It prints no amount,
    * so the rides are built at their printed level and the sentence is the page's.
    */
   easy_line: 'Within a 1-month cycle the endurance rides stay the same length, but each new cycle can add to the overall duration. The long ride can progress the same way, adding volume gradually every 1 to 2 weeks across the whole base season.',
@@ -319,9 +349,6 @@ export const RUNS_COPY = {
   extra_line_by_frame: {
     hyp_5k: 'One or two short easy sessions, running or cross-training, when the week leaves room for more recovery.',  // Viada p245
   } as Partial<Record<FrameId, string>>,
-  // ⛔ ONE RUN OF TWO PARTS ON ITS ROW (Viada p245 / p253; Michael approved the words 2026-09-24). {first} is the row's own
-  // session name (the sample week's sprint where the frame rotates it), {second} the second part's.
-  joined_row: '{first}, then {second}',  // not-instruction: a session name joined from two names
   joined_easy: 'easy running',  // not-instruction: the name of the second part when it is the easy run (p253 VT1)
   extra_row: 'Extra easy run {n}',  // not-instruction: a row label (name)
   extra_card: 'Easy run · {length}',  // not-instruction: a card label (name and length) on Your week

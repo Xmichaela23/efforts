@@ -109,6 +109,7 @@ endurance L1 (5 rides). Watts from the saved FTP.
 - Rides say nothing about terrain (p229 principle: hold the target).
 - ✅ **DECIDED 2026-09-13 (Michael):** the standing-start sprint workout (p236 level 1) is NOT built;
   the Sprint Ride rotates the other two level-1 options. Filed on POLISH-PUNCH-LIST.md.
+> ⛔ SUPERSEDED 2026-09-27 (Michael): rides DO get longer, offered and accepted by the rider, never applied on their own — at the book's timing (p281: Base's long ride every 1 to 2 weeks; midweek endurance rides step up monthly), by at most 5% of the week's easy minutes (p148), inside the level's printed range (p239). Code: `_shared/standing-plan/length-step.ts`, `EnduranceSlot.growth`, `endurance-checkpoint` `length_offer`. Everything in the bullet below is history.
 - ✅ **DECIDED 2026-09-13 (Michael: "yeah we can say if easy rides are kept conversational use your
   own judgement to go longer"):** the plan does NOT lengthen rides week to week (p281's growth is
   not built). Easy rides print their level 1 length; the athlete may ride them longer on their own

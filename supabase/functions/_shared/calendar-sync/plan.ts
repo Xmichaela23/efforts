@@ -1,6 +1,10 @@
 // Calendar sync, the pure part: which planned workouts belong on which provider's calendar, and what to
 // create, update or remove there given what was already sent. No network, no database (tested in plan.test.ts).
 
+import { isJoinedPart, movesWith, type MoveRow } from '../move-check/index.ts';
+import { sessionTitle } from '../session-title.ts';
+import { fill, JOINED_ROW } from '../standing-plan/setup-copy.ts';
+
 export type Provider = 'garmin' | 'intervals_icu';
 export type Destination = Provider | 'none';
 export type SyncSport = 'run' | 'ride' | 'swim' | 'strength';
@@ -44,6 +48,51 @@ export function destinationFor(row: PlannedRow, destinations: Destinations, conn
   const dest = destinations[sport] ?? 'none';
   if (dest === 'none' || !connected.has(dest)) return null;
   return dest;
+}
+
+/**
+ * ⛔ ONE SESSION OF TWO PARTS GOES OUT AS ONE WORKOUT (Michael, 2026-09-27). The builder writes a joined session as
+ * two rows (`JOINED_TAG`; p278's Day 3 and Day 5 rides, p245 / p253's runs), and one ride on the trainer is one Zwift
+ * workout. Returns each first half's second half — the partner `movesWith` finds, on the same date. A second half
+ * whose first half is skipped or gone is not paired, and goes out on its own.
+ */
+export function joinedPartners<R extends MoveRow>(rows: R[]): Map<string, R> {
+  const out = new Map<string, R>();
+  for (const head of rows) {
+    if (isJoinedPart(head)) continue;
+    // Asked both ways: `movesWith` leaves out a skipped partner, so a skipped first half pairs nothing.
+    const part = movesWith(head, rows).find((r) => r.date === head.date && movesWith(r, rows).some((x) => x.id === head.id));
+    if (part) out.set(head.id, part as R);
+  }
+  return out;
+}
+
+/**
+ * ⛔ THE ONE WORKOUT A JOINED SESSION SENDS — both halves' saved steps in order (the first half built without its
+ * cooldown and the second without its warm-up, so nothing moves when a converter sorts warm-ups first), both notes,
+ * both lengths, titled "{first}, then {second}" (`JOINED_ROW`, approved) through `session_title`, which `sessionTitle` reads
+ * first. Every sender uses this, so Garmin and Intervals.icu (and Zwift through it) get the same workout. Throws when a
+ * half has no saved steps: half a ride is not sent as the whole one.
+ */
+export function mergeJoinedRow<R extends Record<string, any>>(head: R, part: R): R {
+  for (const r of [head, part]) {
+    if (!Array.isArray(r?.computed?.steps) || r.computed.steps.length === 0) {
+      throw new Error(`planned workout ${r?.id}: half of a joined session has no saved steps`);
+    }
+  }
+  const sum = (a: unknown, b: unknown) => ((Number(a) || 0) + (Number(b) || 0)) || null;
+  return {
+    ...head,
+    session_title: fill(JOINED_ROW, { first: sessionTitle(head as any), second: sessionTitle(part as any) }),
+    duration: sum(head.duration, part.duration),
+    total_duration_seconds: sum(head.total_duration_seconds, part.total_duration_seconds),
+    description: [head.description, part.description].map((d) => String(d ?? '').trim()).filter(Boolean).join('\n\n'),
+    computed: {
+      ...head.computed,
+      steps: [...head.computed.steps, ...part.computed.steps],
+      total_duration_seconds: sum(head.computed.total_duration_seconds, part.computed.total_duration_seconds),
+    },
+  };
 }
 
 export type Desired = { planned_workout_id: string; provider: Provider; date: string; content_hash: string };

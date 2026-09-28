@@ -98,8 +98,12 @@ import { localDateInTz } from './local-date.ts';
 // 34 (2026-09-25): the program outline — the block description's set paragraph ends "The working sets under each lift
 //   show the count.", and the refresh stores the description's sourced notes beside it (`standing_plan.sourced_notes`)
 //   for the outline's foot. No session changes; the bump is what rewrites an existing plan's description and notes.
+// 35 (2026-09-27): Ride + Strength's two-workout days are one ride each (Day 3 VO2 then sweet spot; Day 5 sprint then
+//   endurance, reordered) — rows gain the joined tags and Friday's two rows swap places; the long ride takes the picked
+//   length; the block description counts a joined session once (Hypertrophy + 5K and + Half read one run fewer); the
+//   Tuesday and Friday endurance rides are p239's plain easy ride every week at one length (Friday follows Tuesday).
 // OURS — code version counter, not a training number (`PLAN_WRITER_VERSION`)
-export const PLAN_WRITER_VERSION = 34;
+export const PLAN_WRITER_VERSION = 35;
 
 /** The job kind `run-jobs` posts to. The refresh IS the Adjust rebuild, run for the athlete by the server. */
 export const PLAN_REFRESH_KIND = 'rematerialize-standing-block';

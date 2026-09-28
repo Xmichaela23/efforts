@@ -192,9 +192,9 @@ Deno.test('the race-tempo row runs at race pace with its recoveries a quarter lo
   assert(lines.some((l) => l.startsWith('5 × 3:30 race pace, 1:15')), lines.join(' | '));
 });
 
-Deno.test('Ride + Strength\'s standard week is p278\'s Standard column: seven rides, the long ride at level 2', () => {
+Deno.test('Ride + Strength\'s standard week is p278\'s Standard column: seven workouts as five rides, the long ride at level 2', () => {
   const std = FRAMES.cycling_base.columns.standard.flatMap((d) => d.endurance.map((e) => `${d.day}:${e.family}:${e.level}`));
-  assertEquals(std, ['1:ride_sweet_spot:1', '2:ride_endurance:1', '3:ride_vo2:1', '3:ride_sweet_spot:1', '5:ride_endurance:1', '5:ride_sprints:1', '6:ride_endurance:2']);
+  assertEquals(std, ['1:ride_sweet_spot:1', '2:ride_endurance:1', '3:ride_vo2:1', '3:ride_sweet_spot:1', '5:ride_sprints:1', '5:ride_endurance:1', '6:ride_endurance:2']);
   const taper = FRAMES.cycling_base.columns.taper.flatMap((d) => d.endurance.map((e) => `${d.day}:${e.family}:${e.level}`));
   assertEquals(taper, ['1:ride_sweet_spot:1', '2:ride_endurance:1', '3:ride_vo2:1', '5:ride_sprints:1', '6:ride_endurance:1']);
 });
