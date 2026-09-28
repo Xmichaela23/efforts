@@ -10,6 +10,9 @@
  * and a rung with no data to read is skipped rather than guessed at. Statements about what the
  * session WAS come before inferences from what the recording LOOKS like.
  *
+ *   0. THE PLAN'S OWN TARGETS SAY THERE WERE HARDER SETS IN IT (2026-09-27, Michael: "a session with harder sets in
+ *      it is not a steady effort"). A long run or ride built with sets is not steady, whatever its type says, so this
+ *      rung answers before rung 1. It only ever answers "not steady".
  *   1. THE PLAN'S OWN SESSION TYPE, when the session is linked to one. Easy, long and recovery get
  *      a drift read; tempo, threshold, intervals and anything harder do not.
  *   2. PLANNED STEPS — more than two prescribed steps is an interval session.
@@ -34,6 +37,7 @@ import { ENDURANCE_CLASS } from '../endurance-library/classification.ts';
 import type { FamilyId } from '../endurance-library/types.ts';
 
 export type SteadyRung =
+  | 'planned_sets'
   | 'plan_family'
   | 'plan_words'
   | 'planned_steps'
@@ -66,11 +70,89 @@ export type SteadinessInput = {
   athleteTag?: 'steady' | 'intervals' | null;
   /** The workout row, for the provider's word (rung 4) and the device's lap markings (rung 5). */
   workoutRow?: unknown;
-  /** The rendered interval rows (rung 7). */
-  intervals?: Array<{ interval_type?: unknown }>;
+  /** The rendered interval rows, with their planned targets (rungs 0 and 7). */
+  intervals?: Array<IntervalRowInput>;
+  /**
+   * The analysis, for a caller with no rendered rows (State, Today, the ride analyser): rung 0 reads its interval
+   * breakdown (`granular_analysis.interval_breakdown.intervals`). Read only when `intervals` is empty.
+   */
+  workoutAnalysis?: unknown;
+};
+
+/** An interval row as rung 0 and rung 7 read it: its role and, where the plan gave one, its target band. */
+export type IntervalRowInput = {
+  interval_type?: unknown;
+  /** The library reports a pace band fastest-first, so `lower_sec_per_mi` is the FASTER number. */
+  planned_pace_range?: { lower_sec_per_mi?: number | null; upper_sec_per_mi?: number | null } | null;
+  planned_power_range?: { lower_w?: number | null; upper_w?: number | null } | null;
 };
 
 const lower = (v: unknown) => String(v ?? '').toLowerCase();
+
+const positive = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * The analyser's interval breakdown in the shape rung 0 reads — the role and the planned band — for a caller that has
+ * no rendered rows. The same breakdown `session-detail/build.ts` renders its rows from.
+ */
+function rowsFromAnalysis(workoutAnalysis: unknown): IntervalRowInput[] {
+  let wa = workoutAnalysis;
+  if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { return []; } }
+  const list = (wa as { granular_analysis?: { interval_breakdown?: { intervals?: unknown } } } | null)
+    ?.granular_analysis?.interval_breakdown?.intervals;
+  if (!Array.isArray(list)) return [];
+  return (list as Array<Record<string, unknown>>).map((iv) => {
+    const pwLo = iv?.planned_power_range_lower ?? (iv?.planned_power_range as { lower?: unknown })?.lower;
+    const pwHi = iv?.planned_power_range_upper ?? (iv?.planned_power_range as { upper?: unknown })?.upper;
+    const pcLo = iv?.planned_pace_range_lower ?? (iv?.planned_pace_range as { lower?: unknown })?.lower;
+    const pcHi = iv?.planned_pace_range_upper ?? (iv?.planned_pace_range as { upper?: unknown })?.upper;
+    return {
+      interval_type: iv?.interval_type ?? iv?.kind,
+      ...(Number.isFinite(Number(pcLo)) && Number.isFinite(Number(pcHi))
+        ? { planned_pace_range: { lower_sec_per_mi: Number(pcLo), upper_sec_per_mi: Number(pcHi) } } : {}),
+      ...(Number.isFinite(Number(pwHi))
+        ? { planned_power_range: { lower_w: Number(pwLo ?? 0), upper_w: Number(pwHi) } } : {}),
+    };
+  });
+}
+
+/**
+ * ⛔ RUNG 0. A work step asked harder than the session's EASIEST work step is a set, and a session with a set in it is
+ * not a steady effort (2026-09-27, Michael; TrainingPeaks reads decoupling on steady efforts only). p235 builds its long
+ * run with sets ("1h VT1 run with 2 sets added at any point"), and that session now has no drift, like an interval
+ * session.
+ *
+ * ⛔ WHY THE TEST IS RELATIVE TO THE SESSION (traced 2026-09-12). The step's own kind does not say: the library gives
+ * the easy body and the inserted set the same role, 'work'. The label does say and is not safe to read (display names,
+ * renamed once already). The prescribed percentage is gone by the time this runs: `materialize-plan` resolves it into
+ * absolute watts and paces. So the comparison is on each row's planned band, within one session, on the band's upper
+ * value — the most watts, or the fastest pace — so a band from zero and a single value compare on the same footing.
+ * Rows with no target sit out. The warm-up, the cool-down and the recoveries are not work rows: a cool-down asked
+ * easier than the body would otherwise make the whole body look like sets. A ride's rows compare on power when any
+ * work row carries a power target, else on pace.
+ * ⚠️ IT ONLY EVER ANSWERS "NOT STEADY". Every work row at one target says nothing, and the ladder goes on.
+ */
+function plannedSetsSteady(intervals: SteadinessInput['intervals'], workoutAnalysis: unknown): boolean | null {
+  const rows = Array.isArray(intervals) && intervals.length > 0 ? intervals : rowsFromAnalysis(workoutAnalysis);
+  const work = rows.filter((r) => {
+    const k = lower(r?.interval_type);
+    return k !== 'recovery' && k !== 'warmup' && k !== 'cooldown';
+  });
+  const onPower = work.some((r) => positive(r?.planned_power_range?.upper_w) != null);
+  const demand = (r: IntervalRowInput): number | null => {
+    if (onPower) return positive(r?.planned_power_range?.upper_w);
+    const a = positive(r?.planned_pace_range?.lower_sec_per_mi);
+    const b = positive(r?.planned_pace_range?.upper_sec_per_mi);
+    const fastest = a != null && b != null ? Math.min(a, b) : (a ?? b);
+    return fastest == null ? null : 1 / fastest;
+  };
+  const demands = work.map(demand).filter((d): d is number => d != null);
+  if (demands.length < 2) return null;
+  return Math.max(...demands) > Math.min(...demands) ? false : null;
+}
 
 /** ⛔ RUNG 1. The plan's family tag is the plan naming the session type outright. */
 function planFamilySteady(plannedRow: SteadinessInput['plannedRow']): boolean | null {
@@ -225,6 +307,9 @@ function detectedRowsSteady(intervals: SteadinessInput['intervals']): boolean | 
 }
 
 export function sessionSteadiness(input: SteadinessInput): Steadiness {
+  const sets = plannedSetsSteady(input.intervals, input.workoutAnalysis);
+  if (sets !== null) return { steady: sets, decidedBy: 'planned_sets' };
+
   const fam = planFamilySteady(input.plannedRow);
   if (fam !== null) return { steady: fam, decidedBy: 'plan_family' };
 

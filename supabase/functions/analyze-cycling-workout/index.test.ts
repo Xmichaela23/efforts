@@ -20,7 +20,6 @@ Deno.test('generateCyclingAdherenceSummary: returns null when no work intervals'
     performance: { execution_score: 90 },
     intervalBreakdown: [],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r, null);
 });
@@ -31,7 +30,6 @@ Deno.test('generateCyclingAdherenceSummary: returns null when intervalBreakdown 
       performance: { execution_score: 90 },
       intervalBreakdown: null,
       factPacket: null,
-      hrDriftPct: null,
     }),
     null,
   );
@@ -45,7 +43,6 @@ Deno.test('generateCyclingAdherenceSummary: returns null when intervals exist bu
       { interval_type: 'cooldown', adherence_percentage: 100 },
     ],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r, null);
 });
@@ -57,7 +54,6 @@ Deno.test('generateCyclingAdherenceSummary: verdict — Excellent at execution_s
     performance: { execution_score: 92, power_adherence: 95 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 95 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.verdict, 'Excellent execution — power held steady through the prescribed work.');
 });
@@ -67,7 +63,6 @@ Deno.test('generateCyclingAdherenceSummary: verdict — Solid at 80-89', () => {
     performance: { execution_score: 82 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 88 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.verdict, 'Solid execution — power adherence was strong with minor variation.');
 });
@@ -77,7 +72,6 @@ Deno.test('generateCyclingAdherenceSummary: verdict — Acceptable at 65-79', ()
     performance: { execution_score: 70 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 75 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.verdict, 'Acceptable execution — power drifted from target on some intervals.');
 });
@@ -87,7 +81,6 @@ Deno.test('generateCyclingAdherenceSummary: verdict — Below target at <65', ()
     performance: { execution_score: 50 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 50 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assert(r?.verdict.startsWith('Below target'));
 });
@@ -101,7 +94,6 @@ Deno.test('generateCyclingAdherenceSummary: one work interval — the judged wat
       { interval_type: 'work', actual_power_w: 128, planned_power_range_lower: 109, planned_power_range_upper: 126 },
     ],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '128 W against 109–126 W, 2 W over the top.');
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power adherence'), undefined);
@@ -114,7 +106,6 @@ Deno.test('generateCyclingAdherenceSummary: several work intervals — how many 
     performance: { execution_score: 80, power_adherence: 88 },
     intervalBreakdown: [iv(210), iv(215), iv(225), iv(198)],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '2 of 4 work intervals inside their range.');
 });
@@ -130,7 +121,6 @@ Deno.test('generateCyclingAdherenceSummary: a floor-only session is judged at or
     performance: { execution_score: 95, power_adherence: 100 },
     intervalBreakdown: [iv(232), iv(210), iv(202), iv(260)],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '4 of 4 work intervals at or above their floor.');
 });
@@ -142,7 +132,6 @@ Deno.test('generateCyclingAdherenceSummary: one floor-only work interval names t
       { interval_type: 'work', actual_power_w: 218, planned_power_range_lower: 202, planned_power_range_upper: null },
     ],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '218 W against a floor of 202 W.');
 });
@@ -156,24 +145,20 @@ Deno.test('generateCyclingAdherenceSummary: a mixed session keeps "inside their 
       { interval_type: 'work', actual_power_w: 152, planned_power_range_lower: 143, planned_power_range_upper: 159 },
     ],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '2 of 2 work intervals inside their range.');
 });
 
 // ── §4 no "Cardiac drift" insight — the ride's drift is one number, read by the session builder ────
 
-Deno.test('generateCyclingAdherenceSummary: never emits a Cardiac drift insight (2026-09-12)', () => {
-  for (const hrDriftPct of [1.5, 5.5, 12, null]) {
-    const r = generateCyclingAdherenceSummary({
-      performance: { execution_score: 85 },
-      intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-      factPacket: null,
-      hrDriftPct,
-    });
-    const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
-    assertEquals(insight, undefined);
-  }
+Deno.test('generateCyclingAdherenceSummary: never emits a Cardiac drift insight (2026-09-12; takes no drift at all since 2026-09-27)', () => {
+  const r = generateCyclingAdherenceSummary({
+    performance: { execution_score: 85 },
+    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
+    factPacket: null,
+  });
+  const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
+  assertEquals(insight, undefined);
 });
 
 // ── §5 intensity insight from fact packet ─────────────────────────────────
@@ -185,7 +170,6 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight uses NP + IF + cla
     factPacket: {
       facts: { normalized_power_w: 245, intensity_factor: 0.92, classified_type: 'threshold' },
     },
-    hrDriftPct: null,
   });
   const insight = r?.technical_insights.find((i) => i.label === 'Intensity');
   assertEquals(insight?.value, 'Normalized power 245W at IF 0.92 — threshold effort.');
@@ -198,7 +182,6 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight handles underscore
     factPacket: {
       facts: { normalized_power_w: 220, intensity_factor: 0.88, classified_type: 'sweet_spot' },
     },
-    hrDriftPct: null,
   });
   const insight = r?.technical_insights.find((i) => i.label === 'Intensity');
   assertEquals(insight?.value, 'Normalized power 220W at IF 0.88 — sweet spot effort.');
@@ -211,7 +194,6 @@ Deno.test('generateCyclingAdherenceSummary: focus maps from classified_type', ()
     performance: { execution_score: 85 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
     factPacket: { facts: { normalized_power_w: 240, intensity_factor: 0.95, classified_type: 'vo2' } },
-    hrDriftPct: null,
   });
   assertEquals(r?.plan_impact.focus, 'VO2max / max aerobic power');
 });
@@ -221,7 +203,6 @@ Deno.test('generateCyclingAdherenceSummary: focus defaults to General aerobic wh
     performance: { execution_score: 85 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assertEquals(r?.plan_impact.focus, 'General aerobic');
 });
@@ -231,7 +212,6 @@ Deno.test('generateCyclingAdherenceSummary: outlook reflects execution tier', ()
     performance: { execution_score: 92 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 95 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assert(strong?.plan_impact.outlook.includes('proceed with planned next session'));
 
@@ -239,7 +219,6 @@ Deno.test('generateCyclingAdherenceSummary: outlook reflects execution tier', ()
     performance: { execution_score: 75 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 80 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assert(adequate?.plan_impact.outlook.includes('Adequate stimulus'));
 
@@ -247,7 +226,6 @@ Deno.test('generateCyclingAdherenceSummary: outlook reflects execution tier', ()
     performance: { execution_score: 55 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 60 }],
     factPacket: null,
-    hrDriftPct: null,
   });
   assert(subpar?.plan_impact.outlook.includes('Suboptimal stimulus'));
 });
@@ -259,7 +237,6 @@ Deno.test('generateCyclingAdherenceSummary: returned object has the exact shape 
     performance: { execution_score: 85, power_adherence: 88 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
     factPacket: { facts: { normalized_power_w: 230, intensity_factor: 0.85, classified_type: 'tempo' } },
-    hrDriftPct: 4,
   });
   // Top-level keys match running's WorkoutAdherenceSummary interface.
   assertEquals(Object.keys(r ?? {}).sort(), ['plan_impact', 'technical_insights', 'verdict']);

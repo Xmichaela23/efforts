@@ -20,13 +20,12 @@ Deno.test('a narrow prior row reads exactly as the full row would', () => {
   const p = priorFromRow({
     id: 'a', date: '2026-08-01', type: 'ride',
     power_curve: { '20min': 250 }, duration_s_moving: 3600,
-    hr_at_band: 140, counts_toward_trend: false, decoupling_pct: 3.2, hr_drift_pct: 6, hr_drift_seconds: 3240,
+    hr_at_band: 140, counts_toward_trend: false, decoupling_pct: 3.2,
   });
   assertEquals(p.computed, { power_curve: { '20min': 250 }, overall: { duration_s_moving: 3600 } });
   assertEquals(p.workout_analysis, {
     bike_fitness_v1: { hr_at_band: 140, counts_toward_trend: false },
     heart_rate_summary: { decouplingPct: 3.2 },
-    hr_drift_v1: { pct: 6, seconds: 3240 },
   });
   // Nothing stored → nothing invented.
   assertEquals(priorFromRow({ id: 'b', date: '2026-08-02', type: 'run' }).workout_analysis, {});
@@ -47,25 +46,31 @@ Deno.test('⛔ the stored line read back from jsonb, keys reordered, is the same
   assertEquals(sameBoom(boom, null), false);
 });
 
-Deno.test('the drift the tile prints: an interval session has none (p107, 2026-09-12); a ride reads its ratio before heart rate alone', () => {
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3 }, fact_packet_v1: { derived: { interval_execution: { total_steps: 12 } } } }, null, 'ride'), null);
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3 }, fact_packet_v1: { derived: { interval_execution: { total_steps: 12 } } } }, null, 'run'), null);
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4, seconds: 1500 } }, { analysis: { efficiency: { aerobic_decoupling_pct: 10.04 } } }, 'ride'), 10);
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4, seconds: 1500 } }, null, 'ride'), 5.4);
+Deno.test('the drift the tile prints: an interval session has none (p107, 2026-09-12); a ride reads its power ratio', () => {
+  const intervalRide = { fact_packet_v1: { derived: { interval_execution: { total_steps: 12 } } } };
+  assertEquals(sessionDriftPct(intervalRide, { analysis: { efficiency: { aerobic_decoupling_pct: 4 } } }, 'ride'), null);
+  assertEquals(sessionDriftPct({ ...intervalRide, heart_rate_summary: { decouplingPct: 4 } }, null, 'run'), null);
+  assertEquals(sessionDriftPct({}, { analysis: { efficiency: { aerobic_decoupling_pct: 10.04 } } }, 'ride'), 10);
 });
 
-Deno.test('⛔ heart rate alone counts only over twenty minutes (2026-09-27, TrainingPeaks: under 20 minutes is not a valid read)', () => {
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4, seconds: 1199 } }, null, 'ride'), null);
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4, seconds: 1200 } }, null, 'ride'), 5.4);
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3.1, seconds: 540 } }, null, 'run'), null);
-  // A stored read with no length is not a twenty-minute read.
-  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3.1 } }, null, 'run'), null);
+Deno.test('⛔ no heart-rate-only drift, run or ride (2026-09-27, the one drift rule: Pa:Hr or Pw:Hr, else nothing)', () => {
+  // A run with no pace ratio (under 20 minutes, or no pace): heart rate alone does not put a drift number on it.
+  assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: null }, hr_drift_v1: { pct: 3.1, seconds: 2220 } }, null, 'run'), null);
+  // A ride with power but no power ratio, and a ride with no power at all: no drift either way.
+  const withPower = { analysis: { efficiency: { efficiency_factor: 0.98, avg_pedaling_power_w: 132 } } };
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: -0.7, seconds: 1637 } }, withPower, 'ride'), null);
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4, seconds: 3600 } }, null, 'ride'), null);
+  // The pace ratio, when the run had one, is the read.
+  assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: 3.46, decouplingBasis: 'gap' }, hr_drift_v1: { pct: 1, seconds: 3000 } }, null, 'run'), 3.5);
+  // An earlier session in Today's streak carries no heart-rate-only drift from its narrow row.
+  const prior = priorFromRow({ id: 'p', date: '2026-09-24', type: 'ride', hr_drift_pct: -0.7, hr_drift_seconds: 1637 });
+  assertEquals(prior.workout_analysis, {});
 });
 
-Deno.test('the drift the tile prints: decoupling first, heart-rate halves second, one decimal', () => {
+Deno.test('the drift the tile prints: the run\'s pace ratio, one decimal', () => {
   assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: 4.96 }, hr_drift_v1: { pct: 1 } }), 5);
-  assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: null }, hr_drift_v1: { pct: 2.44, seconds: 1500 } }), 2.4);
-  assertEquals(sessionDriftPct(JSON.stringify({ hr_drift_v1: { pct: 3, seconds: 1500 } })), 3);
+  assertEquals(sessionDriftPct(JSON.stringify({ heart_rate_summary: { decouplingPct: 2.44 } })), 2.4);
+  assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: null }, hr_drift_v1: { pct: 2.44, seconds: 1500 } }), null);
   assertEquals(sessionDriftPct({ heart_rate_summary: {} }), null);
   assertEquals(sessionDriftPct(null), null);
 });

@@ -2,7 +2,7 @@ import { rowsComeFromTheWatch } from './lib/interval-display.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
-import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
+import { extractSensorData, normalizeSamples, sensorArrayOf } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
 import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
@@ -14,7 +14,7 @@ import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { computeVarianceGate } from './lib/variance-gate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 // Old HR drift import removed - now using consolidated HR analysis module
-import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
+import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type RecordingRow, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
 import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from '../_shared/goal-race-completion.ts';
@@ -562,18 +562,24 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
     // Extract sensor data - try different data sources
     let sensorData: any[] = [];
+    /**
+     * ⛔ THE SAME RECORDING, EVERY ROW (2026-09-27). `sensorData` holds the moving samples only; the drift reads
+     * every row of the recording the samples came from (`normalizeSamples`, the ride's row reader), so a stop's heart
+     * rate stays in its half and the read starts at the recording's first second (`lib/heart-rate/efficiency.ts`).
+     */
+    let recordingRows: RecordingRow[] = [];
+    const readSource = (source: unknown, label: string) => {
+      const raw = sensorArrayOf(source);
+      sensorData = extractSensorData(raw);
+      if (sensorData.length > 0) recordingRows = normalizeSamples(raw);
+      console.log(`📊 ${label} yielded ${sensorData.length} samples`);
+    };
 
     // Try primary sources first (already loaded).
-    if (workout.sensor_data) {
-      sensorData = extractSensorData(workout.sensor_data);
-      console.log(`📊 sensor_data yielded ${sensorData.length} samples`);
-    }
+    if (workout.sensor_data) readSource(workout.sensor_data, 'sensor_data');
     (workout as any).sensor_data = null; // free immediately
 
-    if (sensorData.length === 0 && workout.computed) {
-      sensorData = extractSensorData(workout.computed);
-      console.log(`📊 computed data yielded ${sensorData.length} samples`);
-    }
+    if (sensorData.length === 0 && workout.computed) readSource(workout.computed, 'computed data');
 
     // Phase 2: only load the heavy blobs if primary sources had no data.
     if (sensorData.length === 0) {
@@ -583,14 +589,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         .select('time_series_data, garmin_data')
         .eq('id', workout_id)
         .single();
-      if (heavyRow?.time_series_data) {
-        sensorData = extractSensorData(heavyRow.time_series_data);
-        console.log(`📊 time_series_data yielded ${sensorData.length} samples`);
-      }
-      if (sensorData.length === 0 && heavyRow?.garmin_data) {
-        sensorData = extractSensorData(heavyRow.garmin_data);
-        console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
-      }
+      if (heavyRow?.time_series_data) readSource(heavyRow.time_series_data, 'time_series_data');
+      if (sensorData.length === 0 && heavyRow?.garmin_data) readSource(heavyRow.garmin_data, 'garmin_data');
       // heavyRow goes out of scope here — GC can reclaim it.
     }
 
@@ -730,10 +730,10 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       paceRange: i.pace_range
     })));
     
-    // D-036: GAP enrichment lifted to top-level so the HR analyzer
-    // (calculateEfficiency) can score decoupling on grade-adjusted pace, not
-    // raw pace. enrichSamplesWithGAP is idempotent — granular-pace.ts's
-    // internal call sees the marker and short-circuits, so no double-apply.
+    // D-036: GAP enrichment lifted to top-level so pace adherence and the HR analyser read one grade-adjusted
+    // series. enrichSamplesWithGAP is idempotent — granular-pace.ts's internal call sees the marker and
+    // short-circuits, so no double-apply. ⚠️ The decoupling does not read it (2026-09-27): it grade-adjusts the
+    // recording's own rows (`recordingRows`, `_shared/run-pace.ts runDecouplingPct`).
     const _enrichedRun = enrichSamplesWithGAP(sensorData);
     const effectiveSensorData = _enrichedRun.samples;
     const _runPaceBasis: 'gap' | 'raw' = _enrichedRun.basis;
@@ -953,51 +953,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       : (planClassifiedTypeKey || String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').trim() || 'steady_state');
     const classifiedHrWorkoutType: WorkoutType = mapClassifiedTypeToHrWorkoutType(classifiedTypeKey);
 
-    // D-038 Piece 1B: pre-HR variance hint. The full _varGate below depends on
-    // fact_packet_v1 (terrain_type, interval_execution) which isn't built yet,
-    // so reproduce the subset of predicates whose inputs are available now:
-    // pace CV at GAP basis, detected intervals on unplanned sessions, plan
-    // intent intervals on linked sessions. Threaded into hrAnalysisContext so analyzeHeartRate marks the
-    // DECOUPLING low-confidence (basis='raw') on a not-steady-enough effort — it NO LONGER re-labels the
-    // run "fartlek" (that was scientifically wrong + out of step with every commercial app; the label
-    // stays honest, the metric carries the uncertainty). ie-total-steps and raw-CV-on-flat signals are
-    // deferred to the full _varGate downstream.
-    const preHRMixedEffortHint: boolean = (() => {
-      // (1) pace CV at GAP basis ≥ 13%. Was 8% — research-corrected 2026-07-12: normal easy runs run
-      // 5–10% CV on raw/GAP pace (GPS noise + hills + lights) and 7% CV is metabolically costless, so 8%
-      // fired on ordinary easy runs. ~13% (low-mid teens) separates genuinely-variable efforts (marathons
-      // ~16%, fartlek/intervals higher) from steady easy running. (Ideal = a Variability-Index / NGP÷avg
-      // gate ~1.05, jitter-resistant — not computed here yet.)
-      const cvPct = Number((analysis as any)?.pacing_variability?.coefficient_of_variation);
-      const gapAdj = Boolean((analysis as any)?.gap_adjusted);
-      // OURS — 13% pace CV (the reasoning is in the note above, no named source); kept as found
-      if (Number.isFinite(cvPct) && cvPct >= 13 && gapAdj) return true;
-      // (2) detected intervals on unplanned session (non-easy/steady/long/recovery)
-      if (!isLinkedPlanSession) {
-        const detected = String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').toLowerCase().trim();
-        if (detected && detected !== 'easy' && detected !== 'steady_state' &&
-            detected !== 'long' && detected !== 'long_run' && detected !== 'recovery') {
-          return true;
-        }
-      }
-      // (3) plan intent intervals on linked session
-      if (isLinkedPlanSession) {
-        const k = String(classifiedTypeKey || '').toLowerCase();
-        if (k === 'intervals' || k === 'interval' || k === 'interval_run' ||
-            k === 'tempo' || k === 'tempo_run' || k === 'fartlek' || k === 'threshold' ||
-            k === 'vo2' || k === 'vo2max' || k === 'speed' || k === 'track') return true;
-      }
-      return false;
-    })();
-
     const hrAnalysisContext: HRAnalysisContext = {
       workoutType: classifiedHrWorkoutType,
-      // D-035 canonical unplanned signal; consumed by the HR analyzer's
-      // interval-route decoupling gate (detected intervals on unplanned runs
-      // still compute decoupling, basis forced to 'raw').
-      isUnplanned: !isLinkedPlanSession,
-      // D-038 Piece 1B: see preHRMixedEffortHint construction above.
-      varianceGate: { isMixedEffort: preHRMixedEffortHint },
       intervals: intervalsToAnalyze.map(interval => {
         // Compute timestamps from sample indices
         // Sample indices are roughly 1 sample per second
@@ -1039,6 +996,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         totalElevationGainM: workout?.elevation_gain ?? workout?.metrics?.elevation_gain ?? undefined,
         samples: sensorData
       },
+      recording: recordingRows,
       weather: (() => {
         const avgC = workout?.avg_temperature;
         const wd = workout?.weather_data;
@@ -1104,8 +1062,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     }
     
     // D-036: feed the HR analyzer the GAP-enriched samples (same series
-    // calculatePrescribedRangeAdherenceGranular consumes). calculateEfficiency
-    // now scores decoupling on grade-adjusted pace — terrain confound removed.
+    // calculatePrescribedRangeAdherenceGranular consumes) for its zones and bpm drift. The decoupling reads
+    // `hrAnalysisContext.recording`, the recording's every row, grade-adjusted (2026-09-27).
     const hrAnalysisResult = analyzeHeartRate(effectiveSensorData, hrAnalysisContext);
     console.log(`🏁 AFTER_HR +${Date.now()-_t0}ms heap=${_mem()} drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'} pace_basis=${_runPaceBasis}`);
     
@@ -2042,6 +2000,12 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // The whole row (2026-09-26): the packet's segment zones and easy band come from their owners, fed this row.
         baselines: userBaselinesRow,
         arcContext: preFactArc,
+        // The run's one drift (2026-09-27): the sample-level Pa:Hr over the whole run, null included.
+        decoupling: {
+          pct: hrAnalysisResult.summary?.decouplingPct ?? null,
+          basis: hrAnalysisResult.summary?.decouplingBasis ?? null,
+          assessment: hrAnalysisResult.summary?.decouplingAssessment ?? null,
+        },
       });
       fact_packet_v1 = factPacket;
       flags_v1 = flags;
@@ -2057,23 +2021,6 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           total_steps: performance.total_steps ?? null,
           gap_adjusted: !!performance.gap_adjusted,
         };
-      }
-
-      // D-036: replace segment-level cardiac_decoupling_pct (raw pace) with
-      // the sample-level decoupling from the run HR analyzer (now GAP-corrected
-      // because the analyzer reads effectiveSensorData per task #24). Surface
-      // basis so the LLM prompt rule can gate the fitness-claim translation.
-      // No-op when sample-level decoupling is null (intervals, < 20 min, etc.) —
-      // segment-level value stays in place for those cases.
-      if (fact_packet_v1) {
-        const fp = fact_packet_v1 as any;
-        if (!fp.derived) fp.derived = {};
-        const sampleLevelDecoupling = hrAnalysisResult.summary?.decouplingPct ?? null;
-        if (sampleLevelDecoupling != null) {
-          fp.derived.cardiac_decoupling_pct = Math.round(sampleLevelDecoupling * 10) / 10;
-        }
-        fp.derived.decoupling_basis = hrAnalysisResult.summary?.decouplingBasis ?? null;
-        fp.derived.decoupling_assessment = hrAnalysisResult.summary?.decouplingAssessment ?? null;
       }
     } catch (e) {
       console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
@@ -3017,8 +2964,9 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         heart_rate_summary: heartRateSummaryOut,
         // 2026-09-03: heart-rate drift as a percentage, halves by time, first 3 min skipped — the one
-        // definition shared with rides (`_shared/hr-drift-halves.ts`). Read by session-detail when the
-        // pace-to-heart-rate decoupling was not computed (intervals), so the Drift chip is never empty.
+        // definition shared with rides (`_shared/hr-drift-halves.ts`). Read by the coach, compute-facts and the daily
+        // ledger (in percent and in beats). ⛔ NOT the Drift tile (2026-09-27): a run's drift is its pace-to-heart-rate
+        // decoupling or nothing (`_shared/session-detail/drift-pct.ts`).
         hr_drift_v1: (() => {
           try {
             const smp = (typeof effectiveSensorData !== 'undefined' && Array.isArray(effectiveSensorData)) ? effectiveSensorData : (workout.sensor_data?.samples || []);

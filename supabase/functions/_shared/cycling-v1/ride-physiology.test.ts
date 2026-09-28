@@ -98,30 +98,64 @@ Deno.test('efficiency (§9 Q4): denominator is the passed whole-ride average, no
 });
 
 Deno.test('efficiency (§9 Q4): no average HR → no efficiency factor, decoupling still read', () => {
-  const t = Array.from({ length: 1400 }, (_, i) => i);
+  const t = Array.from({ length: 3600 }, (_, i) => i);
   const r = computeRideEfficiency(t, t.map(() => 145), t.map(() => 200), 200, null)!;
   assertEquals(r.efficiency_factor, null);
   assertEquals(r.aerobic_decoupling_pct, 0);
 });
 
-Deno.test('efficiency: ≥20 min span → aerobic_decoupling_pct; positive when HR drifts up at held power', () => {
-  // 1400 samples (~23 min). Power held 200W throughout; HR 140 first half,
-  // 154 second half → second-half power:HR ratio lower → positive decoupling.
-  const t = Array.from({ length: 1400 }, (_, i) => i);
+Deno.test('efficiency: aerobic_decoupling_pct over the whole ride; positive when HR drifts up at held power', () => {
+  // 3600 samples (60 min). Power held 200W throughout; HR 140 in the first half (to 30:00), 154 in the second
+  // → second-half power:HR ratio lower → positive decoupling.
+  const t = Array.from({ length: 3600 }, (_, i) => i);
   const p = t.map(() => 200);
-  const hr = t.map((_, i) => (i < 700 ? 140 : 154));
+  const hr = t.map((_, i) => (i < 1800 ? 140 : 154));
   const r = computeRideEfficiency(t, hr, p, 200, 147)!;
   assert(typeof r.aerobic_decoupling_pct === 'number');
   // r1 = 200/140 = 1.4286 ; r2 = 200/154 = 1.2987 ; (r1-r2)/r1 ≈ 9.1%
   assert(r.aerobic_decoupling_pct! > 8 && r.aerobic_decoupling_pct! < 10);
 });
 
-Deno.test('efficiency: held HR + held power over 20 min → ~0% decoupling', () => {
-  const t = Array.from({ length: 1400 }, (_, i) => i);
+Deno.test('efficiency: held HR + held power → ~0% decoupling', () => {
+  const t = Array.from({ length: 3600 }, (_, i) => i);
   const p = t.map(() => 200);
   const hr = t.map(() => 145);
   const r = computeRideEfficiency(t, hr, p, 200, 147)!;
   assertEquals(r.aerobic_decoupling_pct, 0);
+});
+
+Deno.test('⛔ efficiency: drift is read over the whole ride, warm-up and easing included (2026-09-27, TrainingPeaks)', () => {
+  // 60 minutes. Heart rate climbs through the first 10 and power falls in the last 8; TrainingPeaks' number counts the
+  // whole file, so both move the drift.
+  const t = Array.from({ length: 3600 }, (_, i) => i);
+  const hr = t.map((i) => (i < 600 ? 120 + (i / 600) * 25 : 145));
+  const p = t.map((i) => (i >= 3120 ? 150 : 200));
+  const r = computeRideEfficiency(t, hr, p, 200, 145)!;
+  assert(typeof r.aerobic_decoupling_pct === 'number' && r.aerobic_decoupling_pct !== 0, `got ${r.aerobic_decoupling_pct}`);
+});
+
+Deno.test('⛔ efficiency: a 30-minute ride reads; exactly 20 minutes reads, a second less does not (2026-09-27)', () => {
+  const t = Array.from({ length: 1800 }, (_, i) => i);
+  const r = computeRideEfficiency(t, t.map(() => 145), t.map(() => 200), 200, 145)!;
+  assertEquals(r.efficiency_factor, 1.38);
+  assertEquals(r.aerobic_decoupling_pct, 0);
+  const twenty = Array.from({ length: 1201 }, (_, i) => i); // 0..1200 s
+  assertEquals(computeRideEfficiency(twenty, twenty.map(() => 145), twenty.map(() => 200), 200, 145)!.aerobic_decoupling_pct, 0);
+  const short = Array.from({ length: 1200 }, (_, i) => i);
+  assertEquals(computeRideEfficiency(short, short.map(() => 145), short.map(() => 200), 200, 145)!.aerobic_decoupling_pct, undefined);
+});
+
+Deno.test('⛔ efficiency: coasting counts as 0 W in each half\'s normalized power (TrainingPeaks), 2026-09-27', () => {
+  // 60 minutes at 145 bpm. The second half (from 30:00) coasts one second in ten. TrainingPeaks keeps the
+  // zeros, so that half's normalized power is lower and the same heart rate buys less: drift reads positive. The
+  // pedalling-only average this replaced dropped the zeros and read 0.
+  const t = Array.from({ length: 3600 }, (_, i) => i);
+  const p = t.map((i) => (i >= 1800 && i % 10 === 0 ? 0 : 200));
+  const r = computeRideEfficiency(t, t.map(() => 145), p, 200, 145)!;
+  assert(r.aerobic_decoupling_pct! > 5 && r.aerobic_decoupling_pct! < 15, `got ${r.aerobic_decoupling_pct}`);
+  // A missing power reading on a ride with power is the same coasting second.
+  const gaps = t.map((i) => (i >= 1800 && i % 10 === 0 ? null : 200));
+  assertEquals(computeRideEfficiency(t, t.map(() => 145), gaps, 200, 145)!.aerobic_decoupling_pct, r.aerobic_decoupling_pct);
 });
 
 // ── computeRideVam ──────────────────────────────────────────────────────────

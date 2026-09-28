@@ -31,7 +31,8 @@ export interface EnduranceFactRow {
 
 /**
  * ⚠️ NO DRIFT HERE (2026-09-26). This read carried `run_facts / ride_facts.hr_drift_pct` as `drift`, and nothing read
- * it: every State point takes its drift from `driftReadForPoint` (the Performance screen's rule, `hr_drift_v1`).
+ * it: every State point takes its drift from `driftReadForPoint` (the Performance screen's rule,
+ * `_shared/session-detail/drift-pct.ts`).
  */
 export interface EnduranceFactRead {
   /** Output per heartbeat, as stored (run: m/s per beat; ride: W per beat). */

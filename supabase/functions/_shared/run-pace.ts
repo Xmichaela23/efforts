@@ -26,6 +26,7 @@
  *   step's existing cap, moved here unchanged.
  */
 import { hasUsableElevation, paceToGAP } from './gap.ts';
+import { steadyDecouplingPct } from './aerobic-decoupling.ts';
 
 // FIELD — definition (1 mi = 1609.34 m)
 const METERS_PER_MILE = 1609.34;
@@ -42,6 +43,8 @@ export const DRIFT_LINE_PCT = 5;
 
 /** One recorded second as the rules read it. `t` seconds, `d` cumulative metres, `v` m/s, `elev` metres. */
 export type RunSample = { t?: number | null; d?: number | null; v?: number | null; elev?: number | null };
+/** The same second with its heart rate, for the drift. */
+export type RunDriftSample = RunSample & { hr?: number | null };
 
 const num = (x: unknown): number | null => {
   const n = Number(x);
@@ -285,4 +288,43 @@ export function cumulativeFlatMeters(samples: ReadonlyArray<RunSample>, grades: 
     out[i] = out[i - 1] + add;
   }
   return out;
+}
+
+/**
+ * ⛔ THE RUN'S DRIFT (2026-09-27): TrainingPeaks' Pa:Hr, worked out by the one drift rule the ride uses
+ * (`./aerobic-decoupling.ts steadyDecouplingPct`: the whole session, 20 minutes or more, halves split at the middle
+ * second). Each half's output is its plain average grade-adjusted speed over every recorded second, stops at 0, over
+ * its average heart rate (the owner's ruling, 2026-09-27; no weighting). The run analyser and the summary step's
+ * execution score both call this, so a run has one drift.
+ *
+ * ⛔ EVERY ROW OF THE RECORDING, STOPS INCLUDED, AS ON A RIDE. The session starts at the recording's first row and ends
+ * at its last, not at the first and last moving second. A stopped second (the stopped line above, or a recording
+ * break) counts as 0 speed and keeps its heart rate in its half, the way a ride's coasting second counts as 0 W. Every
+ * other speed is used as recorded. Found 2026-09-27: the analyser's samples dropped every second
+ * without a pace, so a 4-minute stop at a light read 0.0% on the run and 1.9% on the same seconds as a ride.
+ *
+ * The output is each moving second's grade-adjusted speed: its speed times the Minetti cost of its grade over the flat
+ * cost (the weighting `gapSecPerMiBetween` uses), grade over 100 m (`runGrades`). The unit cancels in the ratio.
+ * `basis` is 'gap' when the run's elevation was usable and moved the speed (`./gap.ts hasUsableElevation`, the test the
+ * run analyser has always used), else 'raw'. Null when the session is under 20 minutes.
+ */
+export function runDecouplingPct(samples: ReadonlyArray<RunDriftSample>): { pct: number; basis: 'gap' | 'raw' } | null {
+  const grades = hasUsableElevation(samples.map((x) => ({ elevation_m: num(x?.elev) }))) ? runGrades(samples) : null;
+  const timeS: number[] = [];
+  const hrBpm: Array<number | null> = [];
+  const speed: number[] = [];
+  for (let i = 0; i < samples.length; i += 1) {
+    const t = num(samples[i]?.t);
+    if (t == null) continue;
+    const t0 = i > 0 ? num(samples[i - 1]?.t) : null;
+    const dt = t0 != null ? t - t0 : 0;
+    const v = dt > 0 && dt <= SAMPLE_BREAK_S ? speedAt(samples, i, dt) : 0;
+    const moving = v >= STOPPED_BELOW_MPS;
+    const g = grades && Number.isFinite(grades[i]) ? grades[i] : 0;
+    timeS.push(t);
+    hrBpm.push(num(samples[i]?.hr));
+    speed.push(moving ? (grades ? v * (1000 / paceToGAP(1000, g)) : v) : 0);
+  }
+  const pct = steadyDecouplingPct(timeS, hrBpm, speed, 'average');
+  return pct == null ? null : { pct, basis: grades ? 'gap' : 'raw' };
 }

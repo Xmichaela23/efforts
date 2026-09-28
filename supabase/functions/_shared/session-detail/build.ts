@@ -6,7 +6,6 @@ import { talkTestAppliesToTags } from '../effort-words.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolveSessionDrift, STEADY_RIDE_MAX_VI } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
-import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { plannedDurationFields } from '../planned-duration-label.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
@@ -587,8 +586,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * throwaway account). This required `pwLower > 0` alongside the "0,0 from strides" guard, and
        * the library writes an easy ride as exactly `{lo: 0, hi: 0.75 × FTP}` — "below 75%", p239's
        * own shape (`endurance-library/generate.ts:156`). So every VT1 row on a Viada endurance ride
-       * arrived with NO planned band at all, and the drift window could not tell those rows from
-       * the sets inside the same session.
+       * arrived with NO planned band at all, and the steadiness ladder could not tell those rows from
+       * the sets inside the same session (`session-steadiness.ts`, rung 0).
        * ⚠️ THE ORIGINAL GUARD'S INTENT SURVIVES: a band of 0–0 is still not a range. Only the upper
        * has to be positive; the lower may be zero, and a negative one is still refused.
        * ⛔ AND IT IS JUDGED (2026-09-18, p239): `powerBand` reads a floor of zero under a ceiling as p239's easy
@@ -1014,7 +1013,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   /**
    * ⛔ A RIDE WHOSE POWER SWUNG HAS NO DRIFT (2026-09-27, Michael). A variability index above 1.05 (TrainingPeaks:
-   * "a steady and even output … should have a VI of 1.05 or less") makes `resolveSessionDrift` and the window below
+   * "a steady and even output … should have a VI of 1.05 or less") makes `resolveSessionDrift`
    * return nothing, so `decouplingV1` is null: no Drift tile, no Heart rate drift row. The rule is `driftReadApplies`
    * in `drift-pct.ts`, not a check here. ⚠️ The first cut that morning kept the percentage and dropped only its 5%
    * line (`driftLineOn`, deleted). Runs unchanged.
@@ -1030,43 +1029,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     if (noVerdict) return null;
     // ⛔ ONE RULE (2026-09-12, Michael: "we need consistent rules across all screens"): `resolveSessionDrift`
     // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
-    // power-to-heart-rate ratio, heart rate alone as the fallback. Today's boom line and State's
-    // drift chart read the same function. This block used to be its own copy.
-    /**
-     * ⛔ A LONG SESSION WITH SETS IS READ OVER ITS VT1 PORTIONS (p107 / p235, 2026-09-12). The book
-     * builds LSD with sets in it, and a whole-file number on that session reports a durability
-     * failure every week on an athlete following the page exactly. `vt1WindowDrift` removes the sets
-     * and their recoveries and splits what is left; a plain long session has nothing to remove and
-     * says `not_applicable`, so it keeps the ordinary read below. See that file for how the sets are
-     * found, and for its floor: twenty minutes of easy time (`DRIFT_MIN_STEADY_S`, 2026-09-27).
-     */
-    // ⛔ THE SAME MATERIALS THE LADDER READS BELOW — the window may not answer where p107's gate says no.
-    const driftSteadiness = {
-      factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow,
-    };
-    const win = vt1WindowDrift({ intervals, workoutAnalysis: wa, sport: type, steadiness: driftSteadiness });
-    if (win.kind === 'too_short') {
-      return {
-        pct: null, basis: null, assessment: null, confounded: false, whole_session: false,
-        // Approved words (2026-09-12). No number, no mention of the sets, no minutes.
-        line: /^(ride|bike|cycling)$/.test(String(type ?? '').toLowerCase())
-          ? 'Not enough easy riding to read'
-          : 'Not enough easy running to read',
-      };
-    }
+    // power-to-heart-rate ratio, both over the whole session of 20 minutes or more (`../aerobic-decoupling.ts`),
+    // and nothing else (2026-09-27). Today's boom line and State's drift chart read the same function.
+    // ⛔ A LONG SESSION WITH HARDER SETS IN IT HAS NO DRIFT (2026-09-27, Michael): it is not a steady effort, and
+    // the steadiness ladder says so (`session-steadiness.ts`, rung 0, off the rows' planned targets). The window
+    // that read such a session over its easy rows is deleted, and with it the "not enough easy running" line.
     const d = resolveSessionDrift({
       workoutAnalysis: wa, computed: comp, sport: type,
       // The materials, not a verdict — `session-steadiness.ts` decides. `plannedRowRaw` carries the
-      // plan's family tag, `completedRow` the provider's word and the device's lap markings.
-      steadiness: driftSteadiness,
+      // plan's family tag, `completedRow` the provider's word and the device's lap markings, `intervals` the
+      // rendered rows with their planned targets.
+      steadiness: { factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow },
     });
-    if (win.kind === 'read') {
-      // The windowed number replaces the whole-file one; everything else about the row is unchanged.
-      return {
-        pct: win.pct, basis: win.basis, assessment: null, confounded: d?.confounded ?? false,
-        whole_session: false, line: driftLineFor(win.pct),
-      };
-    }
     if (!d) return null;
     return {
       pct: d.pct,
@@ -1911,10 +1885,8 @@ export function formatCyclingPacingRow(
 
 /**
  * EFFICIENCY row from computed.analysis.efficiency (the block compute-workout-
- * analysis writes via ride-physiology.computeRideEfficiency). Reads the ACTUAL
- * persisted keys efficiency_factor + aerobic_decoupling_pct. (The request named
- * the decoupling field generically; the shipped shape uses
- * `aerobic_decoupling_pct` — Friel aerobic decoupling %. Documented deviation.)
+ * analysis writes via ride-physiology.computeRideEfficiency). Reads the persisted
+ * key efficiency_factor.
  *
  * ⛔⛔ STEADY AEROBIC RIDES ONLY, AND IT TAKES BOTH GATES (2026-09-15). The only gate here was "both
  * numbers are on file", which is a data-presence test rather than a statement about the session — so
@@ -1997,7 +1969,7 @@ export function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
-  decoupling: { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean; whole_session?: boolean } | null = null,
+  decoupling: { pct: number | null; basis: 'gap' | 'raw' | 'power' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean; whole_session?: boolean } | null = null,
   /** The provider's own elevation total (metres) — the number the DETAILS tab renders.
    *  ⚠️ NOT READ HERE SINCE 2026-09-27: the climbing left the Conditions rows for the Elevation tile
    *  (`completed_totals.elevation_display`, composed in `buildSessionDetailV1`). The slot stays because the
@@ -2415,8 +2387,7 @@ export function buildAnalysisDetailRows(
         // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.
-        const scope = decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
-          : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : '');
+        const scope = decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : '';
         rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}%${room ? ` (${room})` : ''}${scope}` });
       } else if (withheldForPaceSpread) {
         rows.push({
@@ -2424,6 +2395,14 @@ export function buildAnalysisDetailRows(
           value: 'Not read on this session — no usable heart-rate data across it',
         });
       }
+    /**
+     * ⛔ NO DRIFT READ, NO HEART-RATE DRIFT LINE (2026-09-27, the one drift rule). A session with no drift — under 20
+     * minutes (`../aerobic-decoupling.ts`), or a ride whose power swung — has no Drift tile, and the bpm lines below are
+     * the same claim in beats. A run under 20 minutes printed a bpm line here before; it prints none now. A session with a drift read that the line
+     * above does not print (a raw or heat-confounded pace ratio) keeps the bpm description, as before.
+     */
+    } else if (typeof decoupling?.pct !== 'number') {
+      /* no drift read: no line */
     // OURS — `buildAnalysisDetailRows` a raw HR rise of 5 bpm or more on a negative split is named as pace-driven; no source, kept as found
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
       rows.push({

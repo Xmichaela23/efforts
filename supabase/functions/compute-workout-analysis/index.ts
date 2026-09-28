@@ -1098,7 +1098,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
      * Deliberately unchanged, because each already excludes non-pedalling itself: the power curve
      * and best-20-min (`rollingMaxAverage` filters `v > 0`, so outdoor descents cannot drag the
      * window down and the FTP learner's input is untouched), avg pedalling power and % time
-     * pedalling (`> 25 W`, already reading missing as 0), and ride efficiency / decoupling (`p > 0`).
+     * pedalling (`> 25 W`, already reading missing as 0), and ride efficiency's 60-sample gate (`p > 0`).
+     * ⚠️ 2026-09-27: decoupling is no longer on that list. It reads normalized power per half with
+     * coasting at 0 W, as TrainingPeaks counts it (`_shared/aerobic-decoupling.ts steadyDecouplingPct`).
      */
     if (hasRows && /ride|bike|cycl/i.test(sport)) {
       const anyPower = rows.some((r) => typeof r.power_w === 'number' && Number.isFinite(r.power_w as number));

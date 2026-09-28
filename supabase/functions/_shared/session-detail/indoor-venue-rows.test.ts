@@ -45,8 +45,10 @@ const bpm = {
   facts: { weather: { temperature_f: 88, heat_stress_level: 'moderate' } },
   derived: { hr_drift_bpm: 11, hr_drift_typical: 4, terrain_contribution_bpm: 6, drift_explanation: 'terrain_driven' },
 };
+// The bpm line prints only on a session with a drift read (2026-09-27, the one drift rule): this ride has its power ratio.
 const bpmRow = (indoors: boolean) =>
-  buildAnalysisDetailRows(bpm, [], false, null, false, [], 'ride', null, 88, null, null, null, null, indoors)
+  buildAnalysisDetailRows(bpm, [], false, null, false, [], 'ride', null, 88,
+    { pct: 7.4, basis: 'power', assessment: null, confounded: false }, null, null, null, indoors)
     .find((r) => r.label === 'Heart rate')?.value ?? '';
 
 Deno.test('⛔ "THE HEAT DROVE IT" IS AN OUTDOOR SENTENCE', () => {

@@ -1,5 +1,5 @@
 import type { HrZone, StimulusAssessmentV1, WorkoutSegmentV1 } from './types.ts';
-import { coerceNumber, calculateCardiacDecouplingPct } from './utils.ts';
+import { coerceNumber } from './utils.ts';
 
 function zoneBounds(zones: HrZone[], label: string): { min: number; max: number } | null {
   const z = zones.find((x) => String(x.label).toUpperCase() === label.toUpperCase());
@@ -53,6 +53,8 @@ export function assessStimulus(
      * not the rule's 80%) on a max heart rate: two easy tops for one athlete.
      */
     easy_ceiling_bpm?: number | null;
+    /** The run's one drift (2026-09-27): the analyser's decoupling over the whole run, null under 20 minutes. */
+    decoupling_pct?: number | null;
   } | null
 ): StimulusAssessmentV1 | null {
   const intent = String(workoutIntent || 'unknown').toLowerCase();
@@ -98,9 +100,9 @@ export function assessStimulus(
         }
         // OURS — `assessStimulus` ≥ 70% of time in the aerobic range; decoupling ≤ 5% is the line state-trend/run.ts reads from Viada p107
         const zoneHit = pct != null ? pct >= 0.7 : false;
-        const dec = calculateCardiacDecouplingPct(segsWork.length ? segsWork : segments);
+        const dec = coerceNumber(planned?.decoupling_pct);
         const decOk = dec != null ? dec <= 5 : null;
-        if (decOk === true) evidence.push(`Cardiac decoupling ${dec.toFixed(1)}%`);
+        if (dec != null && decOk === true) evidence.push(`Cardiac decoupling ${dec.toFixed(1)}%`);
 
         const achieved = durationHit && zoneHit;
         const confidence: StimulusAssessmentV1['confidence'] =

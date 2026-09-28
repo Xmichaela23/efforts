@@ -5,8 +5,9 @@
  * Regression guards (permanent — these are the exact lies the fix removed):
  *  1. GAP-basis decoupling → an "Aerobic decoupling" row renders with the % + word,
  *     and the descriptive "Heart rate" bpm line is SUPPRESSED (one read, not two).
- *  2. No decoupling (raw / null) → NO "Aerobic decoupling" row; the descriptive
- *     bpm "Heart rate" line renders but NEVER contains "normal for N min".
+ *  2. A raw-basis decoupling → NO "Aerobic decoupling" row; the descriptive bpm "Heart rate" line
+ *     renders but NEVER contains "normal for N min". No decoupling at all (null) → no heart-rate drift
+ *     line of any kind (2026-09-27, the one drift rule: no drift read, no drift line).
  *  3. drift.ts empty-half-window guard → an all-dropout late window returns an
  *     invalid drift (driftBpm 0), so no garbage bpm ever reaches the row.
  *
@@ -98,13 +99,13 @@ Deno.test('Q-158 (2): no GAP % → bpm line renders and NEVER says "normal for N
   // own-baseline comparison is still allowed (honest, individual-relative).
   assertStringIncludes(hrRaw!.value, 'typical');
 
-  // null decoupling (short/interval/cycling) → same: no verdict row, no "normal for N min".
+  // ⛔ null decoupling (a run under 20 minutes, 2026-09-27) → no verdict row and no bpm line either:
+  // the Drift tile says nothing on it, so the Heart rate row does not say it in beats.
   const rowsNull = buildAnalysisDetailRows(
     factPacketWithDrift(6), [], false, null, false, [], 'run', null, null, null,
   );
   assertEquals(labels(rowsNull).includes('Aerobic decoupling'), false);
-  const hrNull = find(rowsNull, 'Heart rate');
-  assertEquals(/normal for \d+ min/.test(hrNull!.value), false);
+  assertEquals(find(rowsNull, 'Heart rate'), undefined);
 });
 
 Deno.test('Q-158 (3): all-dropout late window → invalid drift, never a garbage bpm', () => {

@@ -155,3 +155,38 @@ Deno.test('the order holds — a higher rung beats every lower one that disagree
     { steady: true, decidedBy: 'plan_family' },
   );
 });
+
+/* ── Rung 0 (2026-09-27, Michael): a session with harder sets in it is not a steady effort. ── */
+
+const paced = (interval_type: string, lo: number, hi: number) =>
+  ({ interval_type, planned_pace_range: { lower_sec_per_mi: lo, upper_sec_per_mi: hi } });
+
+Deno.test('rung 0: a long run with harder sets is not steady, even when its family says steady', () => {
+  const r = sessionSteadiness({
+    plannedRow: { tags: ['family:run_lsd'] },
+    intervals: [paced('warmup', 660, 720), paced('work', 600, 640), paced('work', 480, 500), paced('recovery', 700, 760), paced('work', 600, 640), paced('cooldown', 700, 760)],
+  });
+  assertEquals(r, { steady: false, decidedBy: 'planned_sets' });
+});
+
+Deno.test('rung 0: every work row at one target says nothing; a slower cool-down is not a set', () => {
+  const r = sessionSteadiness({
+    plannedRow: { tags: ['family:run_lsd'] },
+    intervals: [paced('warmup', 660, 720), paced('work', 600, 640), paced('work', 600, 640), paced('cooldown', 700, 760)],
+  });
+  assertEquals(r, { steady: true, decidedBy: 'plan_family' });
+});
+
+Deno.test('rung 0: reads the analysis breakdown when there are no rendered rows (State, Today)', () => {
+  const workoutAnalysis = { granular_analysis: { interval_breakdown: { intervals: [
+    { interval_type: 'work', planned_power_range_lower: 0, planned_power_range_upper: 150 },
+    { interval_type: 'work', planned_power_range_lower: 250, planned_power_range_upper: 290 },
+    { interval_type: 'work', planned_power_range_lower: 0, planned_power_range_upper: 150 },
+  ] } } };
+  assertEquals(sessionSteadiness({ plannedRow: { tags: ['family:ride_endurance'] }, workoutAnalysis }).decidedBy, 'planned_sets');
+});
+
+Deno.test('rung 0: rows with no targets say nothing', () => {
+  const r = sessionSteadiness({ intervals: [{ interval_type: 'work' }, { interval_type: 'work' }] });
+  assertEquals(r, { steady: true, decidedBy: 'nothing_said' });
+});

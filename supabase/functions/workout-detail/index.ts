@@ -317,8 +317,16 @@ const STRENGTH_VOLUME_VERSION = 2;
  *  10 — a ride whose variability index is above 1.05 has no drift at all: `classification.decoupling` is null, so no
  *       Drift tile and no Heart rate drift row (2026-09-27, Michael, revising v9's line-only cut; `driftReadApplies`
  *       in drift-pct.ts). A copy stored at v9 would keep printing that ride's drift number until it rebuilt.
+ *  11 — drift, runs and rides, is TrainingPeaks' Pa:Hr / Pw:Hr over the whole session, on a steady session of 20
+ *       minutes or more (`_shared/aerobic-decoupling.ts`, FIELD — TrainingPeaks' 20 minutes); a long session with
+ *       harder sets in it is not steady and has none, and no session gets a heart-rate-only drift (a ride with no power has
+ *       none); the Heart rate row's bpm lines print only on a session with a drift read, and the ride's EFFICIENCY
+ *       row no longer needs one (2026-09-27, Michael: "fix A"). A copy stored at v10 would keep the heart-rate-only
+ *       read and the bpm lines until it rebuilt. ⚠️ THE REBUILD DOES NOT MOVE THE NUMBER: the drift itself is stored by
+ *       the analysers (`heart_rate_summary.decouplingPct`, `computed.analysis.efficiency.aerobic_decoupling_pct`), so a
+ *       session analysed before this rule keeps its old drift until it is analysed again (`recompute-workout`).
  */
-const SESSION_TOTALS_VERSION = 10;
+const SESSION_TOTALS_VERSION = 11;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 

@@ -2,16 +2,15 @@
  * Shared Sensor Data Extraction Utilities
  * 
  * Used by:
- * - analyze-running-workout (extractSensorData)
+ * - analyze-running-workout (sensorArrayOf, extractSensorData, and normalizeSamples for the drift)
  * - compute-workout-analysis (normalizeSamples)
  */
 
 /**
- * Extract sensor data from various formats (Garmin, Strava, etc.)
- * Handles arrays, objects, JSON strings
- * Returns normalized sensor samples with pace, HR, elevation, power
+ * The recording's raw samples, from the formats providers store (Garmin, Strava, etc.): an array, an object holding
+ * one, or a JSON string of either. Empty when none is found.
  */
-export function extractSensorData(data: any): any[] {
+export function sensorArrayOf(data: any): any[] {
   console.log('🔍 Data type:', typeof data);
   console.log('🔍 Data is array:', Array.isArray(data));
   console.log('🔍 Data keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
@@ -82,6 +81,18 @@ export function extractSensorData(data: any): any[] {
     console.log('⚠️ Data is not an array, object, or string.');
     return [];
   }
+  return dataArray;
+}
+
+/**
+ * Extract sensor data from various formats (Garmin, Strava, etc.)
+ * Handles arrays, objects, JSON strings
+ * Returns normalized sensor samples with pace, HR, elevation, power: the MOVING samples only — a sample with no valid
+ * pace is dropped. A read that needs every second of the recording (the run's drift) takes `normalizeSamples` of
+ * `sensorArrayOf` instead.
+ */
+export function extractSensorData(data: any): any[] {
+  const dataArray = sensorArrayOf(data);
 
   console.log(`📊 Raw sensor data length: ${dataArray.length}`);
 
@@ -218,8 +229,9 @@ export function extractSensorData(data: any): any[] {
 }
 
 /**
- * Normalize sensor samples to standard format
- * Used by compute-workout-analysis for chart data
+ * Normalize sensor samples to standard format: every row of the recording, stopped seconds included.
+ * Used by compute-workout-analysis for chart data and the ride's drift, and by the run analyser for the run's drift
+ * (`functions/_shared/run-pace.ts runDecouplingPct`), so both sports read one clock and one heart rate per row.
  */
 export function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> {
   const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> = [];

@@ -1,8 +1,11 @@
 /**
  * HEART-RATE DRIFT, THE BOOK'S OWN MEASURE (p107): heart rate in the second half of a session against the
- * first half, as a percentage, at whatever effort the session held. One definition for runs and rides, so
- * the Drift chip on a run and on a ride mean the same thing (Michael 2026-09-03: "drift is going to be
- * important... on the performance screens for running and riding").
+ * first half, as a percentage, at whatever effort the session held. One definition for runs and rides, stored
+ * by both analysers as `hr_drift_v1` and read by the coach, compute-facts and the daily ledger (in percent, and in
+ * beats through `hrDriftV1Bpm` below).
+ * ⛔ NOT THE DRIFT TILE (2026-09-27). The Drift tile, Today's drift line, State's drift chart and the ride paragraph
+ * read TrainingPeaks' Pa:Hr / Pw:Hr over the whole session (`./aerobic-decoupling.ts`, `session-detail/drift-pct.ts`). This
+ * measure has its own start (below) and is no longer a fallback for any of them.
  *
  *   - The first `skipStartS` (180 s) are dropped: heart rate lags effort by 2–3 min, so the opening minutes
  *     read low and would inflate every session's drift.
@@ -10,9 +13,7 @@
  *   - Halves are split by TIME, not by sample count, so a recording with gaps still splits at the midpoint.
  *   - At least 6 minutes of usable samples, or null.
  *
- * On an interval session the number is computed but NOT shown on the session screen (2026-09-12, p107:
- * drift is a steady-session read); `session-detail/build.ts decouplingV1` gates it. State's trend
- * excludes interval sessions on its own rule.
+ * State's trend excludes interval sessions on its own rule.
  */
 import { sampleOffsetSeconds } from './run-warmup-easy.ts';
 
@@ -95,8 +96,8 @@ function storedDrift(v: unknown): HrDriftHalves | null {
 /**
  * ⛔ THE ONE DRIFT, FOR A READER THAT IS NOT THE ANALYSER (2026-09-26, Michael: "go"). `compute-facts` halved the
  * samples by COUNT with no warm-up skip — a second drift beside this one, and the one the "Bike HR drift trending
- * higher" signal read. This returns the analyser's stored `hr_drift_v1` whenever the analysis carries the key (the
- * number the Performance screen prints, null included), else the same measure worked out here from the inputs the
+ * higher" signal read. This returns the analyser's stored `hr_drift_v1` whenever the analysis carries the key (null
+ * included), else the same measure worked out here from the inputs the
  * analysers hand it — the samples, the moving time, the planned warm-up. `compute-facts` runs before the analyser
  * on a first ingest, which is the only time the key is missing on a session analysed since 2026-09-03.
  */

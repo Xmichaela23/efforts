@@ -49,7 +49,6 @@ import { indexEnduranceFactsByWorkout } from "./endurance-facts.ts";
 // This file kept its own copies of both and they disagreed; see the note on `driftReadForPoint`.
 import { resolveSessionDrift } from "../_shared/session-detail/drift-pct.ts";
 import { sessionSteadiness } from "../_shared/session-detail/session-steadiness.ts";
-import { vt1WindowDrift } from "../_shared/session-detail/vt1-window-drift.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
   assembleStateTrends,
@@ -145,23 +144,17 @@ function driftReadForPoint(input: {
   sport?: string | null;
   plannedRow?: { tags?: unknown; name?: unknown; description?: unknown } | null;
   workoutRow?: unknown;
-}): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+}): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
   const wa = input.workoutAnalysis as any;
+  // The analysis goes with the materials: its interval breakdown carries the planned targets the ladder reads for
+  // harder sets (rung 0, `session-steadiness.ts`) — a long session with sets is not steady and has no drift.
   const steadiness = {
     factPacket: wa?.fact_packet_v1 ?? null,
     plannedRow: input.plannedRow ?? null,
     workoutRow: input.workoutRow ?? null,
+    workoutAnalysis: wa,
   };
   const steady = sessionSteadiness(steadiness).steady;
-  /**
-   * ⛔ THE SAME WINDOW THE PERFORMANCE SCREEN APPLIES (2026-09-12). A long session with sets is read
-   * over its VT1 portions, and without this State printed the whole-file number beside Performance's
-   * windowed one — 12.9% against 4.8% on the same run. State has no rendered interval rows, so the
-   * window reads the analyser's breakdown off the row this function was already handed.
-   */
-  const win = vt1WindowDrift({ workoutAnalysis: wa, sport: input.sport ?? null, steadiness });
-  if (win.kind === 'too_short') return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: true };
-  if (win.kind === 'read') return { driftPct: win.pct, driftBasis: win.basis, driftWholeSession: !steady, fadeWithheld: false };
   const d = resolveSessionDrift({
     workoutAnalysis: wa,
     computed: input.computed ?? null,
@@ -1078,7 +1071,6 @@ serve(async (req: Request) => {
             hr_avg: runHrByDate.get(r.date) ?? null,
             decoupling_pct: hrs?.decouplingPct ?? null,
             decoupling_basis: hrs?.decouplingBasis ?? null,
-            decoupling_mixed_effort: hrs?.decouplingMixedEffort ?? null, // confidence hedge — NOT a filter
             decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat/RPE-confounded → excluded from the durability substrate
             // ⛔ THE PLAN'S OWN WORD FIRST (2026-08-28) — see `runTypeByDate` above. The analyser's
             // three-word field is the fallback, so nothing that read this before reads less now.
@@ -1558,11 +1550,10 @@ serve(async (req: Request) => {
              * session would report a durability failure every week on an athlete following the book
              * exactly** — the pace changes by prescription and the ratio falls apart by design.
              *
-             * ⚠️ THE FLAG ALREADY EXISTED AND THIS IS NOT A SECOND STEADINESS TEST. D-283 correctly
-             * made `decoupling_mixed_effort` a HEDGE rather than an exclusion for the general
-             * durability row. **Here it is the SWITCH.** Not a contradiction: D-283 says do not delete
-             * a steady run for being LOW-CONFIDENCE; this says do not print a fade number for a
-             * session that WAS NOT STEADY.
+             * ⚠️ THIS IS NOT A SECOND STEADINESS TEST. D-283 says do not delete a steady run from the
+             * durability row for being LOW-CONFIDENCE; this says do not print a fade number for a
+             * session that WAS NOT STEADY. (The `decoupling_mixed_effort` hedge D-283 named is gone,
+             * 2026-09-27: it reached no screen, and drift is read on steady sessions only.)
              * ⛔ IT WITHHOLDS THE FIGURE ONLY. The session still carries its efficiency and still
              * feeds the trend — never dropped.
              * ⚠️ CONSEQUENCE, STATED AND CORRECT: a marathon-plan long run is usually genuinely steady
@@ -1574,10 +1565,11 @@ serve(async (req: Request) => {
              * THE FADE SWITCH, which is what it was written about. It does NOT govern the drift read,
              * and the long run is no longer withheld from one: p107 makes drift the dose guide for
              * *"easy/VT1 work in a given session"* and p235's LSD is *"primarily below VT1"*, so a
-             * long session ALWAYS gets a reading. The sets this note is really describing are handled
-             * by taking the reading over the VT1 portions only — `_shared/session-detail/
-             * vt1-window-drift.ts` — rather than by refusing the session a number. A plain long
-             * session keeps its whole-session read.
+             * long session ALWAYS gets a reading.
+             * ⛔⛔ AND SUPERSEDED AGAIN FOR A LONG SESSION WITH SETS (2026-09-27, Michael: "a session with harder
+             * sets in it is not a steady effort"). The reading over the VT1 portions is deleted: a session with
+             * harder sets in it is not steady (`session-steadiness.ts`, rung 0) and has no drift. A plain long
+             * session keeps its read, over the whole session.
              * ⚠️ DO NOT READ THE PARAGRAPH ABOVE AS A REASON TO PUT `run_lsd` OUTSIDE THE DRIFT-READ
              * BAND in `session-steadiness.ts`. That was considered and is wrong: it would blank the
              * session the drift chart most wants.
@@ -1592,13 +1584,11 @@ serve(async (req: Request) => {
               efficiency: f.efficiency,
               // ⛔ The switch above. Null here means "this session was not steady enough to fade-read",
               // which is a different fact from "we did not measure it" — `fadeWithheld` says which.
-              // 2026-09-03: ONE drift read with the Performance screen (session-detail): the pace-to-heart-rate
-              // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
-              // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
-              // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              // ⛔ THE SAME FUNCTION THE PERFORMANCE SCREEN READS, given the same materials. The
-              // `f.drift` fourth fallback and the runs-only graded-interval flag are both gone; the
-              // ladder in `session-steadiness.ts` answers for every sport.
+              // ⛔ THE SAME FUNCTION THE PERFORMANCE SCREEN READS, given the same materials: the pace-to-heart-rate
+              // decoupling (a run) or the power-to-heart-rate one (a ride), over the whole session, and nothing else —
+              // no heart-rate-only read since 2026-09-27 (`_shared/session-detail/drift-pct.ts`). The `f.drift`
+              // fallback and the runs-only graded-interval flag are both gone; the ladder in `session-steadiness.ts`
+              // answers for every sport.
               ...driftReadForPoint({
                 workoutAnalysis: r?.workout_analysis,
                 computed: r?.computed ?? null,
