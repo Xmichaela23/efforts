@@ -1932,7 +1932,8 @@ export function formatCyclingEfficiencyRow(
     ? ` Your average on steady rides over the last four weeks is ${recent.toFixed(2)}.`
     : '';
   // Efficiency Factor — Friel's and TrainingPeaks' name for this number (2026-09-27, approved by Michael; not a registered mark).
-  return { label: 'EFFICIENCY', value: `Efficiency factor ${ef.toFixed(2)}.${against}` };
+  // "Higher means…" — Friel / TrainingPeaks: a rising EF across similar steady rides is improving aerobic fitness (approved 2026-09-27).
+  return { label: 'EFFICIENCY', value: `Efficiency factor ${ef.toFixed(2)}. Higher means more power for the same heart rate.${against}` };
 }
 
 /**
