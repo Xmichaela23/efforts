@@ -10,6 +10,7 @@ import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { plannedDurationFields } from '../planned-duration-label.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { offPrescriptionLine } from './off-prescription.ts';
+import { executionScoreNotes } from './score-notes.ts';
 import { isCeilingOnly, oneSidedPowerText } from '../ride-power.ts';
 import { driftReachesLine } from '../run-pace.ts';
 import { planShare } from './swim-plan-share.ts';
@@ -1412,6 +1413,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * "Time in easy HR"). Counted off the same work rows the table prints, "not done" rows included.
        */
       execution_line: executionLine(verdictPerf?.execution_basis, intervals, type === 'ride'),
+      /** ⛔ THE NOTES UNDER IT (2026-09-28): what took each part of the score below 100 — `./score-notes.ts`. */
+      score_notes: executionScore != null ? executionScoreNotes(verdictPerf, intervals, type === 'ride') : [],
       assessed_against: assessedAgainst,
       status_label: noVerdict ? null : (sessionState?.glance?.status_label ?? null),
       gap_adjusted: !!perf?.gap_adjusted,

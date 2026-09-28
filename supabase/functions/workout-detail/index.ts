@@ -331,7 +331,7 @@ const STRENGTH_VOLUME_VERSION = 2;
  *       Michael, "go"; `_shared/session-detail/top-tiles.ts`). A copy stored at v11 has none, and the ride's top card
  *       would print no Weighted Power until it rebuilt.
  */
-const SESSION_TOTALS_VERSION = 12;
+const SESSION_TOTALS_VERSION = 13;  // 13 (2026-09-28): the notes under Execution
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 

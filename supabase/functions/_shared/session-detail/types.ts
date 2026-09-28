@@ -228,6 +228,8 @@ export type SessionDetailV1 = {
      * ride) or "Time in easy HR" (an easy session). Null when there is no score. `build.ts executionLine`.
      */
     execution_line?: string | null;
+    /** What took the score below 100, one note per cause (`score-notes.ts`, 2026-09-28). Empty when nothing did. */
+    score_notes?: string[];
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;
     /** True when pace_adherence was scored on Grade-Adjusted Pace (Minetti model). */

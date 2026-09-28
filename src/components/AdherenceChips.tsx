@@ -20,6 +20,8 @@ interface AdherenceChipsProps {
       easy_line?: string | null;
       /** 2026-09-17: the words under Execution — "4 of 6 reps done" / "Time in easy HR". */
       execution_line?: string | null;
+      /** 2026-09-28: what took the score below 100, one note per cause — the server's words. */
+      score_notes?: string[];
       easy_ceiling_bpm?: number | null;
       easy_ceiling_anchor?: string | null;
       performance_assessment?: string | null;
@@ -209,6 +211,14 @@ export default function AdherenceChips({
     // ⛔ THE LINE UNDER EXECUTION IS THE SERVER'S (2026-09-17) — "4 of 6 reps done" or "Time in easy HR".
     // Execution is time in the target range now (Garmin's method), no longer efforts and time together.
     const executionSubtitle = ex?.execution_line ?? '';
+    // ⛔ THE NOTES UNDER THE SCORE ROW ARE THE SERVER'S (2026-09-28, `score-notes.ts`): what pulled Execution down.
+    // Full width under the three readouts, since a readout's own line cannot wrap. Performance only; the Today card stays short.
+    const scoreNotes = executionScore != null && !dense ? (ex?.score_notes ?? []).filter((n) => typeof n === 'string' && n.trim()) : [];
+    const scoreNotesBlock = scoreNotes.length ? (
+      <div className="mb-3 space-y-0.5 text-center px-3" data-testid="execution-score-notes">
+        {scoreNotes.map((n) => <p key={n} className="text-caption text-label-secondary leading-snug">{n}</p>)}
+      </div>
+    ) : null;
 
     const completedDurS = sd.completed_totals?.duration_s ?? null;
     const plannedDurS = sd.planned_totals?.duration_s ?? null;
@@ -369,6 +379,7 @@ export default function AdherenceChips({
                 : (driftNote ? <React.Fragment key="dr">{chipNote('Drift', driftNote)}</React.Fragment> : null),
             ])}
           </div>
+          {scoreNotesBlock}
         </div>
       );
     }
@@ -396,6 +407,7 @@ export default function AdherenceChips({
             driftValue != null ? <React.Fragment key="dr">{chipText('Drift', driftValue, driftSubtitle)}</React.Fragment> : null,
           ])}
         </div>
+        {scoreNotesBlock}
       </div>
     );
   } catch { return null; }
