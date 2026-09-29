@@ -229,7 +229,7 @@ Deno.test('⛔ level 3 builds on this plan only — its own ceiling of 3; Base a
 });
 
 Deno.test('⛔ the long ride builds the length picked inside p239 level 3 (3h30 to 5h); the deload\'s level-1 ride is not moved', () => {
-  assertEquals(FRAMES.cycling_long.rideWeek?.chips, { '6:0': [210, 300] });
+  assertEquals(FRAMES.cycling_long.rideWeek?.chips, { '6:0': [210, 300], '2:0': [150, 210] });
   for (const m of [210, 239, 268, 300]) {
     const w = composeWeek({ ...baseArgs(2), sportMix: { minutes: { '6:0': m } } } as never);
     assertEquals(bySlot(w, '6:0')!.duration, m, `long ride at ${m}`);
@@ -238,10 +238,72 @@ Deno.test('⛔ the long ride builds the length picked inside p239 level 3 (3h30 
   const taper = composeWeek(baseArgs(4, 'taper') as never);
   const taperPicked = composeWeek({ ...baseArgs(4, 'taper'), sportMix: { minutes: { '6:0': 300 } } } as never);
   assertEquals(bySlot(taperPicked, '6:0')!.duration, bySlot(taper, '6:0')!.duration);
-  // ⚠️ The midweek rides take no length pick on this plan (p281 prints this program no note on them).
-  const plain = composeWeek(baseArgs(2) as never);
-  const asked = composeWeek({ ...baseArgs(2), sportMix: { minutes: { '2:0': 60, '5:0': 60 } } } as never);
-  assertEquals([bySlot(asked, '2:0')!.duration, bySlot(asked, '5:0')!.duration], [bySlot(plain, '2:0')!.duration, bySlot(plain, '5:0')!.duration]);
+});
+
+const archOf = (s: { tags?: string[] } | undefined) => (s?.tags ?? []).find((t) => t.startsWith('archetype:'))?.slice(10);
+const ENDURANCE = ['2:0', '5:0', '6:0'];
+
+Deno.test('⛔ p239\'s two rides on every endurance ride — the easy ride by default, the structured ride when picked', () => {
+  // No pick: the easy ride on Days 2, 5 and 6, both columns (OURS — the default, Ride + Strength's precedent).
+  for (const [week, column] of [[2, 'standard'], [4, 'taper']] as const) {
+    const w = composeWeek(baseArgs(week, column) as never);
+    assertEquals(ENDURANCE.map((k) => archOf(bySlot(w, k))), ['steady', 'steady', 'steady'], `${column}: default`);
+  }
+  // With efforts on Day 2 (Day 5 follows it) and on Day 6: the structured ride at its printed length, any length pick dropped.
+  const mixed = { archetypes: { '2:0': 'mixed', '6:0': 'mixed' } };
+  for (const minutes of [undefined, { '2:0': 150, '6:0': 210 }, { '2:0': 210, '6:0': 300 }]) {
+    const w = composeWeek({ ...baseArgs(2), sportMix: { ...mixed, ...(minutes ? { minutes } : {}) } } as never);
+    assertEquals(ENDURANCE.map((k) => archOf(bySlot(w, k))), ['mixed', 'mixed', 'mixed'], JSON.stringify(minutes));
+    // p239: level 2 = 20-min spin + 2 sets of 4 rounds (5-min spin between) + 60 min @ VT1 = 2h05; level 3 = 3h.
+    assertEquals(ENDURANCE.map((k) => bySlot(w, k)!.duration), [125, 125, 180], JSON.stringify(minutes));
+    assertEquals(ENDURANCE.map((k) => levelOf(bySlot(w, k))), [2, 2, 3]);
+  }
+  // Easy ride × both printed lengths, Day 5 following Day 2's length and version.
+  for (const [mid, long] of [[150, 210], [210, 300]]) {
+    const w = composeWeek({ ...baseArgs(2), sportMix: { archetypes: { '2:0': 'steady', '6:0': 'steady' }, minutes: { '2:0': mid, '6:0': long } } } as never);
+    assertEquals(ENDURANCE.map((k) => bySlot(w, k)!.duration), [mid, mid, long]);
+    assertEquals(ENDURANCE.map((k) => archOf(bySlot(w, k))), ['steady', 'steady', 'steady']);
+    // ⚠️ 3h30 is both p239's level-2 top and its level-3 floor, and the ladder names it level 3 — the same ride, the same
+    // minutes, as Ride + Strength's 3h30 long ride already builds.
+    assertEquals(ENDURANCE.map((k) => levelOf(bySlot(w, k))), mid === 150 ? [2, 2, 3] : [3, 3, 3]);
+  }
+  const base210 = composeWeek({ ...baseArgs(2, 'standard', 'cycling_base'), sportMix: { minutes: { '6:0': 210 } } } as never);
+  assertEquals(levelOf(bySlot(base210, '6:0')), 3);
+  // Mixed choices: each ride its own; a pick on Day 5 alone is not honoured (Day 5 follows Day 2).
+  const one = composeWeek({ ...baseArgs(2), sportMix: { archetypes: { '5:0': 'mixed', '6:0': 'mixed' }, minutes: { '2:0': 210, '6:0': 300 } } } as never);
+  assertEquals(ENDURANCE.map((k) => [archOf(bySlot(one, k)), bySlot(one, k)!.duration]), [['steady', 210], ['steady', 210], ['mixed', 180]]);
+  // A version the slot does not list is ignored.
+  const junk = composeWeek({ ...baseArgs(2), sportMix: { archetypes: { '2:0': 'hike' } } } as never);
+  assertEquals(archOf(bySlot(junk, '2:0')), 'steady');
+  // The two versions build different steps, not the same ride under two names.
+  const easyW = composeWeek({ ...baseArgs(2), sportMix: { minutes: { '2:0': 150 } } } as never);
+  const effW = composeWeek({ ...baseArgs(2), sportMix: { archetypes: { '2:0': 'mixed' } } } as never);
+  assert(JSON.stringify(bySlot(easyW, '2:0')!.steps_preset) !== JSON.stringify(bySlot(effW, '2:0')!.steps_preset));
+});
+
+Deno.test('⛔ the deload rides take the rider\'s version at level 1; the picked lengths do not reach them (as Base)', () => {
+  // p239 level 1: the 60- to 100-minute easy ride, or 20 min + 4 rounds + 45 min @ VT1 (85 min).
+  const plain = composeWeek(baseArgs(4, 'taper') as never);
+  const picked = composeWeek({ ...baseArgs(4, 'taper'), sportMix: { minutes: { '2:0': 210, '6:0': 300 } } } as never);
+  assertEquals(ENDURANCE.map((k) => bySlot(picked, k)!.duration), ENDURANCE.map((k) => bySlot(plain, k)!.duration));
+  assert(ENDURANCE.every((k) => levelOf(bySlot(picked, k)) === 1));
+  const eff = composeWeek({ ...baseArgs(4, 'taper'), sportMix: { archetypes: { '2:0': 'mixed', '6:0': 'mixed' }, minutes: { '2:0': 210, '6:0': 300 } } } as never);
+  assertEquals(ENDURANCE.map((k) => [archOf(bySlot(eff, k)), bySlot(eff, k)!.duration, levelOf(bySlot(eff, k))]),
+    [['mixed', 85, 1], ['mixed', 85, 1], ['mixed', 85, 1]]);
+  // The four-ride switch still drops Day 5 on either version.
+  const off = composeWeek({ ...baseArgs(4, 'taper'), sportMix: { archetypes: { '2:0': 'mixed' }, slotsOff: ['5:0'] } } as never);
+  assertEquals(rides(off).map(frameDayOf).sort(), [1, 2, 3, 6]);
+});
+
+Deno.test('⛔ step-ups: the easy long ride only — the structured version holds its printed length', () => {
+  const blockStart = '2026-09-07';
+  const base = { frame: 'cycling_long' as const, weekEasyMinutes: 600, history: [], blockStart, today: '2026-09-28', currentWeek: 4 };
+  assertEquals(lengthStepOffers({ ...base, minutes: { '6:0': 210 } }).length, 1);
+  assertEquals(lengthStepOffers({ ...base, minutes: { '6:0': 210 }, archetypes: { '6:0': 'steady' } }).length, 1);
+  assertEquals(lengthStepOffers({ ...base, minutes: { '6:0': 210 }, archetypes: { '6:0': 'mixed' } }), []);
+  assertEquals(lengthStepOffers({ ...base, minutes: { '6:0': 180 }, archetypes: { '6:0': 'mixed' } }), []);
+  // The midweek rides take a length now, and still no step: p281's note for this program is the long ride's.
+  assertEquals(lengthStepOffers({ ...base, minutes: { '2:0': 150 } }), []);
 });
 
 Deno.test('⛔ step-ups: the long ride only, offered in weeks 4, 8 and 12, inside p239 level 3, at most 5% of the week\'s easy minutes', () => {
@@ -322,26 +384,39 @@ Deno.test('⛔ plumbing: Ride Focus\'s long card resolves to this frame; rides-o
   assert(!PICK_KEYS_BY_FRAME.cycling_long.includes('core'));
 });
 
-Deno.test('⛔ the words: only the approved name and goal, the pending ones empty or marked', () => {
+Deno.test('⛔ the words: every line Michael approved, and the rides screen\'s choices', () => {
   assertEquals(PROGRAM_COPY.ride_long_strength.label, 'Long Ride + Strength');
-  assertEquals(PROGRAM_COPY.ride_long_strength.blurb, '');
+  assertEquals(PROGRAM_COPY.ride_long_strength.blurb, 'Five rides and three lifting days a week. The long ride runs 3h30 to 5h.');
   assertEquals(PROGRAM_COPY.ride_long_strength.requirement, PROGRAM_COPY.ride_strength.requirement);
   assertEquals(PLAN_COPY.cycling_long.name, 'Long Ride + Strength');
   assertEquals(RIDE_GROUPS.find((g) => g.programs.includes('ride_long_strength'))?.title, 'Go longer');
-  // The rides screen: no line that describes Base's week, the level chips drawn only once their words exist.
   const r = enduranceIntakeReadout({ frame: 'cycling_long', answers: {}, baselines: { performance_numbers: { ftp: 250 } } } as never)
     .ride_strength_week!;
-  assertEquals([r.sub_line, r.easy_line], [null, null]);
+  assertEquals([r.sub_line, r.easy_line], ['Pick how long the long ride is.', 'The long ride gets longer every fourth week.']);
   assertEquals(r.rows.map((x) => x.line), ['Day 1 · Sweet Spot', 'Day 2 · Ride', 'Day 3 · VO2', 'Day 5 · Ride', 'Day 6 · Ride']);
-  assertEquals(r.rows.filter((x) => x.optional).map((x) => x.optional_line), [RIDES_COPY.optional_line_by_frame.cycling_long ?? null]);
+  assertEquals(r.rows.filter((x) => x.optional).map((x) => x.optional_line), ['Optional. An easy ride the day before the long ride.']);
   const long = r.rows.find((x) => x.is_long)!;
   assertEquals([long.length?.options, long.length?.default], [[210, 300], 210]);
   const lv = r.rows.find((x) => x.level)!.level!;
   assertEquals([lv.default, lv.options.map((o) => o.level)], [2, [2, 3]]);
-  assertEquals([lv.label, ...lv.options.map((o) => o.label)], [null, null, null]);
+  assertEquals([lv.label, ...lv.options.map((o) => o.label)], ['Sweet spot level', 'Level 2', 'Level 3']);
+  // Days 2 and 5: 2h30 · 3h30, Day 5 held to Day 2; the version chips on Days 2, 5 (Day 2's) and 6.
+  const byKey = (k: string) => r.rows.find((x) => x.key === k)!;
+  assertEquals([byKey('easy').length?.options, byKey('easy').length?.default], [[150, 210], 150]);
+  assertEquals([byKey('easy2').length?.key, byKey('easy2').length?.same_as], ['easy', 'Same length as Day 2.']);
+  const ver = (k: string) => byKey(k).version!;
+  for (const k of ['easy', 'easy2', 'long']) {
+    assertEquals(ver(k).default, 'steady');
+    assertEquals(ver(k).options.map((o) => o.label), ['Easy ride', 'With efforts']);
+    assertEquals(ver(k).options[0].fixed_label, null);
+  }
+  assertEquals([ver('easy').key, ver('easy2').key, ver('easy2').same_as], ['easy', 'easy', 'Same length as Day 2.']);
+  assertEquals(ver('easy').options[1].fixed_label, '2h05');
+  assertEquals(ver('long').options[1].fixed_label, '3h');
+  assert(['hard1', 'hard2'].every((k) => byKey(k).version == null));
   // ⚠️ Base's screen is unchanged.
   const b = enduranceIntakeReadout({ frame: 'cycling_base', answers: {}, baselines: { performance_numbers: { ftp: 250 } } } as never)
     .ride_strength_week!;
   assertEquals([b.sub_line, b.easy_line], [RIDES_COPY.sub, RIDES_COPY.easy_line]);
-  assert(b.rows.every((x) => x.level == null));
+  assert(b.rows.every((x) => x.level == null && x.version == null));
 });

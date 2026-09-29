@@ -107,6 +107,15 @@ export type EnduranceIntakeReadout = {
        * null until their words are approved, and the card draws nothing then.
        */
       level?: { key: SlotKey; label: string | null; default: number; options: Array<{ level: number; label: string | null }> } | null;
+      /**
+       * The version chips on an endurance ride p239 prints two ways (2026-09-28). A version with `fixed_label` is printed at
+       * one length and takes no length chips. `key` is the leader's row on a ride that follows another's. Absent from an
+       * older server.
+       */
+      version?: {
+        key: SlotKey; default: string; same_as: string | null;
+        options: Array<{ id: string; label: string; fixed_minutes: number | null; fixed_label: string | null }>;
+      } | null;
     }>;
     easy_line: string | null;
   } | null;

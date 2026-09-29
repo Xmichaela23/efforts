@@ -938,6 +938,11 @@ export type NonRaceState = {
    */
   slotLevels?: Partial<Record<SlotKey, number>>;
   /**
+   * ⛔ THE RIDE VERSION PICKED ON AN ENDURANCE RIDE (p239: the easy ride or the structured ride; 2026-09-28) — screen row
+   * keys to the library's archetype id. Absent = the server's default version.
+   */
+  slotVersions?: Partial<Record<SlotKey, string>>;
+  /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
    * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is
    * what `getSteps` reads to put the `program` screen in the flow, and what highlights the card on
@@ -1789,6 +1794,14 @@ function assemblePayload(
                 : state.hardDays[hardKeys.indexOf(s.key)];
               const a = (entry as { archetype?: string } | undefined)?.archetype;
               if (a) out[s.frameKey] = a;
+            }
+            // ⛔ THE RIDE VERSION PICKED ON THE RIDES SCREEN (p239's easy ride or its structured ride, 2026-09-28) — the
+            // same variant-pick field, keyed the engine's way. A ride that follows another's takes it on the server.
+            if (printedRideWeekPath(state)) {
+              for (const s of frameSlots(wizardFrame)) {
+                const v = state.slotVersions?.[s.key];
+                if (s.role !== 'hard' && typeof v === 'string' && v) out[s.frameKey] = v;
+              }
             }
             return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
           })(),
@@ -5820,6 +5833,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             }))}
             slotLevels={state.slotLevels}
             onSlotLevel={(key, level) => setState((st) => ({ ...st, slotLevels: { ...(st.slotLevels ?? {}), [key]: level } }))}
+            slotVersions={state.slotVersions}
+            onSlotVersion={(key, version) => setState((st) => ({ ...st, slotVersions: { ...(st.slotVersions ?? {}), [key]: version } }))}
           />
         </StepLayout>
       )}

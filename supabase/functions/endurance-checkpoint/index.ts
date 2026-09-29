@@ -118,6 +118,8 @@ Deno.serve(async (req: Request) => {
         history, blockStart, today,
         // ⛔ The plan week this checkpoint already reads — p279's long ride is offered in weeks 4, 8 and 12 (`blockWeeks`).
         currentWeek,
+        // The ride version picked — the structured ride holds its printed length (`length-step.ts`).
+        archetypes: sp.sport_mix?.archetypes ?? null,
       }) : [];
       // ⚠️ AN OFFER WHOSE WORDS ARE NOT APPROVED CARRIES NO LINE, and the phone draws nothing for it (`LENGTH_OFFER_COPY`).
       const worded = offers.map((o) => {

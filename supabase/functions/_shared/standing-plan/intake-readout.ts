@@ -37,7 +37,7 @@ import {
   type SlotSport,
 } from '../../../../src/lib/standing-plan-week-copy.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
-import { FRAMES, isJoinedSlot, planLongCeilingFor, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FRAMES, isJoinedSlot, planCeilingFor, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
 import { frameRotatedArchetype } from './compose.ts';
@@ -159,6 +159,17 @@ export type EnduranceIntakeReadout = {
       level: {
         key: SlotKey; label: string | null; default: number;
         options: Array<{ level: number; label: string | null }>;
+      } | null;
+      /**
+       * ⛔ THE VERSION CHIPS on an endurance ride p239 prints two ways (`EnduranceSlot.versions`): the easy ride, which takes
+       * the length chips, or the structured ride, printed at one length (`fixed_minutes`, `fixed_label`) and taking none.
+       * `key` is the row the pick is stored under — a ride that follows another's (`sameLengthAs`) carries the leader's
+       * key and `same_as`, so the phone shows the chips once. `default` is the first version. Null on every other ride,
+       * and when a version has no approved word (`RIDES_COPY.version_chip`).
+       */
+      version: {
+        key: SlotKey; default: string; same_as: string | null;
+        options: Array<{ id: string; label: string; fixed_minutes: number | null; fixed_label: string | null }>;
       } | null;
     }>;
     /** Null where the plan's own line is not yet approved (`RIDES_COPY.easy_line_by_frame`). */
@@ -356,7 +367,7 @@ export function enduranceIntakeReadout(args: {
       const owner = all.find((r) => r.frameKey === frameKey);
       if (!slot || !chips || !owner) return null;
       // ⛔ THE PLAN'S OWN LONG-RIDE CAP where it states one (p279, p239 level 3) — the same reader the composer uses.
-      const ceilingMin = planLongCeilingFor(frame, slot.family, slot.role);
+      const ceilingMin = planCeilingFor(frame, slot.family, slot.role);
       const ladder = (level: number) => ladderOf({
         family: slot.family as never, level: level as never, role: slot.role,
         sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
@@ -393,6 +404,33 @@ export function enduranceIntakeReadout(args: {
           if (!l || leads === row.frameKey) return l;
           const leader = all.find((r) => r.frameKey === leads);
           return { ...l, same_as: leader ? fill(RIDES_COPY.same_length, { day: leader.frameDay }) : null };
+        })(),
+        version: (() => {
+          const slot = slotOf(row.frameKey);
+          const versions = slot?.versions ?? [];
+          if (!slot || versions.length < 2 || !versions.every((v) => RIDES_COPY.version_chip[v])) return null;
+          const leaderKey = slot.sameLengthAs ?? row.frameKey;
+          const leader = all.find((r) => r.frameKey === leaderKey);
+          if (!leader) return null;
+          const ceilingMin = planCeilingFor(frame, slot.family, slot.role);
+          const fixedOf = (v: string): number | null => {
+            // The structured ride's one printed length at this level (p239), measured by the library.
+            const r = ladderOf({
+              family: slot.family as never, level: slot.level as never, role: slot.role, archetype: v,
+              sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
+              ...(ceilingMin ? { ceilingMin } : {}),
+            } as never, anchors)[0];
+            return r && r.level === slot.level ? Math.round(r.lo) : null;
+          };
+          return {
+            key: leader.key,
+            default: versions[0],
+            same_as: leaderKey !== row.frameKey ? fill(RIDES_COPY.same_length, { day: leader.frameDay }) : null,
+            options: versions.map((v, i) => {
+              const fixed = i === 0 ? null : fixedOf(v);
+              return { id: v, label: RIDES_COPY.version_chip[v], fixed_minutes: fixed, fixed_label: fixed != null ? lengthWords(fixed) : null };
+            }),
+          };
         })(),
         level: (() => {
           const choices = slotOf(row.frameKey)?.levelChoices ?? [];

@@ -323,6 +323,16 @@ export type EnduranceSlot = {
    */
   levelChoices?: Level[];
   /**
+   * ⛔ THE TWO RIDES p239 PRINTS AT EVERY ENDURANCE LEVEL, AND THE RIDER PICKS ONE (Michael, 2026-09-28): the straight
+   * "easy ride below 75%" (`steady`) or the structured ride — a 20-minute spin, rounds of 2 min @ 80% / 3 min @ 70%, and
+   * a VT1 block with a 10-second all-out sprint every 8 or 9 minutes (`mixed`). Library archetype ids, so the pick travels
+   * as the existing variant pick (`SportMix.archetypes[frameKey]`) and is built by the library as printed.
+   * ⚠️ THE FIRST IS THE DEFAULT AND THE ONE THE LENGTH CHIPS ARE MEASURED ON — the easy ride spans a range; the structured
+   * ride is printed at one length per level, so it takes no length pick and no step-up. OURS — the default (see
+   * `pickedVersions`, and the ledger row). A slot with `sameLengthAs` follows its leader's version as well as its length.
+   */
+  versions?: string[];
+  /**
    * ⛔ THIS SESSION IS THE SAME LENGTH AS ANOTHER ONE, AND ONE ANSWER SETS BOTH (Michael, 2026-09-27; p281: "Over a
    * 1-month cycle, the Tuesday and Friday endurance rides should be the same duration"). The named slot key holds the
    * pick (`rideWeek.chips`) and its step-ups; this slot follows it.
@@ -497,6 +507,12 @@ export type Frame = {
      * of p239's level 2). p279's long ride is level 3, p239's "3.5- to 5-hour easy ride", so its cap is 300.
      */
     longRideCeilingMinutes?: number;
+    /**
+     * ⛔ THE MIDWEEK EASY RIDE'S LENGTH CAP WHEN THIS PLAN PRINTS IT ABOVE p108's TWO HOURS — the counterpart of
+     * `longRideCeilingMinutes` for the `easy` role. Absent = `RIDE_EASY_CEILING_MIN` (120, p108). p279 prints its Tuesday
+     * and Friday rides at level 2, p239's "2.5- to 3.5-hour easy ride", so its cap is 210: the page names the dose.
+     */
+    easyRideCeilingMinutes?: number;
   };
   /**
    * ⛔ THE HIGHEST RIDE LEVEL THIS PLAN BUILDS, WHERE ITS PAGE PRINTS ABOVE `RIDE_LEVEL_CEILING` (Michael, 2026-09-27,
@@ -1714,6 +1730,9 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
  * ⚠️ NO RUN SLOT AND NO SWIM. ⚠️ NO OVERHEAD PRESS IS NAMED — the push rows are categories, as on p278, so
  * `testedLifts` is bench, squat and deadlift.
  */
+/** p239's two rides at every endurance level — the easy ride first (the default and the one lengths apply to). */
+const P239_RIDE_VERSIONS = ['steady', 'mixed'];
+
 const CYCLING_LONG_STANDARD: FrameDay[] = [
   {
     day: 1,
@@ -1747,8 +1766,9 @@ const CYCLING_LONG_STANDARD: FrameDay[] = [
       // p279 puts the carry on day 2 (p278 has it on day 4). A carry has no pattern in his key — see p278's day 4 row.
       S('SKILL', 'accessory', 'carry', 'hinge_lower', '1 x SKILL: Carry'),
     ],
-    // p279 Standard column, day 2: "Cyc endurance (level 2)".
-    endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy' })],
+    // p279 Standard column, day 2: "Cyc endurance (level 2)". The rider picks p239's easy ride (2h30 or 3h30) or its
+    // structured ride (Michael, 2026-09-28).
+    endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy', versions: P239_RIDE_VERSIONS })],
   },
   // p279 Standard column, day 3: "Plyo warm-up", "Cyc VO2 (level 2)".
   { day: 3, label: null, strength: [], plyo: true, endurance: [E('ride_vo2', 2, 'Cyc VO2 (level 2)', { role: 'hard' })] },
@@ -1772,8 +1792,12 @@ const CYCLING_LONG_STANDARD: FrameDay[] = [
     ],
     endurance: [],
   },
-  // p279 Standard column, day 5: "Cyc endurance (level 2)". Optional (Michael, 2026-09-27, decision 2).
-  { day: 5, label: null, strength: [], endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy', optional: true })] },
+  // p279 Standard column, day 5: "Cyc endurance (level 2)". Optional (Michael, 2026-09-27, decision 2). Day 2's version and
+  // length (Michael, 2026-09-28: "Same length as Day 2.").
+  {
+    day: 5, label: null, strength: [],
+    endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy', optional: true, sameLengthAs: '2:0', versions: P239_RIDE_VERSIONS })],
+  },
   /**
    * ⚠️ p281 CALLS THIS "THE LONG RIDE" and names Saturday a priority, so the frame states `long`. p279 Standard column,
    * day 6: "Cyc endurance (level 3)/LSR" — "/LSR" adds no other content (build note §2). The rider picks its length
@@ -1782,7 +1806,7 @@ const CYCLING_LONG_STANDARD: FrameDay[] = [
   {
     day: 6, label: null, strength: [],
     endurance: [E('ride_endurance', 3, 'Cyc endurance (level 3)/LSR', {
-      role: 'long',
+      role: 'long', versions: P239_RIDE_VERSIONS,
       // p281: "The long ride every fourth week should progressively get longer" — weeks 4, 8 and 12 (Michael, 2026-09-27).
       growth: { every: { blockWeeks: 4 }, cite: 'Viada p281 — "The long ride every fourth week should progressively get longer"' },
     })],
@@ -1826,8 +1850,8 @@ const CYCLING_LONG_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'secondary', 'pull_upper', '1 x HYP: Secondary pull'),
       S('SKILL', 'accessory', 'carry', 'hinge_lower', '1 x SKILL: Carry'),
     ],
-    // p279 Deload column, day 2: "Cyc endurance (level 1)".
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+    // p279 Deload column, day 2: "Cyc endurance (level 1)". The rider's version applies here too (p239 prints both at level 1).
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', versions: P239_RIDE_VERSIONS })],
   },
   /**
    * p279 Deload column, day 3: "Plyo warm-up", "Cyc sprint (level 1)" — a sprint ride in place of the VO2 ride. p278's
@@ -1846,9 +1870,12 @@ const CYCLING_LONG_TAPER: FrameDay[] = [
     endurance: [],
   },
   // p279 Deload column, day 5: "Cyc endurance (level 1)". The same switch as the standard week's day 5 (settled point 7).
-  { day: 5, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true })] },
+  {
+    day: 5, label: null, strength: [],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true, sameLengthAs: '2:0', versions: P239_RIDE_VERSIONS })],
+  },
   // p279 Deload column, day 6: "Cyc endurance (level 1)" — read by row shading (SOURCE Part E10a).
-  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long' })] },
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long', versions: P239_RIDE_VERSIONS })] },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
 
@@ -2055,9 +2082,13 @@ export const FRAMES: Record<FrameId, Frame> = {
     printedWeekOnly: true,
     // ⛔ p279 prints level 3 on day 1 (the rider's pick) and day 6 (Michael, 2026-09-27, decision 4).
     rideLevelCeiling: 3,
-    // Viada p239's level 3 endurance ride, "3.5- to 5-hour easy ride below 75%": its two printed ends. The long ride only —
-    // p281 gives this program no note on the midweek rides, so they build at p279's level 2 and take no length pick.
-    rideWeek: { chips: { '6:0': [210, 300] }, longRideCeilingMinutes: 300 },
+    // Viada p239's easy ride at each printed level, its two printed ends (Michael, 2026-09-28): the long ride at level 3
+    // ("3.5- to 5-hour easy ride below 75%"), the Tuesday ride at level 2 ("2.5- to 3.5-hour"), Friday's following it.
+    // Only the long ride steps up (p281's note for this program is about the long ride alone).
+    rideWeek: {
+      chips: { '6:0': [210, 300], '2:0': [150, 210] },
+      longRideCeilingMinutes: 300, easyRideCeilingMinutes: 210,
+    },
   },
 };
 
@@ -2227,15 +2258,40 @@ export function clampRideLevel(family: string, level: Level, frame?: FrameId | n
 }
 
 /**
- * ⛔ THE PLAN'S OWN LENGTH CAP FOR ITS LONG SESSION, where the plan states one: Run Lead's long run
- * (`runStrengthWeek.longRunCeilingMinutes`, p235) and the p279 long ride (`rideWeek.longRideCeilingMinutes`, p239).
- * Undefined = the family cap in `volume-bounds.ts`. One reader for the composer, the rides screen and the step offer.
+ * ⛔ THE PLAN'S OWN LENGTH CAP FOR A SESSION, where the plan states one: Run Lead's long run
+ * (`runStrengthWeek.longRunCeilingMinutes`, p235), the p279 long ride (`rideWeek.longRideCeilingMinutes`, p239 level 3)
+ * and the p279 midweek easy rides (`rideWeek.easyRideCeilingMinutes`, p239 level 2). Undefined = the family cap in
+ * `volume-bounds.ts`. One reader for the composer, the rides screen and the step offer.
  */
-export function planLongCeilingFor(frame: FrameId | null | undefined, family: string, role?: string | null): number | undefined {
-  if (role !== 'long' || !frame) return undefined;
-  if (family === 'run_lsd') return FRAMES[frame]?.runStrengthWeek?.longRunCeilingMinutes;
-  if (family === 'ride_endurance') return FRAMES[frame]?.rideWeek?.longRideCeilingMinutes;
+export function planCeilingFor(frame: FrameId | null | undefined, family: string, role?: string | null): number | undefined {
+  if (!frame) return undefined;
+  if (role === 'long' && family === 'run_lsd') return FRAMES[frame]?.runStrengthWeek?.longRunCeilingMinutes;
+  if (role === 'long' && family === 'ride_endurance') return FRAMES[frame]?.rideWeek?.longRideCeilingMinutes;
+  if (role === 'easy' && family === 'ride_endurance') return FRAMES[frame]?.rideWeek?.easyRideCeilingMinutes;
   return undefined;
+}
+
+/**
+ * ⛔ THE VERSION EACH RIDE BUILDS (`EnduranceSlot.versions`), as variant picks keyed by frame slot: the rider's pick where
+ * it is one of the slot's versions, a follower's (`sameLengthAs`) taken from its leader, else the slot's first version.
+ * Every other key in `picks` passes through untouched. A column with no `versions` gets `picks` back as it came.
+ * OURS — the default is the easy ride, the version Ride + Strength builds on every endurance ride with nothing asked
+ * (its Tuesday and Friday rides are pinned to it; its long ride builds it once a length is picked), and p239's own
+ * advice to use the more intense versions "sparingly unless an event is coming".
+ */
+export function pickedVersions(
+  days: FrameDay[], picks: Record<string, string> | null | undefined,
+): Record<string, string> | null | undefined {
+  const withVersions = days.flatMap((d) => d.endurance.map((slot, i) => ({ slot, key: `${d.day}:${i}` })))
+    .filter(({ slot }) => (slot.versions?.length ?? 0) > 0);
+  if (withVersions.length === 0) return picks;
+  const out: Record<string, string> = { ...(picks ?? {}) };
+  for (const { slot, key } of withVersions) {
+    const from = slot.sameLengthAs ?? key;
+    const want = picks?.[from];
+    out[key] = want && slot.versions!.includes(want) ? want : slot.versions![0];
+  }
+  return out;
 }
 
 /**
