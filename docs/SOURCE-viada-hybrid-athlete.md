@@ -1103,7 +1103,7 @@ read and carried four things nothing else here records — see Part E1.
 | ⭐ **The All Rounder** | p274 | p275 | **the year-round home base** — transcribed below |
 | The Speed Solution: Pivot | p276 | p277 | obligate pivot, 4–6 weeks; slow runner → explosive |
 | Cycling: Base | p278 | p280 (+ Base notes on p281) | cycling proficiency — **run this 4 weeks before the other two**. **Transcribed in Part E2.** |
-| Cycling: [p279 program]/MTB/Gravel | p279 | p280 | steady output, longer mixed-terrain racing |
+| Cycling: [p279 program]/MTB/Gravel | p279 | p280 (+ its notes on p281) | steady output, longer mixed-terrain racing. **Transcribed in Part E10.** |
 | Cycling: Crit/CX/XCO | p281 | p280 | punchier racing; strength is **DE secondary movements only** |
 | Weightlifting and Running | p282 | pp.283–284 | Olympic lifting — the **only** program using the OLY vocabulary (Part A3) |
 
@@ -1458,6 +1458,148 @@ What these two bullets settle, read off the page:
   the base season. **No amount of increase is printed.**
 - "Two to three by 1-month cycles" reads as two to three 1-month cycles (the page's wording is kept).
 - The page gives no length for "the entire base season".
+
+---
+
+# PART E10 — CYCLING: THE p279 PROGRAM, "Long Ride + Strength" (proposed) (Chapter 10, pp.279–281)
+
+**Transcribed 2026-09-27 from `p279.jpg`, `p280.jpg` and `p281.jpg`, all read directly.** The cycling
+session levels it names were checked against `p236.jpg`, `p238.jpg` and `p239.jpg` the same day and match
+Part D2 as written. Build note: `NOTES-p279-frame-2026-09-27.md`.
+⛔ **Naming rule (Michael):** the book's name for this program is never written in this repo. It is
+**"the p279 program"**, app name proposed **"Long Ride + Strength"**, goal label proposed **"Go longer"**
+(neither decided). Where a page prints the name, this Part writes **[p279 program]**. Every other word is
+the page's.
+
+## E10a. The week (p279) — verified against the image
+
+⚠️ **The photograph is angled, and in the Deload column Days 5 and 6 sit to the right of the Standard
+rows, so by eye the two "Cyc endurance (level 1)" entries could belong to Days 4-5 or 5-6.** Settled the
+way Part E2a settled p278: the image (1275 x 1700 as displayed) was sampled down pixel columns inside the
+Deload endurance column, where the table alternates light and shaded rows. At x=1110: Day 4 shaded to
+y1119, **Day 5 light y1120-1166, Day 6 shaded y1167-1212**, Day 7 light from y1213. At x=1180 the same
+bands sit about 6 px higher (the page tilt). The two text entries (dark pixels in x1000-1095) sit at
+**y1134-1168** and **y1180-1216**, so the first is in the Day 5 band and the second in the Day 6 band.
+The Deload strength column (x=950) shows the same pattern: Day 4 shaded to about y1130, Day 5 light,
+Day 6 shaded to about y1230, then Day 7 with the centred "REST". The Standard column's Days 5, 6 and 7
+are unambiguous by eye.
+
+| Day | STANDARD strength | STANDARD endurance | DELOAD strength | DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **ME Upper** — 1 x ME: Primary push · 1 x ME: Accessory: primary pull · 1 x DE: Accessory: secondary push · 1 x HYP: Accessory: focused pull, focused push superset | Cyc sweet spot (level 2 to 3) | **ME Upper** — 1 x SKILL: Primary push · 1 x DE: Primary pull · 1 x DE: Secondary push · 1 x HYP: Accessory: focused pull, focused push superset | Cyc sweet spot (level 1) |
+| **2** | **ME Lower** — 1 x ME: Primary hinge lower *(rotate with primary push)* · 1 x DE: Secondary hinge lower · 1 x HYP: Secondary pull · 1 x SKILL: Carry | Cyc endurance (level 2) | **ME Lower** — 1 x DR: Primary hinge lower *(rotate with primary push)* · 1 x SKILL: Secondary hinge lower · 1 x HYP: Secondary pull · 1 x SKILL: Carry | Cyc endurance (level 1) |
+| **3** | Plyo warm-up | Cyc VO2 (level 2) | Plyo warm-up | Cyc sprint (level 1) |
+| **4** | **Full** — 1 x DE: Primary push · 1 x DE: Primary push lower *(rotate with primary hinge)* · 2 x HYP: Focused push/hinge lower (superset) · 1 x DE: Accessory: primary hinge lower *(rotate with primary push lower)* | *(none)* | **Full** — 1 x DE: Primary push · 1 x DE: Primary push lower *(rotate with primary hinge)* · 2 x HYP: Focused push/hinge lower (superset) | *(none)* |
+| **5** | *(none)* | Cyc endurance (level 2) | *(none)* | Cyc endurance (level 1) |
+| **6** | *(none)* | Cyc endurance (level 3)/LSR | *(none)* | Cyc endurance (level 1) |
+| **7** | **REST** | | **REST** | |
+
+⚠️ **Printed exactly, including four things that look like slips. None is corrected here; the page does
+not say which reading is meant.**
+- **"DR"** (Deload Day 2, first row). p219's abbreviations are ME, DE, SKILL and HYP (Part A1); "DR" is
+  not among them. Zoomed at full size: the letters are D and R.
+- **Day 4 is headed "Full"**, not "DE: Full" as on p278.
+- **Deload Day 1 drops "Accessory:"** from two rows ("1 x DE: Primary pull", "1 x DE: Secondary push")
+  that carry it in the Standard column.
+- **Deload Days 1 and 2 keep the headings "ME Upper" and "ME Lower"** with no ME row under them
+  (unless "DR" was meant as ME, which the page does not say).
+
+**What the table shows (read off the page, nothing inferred):**
+
+- **Three lifting days** (1, 2, 4) and a **plyo warm-up on Day 3**, the same days as p278. Days 5 and 6
+  are ride-only. Day 7 is a full rest day in both columns.
+- **Five rides in Standard, one a day on Days 1, 2, 3, 5 and 6:** sweet spot (level 2 to 3), endurance
+  (2), VO2 (2), endurance (2), endurance (3)/LSR. **No sprint ride in the Standard week.**
+- **Five rides in Deload, one a day on the same days:** sweet spot (1), endurance (1), **sprint (1)**,
+  endurance (1), endurance (1). Every level is 1. Day 3's VO2 ride becomes a sprint ride, which is a
+  different session type, not a lower level of the same one.
+- **Deload strength is mostly a substitution, plus one cut** (p278's deload is a cut only, Part E2a).
+  Day 1: ME primary push becomes SKILL; the ME primary pull and the DE secondary push become DE rows.
+  Day 2: the ME hinge becomes "DR"; the DE secondary hinge becomes SKILL. Day 4 loses one row, the DE
+  accessory primary hinge. The HYP rows, the carry and the Day 4 push and push-lower rows are unchanged.
+- **The carry is on Day 2** (the heavy lower day). On p278 it is on Day 4.
+- **Day 2 has one ME row**, not p278's two: the primary hinge, "rotate with primary push". Day 4 has the
+  DE primary push lower "(rotate with primary hinge)" and the DE accessory primary hinge lower "(rotate
+  with primary push lower)". p280 states no rotation cadence; p247's is the only one in the book (Part E1c).
+- **"2 x HYP" appears once**, on Day 4 in both columns: "Focused push/hinge lower (superset)". p278 has
+  no "2 x" row. The same notation is on p244 and p274.
+- **No overhead press is named.** The push rows are categories, as on p278.
+- **"LSR"** follows the Day 6 Standard ride. The cycling pages (p236–p239) do not define it. The only
+  place this file records the letters is p275, "the weekend LSR", in the running program's notes
+  (Part E, "Long slow run"). p281 calls this ride **"the long ride"** (E10c). What "/LSR" adds to
+  "Cyc endurance (level 3)" is not stated on the page.
+
+**The sessions it names, as p236–p239 print them (Part D2):**
+- Sweet spot level 2: 4 sets of 6 min @ 90% with 10 s @ 105% every minute on the minute · 8 rounds of
+  4 min @ 95% · 4 rounds of 8 min @ 90% · 3 rounds of 20 min @ 80%. Level 3: 4 sets of 8 min @ 90% with
+  the 10 s surges · 8 rounds of 2 min @ 95% / 2 min @ 100% · 4 rounds of 10 min @ 90% · 3 rounds of
+  20 min @ 80% with a 10 s all-out sprint every 4 minutes.
+- Endurance level 2: 2.5 to 3.5-hour easy ride below 75%, or the 20-min spin + 2 sets of 4 rounds of
+  (2 min @ 80% / 3 min @ 70%) + 60 min @ VT1 with a 10 s all-out sprint every 8 minutes. Level 3:
+  3.5 to 5-hour easy ride below 75%, or 3 sets of the same rounds + 90 min @ VT1 with a sprint every
+  9 minutes.
+- VO2 level 2: 5 rounds of 4 min @ 110 to 120% · 2 sets of 8 rounds of 1:30 @ 115% · 4 sets of 8 rounds
+  of 30 s @ 125% / 30 s @ 85%.
+- Sprint level 1: p236's three level 1 sessions (Part D2).
+
+## E10b. Two workouts in one day's box
+
+The book's convention: two workouts in one day's box are one session unless the box says "(separate
+sessions)". Read directly: p245 (*"Monday's session is a single run with two components"*), p253 (*"The
+MLSS+ session should flow directly into the VT1 work"*), p263 (*"The Monday sprint session should flow
+right into the VT1 with no break"*), p269 (*"the two workouts listed are intended to be combined"*), and
+p258, where the one exception is printed as "NT (level 1) · NT (level 1 to 2) (separate sessions)"
+(Part E7a).
+
+- **On p279 it joins nothing.** Every day's box in both columns holds one ride. "Cyc endurance
+  (level 3)/LSR" is one entry.
+- **On p278 it joins two days:** Standard Day 3 (VO2 level 1 + sweet spot level 1) and Standard Day 5
+  (endurance level 1 + sprint level 1). Neither box says "(separate sessions)", so each is one session.
+  The Deload column has one ride a day.
+
+## E10c. Notes (p280 and p281)
+
+**p280, main text** (the whole of it is in Part E2b; the lines about this program, verbatim):
+
+> *"The three programs track three general emphases: basic cycling proficiency (strength and cycling
+> base), steady output or longer effort mixed terrain racing ([p279 program]/MTB/gravel), and faster,
+> punchier races (crit/CX/XCO). If you're an experienced cyclist, you may know which fits best, but if
+> you have less experience, I encourage you to run the Base program for at least 4 weeks before
+> attempting the others. If, at that point, you want to improve your steady output/climbing/longer
+> distance chops, the [p279 program] program is the way to go. This is intended for events where the
+> terrain (climbing and/or technical) is what dictates the race more than the competitors. The emphasis
+> is on building muscular endurance and durability for multiple longer efforts close to threshold."*
+
+The rest of p280 applies to all three programs and is in Part E2b and E2c: true hybrid programs usable
+for strength progression; cycling fatigue is not "felt" and masks fitness, so expect lower performance on
+lower-body days and consider lowering the working max "by a few more percentage points than usual" (no
+number printed); fueling and bottles, some rides "may easily run 50 percent longer than a comparable
+running session"; plyometrics for rebound strength, agility and bone density.
+
+**p280, Strength Notes, the bullet that names this program:**
+
+> *"For powerlifters, the Base and [p279 program] programs offer the best framework for competitive lift
+> training. If properly constructed, the program can allow for the big three to be trained one or two
+> times per week, both dynamically and through max effort lifting, with enough volume allocated overall
+> to ensure you can continue to develop proficiency."*
+
+**p281, Cycling Notes, the bullet about this program, verbatim:**
+
+> *"For the [p279 program] program, the Monday and Saturday sessions are the highest priority, building
+> power for sustained efforts. The long ride every fourth week should progressively get longer and be
+> used to verify/test equipment and set up for any event that may be in the future. This may include
+> triathlons, if you're using this program as a way to kick-start your riding leading up to a
+> long-course tri."*
+
+What the page settles, and what it does not:
+- **Monday and Saturday are Day 1 and Day 6** (Day 1 = Monday, Part E9a): the sweet spot ride
+  (level 2 to 3) and the endurance ride (level 3)/LSR are the two highest-priority sessions.
+- **"The long ride every fourth week" is not explained.** The table prints a long ride on Day 6 every
+  week. The page does not say which week is the fourth, whether it is the same ride as Day 6, or by how
+  much it gets longer. No amount is printed.
+- **No length, rate of lift increase or deload cadence is printed for this program** on pp.279–281.
+  p280's only length is "at least 4 weeks" of Base before this program.
+- p281 gives this program no bullet about the Tuesday and Friday rides (Base has one, Part E2d).
 
 ---
 
@@ -2384,6 +2526,13 @@ gloss will be wrong on three of the four programs that define it.
   which is what Part G gap #2 has been calling an inference. **Each needs its page re-read before use.**
 
 ---
+- **2026-09-27 — PART E10, THE p279 PROGRAM (p279, p280, and its notes on p281).** Table read off
+  `p279.jpg`; the Deload column's Days 5 and 6 placed by measuring row shading. Four printed oddities
+  recorded as printed, not corrected ("DR", "Full", Deload Day 1's missing "Accessory:", ME headings
+  over no ME row). "LSR" on a ride is not defined on the cycling pages. p281's bullet on this program
+  ("the long ride every fourth week should progressively get longer") prints no amount and does not
+  say which week. Part E10b records the one-session convention for two workouts in one box: it joins
+  nothing on p279 and joins p278's Standard Days 3 and 5.
 - **2026-09-13 — PART E2, CYCLING: BASE (p278, p280, and the Base notes on p281).** Table read off
   `p278.jpg`; Days 5-7 placed by measuring row shading, because the photo's angle makes them ambiguous
   by eye. ⛔ **The last endurance ride is on Day 6 and Day 7 is full rest** — the reading passed along
