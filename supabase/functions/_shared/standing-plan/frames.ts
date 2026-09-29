@@ -1536,6 +1536,12 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
  * ⚠️ NO OVERHEAD PRESS IS NAMED — p278's push rows are categories. `testedLifts` is bench, squat and
  * deadlift, so the entry check and the week-one test never ask for a press.
  */
+/** p239's two rides at every endurance level — the easy ride first (the week's build and the one lengths apply to). */
+const P239_RIDE_VERSIONS = ['steady', 'mixed'];
+
+// ⛔ RIDE + STRENGTH'S EASY AND LONG RIDES CARRY p239's TWO VERSIONS TOO (2026-09-29): the week still builds the easy
+// ride every week (the first version, and the 2026-09-27 option-A ruling); the structured ride is a one-day choice on
+// the swap sheet, as on Long Ride + Strength — p239 prints both rides at every endurance level.
 const CYCLING_BASE_STANDARD: FrameDay[] = [
   {
     day: 1,
@@ -1593,7 +1599,7 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
     // held for the month (p281), picked by the rider, a step offered once a month (`growth`). No alternation with
     // p239's mixed ride, which is printed at one fixed length per level and so cannot hold or grow by 5% (p148).
     endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', {
-      role: 'easy', optional: true, archetypes: ['steady'],
+      role: 'easy', optional: true, archetypes: ['steady'], versions: P239_RIDE_VERSIONS,
       growth: { every: { months: 1 }, cite: 'Viada p281 — the Tuesday and Friday endurance rides hold one duration over a 1-month cycle; each cycle can increase it' },
     })],
   },
@@ -1640,7 +1646,7 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
     endurance: [
       E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] }),
       // The Friday endurance ride is Tuesday's length (p281) and the same plain easy ride.
-      E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', joinsPrevious: true, archetypes: ['steady'], sameLengthAs: '2:0' }),
+      E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', joinsPrevious: true, archetypes: ['steady'], sameLengthAs: '2:0', versions: P239_RIDE_VERSIONS }),
     ],
   },
   /**
@@ -1650,7 +1656,7 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
   {
     day: 6, label: null, strength: [],
     endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', {
-      role: 'long', lengthFromLevel: 1,
+      role: 'long', lengthFromLevel: 1, versions: P239_RIDE_VERSIONS,
       // p281: "The Saturday long ride can likewise progress, increasing the volume gradually over the entire base season
       // every 1 to 2 weeks." Offered from one week after the last step.
       growth: { every: { weeks: 1 }, cite: 'Viada p281 — the long ride progresses "every 1 to 2 weeks"' },
@@ -1686,7 +1692,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
     ],
     // p278 Deload column, day 2 endurance cell: Cyc endurance (level 1). The same switch, ride and length as the standard
     // week's day 2.
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true, archetypes: ['steady'] })],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true, archetypes: ['steady'], versions: P239_RIDE_VERSIONS })],
   },
   // p278 Deload column, day 3: "Cyc VO2 (level 1)".
   { day: 3, label: null, strength: [], plyo: true, endurance: [E('ride_vo2', 1, 'Cyc VO2 (level 1)', { role: 'hard' })] },
@@ -1705,7 +1711,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
   // p278 Deload column, day 5: "Cyc sprint (level 1)".
   { day: 5, label: null, strength: [], endurance: [E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] })] },
   // p278 Deload column, day 6: "Cyc endurance (level 1)".
-  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long' })] },
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long', versions: P239_RIDE_VERSIONS })] },
   { ...CYCLING_BASE_STANDARD[6] },
 ];
 
@@ -1737,8 +1743,6 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
 /** The row tag naming a ride's p239 versions (`EnduranceSlot.versions`), `versions:steady|mixed` — read by the swap sheet. */
 export const VERSIONS_TAG = 'versions:';
 
-/** p239's two rides at every endurance level — the easy ride first (the week's build and the one lengths apply to). */
-const P239_RIDE_VERSIONS = ['steady', 'mixed'];
 
 const CYCLING_LONG_STANDARD: FrameDay[] = [
   {

@@ -77,16 +77,17 @@ Deno.test('⛔ §6.2 — easy and long rides: steady / mixed, the same minutes a
   const want: Record<string, Record<string, string[]>> = {
     'All Rounder, rides': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
     'All Rounder, newer': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
-    // ⛔ The Tuesday and Friday rides are p239's plain easy ride every week (Michael, 2026-09-27, option A); the long
-    // ride with no length picked still rotates p239's two level-2 rides.
+    // ⛔ The Tuesday and Friday rides are p239's plain easy ride every week (Michael, 2026-09-27, option A). ⛔ And the long
+    // ride too, since 2026-09-29: it carries p239's two versions (`EnduranceSlot.versions`), builds the easy one every
+    // week, and the structured ride is a one-day choice on the swap sheet (p239: "sparingly unless an event is coming").
     'Ride + Strength, five rides': {
       'Tuesday 2:0': Array.from({ length: WEEKS }, () => 'steady/80'),
       'Friday 5:1': Array.from({ length: WEEKS }, () => 'steady/80'),
-      'Saturday 6:0': alternating('steady/170', 'mixed/125'),
+      'Saturday 6:0': Array.from({ length: WEEKS }, () => 'steady/170'),
     },
     'Ride + Strength, Day 2 off': {
       'Friday 5:1': Array.from({ length: WEEKS }, () => 'steady/80'),
-      'Saturday 6:0': alternating('steady/170', 'mixed/125'),
+      'Saturday 6:0': Array.from({ length: WEEKS }, () => 'steady/170'),
     },
   };
   for (const [label, slots] of Object.entries(want)) {

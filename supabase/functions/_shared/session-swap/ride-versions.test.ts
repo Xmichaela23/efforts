@@ -110,10 +110,16 @@ Deno.test('⛔ the rest-of-plan question: a chosen workout is written for today 
   assertEquals(scope, 'today');
 });
 
-Deno.test('⚠️ Ride + Strength (cycling_base) declares no versions, so its endurance rides are offered nothing new', () => {
-  const rows = rowsOf(composeWeek(args('cycling_base', 2) as never));
-  for (const r of rows.filter((x) => x.type === 'ride' && (x.tags ?? []).includes('band:vt1_or_easier'))) {
-    assertEquals(workoutChoiceOptions(r, rows), [], String(slotOf(r)));
-    assert(!(r.tags ?? []).some((t: string) => t.startsWith('versions:')));
+Deno.test('⛔ Ride + Strength (cycling_base) carries p239\'s two versions too (2026-09-29): its easy and long rides offer "With efforts"', () => {
+  for (const [week, column, keys] of [[2, 'standard', ['2:0', '5:1', '6:0']], [4, 'taper', ['2:0', '6:0']]] as const) {
+    const rows = rowsOf(composeWeek(args('cycling_base', week, column) as never));
+    for (const r of rows.filter((x) => x.type === 'ride')) {
+      const work = sheetOptions(ctx(r, rows)).filter((o) => o.kind === 'workout');
+      if ((keys as readonly string[]).includes(slotOf(r)!)) {
+        assertEquals(work.map((o) => [optionId(o), o.label, o.line]), [['workout:mixed', 'With efforts', LINE]], `${column} ${slotOf(r)}`);
+      } else {
+        assert(!work.some((o) => o.label === 'With efforts'), `${column} ${slotOf(r)}`);
+      }
+    }
   }
 });

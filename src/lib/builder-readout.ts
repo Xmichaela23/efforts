@@ -101,6 +101,8 @@ export type EnduranceIntakeReadout = {
     /** `length`: the chips on a ride whose length the rider picks, stored under `length.key` (shared by rides held to one length). */
     rows: Array<{
       key: SlotKey; line: string; is_long: boolean; optional: boolean; optional_line?: string | null;
+      /** A ride with no length pick: its shortest to longest across the block (server words). */
+      time_line?: string | null;
       length: { key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null; same_as?: string | null } | null;
       /**
        * The level chips on a ride the page prints as a range (p279 day 1). Absent from an older server. The labels are

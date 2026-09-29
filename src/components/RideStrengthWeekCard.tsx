@@ -75,6 +75,8 @@ export default function RideStrengthWeekCard(props: Props) {
               ) : (
                 <p className="text-white text-[15px]">{row.line}</p>
               )}
+              {/* A ride with no length pick states its length, shortest to longest across the block (the server's). */}
+              {!len && row.time_line ? <p className="text-white/55 text-xs mt-1 leading-relaxed">{row.time_line}</p> : null}
               {len && picked != null && len.options.includes(picked) ? (
                 <p className="text-white/55 text-xs mt-1 leading-relaxed">
                   {/* "Same length as Day 2." while Day 2 carries the chips; on its own when it has them. */}

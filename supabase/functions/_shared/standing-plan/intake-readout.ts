@@ -40,7 +40,9 @@ import type { EnduranceBaselines } from '../endurance-library/index.ts';
 import { FRAMES, isJoinedSlot, planCeilingFor, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
-import { frameRotatedArchetype } from './compose.ts';
+import { composeWeek, frameRotatedArchetype } from './compose.ts';
+import { defaultCompetitionLifts } from './frame-resolver.ts';
+import { sessionLengthRangeLabel } from '../../../../src/lib/standing-plan-week-copy.ts';
 import { fill, JOINED_ROW, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
 import { ladderOf } from './volume-bounds.ts';
 import { resolveEnduranceAnchors } from '../endurance-library/index.ts';
@@ -145,6 +147,9 @@ export type EnduranceIntakeReadout = {
       key: SlotKey; line: string; is_long: boolean;
       /** An optional ride carries a switch on its own row, on by default (the week as printed), and this line under its name. */
       optional: boolean; optional_line: string | null;
+      /** A ride with no length pick: the shortest and longest this ride builds across the block's standard weeks, both
+       *  parts of a joined ride together ("37 min–1h08"; Michael 2026-09-28: "this section should show all the times"). */
+      time_line: string | null;
       length: {
         key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null;
         /** On a ride held to another's length: "Same length as Day N." — shown while that ride is in the week. */
@@ -350,6 +355,33 @@ export function enduranceIntakeReadout(args: {
     // ⛔ THE CHIPS A SLOT CAN BUILD — inside its ladder from its smaller tier (`lengthFromLevel`) up — and the first one at
     // its own printed level opens selected (the runs screen's "first chip selected", 2026-09-23).
     const anchors = resolveEnduranceAnchors(baselines as never);
+    /**
+     * ⛔ EACH RIDE'S MINUTES AS THE BLOCK BUILDS THEM (2026-09-29): the composer's own standard weeks 2 to 12 (week 1 is
+     * the test week), read off each session's `slot:` tag — so the row states lengths the rider will actually ride, the
+     * rotating shapes included, and never a second computation of "how long is this session".
+     */
+    const builtMinutes: Array<Record<string, number>> = [];
+    for (let week = 2; week <= 12; week++) {
+      try {
+        const wk = composeWeek({
+          frame, week, column: 'standard', competitionLifts: defaultCompetitionLifts(),
+          seed1RMs: { bench: 135, squat: 185, deadlift: 225, overheadPress: 95 }, equipment: null, roundTo: 5,
+          baselines: baselines as never,
+        } as never);
+        const byKey: Record<string, number> = {};
+        for (const sess of (wk.sessions ?? []) as Array<{ tags?: string[]; duration?: number }>) {
+          const k = (sess.tags ?? []).find((t) => t.startsWith('slot:'))?.slice(5);
+          if (k && Number(sess.duration) > 0) byKey[k] = (byKey[k] ?? 0) + Number(sess.duration);
+        }
+        builtMinutes.push(byKey);
+      } catch { /* a week that cannot compose states nothing */ }
+    }
+    const timeLineFor = (keys: string[]) => {
+      const totals = builtMinutes
+        .map((byKey) => keys.every((k) => byKey[k] != null) ? keys.reduce((a, k) => a + byKey[k], 0) : null)
+        .filter((n): n is number => n != null);
+      return totals.length ? sessionLengthRangeLabel({ min: Math.min(...totals), max: Math.max(...totals) }) : null;
+    };
     const lengthFor = (frameKey: string) => {
       const slot = slotOf(frameKey);
       const chips = f.rideWeek!.chips[frameKey];
@@ -388,6 +420,11 @@ export function enduranceIntakeReadout(args: {
         is_long: row.role === 'long',
         optional: slotOf(row.frameKey)?.optional === true,
         optional_line: slotOf(row.frameKey)?.optional === true ? RIDES_COPY.optional_line_by_frame[frame] ?? null : null,
+        time_line: (() => {
+          if (leads) return null;
+          const [fd, idx] = row.frameKey.split(':').map(Number);
+          return timeLineFor(next ? [row.frameKey, `${fd}:${idx + 1}`] : [row.frameKey]);
+        })(),
         length: (() => {
           const l = leads ? lengthFor(leads) : null;
           if (!l || leads === row.frameKey) return l;
