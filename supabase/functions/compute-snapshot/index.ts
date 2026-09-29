@@ -2143,7 +2143,14 @@ serve(async (req: Request) => {
       user_id: userId,
       week_start: targetWeek,
 
-      state_trends_v1: stateTrendsV1,
+      /**
+       * ⛔ A SKIPPED OR FAILED BUILD LEAVES THE ROW'S TRENDS AS THEY ARE (2026-09-28). A historical recompute (an explicit
+       * past `week_start`, `stateTrendGate`) used to upsert `state_trends_v1: null` onto that week's row, blanking what
+       * the live build had written there. At the week seam — a new Monday with no row yet — the coach reads that
+       * previous week's row (`coach/index.ts`, latest `week_start <= mondayOfToday()`), so State's trends went blank
+       * until the next live compute. Omitted from the upsert, the column keeps its value; a new row starts null.
+       */
+      ...(stateTrendsV1 != null ? { state_trends_v1: stateTrendsV1 } : {}),
 
       workload_total: Math.round(current.workloadTotal),
       workload_by_discipline: current.workloadByDisc,
