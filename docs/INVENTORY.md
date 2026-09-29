@@ -548,7 +548,7 @@ no-deploy.**
 
 | touch this file | redeploy these |
 |---|---|
-| `copy.ts` | `swap-session` |
+| `copy.ts` | `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
 | `library-session.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
 | `lift-swap.ts` | `coach` · `endurance-checkpoint` · `generate-strength-plan` · `materialize-plan` · `rematerialize-standing-block` |
 | `plan-adjustments.ts` | `materialize-plan` · `rematerialize-standing-block` · `swap-session` |
