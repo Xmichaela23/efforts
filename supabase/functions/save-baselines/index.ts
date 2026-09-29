@@ -49,6 +49,7 @@
  *            lift / swim_pace → { success, accepted: { kind, lift, value, locked }, performance_numbers, locked_baselines }
  *   zones  → { success, zones: { power, swim_pace, run_easy_hr } }
  */
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
   acceptMeasuredForSave,
@@ -104,13 +105,40 @@ const parseJson = (v: unknown) => {
   try { return JSON.parse(v); } catch { return null; }
 };
 
+/**
+ * ⛔ A SAVED NUMBER MARKS STATE'S SAVED COPY OLD (2026-09-29, Michael: "I had to refresh it to see the new ftp"). State
+ * reads the coach's saved copy (`coach_cache`); every other truth change marks it old (`invalidateUserTrainingCache`), but
+ * an accepted FTP, a threshold, a pace or a lift saved here did not, so the screen kept the old number. Only a request
+ * that wrote something and succeeded marks it — a readout or a preview does not. The service client, because
+ * `coach_cache` writes are service-only (`coach/index.ts`). The shared helper is not used: it also rebuilds the Record
+ * tab's cache, which is too slow for a screen the athlete is watching.
+ */
 Deno.serve(async (req) => {
+  const ctx: { userId?: string; writes?: boolean } = {};
+  const res = await handle(req, ctx);
+  if (ctx.userId && ctx.writes && res.status === 200) {
+    try {
+      const out = await res.clone().json();
+      if (out?.success === true && out?.preview !== true) {
+        const service = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        await service.from('coach_cache').update({ invalidated_at: new Date().toISOString() }).eq('user_id', ctx.userId);
+      }
+    } catch (e) {
+      console.error('[save-baselines] coach_cache invalidate failed (non-fatal):', e);
+    }
+  }
+  return res;
+});
+
+async function handle(req: Request, ctx: { userId?: string; writes?: boolean }): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
     const body = await req.json().catch(() => ({}));
     const { userId, supabase, internal } = await requireUserOrService(req, body?.user_id);
+    ctx.userId = userId;
+    ctx.writes = !!(body?.baselines || body?.heart_rate || body?.calibration || body?.accept || body?.paces || body?.lifts);
     // ⛔ A SERVICE CALLER GETS ONE DOOR (2026-09-16, Stage 7 session 1): the tested CSS → swim pace, which the learner
     // asks for after a CSS test. Everything else here is the athlete's own save and needs the athlete's token.
     // And the learner's one-time seed of an accepted value (Stage 7 session 1: the accept stays the one writer of it).
@@ -359,4 +387,4 @@ Deno.serve(async (req) => {
     console.error('[save-baselines]', e);
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
-});
+}

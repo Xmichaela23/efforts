@@ -664,7 +664,19 @@ export type CoachWeekContextV1 = {
  * OURS — 60 s, chosen to cover screens mounting together, not to delay a real change.
  */
 const COACH_SHARED_RECHECK_MS = 60 * 1000;
-const COACH_CHANGE_EVENTS = ['workouts:invalidate', 'planned:invalidate', 'week:invalidate', 'plans:invalidate', 'plans:refresh', 'baseline:saved'];
+const COACH_CHANGE_EVENTS = ['workouts:invalidate', 'planned:invalidate', 'week:invalidate', 'plans:invalidate', 'plans:refresh', 'baseline:saved', 'baselines:stale'];
+/**
+ * ⛔ AN OPEN SCREEN RECHECKS WHEN THE APP ANNOUNCES A CHANGE (2026-09-29, Michael: "can it auto refresh when new data
+ * comes in?"). A synced workout arrives as a burst of realtime row updates (the import, then each step that fills it in),
+ * and an accepted number as one `baselines:stale`. The events used to mark the copy old for the NEXT screen to open; a
+ * screen already open (State, Today) kept the old numbers until pulled. Now the burst settles for COACH_EVENT_SETTLE_MS,
+ * then ONE background check runs for every open screen — the server rebuilds only if its saved copy was marked old, and
+ * the answer is written into the shared copy every screen paints from.
+ * OURS — 4 s, long enough to fold one sync's row updates into one check, short enough to feel immediate.
+ */
+const COACH_EVENT_SETTLE_MS = 4 * 1000;
+let coachEventTimer: ReturnType<typeof setTimeout> | null = null;
+let coachEventRecheck: (() => void) | null = null;
 
 export function useCoachWeekContext(date?: string) {
   const focusDate = date || new Date().toLocaleDateString('en-CA');
@@ -685,7 +697,16 @@ export function useCoachWeekContext(date?: string) {
   );
 
   useEffect(() => {
-    const onChange = () => { queryClient.invalidateQueries({ queryKey: ['coach-week'], refetchType: 'none' }); };
+    const onChange = () => {
+      queryClient.invalidateQueries({ queryKey: ['coach-week'], refetchType: 'none' });
+      // One settled background check for all open screens — see COACH_EVENT_SETTLE_MS.
+      if (coachEventTimer) clearTimeout(coachEventTimer);
+      coachEventTimer = setTimeout(() => {
+        coachEventTimer = null;
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        coachEventRecheck?.();
+      }, COACH_EVENT_SETTLE_MS);
+    };
     COACH_CHANGE_EVENTS.forEach((n) => window.addEventListener(n, onChange));
     return () => { COACH_CHANGE_EVENTS.forEach((n) => window.removeEventListener(n, onChange)); };
   }, [queryClient]);
@@ -816,6 +837,14 @@ export function useCoachWeekContext(date?: string) {
   }, [focusDate, setData]);
 
   const fetchCoach = useCallback(() => runPipeline(false, { force: true }), [runPipeline]);
+
+  // The settled recheck (COACH_EVENT_SETTLE_MS) runs through the newest open screen's pipeline; every screen paints the
+  // shared copy it writes. A background run: the server's saved copy answers unless a change marked it old.
+  useEffect(() => {
+    const mine = () => { void runPipeline(true, { force: false }); };
+    coachEventRecheck = mine;
+    return () => { if (coachEventRecheck === mine) coachEventRecheck = null; };
+  }, [runPipeline]);
 
   useEffect(() => {
     hasCachedData.current = false;
