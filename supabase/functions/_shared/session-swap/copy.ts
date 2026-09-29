@@ -44,6 +44,22 @@ export const VENUE_LABEL: Record<string, string> = {
 export const SWAP_BACK_TO_PLAN = 'Back to the plan.';
 
 /**
+ * ⛔ p239's TWO RIDES ON THE SHEET, FOR ONE DAY (Michael approved the words 2026-09-28) — `EnduranceSlot.versions`,
+ * offered by `workout-choice.ts`. Keyed by the library's archetype id. The easy ride's name labels the way back.
+ */
+export const RIDE_VERSION_LABEL: Record<string, string> = {
+  steady: 'Easy ride',  // not-instruction: a button label (a name)
+  mixed: 'With efforts',  // not-instruction: a button label (a name)
+};
+/**
+ * The line under a version's button. Viada p239: "use judgment and do the more intense workouts sparingly unless an event
+ * is coming" — the structured ride is the more intense one. Michael approved the words 2026-09-28.
+ */
+export const RIDE_VERSION_LINE: Record<string, string> = {
+  mixed: 'A shorter ride with some harder work in it. Meant for occasional use, or the weeks before an event.',  // Viada p239
+};
+
+/**
  * ⛔ THE MACHINE'S WAY BACK IS A PLACE, NOT A SPORT (§8, APPROVED). A trainer ride reverting is not
  * "Ride instead" — the sport never changed — so the option is named for the only thing that did.
  */

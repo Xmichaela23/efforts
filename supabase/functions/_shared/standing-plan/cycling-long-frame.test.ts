@@ -243,13 +243,15 @@ Deno.test('⛔ the long ride builds the length picked inside p239 level 3 (3h30 
 const archOf = (s: { tags?: string[] } | undefined) => (s?.tags ?? []).find((t) => t.startsWith('archetype:'))?.slice(10);
 const ENDURANCE = ['2:0', '5:0', '6:0'];
 
-Deno.test('⛔ p239\'s two rides on every endurance ride — the easy ride by default, the structured ride when picked', () => {
-  // No pick: the easy ride on Days 2, 5 and 6, both columns (OURS — the default, Ride + Strength's precedent).
-  for (const [week, column] of [[2, 'standard'], [4, 'taper']] as const) {
-    const w = composeWeek(baseArgs(week, column) as never);
-    assertEquals(ENDURANCE.map((k) => archOf(bySlot(w, k))), ['steady', 'steady', 'steady'], `${column}: default`);
+Deno.test('⛔ p239\'s two rides: every week builds the easy ride; a block saved with the structured ride still builds it', () => {
+  // Every week of a twelve-week block, both columns: the easy ride on Days 2, 5 and 6, each carrying its versions.
+  for (const w of twelveWeeks([4, 8, 12], { sportMix: { minutes: { '2:0': 150, '6:0': 210 } } })) {
+    assertEquals(ENDURANCE.map((k) => archOf(bySlot(w, k))), ['steady', 'steady', 'steady'], `week ${w.week}`);
+    assert(ENDURANCE.every((k) => (bySlot(w, k)!.tags ?? []).includes('versions:steady|mixed')), `week ${w.week}: versions tag`);
+    assert(!(bySlot(w, '1:0')!.tags ?? []).some((t) => t.startsWith('versions:')), 'a hard ride carries versions');
   }
-  // With efforts on Day 2 (Day 5 follows it) and on Day 6: the structured ride at its printed length, any length pick dropped.
+  // ⚠️ A block saved with 'mixed' (the 2026-09-28 setup chips, since removed; none exist outside tests) keeps building
+  // what it saved — no migration. Day 5 follows Day 2, the structured ride at its printed length, length picks dropped.
   const mixed = { archetypes: { '2:0': 'mixed', '6:0': 'mixed' } };
   for (const minutes of [undefined, { '2:0': 150, '6:0': 210 }, { '2:0': 210, '6:0': 300 }]) {
     const w = composeWeek({ ...baseArgs(2), sportMix: { ...mixed, ...(minutes ? { minutes } : {}) } } as never);
@@ -281,7 +283,7 @@ Deno.test('⛔ p239\'s two rides on every endurance ride — the easy ride by de
   assert(JSON.stringify(bySlot(easyW, '2:0')!.steps_preset) !== JSON.stringify(bySlot(effW, '2:0')!.steps_preset));
 });
 
-Deno.test('⛔ the deload rides take the rider\'s version at level 1; the picked lengths do not reach them (as Base)', () => {
+Deno.test('⛔ the deload rides take a saved version at level 1; the picked lengths do not reach them (as Base)', () => {
   // p239 level 1: the 60- to 100-minute easy ride, or 20 min + 4 rounds + 45 min @ VT1 (85 min).
   const plain = composeWeek(baseArgs(4, 'taper') as never);
   const picked = composeWeek({ ...baseArgs(4, 'taper'), sportMix: { minutes: { '2:0': 210, '6:0': 300 } } } as never);
@@ -400,23 +402,15 @@ Deno.test('⛔ the words: every line Michael approved, and the rides screen\'s c
   const lv = r.rows.find((x) => x.level)!.level!;
   assertEquals([lv.default, lv.options.map((o) => o.level)], [2, [2, 3]]);
   assertEquals([lv.label, ...lv.options.map((o) => o.label)], ['Sweet spot level', 'Level 2', 'Level 3']);
-  // Days 2 and 5: 2h30 · 3h30, Day 5 held to Day 2; the version chips on Days 2, 5 (Day 2's) and 6.
+  // Days 2 and 5: 2h30 · 3h30, Day 5 held to Day 2. ⛔ No version pick on this screen (Michael, 2026-09-28): the
+  // structured ride is a swap for one day, never a setup answer.
   const byKey = (k: string) => r.rows.find((x) => x.key === k)!;
   assertEquals([byKey('easy').length?.options, byKey('easy').length?.default], [[150, 210], 150]);
   assertEquals([byKey('easy2').length?.key, byKey('easy2').length?.same_as], ['easy', 'Same length as Day 2.']);
-  const ver = (k: string) => byKey(k).version!;
-  for (const k of ['easy', 'easy2', 'long']) {
-    assertEquals(ver(k).default, 'steady');
-    assertEquals(ver(k).options.map((o) => o.label), ['Easy ride', 'With efforts']);
-    assertEquals(ver(k).options[0].fixed_label, null);
-  }
-  assertEquals([ver('easy').key, ver('easy2').key, ver('easy2').same_as], ['easy', 'easy', 'Same length as Day 2.']);
-  assertEquals(ver('easy').options[1].fixed_label, '2h05');
-  assertEquals(ver('long').options[1].fixed_label, '3h');
-  assert(['hard1', 'hard2'].every((k) => byKey(k).version == null));
+  assert(r.rows.every((x) => !('version' in x)), 'the setup screen asks the ride version');
   // ⚠️ Base's screen is unchanged.
   const b = enduranceIntakeReadout({ frame: 'cycling_base', answers: {}, baselines: { performance_numbers: { ftp: 250 } } } as never)
     .ride_strength_week!;
   assertEquals([b.sub_line, b.easy_line], [RIDES_COPY.sub, RIDES_COPY.easy_line]);
-  assert(b.rows.every((x) => x.level == null && x.version == null));
+  assert(b.rows.every((x) => x.level == null && !('version' in x)));
 });

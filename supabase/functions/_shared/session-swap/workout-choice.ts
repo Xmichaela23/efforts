@@ -42,7 +42,8 @@ import { translateEnduranceSession, type TranslatedSession } from '../standing-p
  * the tap does not build.
  */
 import { parseQualityWork, qualityWorkLine, type QualityPricing } from '../plan-tokens/quality-work.ts';
-import { FRAMES } from '../standing-plan/frames.ts';
+import { FRAMES, VERSIONS_TAG } from '../standing-plan/frames.ts';
+import { RIDE_VERSION_LABEL, RIDE_VERSION_LINE } from './copy.ts';
 import { DEFAULT_SIZE } from '../standing-plan/volume-bounds.ts';
 // ⛔ ONE PLANNED-DURATION READER — the one the card prints its length from.
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
@@ -79,6 +80,11 @@ export type HardSlot = {
    * (no run shape carries a mark, so the filter passes them all).
    */
   venue: 'road' | 'trainer';
+  /**
+   * ⛔ THE p239 VERSIONS OF AN ENDURANCE RIDE (2026-09-28) — set only on a row stamped `versions:` (`EnduranceSlot.versions`,
+   * Long Ride + Strength's Days 2, 5 and 6). Absent on a hard session.
+   */
+  versions?: string[];
 };
 
 /** The row's family, level and workout, when it is a planned hard session whose workout can be chosen. */
@@ -105,6 +111,40 @@ export function hardSlotOf(session: SwappableSession | null | undefined): HardSl
 }
 
 /**
+ * ⛔ AN ENDURANCE RIDE THE PAGE PRINTS TWO WAYS (Michael, 2026-09-28). p239 prints an easy ride and a structured ride at
+ * every endurance level and says to "use judgment and do the more intense workouts sparingly unless an event is coming".
+ * The plan builds the easy ride every week; this offers the other version on the sheet, for that day only — the same
+ * workout choice as a hard session's, so it is written the same way (a `plan_adjustments` row, one date) and goes back
+ * the same way (Back to the plan). The row says which versions it has (`versions:` — `EnduranceSlot.versions`), so no
+ * frame or family is named here: a plan whose frame declares no versions gets nothing.
+ */
+export function versionSlotOf(session: SwappableSession | null | undefined): HardSlot | null {
+  if (!session) return null;
+  const status = String(session.workout_status ?? 'planned').toLowerCase();
+  if (status === 'completed' || status === 'skipped') return null;
+  if (isDisciplineSwapped(session)) return null;
+  const versions = (tagValue(session, VERSIONS_TAG) ?? '').split('|').filter(Boolean);
+  if (versions.length < 2) return null;
+  const family = tagValue(session, 'family:') as FamilyId | null;
+  if (!family || !FAMILIES[family]) return null;
+  const level = Number(tagValue(session, 'level:'));
+  if (level !== 1 && level !== 2 && level !== 3) return null;
+  const archetype = tagValue(session, 'archetype:');
+  if (!archetype || !versions.includes(archetype)) return null;
+  const sport = FAMILIES[family].sport;
+  if ((sport !== 'run' && sport !== 'ride') || disciplineOf(session.type) !== sport) return null;
+  const offered = archetypesFor(family, level as Level).map((a) => a.id);
+  const usable = versions.filter((v) => offered.includes(v));
+  if (!usable.includes(archetype)) return null;
+  return { family, level: level as Level, archetype, sport, venue: venueOf(session) === 'trainer' ? 'trainer' : 'road', versions: usable };
+}
+
+/** The row's workout choice: a hard session's (`hardSlotOf`), else an endurance ride's versions (`versionSlotOf`). */
+export function choiceSlotOf(session: SwappableSession | null | undefined): HardSlot | null {
+  return hardSlotOf(session) ?? versionSlotOf(session);
+}
+
+/**
  * The workouts this slot may be: the frame's own rotation where a programme names one for a slot of
  * this family holding this workout, the library's list for the family at this level otherwise.
  * ⚠️ FILTERED TO THE LEVEL either way — the low-volume tier builds p247's Wednesday at level 1, where
@@ -114,6 +154,8 @@ export function hardSlotOf(session: SwappableSession | null | undefined): HardSl
  * falls through to the family's road list rather than to nothing.
  */
 export function workoutsForSlot(slot: HardSlot): { id: string; label: string }[] {
+  // ⛔ AN ENDURANCE RIDE'S VERSIONS ARE ITS WHOLE LIST, named in the approved words (`RIDE_VERSION_LABEL`).
+  if (slot.versions) return slot.versions.filter((v) => RIDE_VERSION_LABEL[v]).map((v) => ({ id: v, label: RIDE_VERSION_LABEL[v] }));
   const offered = archetypesForVenue(slot.family, slot.level, slot.venue).map((a) => ({ id: a.id, label: a.label }));
   for (const frame of Object.values(FRAMES)) {
     for (const column of Object.values(frame.columns)) {
@@ -166,6 +208,7 @@ export async function loadWorkoutMinutes(
   userId: string,
   session: SwappableSession & { training_plan_id?: string | null },
 ): Promise<Record<string, number>> {
+  // ⚠️ A HARD SESSION ONLY — a ride version's button is its approved word alone, with no minutes on it.
   const slot = hardSlotOf(session);
   if (!slot || !db) return {};
   const out: Record<string, number> = {};
@@ -260,11 +303,12 @@ export function workoutChoiceOptions(
   /** The numbers the line is priced with — see `workoutLine`. Absent prints the page's percentages. */
   pricing: QualityPricing = {},
 ): SwapOption[] {
-  const slot = hardSlotOf(session);
+  const slot = choiceSlotOf(session);
   if (!slot) return [];
   const planned = workoutFromOf(session);
   const taken = new Set<string>();
-  for (const r of week ?? []) {
+  // ⚠️ THE ONE-SHAPE-A-WEEK RULE IS THE HARD SESSIONS' (`applyVariantPicks`); every endurance ride builds the easy ride.
+  for (const r of slot.versions ? [] : week ?? []) {
     if (!r || String(r.id) === String(session.id)) continue;
     if (tagValue(r, 'family:') !== slot.family) continue;
     const held = tagValue(r, 'archetype:');
@@ -290,8 +334,9 @@ export function workoutChoiceOptions(
       kind: 'workout',
       archetype: w.id,
       to: slot.sport,
-      label: `${w.label} · ${minutes} min`,
-      line: workoutLine(next, slot.sport, slotPricing),
+      // ⛔ A RIDE VERSION: the approved word and its approved line (`RIDE_VERSION_LABEL`, `RIDE_VERSION_LINE`), nothing else.
+      label: slot.versions ? w.label : `${w.label} · ${minutes} min`,
+      line: slot.versions ? RIDE_VERSION_LINE[w.id] : workoutLine(next, slot.sport, slotPricing),
       patch: workoutChoicePatch(session, slot, next),
       needsMaterialize: true,
       warnings: [],

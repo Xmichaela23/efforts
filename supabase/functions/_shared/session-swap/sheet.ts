@@ -26,15 +26,16 @@ import {
   revertOptions,
   sameSwapOn,
   sessionSwapExtras,
+  workoutFromOf,
   type SwapOption,
   type SwappableSession,
 } from './swap.ts';
 import type { MatrixSessionKind } from '../schedule-session-constraints.ts';
 import type { PerDisciplinePosture } from '../state-trend/posture.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
-import { swapButtonLabel, swapLineFor, swapSessionLine, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from './copy.ts';
+import { RIDE_VERSION_LABEL, swapButtonLabel, swapLineFor, swapSessionLine, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from './copy.ts';
 import { resolveSwapWrite } from './resolve-write.ts';
-import { workoutChoiceOptions } from './workout-choice.ts';
+import { versionSlotOf, workoutChoiceOptions } from './workout-choice.ts';
 import type { QualityPricing } from '../plan-tokens/quality-work.ts';
 
 // deno-lint-ignore no-explicit-any
@@ -104,8 +105,11 @@ export function sameDayOthers(session: SwapRow, week: ReadonlyArray<SwapRow>): A
  */
 export function sheetOptions(ctx: SwapContext): SwapOption[] {
   const { session, week, posture, ftp } = ctx;
+  // ⛔ THE WAY BACK FROM A RIDE VERSION IS NAMED IN THE APPROVED WORD (2026-09-28): "Easy ride", under "Back to the plan."
+  const back = versionSlotOf(session) ? RIDE_VERSION_LABEL[workoutFromOf(session) ?? ''] : undefined;
   return [
-    ...revertOptions(session, session.training_plan_id ?? null),
+    ...revertOptions(session, session.training_plan_id ?? null)
+      .map((o) => (back && o.kind === 'revert' && !o.venue ? { ...o, label: back } : o)),
     ...sessionSwapExtras(session, posture, week),
     ...getDisciplineSwaps(session, availableDisciplines(week), sameDayOthers(session, week), posture, ftp),
     ...workoutChoiceOptions(session, week, ctx.baselines ?? null, ctx.workoutMinutes ?? null, ctx.pricing ?? {}),

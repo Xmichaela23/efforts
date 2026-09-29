@@ -41,7 +41,7 @@ import {
 } from './swap.ts';
 import { librarySwapSession, swapTargetFamily } from './library-session.ts';
 import { placeOf } from '../day-seq.ts';
-import { composedHardSession, hardSlotOf, workoutChoicePatch } from './workout-choice.ts';
+import { choiceSlotOf, composedHardSession, workoutChoicePatch } from './workout-choice.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -178,8 +178,10 @@ export function sessionForOption(
   const arg = option.slice(at + 1);
   let patch: Record<string, unknown> | null = null;
   if (kind === 'workout') {
-    const slot = hardSlotOf(row);
+    // ⛔ A HARD SESSION'S WORKOUT, OR AN ENDURANCE RIDE'S p239 VERSION (`choiceSlotOf`, 2026-09-28) — only one it lists.
+    const slot = choiceSlotOf(row);
     if (!slot || slot.archetype === arg || !archetypesFor(slot.family, slot.level).some((x) => x.id === arg)) return null;
+    if (slot.versions && !slot.versions.includes(arg)) return null;
     // ⚠️ No anchors, as the composer is called here: the tokens carry percentages and materialize-plan prices them.
     patch = workoutChoicePatch(row, slot, composedHardSession({ ...slot, archetype: arg, baselines: null }));
   } else if (kind === 'discipline') {

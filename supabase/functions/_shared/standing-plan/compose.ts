@@ -72,6 +72,7 @@ import {
   PLYO_DOSE,
   planCeilingFor,
   pickedVersions,
+  VERSIONS_TAG,
   withPickedLevels,
   type ColumnKind,
   type EnduranceExperience,
@@ -3867,6 +3868,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           const extra: string[] = [`slot:${day.day}:${i}`];
           if (joinsNext || joinedPart) extra.push(JOINED_TAG);
           if (joinedPart) extra.push(JOINED_PART_TAG);
+          // ⛔ THE p239 VERSIONS THIS RIDE HAS (`EnduranceSlot.versions`, 2026-09-28) — the swap sheet offers the others for
+          // one day (`session-swap/workout-choice.ts`). Additive: only a slot that declares them carries it.
+          if (slot.versions?.length && !assigned.substituted) extra.push(`${VERSIONS_TAG}${slot.versions.join('|')}`);
           if (isLongSlot(slot)) {
             const w = row.type === 'ride' ? 'long_ride' : row.type === 'run' ? 'long_run' : null;
             if (w && !row.tags.includes(w)) extra.push(w);

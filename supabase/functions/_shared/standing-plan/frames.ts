@@ -323,13 +323,17 @@ export type EnduranceSlot = {
    */
   levelChoices?: Level[];
   /**
-   * ⛔ THE TWO RIDES p239 PRINTS AT EVERY ENDURANCE LEVEL, AND THE RIDER PICKS ONE (Michael, 2026-09-28): the straight
-   * "easy ride below 75%" (`steady`) or the structured ride — a 20-minute spin, rounds of 2 min @ 80% / 3 min @ 70%, and
-   * a VT1 block with a 10-second all-out sprint every 8 or 9 minutes (`mixed`). Library archetype ids, so the pick travels
-   * as the existing variant pick (`SportMix.archetypes[frameKey]`) and is built by the library as printed.
-   * ⚠️ THE FIRST IS THE DEFAULT AND THE ONE THE LENGTH CHIPS ARE MEASURED ON — the easy ride spans a range; the structured
-   * ride is printed at one length per level, so it takes no length pick and no step-up. OURS — the default (see
-   * `pickedVersions`, and the ledger row). A slot with `sameLengthAs` follows its leader's version as well as its length.
+   * ⛔ THE TWO RIDES p239 PRINTS AT EVERY ENDURANCE LEVEL: the straight "easy ride below 75%" (`steady`) and the
+   * structured ride — a 20-minute spin, rounds of 2 min @ 80% / 3 min @ 70%, and a VT1 block with a 10-second all-out
+   * sprint every 8 or 9 minutes (`mixed`). Library archetype ids.
+   * ⛔ THE FIRST IS WHAT THE PLAN BUILDS EVERY WEEK; THE OTHERS ARE OFFERED ON THE SWAP SHEET FOR ONE DAY (Michael,
+   * 2026-09-28): p239 says to "use judgment and do the more intense workouts sparingly unless an event is coming", and a
+   * setup pick built the structured ride every week. The composer stamps `versions:` on the row, and
+   * `session-swap/workout-choice.ts` offers the other version there (a `plan_adjustments` row, just that date).
+   * ⚠️ A VARIANT PICK SAVED ON A BLOCK (`SportMix.archetypes[frameKey]`, the 2026-09-28 setup chips, since removed) still
+   * builds what it saved — `pickedVersions`. The easy ride takes the length chips; the structured ride is printed at one
+   * length per level and takes no length pick and no step-up. OURS — the easy ride as the week's build (ledger row). A
+   * slot with `sameLengthAs` follows its leader's version as well as its length.
    */
   versions?: string[];
   /**
@@ -1730,7 +1734,10 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
  * ⚠️ NO RUN SLOT AND NO SWIM. ⚠️ NO OVERHEAD PRESS IS NAMED — the push rows are categories, as on p278, so
  * `testedLifts` is bench, squat and deadlift.
  */
-/** p239's two rides at every endurance level — the easy ride first (the default and the one lengths apply to). */
+/** The row tag naming a ride's p239 versions (`EnduranceSlot.versions`), `versions:steady|mixed` — read by the swap sheet. */
+export const VERSIONS_TAG = 'versions:';
+
+/** p239's two rides at every endurance level — the easy ride first (the week's build and the one lengths apply to). */
 const P239_RIDE_VERSIONS = ['steady', 'mixed'];
 
 const CYCLING_LONG_STANDARD: FrameDay[] = [

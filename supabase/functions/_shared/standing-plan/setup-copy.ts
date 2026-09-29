@@ -358,11 +358,6 @@ export const RIDES_COPY = {
   level_label: 'Sweet spot level' as string | null,
   level_chip: 'Level {level}' as string | null,  // not-instruction: a chip label (a name)
   /**
-   * ⛔ THE VERSION CHIPS ON AN ENDURANCE RIDE (p239 prints two rides at every level; `EnduranceSlot.versions`). Keyed by
-   * the library's archetype id. Michael approved the words 2026-09-28. A version with no word here draws no chips.
-   */
-  version_chip: { steady: 'Easy ride', mixed: 'With efforts' } as Record<string, string>,  // not-instruction: chip labels (names)
-  /**
    * Viada p281, the Base program's cycling note, reworded (Michael approved the words 2026-09-19); the page: "Over a 1-month cycle, the Tuesday and Friday endurance rides
    * should be the same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise
    * progress, increasing the volume gradually over the entire base season every 1 to 2 weeks." The weekday names are
