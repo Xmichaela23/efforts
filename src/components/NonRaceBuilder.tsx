@@ -2708,10 +2708,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * drop of it is (`pick`, `_shared/standing-plan/preview-session.ts`); this files the day under that key and the server
    * rebuilds the week from the picks. Nothing is decided or placed here.
    */
-  const dropSession = (x: PlanSessionLite, to: DayName) => {
+  const dropSession = (x: PlanSessionLite, to: DayName, swapping = false) => {
     // ⛔ THE SERVER SAID WHAT THIS DROP IS (`pick`, `preview-session.ts`); the phone files it under that key.
     const pick = x.pick;
     if (!pick) return;
+    /**
+     * ⛔ A LIFTING DAY MOVES AS A WHOLE DAY, AND THE TWO DAYS SWAP (Michael, 2026-09-29: "so we move the day not the
+     * workout? — go"). The book builds each day as a unit, and the lift already brings its day's hard session. Dropped on
+     * a day that already holds sessions, those sessions take the lifting day's old day, so neither day ends up with three.
+     * The book does not cover moving; this is Michael's call. The calendar after the build still moves one session.
+     */
+    if (pick.kind === 'lift' && !swapping && x.day && String(x.day).toLowerCase() !== String(to).toLowerCase()) {
+      const from = String(x.day).toLowerCase() as DayName;
+      const there = (previewWeek ?? []).filter((s) =>
+        s !== x && String(s.day ?? '').toLowerCase() === String(to).toLowerCase() && !!(s as PlanSessionLite).pick);
+      for (const s of there) dropSession(s as PlanSessionLite, from, true);
+    }
     if (pick.kind === 'long') {
       if (pick.key === 'ride') { touch('longRide'); setState((st) => ({ ...st, longRideDay: to })); }
       else { touch('longRun'); setState((st) => ({ ...st, longRunDay: to })); }
