@@ -54,3 +54,17 @@ Deno.test('a session that fell both ways prints nothing', () => {
   const rows = [runRep('above', 486), runRep('above', 495), runRep('above', 505), runRep('below', 700), runRep('below', 710), runRep('below', 720)];
   assertEquals(offPrescriptionLine(rows, false), null);
 });
+
+// Q-312 (words approved by Michael 2026-09-28): reps asked for more than one range — no single range is named.
+Deno.test('Q-312: surges and floats both faster — the line names no range', () => {
+  const surge = (pace: number) => ({ interval_type: 'work', not_done: false, planned_pace_range: { lower_sec_per_mi: 398, upper_sec_per_mi: 486 }, executed: { band: 'above', actual_pace_sec_per_mi: pace } }) as never;
+  const float = (pace: number) => ({ interval_type: 'work', not_done: false, planned_pace_range: { lower_sec_per_mi: 493, upper_sec_per_mi: 603 }, executed: { band: 'above', actual_pace_sec_per_mi: pace } }) as never;
+  const rows = [surge(370), float(440), surge(375), float(445), runRep('in', 640), runRep('in', 640)];
+  assertEquals(offPrescriptionLine(rows, false)?.line, 'Four of six reps were faster than the paces asked for.');
+});
+
+Deno.test('Q-312: intervals at two power ranges, above both — the line names no watts', () => {
+  const hi = (w: number) => ({ interval_type: 'work', not_done: false, planned_power_range: { lower_w: 250, upper_w: 270 }, executed: { band: 'above', power_watts: w } }) as never;
+  const rows = [hi(290), rideRep('above', 200), hi(295), rideRep('above', 205), rideRep('above', 210)];
+  assertEquals(offPrescriptionLine(rows, true)?.line, 'All five intervals were above the watts asked for.');
+});

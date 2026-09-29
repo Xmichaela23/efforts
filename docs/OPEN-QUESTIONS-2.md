@@ -1547,7 +1547,7 @@ where 16 were run. Why the app's lap windows differ from the watch's lap starts 
   `compute-workout-summary/index.test.ts` (36 pass). Replayed all 25 of his planned runs since 2026-07-01 through the
   function with the database stubbed (incl. 09-14, 09-16, 09-21, 09-25): only 09-28 changed, the other 24 byte-identical.
 
-## Q-312 — The off-range sentence names one range when the reps had two — **noted** (2026-09-28)
+## Q-312 — The off-range sentence names one range when the reps had two — **fixed** (2026-09-28: two or more ranges → "…faster than the paces asked for." / "…above the watts asked for.", words approved by Michael)
 
 `off-prescription.ts` prints `off[0]`'s range: "Eleven of 14 reps were faster than the 8:13–10:03/mi asked for" on a
 session whose surges were asked 6:38–8:06. Copy change; not raised with Michael.

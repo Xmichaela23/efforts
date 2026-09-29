@@ -53,6 +53,24 @@ export function offPrescriptionLine(intervals: IntervalRow[] | null | undefined,
     ? `All ${countWord(work.length)} ${noun}`
     : `${countWord(off.length).replace(/^./, (c) => c.toUpperCase())} of ${countWord(work.length)} ${noun}`;
 
+  /**
+   * ⛔ TWO RANGES, NO RANGE NAMED (Q-312, words approved by Michael 2026-09-28). The line printed `off[0]`'s range for
+   * every rep: "Eleven of 14 reps were faster than the 8:13–10:03/mi asked for" on a run whose surges were asked
+   * 6:38–8:06. When the reps that came in off were asked for more than one range, the line names none — "…faster than
+   * the paces asked for." / "…above the watts asked for." — and the rep rows carry each one.
+   */
+  const rangeKey = (iv: IntervalRow) => isRide
+    ? `${Number(iv?.planned_power_range?.lower_w)}|${Number(iv?.planned_power_range?.upper_w)}`
+    : `${Number(iv?.planned_pace_range?.lower_sec_per_mi)}|${Number(iv?.planned_pace_range?.upper_sec_per_mi)}`;
+  if (new Set(off.map(rangeKey)).size > 1) {
+    return {
+      side, outside: off.length, judged: work.length,
+      line: isRide
+        ? `${howMany} were ${side} the watts asked for.`
+        : `${howMany} were ${side === 'above' ? 'faster' : 'slower'} than the paces asked for.`,
+    };
+  }
+
   if (isRide) {
     const range = off[0]?.planned_power_range;
     const lo = Number(range?.lower_w), hi = Number(range?.upper_w);
