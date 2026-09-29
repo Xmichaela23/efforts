@@ -3004,6 +3004,40 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     };
   }
   /**
+   * ⛔ THE DELOAD COLUMN IS THE PAGE'S, WHOLE (Michael, 2026-09-29: "It should all be what the book says"). The athlete's
+   * picked lengths and weekly volume asks are keyed by frame slot, and in the deload column the same slot is a different
+   * session: Strength Lead's picked 70-minute long run built the deload Saturday as an 80-minute easy run at level 3
+   * where p246 prints VT1 level 1 (25 to 30 minutes); the same on p244, p250, p252 and p274 (plan sweep, 2026-09-28). In
+   * any column but the standard one the weekly volume asks are not read, and a picked length is kept only where it sits
+   * inside the level the page prints for THAT column's session — the rule Ride + Strength's deload already follows
+   * (`pickedLengths`, p278, Michael 2026-09-27). A 70-minute pick does not reach a 25-to-30-minute VT1 run.
+   */
+  if (args.column !== 'standard' && !frame.printedWeekOnly) {
+    const anchors = resolveEnduranceAnchors(args.baselines);
+    const kept: Record<string, number> = {};
+    for (const d of frame.columns[args.column]) {
+      d.endurance.forEach((slot, i) => {
+        const k = `${d.day}:${i}`;
+        const v = Number(args.sportMix?.minutes?.[k]);
+        if (!Number.isFinite(v)) return;
+        const own = ladderOf({
+          family: slot.family, level: slot.level, role: slotRoleOf(slot),
+          sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
+        } as SlotSpec, anchors)[0];
+        if (own && v <= Math.round(own.hi)) kept[k] = v;
+      });
+    }
+    args = {
+      ...args,
+      targetWeeklyMiles: undefined,
+      targetWeeklyRideHours: undefined,
+      targetRunHours: undefined,
+      targetRideHours: undefined,
+      demonstratedWeeklyMiles: null,
+      sportMix: args.sportMix ? { ...args.sportMix, minutes: Object.keys(kept).length ? kept : undefined } : args.sportMix,
+    };
+  }
+  /**
    * ⛔ THE RIDER'S LEVEL WHERE THE PAGE PRINTS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27) —
    * `withPickedLevels`: only a slot with `levelChoices`, only a level it lists. Every other frame and column is the
    * column as printed (the same array back).
