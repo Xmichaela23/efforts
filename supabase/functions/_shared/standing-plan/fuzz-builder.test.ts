@@ -499,7 +499,15 @@ function checkPlacementLaws(
     const meWeekday = lower.me.map(dayOf).join(' and ');
     if (lower.me.length > 0) {
       const before = [...daysBeforeMeLower].join(' and ');
-      const adjacency = hardRunTheDayBefore;
+      /**
+       * ⚠️ NOT ON A TEST DAY (2026-09-28, plan sweep bug 3). p247's reduction is *"in working 1RM"*, and the test
+       * week's lower day is the p215 pretest that sets the working number — there is none yet to reduce, so the
+       * sentence can only come from a working week. This passed before only because week two usually repeated
+       * the adjacency. A session moved off a day off now returns to its own frame day when that day is clean, so a
+       * row can carry the adjacency in the test week (p246's own day 1 → day 2) and not in a taper week two.
+       */
+      const testDay = ss.some((s) => s.name === 'Test: Lower');
+      const adjacency = hardRunTheDayBefore && !testDay;
       const saysReduced = spoken.some((t) => t.includes('drop in working 1RM'));
       if (adjacency && !saysReduced) {
         fails.push(`week ${wk}: hard RUN on ${before}, ME Lower on ${meWeekday}, and the block never `

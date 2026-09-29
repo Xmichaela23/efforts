@@ -244,8 +244,15 @@ Deno.test('the athlete\'s own day gets the nearest free day, not whatever the ro
     taperWeeks: [],
   })[1];
   const long = wk.sessions.find((s) => isEndurance(s) && /long/i.test(s.name))!;
-  // ⚠️ NEAREST, FORWARD FIRST — Thursday is one day out and unblocked, so nothing may outbid it.
-  assertEquals(long.day, 'Thursday', 'the athlete\'s own session did not get the nearest free day');
+  /**
+   * ⚠️ NEAREST DAY WITH ROOM THAT HOLDS NO OTHER KEYSTONE, FORWARD FIRST (changed 2026-09-28, plan sweep bug 3; p131).
+   * This used to assert Thursday, the nearest day. Thursday already has two sessions (DE: Upper and its easy run), so
+   * the long session made it a three-session day; Tuesday (one back) is the heavy leg day, and p131 counts that as a
+   * keystone too; Monday carries the hard run. Friday (two out, DE: Lower only) is the nearest day with room and nothing
+   * hard or long on it. The session is still the athlete's, placed before any other moved session.
+   */
+  assertEquals(long.day, 'Friday', 'the athlete\'s own session did not get the nearest day with room');
+  assertEquals(wk.sessions.filter((s) => s.day === 'Thursday' && !(s.tags ?? []).includes('plyo')).length, 2);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
