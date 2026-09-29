@@ -40,7 +40,7 @@ import type { EnduranceBaselines } from '../endurance-library/index.ts';
 import { FRAMES, isJoinedSlot, planCeilingFor, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
-import { composeWeek, frameRotatedArchetype } from './compose.ts';
+import { composeWeek } from './compose.ts';
 import { defaultCompetitionLifts } from './frame-resolver.ts';
 import { sessionLengthRangeLabel } from '../../../../src/lib/standing-plan-week-copy.ts';
 import { fill, JOINED_ROW, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
@@ -268,6 +268,25 @@ export function enduranceIntakeReadout(args: {
       }
       return fam.label ?? '';
     };
+    /**
+     * ⛔ THE SHAPE A SLOT BUILDS IN THE SAMPLE WEEK (week two), read off the composed week by its `slot:` tag. Composed
+     * once, on the first row that asks. ⚠️ The frame's printed sports and the athlete's experience answer — the two
+     * inputs this screen holds that move a hard slot's shapes. A week that cannot compose names nothing.
+     */
+    let sampleWeek: Array<{ tags?: string[] }> | null = null;
+    const sampleWeekArchetype = (frameKey: string): string | null => {
+      if (sampleWeek == null) {
+        try {
+          sampleWeek = (composeWeek({
+            frame, week: 2, column: 'standard', competitionLifts: defaultCompetitionLifts(),
+            seed1RMs: { bench: 135, squat: 185, deadlift: 225, overheadPress: 95 }, equipment: null, roundTo: 5,
+            baselines: baselines as never, enduranceExperience: args.experience ?? null,
+          } as never).sessions ?? []) as Array<{ tags?: string[] }>;
+        } catch { sampleWeek = []; }
+      }
+      const s = sampleWeek.find((x) => (x.tags ?? []).includes(`slot:${frameKey}`));
+      return s?.tags?.find((t) => t.startsWith('archetype:'))?.slice('archetype:'.length) ?? null;
+    };
     const seen: Record<string, number> = { hard: 0, easy: 0, long: 0 };
     const rows = frameSlots(frame).map((row) => {
       seen[row.role] += 1;
@@ -283,9 +302,10 @@ export function enduranceIntakeReadout(args: {
           const next = joinedPartOf(frame, row.frameKey);
           if (!next) return sessionName(row.family, row.archetype ?? null);
           // ⛔ AND ITS FIRST PART IS THE SAMPLE WEEK'S OWN SESSION where the frame rotates it (Your week shows week two;
-          // Michael, 2026-09-24: "use that week's sprint name").
-          const own = sessionName(row.family,
-            frameRotatedArchetype({ archetypes: row.archetypes }, { family: row.family }, row.level, 2) ?? row.archetype ?? null);
+          // Michael, 2026-09-24: "use that week's sprint name"). ⛔ READ OFF THE COMPOSED WEEK TWO (2026-09-29): the hard
+          // slots' shapes are chosen together for the whole block (`hard-rotation.ts`), so no week-number formula here
+          // can name what week two builds.
+          const own = sessionName(row.family, sampleWeekArchetype(row.frameKey) ?? row.archetype ?? null);
           const second = next.family === 'run_vt1' ? RUNS_COPY.joined_easy : sessionName(next.family, next.archetype ?? null);
           return fill(JOINED_ROW, { first: own, second });
         })(),

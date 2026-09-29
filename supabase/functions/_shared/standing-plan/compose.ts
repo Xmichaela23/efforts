@@ -119,85 +119,76 @@ import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 
 /**
- * ⛔⛔ THE DEFAULT ROTATION — the family's offered archetypes at this level, alternated by week.
- * **HIS, not ours** (relabelled 2026-08-27 off p229): *"I encourage you to try each type of workout
- * in each segment; some may be subjectively 'easier' than others, and each one has a slightly
- * different intent/emphasis. When in doubt, alternate between the one you like the most and hate the
- * most."*
+ * ⛔⛔ WHAT A SLOT BUILDS BEFORE THE WEEK IS CHOSEN — ONE SHAPE, OR THE SHAPES IT ROTATES THROUGH.
+ * One owner, read by the bounds spec, the built session and the held cycle (`holdRotation`), so the
+ * three can never describe different lists.
  *
- * ⚠️ WHAT IS OURS IS THE ORDER. He alternates between the one the athlete likes most and hates most;
- * this alternates by week number, because that preference cannot be answered before they have done
- * both and the wizard does not ask it. ⚠️ An explicit pick still wins — see the call site.
+ * ⛔ THE ORDER OF PRECEDENCE, unchanged from the two functions this replaced (2026-09-29):
+ *
+ *   1. ⛔⛔ THE FRAME'S OWN LIST — the shapes a SLOT names (2026-09-08). p247 asks the Run + Strength
+ *      Wednesday for 5- to 8-minute work intervals, which selects three of p234's level-3 lines; the
+ *      All Rounder's day 3 is the same family under no such rule. See `EnduranceSlot.archetypes`.
+ *      ⚠️ A SUBSTITUTED SLOT TAKES NONE OF IT — these are run sessions; a slot ridden instead resolves
+ *      inside its own family.
+ *      ⛔ FILTERED TO THE **RESOLVED** LEVEL, which is not always the frame's: the low-volume tier drops
+ *      a slot to level 1 (`levelForFamily`), and asking the library for a level-3 line at level 1
+ *      THROWS. When the athlete's level moves off the row the list no longer applies and the rules
+ *      below take over. ⚠️ THE LIBRARY IS ASKED (`archetypesForVenue`), never a literal.
+ *      ⛔ AND FILTERED TO WHERE THE ROW WILL BE RIDDEN (2026-09-24, SPEC-outdoor-rides §3C). A named
+ *      list the road empties falls through to the family's road rotation rather than throwing.
+ *   2. AN EXPLICIT SHAPE (`assigned.archetype`) — the athlete's own pick, or the frame's pin.
+ *   3. ⛔⛔ A PICKED LENGTH BUILDS THE SESSION THE CHIPS WERE MEASURED ON, EVERY WEEK (2026-09-20). The All
+ *      Rounder's day-4 ride takes a length chip, and `slotLengthOptions` measures the chips on the
+ *      family's FIRST shape (the steady ride); the build used to rotate `steady` / `mixed` by week and
+ *      p239's level-1 mixed ride is PRINTED at 85 min, so every even week built 85 whatever was picked.
+ *      An easy or long row whose length the athlete picked builds the shape that length was offered on.
+ *      ⚠️ OURS — which of p239's two rides a week builds is ours either way. ⚠️ Hard rows never take it.
+ *   4. ⛔⛔ THE FAMILY'S OFFERED SHAPES AT THIS LEVEL. **HIS, not ours** (p229): *"I encourage you to try
+ *      each type of workout in each segment … When in doubt, alternate between the one you like the
+ *      most and hate the most."* ⛔ ONE SHAPE ROTATES AS ITSELF — VO2 has one road shape (p238's long
+ *      repeats), returned by name so the library's list order can never decide it. ⚠️ A family the
+ *      library does not know returns nothing.
+ *
+ * ⛔ EVERY BRANCH WALKS THE SHAPES THE ROW'S VENUE ALLOWS (2026-09-24, SPEC-outdoor-rides §3A): the
+ * road's shapes unless the athlete put this slot on the trainer (`slotVenue`).
  */
-/**
- * ⛔⛔ THE FRAME'S OWN ROTATION — the shapes a SLOT names, walked by week (2026-09-08).
- *
- * ⛔ IT IS A DIFFERENT QUESTION FROM `rotatedArchetype` BELOW, and the difference is whose rule it
- * is. That one asks *"what does this FAMILY offer at this level"* and is the same answer for every
- * programme. This one asks *"which shapes did THIS PROGRAMME name for this slot"* — p247 asks the
- * Run + Strength Wednesday for 5- to 8-minute work intervals, which selects three of p234's
- * level-3 lines, and the All Rounder's day 3 is the same family under no such rule. See
- * `EnduranceSlot.archetypes`.
- *
- * ⛔⛔ IT IS CALLED IN BOTH PLACES OR IT IS WORSE THAN USELESS — the bounds spec and the built
- * session. The comment on `enduranceSpecs` records what happened the last time one of the two was
- * left to a default: the floor described a session the athlete never got. Deterministic in the week
- * number, so two calls give one answer.
- * ⚠️ A SUBSTITUTED SLOT TAKES NONE OF IT. These are run sessions; a slot ridden instead resolves
- * inside its own family, exactly as it did before this existed.
- *
- * ⛔⛔ AND IT IS FILTERED TO THE **RESOLVED** LEVEL, WHICH IS NOT ALWAYS THE FRAME'S — found by the
- * hours sweep before it shipped. The low-volume tier drops this slot to level 1 for an athlete
- * running very little (`levelForFamily`), and p234's three qualifying sessions are level-3 lines:
- * asking the library for one of them at level 1 THROWS, and the whole week fails to build. The
- * frame names shapes for the slot as the PAGE writes it; when the athlete's own level moves off
- * that row, the list no longer applies and the ordinary rules take over.
- * ⚠️ THE LIBRARY IS ASKED, never a literal — `archetypesFor` owns which shapes a level offers, and
- * a second copy of that answer here is the D-457 disease with a new face.
- *
- * ⛔ AND FILTERED TO WHERE THE ROW WILL BE RIDDEN (2026-09-24, SPEC-outdoor-rides §3C) — the same
- * `archetypesForVenue` the rotation below asks. A named list the road empties falls through to the
- * family's road rotation, the level-mismatch lesson above applied once more, rather than throwing.
- */
-export function frameRotatedArchetype(
-  slot: { archetypes?: string[] },
-  assigned: { substituted?: boolean; family: string },
+type SlotRotation = { fixed: string | undefined } | { rotates: string[] };
+
+function slotRotation(
+  slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
+  assigned: { substituted?: boolean; family: string; archetype?: string },
   level: number,
-  week: number,
-  venue: RideVenue = 'road',
-): string | undefined {
+  lengthPicked: boolean,
+  venue: RideVenue,
+): SlotRotation {
   const list = slot.archetypes;
-  if (assigned.substituted || !Array.isArray(list) || list.length === 0) return undefined;
-  const offered = new Set(archetypesForVenue(assigned.family as never, level as never, venue).map((a) => a.id));
-  const usable = list.filter((id) => offered.has(id));
-  if (usable.length === 0) return undefined;
-  return usable[(Math.max(1, week) - 1) % usable.length];
+  if (!assigned.substituted && Array.isArray(list) && list.length > 0) {
+    const offered = new Set(archetypesForVenue(assigned.family as never, level as never, venue).map((a) => a.id));
+    const usable = list.filter((id) => offered.has(id));
+    if (usable.length > 0) return { rotates: usable };
+  }
+  if (assigned.archetype) return { fixed: assigned.archetype };
+  if (lengthPicked && !isHardSlot(slot)) {
+    const first = archetypesForVenue(assigned.family as never, level as never, venue)[0]?.id;
+    if (first) return { fixed: first };
+  }
+  if (!(FAMILIES as Record<string, unknown>)[assigned.family]) return { fixed: undefined };
+  const offered = archetypesForVenue(assigned.family as never, level as never, venue);
+  if (offered.length === 0) return { fixed: undefined };
+  return { rotates: offered.map((a) => a.id) };
 }
 
 /** Where a row will be ridden: the road unless the athlete put that slot on the trainer. See `ComposeArgs.trainerSlotsByWeek`. */
 export type RideVenue = 'road' | 'trainer';
 
 /**
- * ⛔⛔ A PICKED LENGTH BUILDS THE SESSION THE CHIPS WERE MEASURED ON, EVERY WEEK (2026-09-20, found
- * by `builder-answers-sweep.test.ts`).
+ * ⛔ THE SHAPE THIS SLOT BUILDS THIS WEEK. ⚠️ READ AT BOTH SITES (the bounds spec and the build), with the
+ * same arguments, so the measured session is the built one.
  *
- * ⛔ THE DEFECT, BUILT AND READ OVER TWELVE WEEKS. The All Rounder's day-4 ride (p274 "Cyc endurance
- * (level 1)") takes a length chip — 60, 75, 90 or 100 min — and `slotLengthOptions` measures those
- * chips on the conversion's pin, the frame's pin, or with neither the family's FIRST shape (the
- * steady ride). The build then rotated `steady` / `mixed` by week, and p239's level-1 mixed ride is
- * PRINTED at 85 min (20 + 20 + 45): every even week built 85 whatever was picked, and nothing said so.
- *
- * ⛔ THE RULE. An easy or long row whose length the athlete picked builds the shape that length was
- * offered on. p239 offers both rides at each level and says to do the more intense ones "sparingly
- * unless an event is coming", so the steady ride every week is the page's own option.
- * ⚠️ OURS — which of the page's two rides a week builds is ours either way (the weekly rotation is
- * ours too); this only stops the rotation overriding an answer the athlete gave.
- * ⚠️ NO PICK, NO CHANGE. A row with no length answer rotates exactly as it did, so Ride + Strength
- * and every hard row are untouched. ⚠️ READ AT BOTH SITES, like the two resolvers below it.
- *
- * ⛔ AND EVERY BRANCH WALKS THE SHAPES THE ROW'S VENUE ALLOWS (2026-09-24, SPEC-outdoor-rides §3A):
- * the road's shapes unless the athlete put this slot on the trainer (`slotVenue`). An explicit pick
- * (`assigned.archetype` — the athlete's own, or the frame's pin) still wins, as it always did.
+ * ⛔⛔ A ROTATING HARD SLOT TAKES THE HELD CYCLE'S SHAPE (2026-09-29) — `held`, from `holdRotation`: p112's
+ * rotation with p148's under-10% weekly change. Only a shape on the slot's own list is taken. Anything
+ * else — an easy row, the taper column, a slot the cycle was not asked about — walks its list by week
+ * number, as every slot did before.
  */
 function archetypeForSlot(
   slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
@@ -206,37 +197,24 @@ function archetypeForSlot(
   week: number,
   lengthPicked: boolean,
   venue: RideVenue,
+  held?: string,
 ): string | undefined {
-  const pinned = frameRotatedArchetype(slot, assigned, level, week, venue) ?? assigned.archetype;
-  if (pinned) return pinned;
-  if (lengthPicked && !isHardSlot(slot)) {
-    const first = archetypesForVenue(assigned.family as never, level as never, venue)[0]?.id;
-    if (first) return first;
-  }
-  return rotatedArchetype(assigned.family, level, week, venue);
+  const r = slotRotation(slot, assigned, level, lengthPicked, venue);
+  if ('fixed' in r) return r.fixed;
+  if (held && r.rotates.includes(held)) return held;
+  return r.rotates[(Math.max(1, week) - 1) % r.rotates.length];
 }
+
+/** One session's minutes and buckets as the held cycle measures them — see `heldShapes` in `composeWeek`. */
+const HOLD_MEASURE_CACHE = new Map<string, { minutes: number; sub: number; near: number; over: number }>();
 
 /** The venue of one frame slot this week — see `ComposeArgs.trainerSlotsByWeek`. */
 function slotVenue(args: Pick<ComposeArgs, 'trainerSlotsByWeek' | 'week'>, key: string): RideVenue {
   return (args.trainerSlotsByWeek?.[args.week] ?? []).includes(key) ? 'trainer' : 'road';
 }
-
-/**
- * ⛔ THE ROAD'S SHAPES UNLESS THE ROW IS ON THE TRAINER (2026-09-24, SPEC-outdoor-rides §3A) — the
- * library's own filter (`archetypesForVenue`), never a level test or a road list written out here.
- * ⛔ ONE SHAPE ROTATES AS ITSELF. VO2 has one road shape (p238's long repeats), and `undefined` here
- * would hand `buildEnduranceSession` its default — the family's FIRST shape, which is the same shape
- * today only by the order of the list. The single shape is returned by name so that order can never
- * decide it. ⚠️ A family the library does not know still returns nothing.
- */
-function rotatedArchetype(family: string, level: number, week: number, venue: RideVenue = 'road'): string | undefined {
-  if (!(FAMILIES as Record<string, unknown>)[family]) return undefined;
-  const offered = archetypesForVenue(family as never, level as never, venue);
-  if (offered.length === 0) return undefined;
-  return offered[(Math.max(1, week) - 1) % offered.length].id;
-}
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
+import { heldRowFor, holdRotation, type HoldSlot, type HoldVector } from './hard-rotation.ts';
 import { archetypesFor, archetypesForVenue } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
@@ -3322,6 +3300,99 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     (args.levelOverrides?.[family] as Level | undefined) ?? (tierLevels[family] as Level | undefined) ?? frameLevel;
 
   /**
+   * ⛔⛔ THE HARD SLOTS' SHAPES FOR THIS WEEK, CHOSEN TOGETHER (2026-09-29) — see `holdRotation`. p112 rotates
+   * the work and holds the load; p148 changes each weekly number by less than 10%. Walking each slot's list by
+   * week number on its own swung the week's hard minutes 20-45% week to week on every plan.
+   * ⚠️ STANDARD COLUMN ONLY. The taper column is its own prescription, and the test week and a deload week are
+   * not the weeks p148's line runs between; they keep the by-week walk.
+   * ⚠️ MEASURED THE WAY THE BUILD BUILDS each candidate: the same family, level, shape and joined-half trimming,
+   * at the default size — a hard slot's dose is a single rung and the hours never pull on it (`rungForSlot`) —
+   * on the road's shapes (`heldShapeFor`), so the cycle is one answer whichever weeks a slot spends on the trainer.
+   * ⚠️ A SLOT THAT DOES NOT ROTATE (a pick, a pin, a substituted ride) is measured once and held as the base.
+   * ⚠️ EASY AND LONG SESSIONS ENTER ONLY AS THE SUB-VT1 BUCKET'S BASE — they do not rotate with the hard slots,
+   * but a hard session's warm-up is sub-VT1 minutes too, and the bucket's 10% is 10% of the whole week's. They are
+   * measured at their own level and the default size, or at the athlete's picked length, on their week-one shape.
+   * ⚠️ OURS — that base is an estimate for the hours-target case, where the solve sizes the easy sessions around
+   * the hard ones; it is a denominator for the line and nothing is built from it. Week-one so it is the same answer
+   * in every week, or the weeks would not agree on one cycle.
+   */
+  const lengthPickedFor = (key: string) => Number.isFinite(Number(args.sportMix?.minutes?.[key] ?? NaN));
+  const heldShapes: Record<string, string> = (() => {
+    if (args.column !== 'standard') return {};
+    const rotating: HoldSlot[] = [];
+    const base: HoldVector = { minutes: 0, sub: 0, near: 0, over: 0 };
+    const held: Record<string, string[]> = {};
+    const fixedHardBySport: Record<string, number> = {};
+    const anchorsKey = JSON.stringify(anchors);
+    const measure = (family: string, level: Level, archetype: string | undefined, omit: { cooldown: boolean; warmup: boolean } | null): HoldVector => {
+      // ⚠️ Remembered per session asked for — every week of a block asks the same few, and the build is pure.
+      const memo = `${anchorsKey}|${family}|${level}|${archetype ?? ''}|${omit ? `${omit.cooldown}${omit.warmup}` : ''}`;
+      const hit = HOLD_MEASURE_CACHE.get(memo);
+      if (hit) return hit;
+      const s = buildEnduranceSession({ family: family as never, level, archetype, anchors, size: DEFAULT_SIZE, ...(omit ? { omit } : {}) });
+      const led = enduranceLedgerFor([s]);
+      const v = {
+        minutes: Math.max(1, Math.round(s.totals.clockedSeconds / 60)),
+        sub: led.subVt1Minutes,
+        near: led.nearThresholdMinutes,
+        over: led.overThresholdMinutes + led.overVt2Minutes,
+      };
+      if (HOLD_MEASURE_CACHE.size > 2048) HOLD_MEASURE_CACHE.clear();
+      HOLD_MEASURE_CACHE.set(memo, v);
+      return v;
+    };
+    try {
+      for (const d of days) {
+        d.endurance.forEach((slot, i) => {
+          const key = `${d.day}:${i}`;
+          if (droppedSlots.has(key)) return;
+          const a = assignedSlot(sportAssignment, d.day, i, slot);
+          const level = levelForFamily(a.family, a.level);
+          const joinsNext = isJoinedSlot(d.endurance[i + 1]) && !droppedSlots.has(`${d.day}:${i + 1}`);
+          const joinedPart = isJoinedSlot(slot) && i > 0 && !droppedSlots.has(`${d.day}:${i - 1}`);
+          const omit = joinsNext || joinedPart ? { cooldown: joinsNext, warmup: joinedPart } : null;
+          if (!isHardSlot(slot)) {
+            // The sub-VT1 base only — see above. A picked length is the session's own number.
+            const picked = Number(args.sportMix?.minutes?.[key]);
+            base.sub += Number.isFinite(picked) && picked > 0
+              ? picked
+              : measure(a.family, level, archetypeForSlot(slot, a, level, 1, false, 'road'), omit).sub;
+            return;
+          }
+          const r = slotRotation(slot, a, level, lengthPickedFor(key), 'road');
+          if ('fixed' in r) {
+            const v = measure(a.family, level, r.fixed, omit);
+            base.minutes += v.minutes; base.sub += v.sub; base.near += v.near; base.over += v.over;
+            fixedHardBySport[a.sport] = (fixedHardBySport[a.sport] ?? 0) + v.minutes;
+            if (r.fixed) (held[a.family] ??= []).push(r.fixed);
+            return;
+          }
+          rotating.push({
+            key, family: a.family, sport: a.sport,
+            candidates: r.rotates.map((id) => ({ id, ...measure(a.family, level, id, omit) })),
+          });
+        });
+      }
+    } catch {
+      // ⚠️ A shape the library will not build fails the week at the build below, with its own message; the
+      // cycle does not get to fail it first.
+      return {};
+    }
+    // ⛔ A sport with an hours ask holds its own hard minutes too — see `HoldPerSport`. Whether, never how much.
+    const perSport: Record<string, number> = {};
+    if (Number(args.targetRunHours) > 0) perSport.run = fixedHardBySport.run ?? 0;
+    if (Number(args.targetRideHours ?? args.targetWeeklyRideHours) > 0) perSport.ride = fixedHardBySport.ride ?? 0;
+    return heldRowFor(holdRotation(rotating, base, held, perSport), args.week);
+  })();
+  /**
+   * ⛔ THE CYCLE IS THE ROAD'S (SPEC-outdoor-rides §3A: the road unless the athlete put that slot on the trainer).
+   * A slot the athlete moved onto the trainer for a week walks the trainer's shapes by week number, as it always
+   * did, and every other slot keeps the road cycle — so a trainer week changes that one ride and nothing else.
+   */
+  const heldShapeFor = (key: string): string | undefined =>
+    slotVenue(args, key) === 'road' ? heldShapes[key] : undefined;
+
+  /**
    * ⛔ HOW MANY MORE SESSIONS OF A SPORT THE ATHLETE'S OWN DAY COUNT ASKS FOR — see
    * `enduranceDaysBySport`. ⚠️ ONE OWNER, read twice: once when the specs are built (so the hours
    * solve sees every session) and once when they are placed (so the same number of days is actually
@@ -3355,7 +3426,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * not left to the library's default in one of them.
          */
         /**
-         * ⛔ AND THE FRAME'S OWN ROTATION OUTRANKS BOTH (2026-09-08) — see `frameRotatedArchetype`.
+         * ⛔ AND THE FRAME'S OWN ROTATION OUTRANKS BOTH (2026-09-08) — see `slotRotation`.
          * A slot whose programme names its shapes is measured on the shape THIS week builds, or the
          * bounds would describe one of the three and the athlete would run another.
          */
@@ -3366,8 +3437,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // ⛔ The road's shapes unless this slot is on the trainer — see `slotVenue`.
           archetype: archetypeForSlot(
             slot, a, levelForFamily(a.family, a.level), args.week,
-            Number.isFinite(Number(args.sportMix?.minutes?.[`${d.day}:${i}`] ?? NaN)),
+            lengthPickedFor(`${d.day}:${i}`),
             slotVenue(args, `${d.day}:${i}`),
+            // ⛔ The held cycle's shape for a rotating hard slot — see `heldShapes`. Same answer as the build below.
+            heldShapeFor(`${d.day}:${i}`),
           ),
           sport: a.sport,
           // ⛔ THE FRAME'S ROLE, so the easy ride and the long ride get their own ceilings (`ladderCeilingFor`).
@@ -3841,7 +3914,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * ⛔⛔ ONE ARCHETYPE, RESOLVED ONCE, READ BY BOTH THE LADDER AND THE BUILD (2026-08-30).
        *
        * `rungForSlot` was handed `assigned.archetype` — often `undefined`, because the frame names no
-       * shape on most slots — while `buildEnduranceSession` below fell back to `rotatedArchetype`.
+       * shape on most slots — while `buildEnduranceSession` below fell back to the family rotation.
        * **Two different sessions measured and built.** It was invisible while the ladder only had to
        * be roughly right for a dial position; a minutes pick is resolved INSIDE that ladder, so the
        * length the athlete chose would have been mapped through one session's rungs and delivered as
@@ -3862,8 +3935,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       // ⛔ The road's shapes unless this slot is on the trainer — see `slotVenue`. Same key as the specs above.
       const slotArchetype = archetypeForSlot(
         slot, assigned, levelForFamily(assigned.family, assigned.level), args.week,
-        Number.isFinite(Number(args.sportMix?.minutes?.[`${day.day}:${i}`] ?? NaN)),
+        lengthPickedFor(`${day.day}:${i}`),
         slotVenue(args, `${day.day}:${i}`),
+        // ⛔ The held cycle's shape for a rotating hard slot — see `heldShapes`.
+        heldShapeFor(`${day.day}:${i}`),
       );
       /**
        * ⛔ THE ATHLETE'S OWN LENGTH FOR THIS SESSION, WHERE A SCREEN ASKED — see `SportMix.minutes`.

@@ -60,7 +60,7 @@ Deno.test('a pinned Sunday long run is honoured, not told about', () => {
   assertEquals(map.compromises.length, 0, 'a honoured pin still reported a cost');
 
   const wk = composeBlock({ ...COMPOSE, dayOffset: map.order, weeks: 2, taperWeeks: [] })[1];
-  const long = wk.sessions.find((s) => s.type === 'run' && /long/i.test(s.name + s.steps_preset?.join(' ')))!;
+  const long = wk.sessions.find((s) => s.type === 'run' && (s.tags ?? []).includes('long_run'))!;
   assertEquals(long.day, 'Sunday');
 
   /**
@@ -71,7 +71,7 @@ Deno.test('a pinned Sunday long run is honoured, not told about', () => {
    */
   const row = buildStandingPlanRow({ compose: COMPOSE, weeks: 2, taperWeeks: [], dayMap: map });
   const rowLong = (row.sessions_by_week['2'] ?? [])
-    .find((s) => s.type === 'run' && /long/i.test(s.name + (s.steps_preset ?? []).join(' ')))!;
+    .find((s) => s.type === 'run' && (s.tags ?? []).includes('long_run'))!;
   assert(rowLong, 'the built block has no long run at all');
   assertEquals(rowLong.day, 'Sunday', 'the rotation did not reach the plan row');
 });

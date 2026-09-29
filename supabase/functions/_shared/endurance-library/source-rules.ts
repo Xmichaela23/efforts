@@ -920,7 +920,7 @@ export const FAMILIES: Record<FamilyId, {
          * why one archetype could not carry both. A longer surge just above threshold with a
          * near-threshold float under it, and a third step at threshold before the recovery.
          * ⚠️ NEW ID, so nothing stored resolves to it by accident; it enters the rotation as a fourth
-         * shape the engine may choose, which is `rotatedArchetype`'s own job.
+         * shape the engine may choose, which is `slotRotation`'s own job (compose.ts).
          */
         id: 'long_surge_float',
         shape: 'intervals',

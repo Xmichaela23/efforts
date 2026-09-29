@@ -236,7 +236,7 @@ export type EnduranceSlot = {
    *
    * ⛔ AND THE ROTATION IS p112: hold the load and vary *"across slightly different set durations
    * and intensities"* session to session. `composeWeek` walks this list by week, the same rule
-   * `rotatedArchetype` applies to a slot the frame leaves open — which is what day 1 does.
+   * `slotRotation` (compose.ts) applies to a slot the frame leaves open — which is what day 1 does. The shapes of every rotating hard slot are chosen together week by week (`hard-rotation.ts`, p148).
    *
    * ⚠️ IT REPLACES `archetype`, NEVER JOINS IT. A slot states one shape or a rotation, and carrying
    * both would leave two answers to one question. ⚠️ A sport substitution drops it: these are run

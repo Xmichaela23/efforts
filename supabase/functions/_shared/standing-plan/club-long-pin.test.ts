@@ -48,9 +48,11 @@ const BASE: Omit<ComposeArgs, 'week' | 'column'> = {
 const week = (extra: Partial<ComposeArgs> = {}) =>
   composeWeek({ ...BASE, week: 2, column: 'standard', ...extra });
 
-const LONG = /Long/i;
+// ⚠️ BY THE LONG SLOT'S OWN TAG (`long_run` / `long_ride`, compose.ts), not by "Long" in the name: the hard rotation
+// builds workouts named "Long Surge and Float" or "Long VO2 Repeats", and those are not the long session.
 const longSessions = (w: ReturnType<typeof composeWeek>) =>
-  w.sessions.filter((s) => s.type != null && s.type !== 'strength' && LONG.test(s.name));
+  w.sessions.filter((s) => s.type != null && s.type !== 'strength'
+    && (s.tags ?? []).some((t) => t === 'long_run' || t === 'long_ride'));
 
 Deno.test('⛔ A CLUB LONG RIDE IS A PIN — its day holds under every rotation', () => {
   // ⚠️ THE CLUB DAY REACHES THE COMPOSER AS AN ORDINARY LONG PIN, and that is the design: ownership

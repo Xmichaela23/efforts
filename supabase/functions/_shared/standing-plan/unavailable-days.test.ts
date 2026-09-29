@@ -62,6 +62,9 @@ const daysWith = (sessions: PlanSession[], pred: (s: PlanSession) => boolean): s
   [...new Set(sessions.filter(pred).map((s) => s.day))];
 
 const isEndurance = (s: PlanSession) => s.type === 'run' || s.type === 'ride' || s.type === 'swim';
+// ⚠️ The long slot by its own tag (`long_run` / `long_ride`), not by "Long" in a name: the hard rotation (hard-rotation.ts)
+// builds "Long Surge and Float" and "Long VO2 Repeats", which are not the long session.
+const isLongRow = (s: { tags?: string[] }) => (s.tags ?? []).some((t) => t === 'long_run' || t === 'long_ride');
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // 1 — THE ROTATION HONOURS THE DAY OFF
@@ -197,7 +200,7 @@ Deno.test('⛔⛔ A BLOCKED DAY BEATS A TAPPED DAY — the pinned session is mov
     weeks: 2,
     taperWeeks: [],
   })[1];
-  const long = wk.sessions.find((s) => isEndurance(s) && /long/i.test(s.name));
+  const long = wk.sessions.find((s) => isEndurance(s) && isLongRow(s));
   assert(long, 'the week has no long session at all');
   assert(long!.day !== 'Friday', 'the tapped session stayed on the day the athlete blocked');
 
@@ -220,7 +223,7 @@ Deno.test('a tapped day the athlete did NOT block is as absolute as it ever was'
     weeks: 2,
     taperWeeks: [],
   })[1];
-  const long = wk.sessions.find((s) => isEndurance(s) && /long/i.test(s.name));
+  const long = wk.sessions.find((s) => isEndurance(s) && isLongRow(s));
   assertEquals(long!.day, 'Friday', 'an unblocked pin moved');
   assertEquals(
     wk.notes.filter((n) => /is a day off/.test(n.text)).length,
@@ -243,7 +246,7 @@ Deno.test('the athlete\'s own day gets the nearest free day, not whatever the ro
     weeks: 2,
     taperWeeks: [],
   })[1];
-  const long = wk.sessions.find((s) => isEndurance(s) && /long/i.test(s.name))!;
+  const long = wk.sessions.find((s) => isEndurance(s) && isLongRow(s))!;
   /**
    * ⚠️ NEAREST DAY WITH ROOM THAT HOLDS NO OTHER KEYSTONE, FORWARD FIRST (changed 2026-09-28, plan sweep bug 3; p131).
    * This used to assert Thursday, the nearest day. Thursday already has two sessions (DE: Upper and its easy run), so
@@ -301,7 +304,7 @@ Deno.test('⛔⛔ the 2026-08-25 device case: the Friday off wins, and the long 
     `Friday carried sessions: ${wk.filter((s) => s.day === 'Friday').map((x) => x.name).join(', ')}`,
   );
   // ⛔ AND THE ATHLETE'S SATURDAY SURVIVED IT — the pin was not traded away, only the rotation was.
-  const long = wk.find((s) => isEndurance(s) && /long/i.test(s.name));
+  const long = wk.find((s) => isEndurance(s) && isLongRow(s));
   assert(long, 'the week has no long session at all');
   assertEquals(long!.day, 'Saturday', 'the long ride lost its day to the rotation change');
 });
@@ -342,10 +345,11 @@ Deno.test('⛔⛔ THE THREE-CLUB WEEK (Michael\'s device test, 2026-08-25 evenin
   assert(wk.length > 0, 'the tightest week refused to build');
 
   // 1 ── ALL THREE CLUBS ON THEIR OWN DAYS. The world set these; nothing may move them.
-  const long = wk.find((s) => isEndurance(s) && /long/i.test(s.name));
+  const long = wk.find((s) => isEndurance(s) && isLongRow(s));
   assert(long, 'the week has no long session');
   assertEquals(long!.day, 'Saturday', 'the club long ride lost its day');
-  const hard = wk.filter((s) => isEndurance(s) && /interval|threshold|hill|vo2|repeat|hard|mlss|nt/i.test(s.name));
+  // ⚠️ By the session's own band tag, not its name: the hard rotation builds names like "Long Surge and Float".
+  const hard = wk.filter((s) => isEndurance(s) && (s.tags ?? []).some((t) => t === 'band:above' || t === 'band:near' || t === 'band:below'));
   const hardDays = [...new Set(hard.map((s) => s.day))];
   assert(hardDays.includes('Tuesday'), `no hard session on the Tuesday club day: ${hardDays.join(', ')}`);
   assert(hardDays.includes('Thursday'), `no hard session on the Thursday club day: ${hardDays.join(', ')}`);
@@ -435,7 +439,7 @@ Deno.test('⛔ a relocated session takes a training day even when a CLEAR day is
   const wk = composeBlock({
     ...COMPOSE, dayOffset: 0, unavailableDays: ['saturday'], weeks: 2, taperWeeks: [],
   })[1];
-  const long = wk.sessions.find((s) => isEndurance(s) && /long/i.test(s.name));
+  const long = wk.sessions.find((s) => isEndurance(s) && isLongRow(s));
   assert(long, 'the week has no long session at all');
   assertEquals(
     long!.day,

@@ -170,19 +170,24 @@ Deno.test('⛔ p238 VO2 and p236 sprints at level 1 build the page and reach the
 });
 
 Deno.test('⛔ the Day 2 easy ride is an optional switch — off, it leaves out that ride and nothing else, in both columns', () => {
-  // ⚠️ The hard rides' names are the ROAD rotation's for weeks 2 and 3 (2026-09-24, SPEC-outdoor-rides §3A): sweet
-  // spot walks medium / long / tempo, VO2 is p238's long repeats every week; the trainer shapes need a `venue:trainer`
-  // slot (`outdoor-rides.test.ts`). This test is about the switch, not the rotation.
+  // ⚠️ This test is about the switch, not the rotation. The standard week's hard-ride NAMES are the held cycle's
+  // (2026-09-29, `hard-rotation.ts`; road shapes, SPEC-outdoor-rides §3A — `outdoor-rides.test.ts` pins those), so the
+  // standard column pins the days and the kinds of ride; the taper column keeps its names.
   const expectAll = {
-    standard: ['Monday|Long Sweet Spot Repeats', 'Tuesday|Ride', 'Wednesday|Long VO2 Repeats', 'Wednesday|Long Sweet Spot Repeats', 'Friday|Sprint Ride', 'Friday|Ride', 'Saturday|Ride'],
+    standard: ['Monday|sweet', 'Tuesday|Ride', 'Wednesday|Long VO2 Repeats', 'Wednesday|sweet', 'Friday|Sprint Ride', 'Friday|Ride', 'Saturday|Ride'],
     taper: ['Monday|Tempo Blocks', 'Tuesday|Ride', 'Wednesday|Long VO2 Repeats', 'Friday|Sprint Ride', 'Saturday|Ride'],
   };
   for (const [week, column] of [[2, 'standard'], [3, 'taper']] as const) {
     const all = composeWeek(baseArgs(week, column) as never);
     const off = composeWeek({ ...baseArgs(week, column), sportMix: { slotsOff: ['2:0'] } } as never);
-    const rides = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type === 'ride').map((s) => `${s.day}|${s.name}`);
+    const named = (s: { day?: string; name?: string; tags?: string[] }) => column === 'standard' && (s.tags ?? []).includes('family:ride_sweet_spot')
+      ? `${s.day}|sweet` : `${s.day}|${s.name}`;
+    const rides = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type === 'ride').map(named);
     assertEquals(rides(all).sort(), [...expectAll[column]].sort(), `${column}: all rides`);
     assertEquals(rides(off).sort(), expectAll[column].filter((r) => r !== 'Tuesday|Ride').sort(), `${column}: Day 2 off`);
+    // The switch moves no other ride's shape.
+    const shapes = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type === 'ride' && s.day !== 'Tuesday').map((s) => `${s.day}|${s.name}`).sort();
+    assertEquals(shapes(off), shapes(all), `${column}: Day 2 off moved another ride`);
     const lifting = (w: ReturnType<typeof composeWeek>) => w.sessions.filter((s) => s.type !== 'ride');
     assertEquals(lifting(off), lifting(all), `week ${week}: the lifting moved`);
     assert(!off.notes.some((n) => /two hard rides|Two rides land on one day/.test(n.text)), `week ${week}: a ride warning`);

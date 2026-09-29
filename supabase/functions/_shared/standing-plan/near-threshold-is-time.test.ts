@@ -241,13 +241,13 @@ Deno.test('⛔⛔ WEDNESDAY ROTATES p234\'S THREE QUALIFYING LEVEL-3 SESSIONS, A
   }
 });
 
-Deno.test('⛔⛔ THE THREE COME ROUND IN ORDER, WEEK AFTER WEEK — p112', () => {
+Deno.test('⛔⛔ THE THREE COME ROUND, A NEW ONE EVERY WEEK — p112', () => {
   /**
    * ⚠️ ASSERTED ON THE COMPOSED WEEK, not on the helper: the rotation has to survive the assigner
    * and the spec builder, and the bounds and the built session must agree on which one it is.
    */
   const seen: string[] = [];
-  for (const week of [2, 3, 4, 5, 6, 7]) {
+  for (let week = 2; week <= 12; week++) {
     const w = composeWeek({
       competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'strength_5k', week,
       column: 'standard', equipment: ['Barbell + plates', 'Dumbbells', 'Flat bench'],
@@ -259,7 +259,8 @@ Deno.test('⛔⛔ THE THREE COME ROUND IN ORDER, WEEK AFTER WEEK — p112', () =
     seen.push(tok);
     assert(wed.duration >= 55 && wed.duration <= 70, `week ${week}: ${wed.duration} min`);
   }
-  // ⛔ THREE DISTINCT SESSIONS, AND THE FOURTH WEEK IS THE FIRST AGAIN.
-  assertEquals(new Set(seen.slice(0, 3)).size, 3, `the rotation repeats inside three weeks: ${seen.join(', ')}`);
-  assertEquals(seen.slice(0, 3), seen.slice(3), 'the rotation does not come round');
+  // ⛔ ALL THREE IN THE STANDARD WEEKS, AND NEVER THE SAME ONE TWO WEEKS RUNNING. ⚠️ The order is the held cycle's
+  // (2026-09-29, `hard-rotation.ts`: the week's hard minutes held under p148's 10%), not a fixed walk of three.
+  assertEquals(new Set(seen).size, 3, `the rotation does not reach all three: ${seen.join(', ')}`);
+  for (let i = 1; i < seen.length; i++) assert(seen[i] !== seen[i - 1], `week ${i + 2} repeats: ${seen.join(', ')}`);
 });
