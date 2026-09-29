@@ -394,7 +394,7 @@ Deno.test('⛔ the words: every line Michael approved, and the rides screen\'s c
   assertEquals(RIDE_GROUPS.find((g) => g.programs.includes('ride_long_strength'))?.title, 'Go longer');
   const r = enduranceIntakeReadout({ frame: 'cycling_long', answers: {}, baselines: { performance_numbers: { ftp: 250 } } } as never)
     .ride_strength_week!;
-  assertEquals([r.sub_line, r.easy_line], ['Pick how long the long ride is.', 'The long ride gets longer every fourth week.']);
+  assertEquals([r.sub_line, r.easy_line], ['Pick the Day 1 level, and how long the midweek easy rides and the long ride are.', 'The long ride gets longer every fourth week.']);
   assertEquals(r.rows.map((x) => x.line), ['Day 1 · Sweet Spot', 'Day 2 · Ride', 'Day 3 · VO2', 'Day 5 · Ride', 'Day 6 · Ride']);
   assertEquals(r.rows.filter((x) => x.optional).map((x) => x.optional_line), ['Optional. An easy ride the day before the long ride.']);
   const long = r.rows.find((x) => x.is_long)!;

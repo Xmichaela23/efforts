@@ -349,7 +349,8 @@ export const RIDES_COPY = {
    * ⛔ THE SCREEN'S TOP AND BOTTOM LINES, PER PLAN, WHERE THEY DIFFER FROM Ride + Strength's (Michael approved the
    * words 2026-09-28). p281: "The long ride every fourth week should progressively get longer".
    */
-  sub_by_frame: { cycling_long: 'Pick how long the long ride is.' } as Partial<Record<FrameId, string | null>>,
+  // p279 (Day 1 sweet spot "level 2 to 3"), p239 (the endurance ride lengths), p281 (Day 5 = Day 2) — approved 2026-09-29.
+  sub_by_frame: { cycling_long: 'Pick the Day 1 level, and how long the midweek easy rides and the long ride are.' } as Partial<Record<FrameId, string | null>>,  // p279 p239 p281
   easy_line_by_frame: { cycling_long: 'The long ride gets longer every fourth week.' } as Partial<Record<FrameId, string | null>>,
   /**
    * ⛔ THE LEVEL CHIPS ON A RIDE THE PAGE PRINTS AS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27: the rider
