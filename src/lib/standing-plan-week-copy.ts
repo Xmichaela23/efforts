@@ -328,7 +328,7 @@ export function sessionLengthRangeLabel(range: { min: number; max: number } | nu
  *
  * ⛔ THE RULE IT IMPLEMENTS IS p112 — hold the load and vary the work *"across slightly different set
  * durations and intensities"* session to session. The engine rotates the page's own shapes week to
- * week (`rotatedArchetype` / `frameRotatedArchetype`); the builder names none of them and sends no
+ * week (`slotRotation`, held under p148 by `hard-rotation.ts`); the builder names none of them and sends no
  * archetype, so the athlete answers the SPORT and nothing else on a hard row.
  *
  * ⛔ WHAT CAME OFF THE STANDARD FOCUS ROW WITH THIS: the shape list, the *"Engine's pick — rotates

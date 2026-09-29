@@ -111,17 +111,24 @@ Deno.test('⛔ §6.2 — hard rides: the road rotation, and VO2 is the one road 
     if (tag(s, 'family:') === 'ride_endurance') continue;
     (got[`${s.day} ${tag(s, 'slot:')} ${tag(s, 'family:')}`] ??= []).push(tag(s, 'archetype:')!);
   }
-  const cycle = (list: string[]) => Array.from({ length: WEEKS }, (_, i) => list[i % list.length]);
-  assertEquals(got, {
-    'Monday 1:0 ride_sweet_spot': cycle(['medium', 'long', 'tempo']),
-    'Wednesday 3:0 ride_vo2': cycle(['long_vo2']),
-    'Wednesday 3:1 ride_sweet_spot': cycle(['medium', 'long', 'tempo']),
-    'Friday 5:0 ride_sprints': cycle(['max_effort', 'flying_surge']),
-  });
+  // ⛔ THE ORDER IS THE HELD CYCLE'S (2026-09-29, `hard-rotation.ts`: p112's rotation under p148's 10%), so this pins
+  // the shapes each ride walks — every road shape in the standard weeks, a new one every week — not a by-week order.
+  const walks = (seq: Array<string | null>, list: string[]) => {
+    assertEquals([...new Set(seq.slice(1))].sort(), [...list].sort(), seq.join(','));
+    for (let w = 1; w < seq.length; w++) assert(list.length < 2 || seq[w] !== seq[w - 1], seq.join(','));
+    assert(seq.every((id) => !TRAINER.has(String(id))), seq.join(','));
+  };
+  assertEquals(Object.keys(got).sort(), ['Friday 5:0 ride_sprints', 'Monday 1:0 ride_sweet_spot', 'Wednesday 3:0 ride_vo2', 'Wednesday 3:1 ride_sweet_spot']);
+  walks(got['Monday 1:0 ride_sweet_spot'], ['medium', 'long', 'tempo']);
+  walks(got['Wednesday 3:1 ride_sweet_spot'], ['medium', 'long', 'tempo']);
+  walks(got['Wednesday 3:0 ride_vo2'], ['long_vo2']);
+  walks(got['Friday 5:0 ride_sprints'], ['max_effort', 'flying_surge']);
+  // ⛔ The two sweet spot rides never build one shape in one week (Michael, 2026-08-26).
+  got['Monday 1:0 ride_sweet_spot'].forEach((id, w) => assert(id !== got['Wednesday 3:1 ride_sweet_spot'][w], `week ${w + 1}: both sweet spot rides built ${id}`));
   // And the All Rounder's own anaerobic ride (p274 day 2) rotates p237's three by-feel shapes, all road.
   const ar = CASES.find((x) => x.label === 'All Rounder, runs')!;
   const tuesday = rides(block(ar.args)).filter(({ s }) => tag(s, 'slot:') === '2:0').map(({ s }) => tag(s, 'archetype:'));
-  assertEquals(tuesday, cycle(['progressive_repeats', 'one_to_one', 'sandwich']));
+  walks(tuesday, ['progressive_repeats', 'one_to_one', 'sandwich']);
 });
 
 /**

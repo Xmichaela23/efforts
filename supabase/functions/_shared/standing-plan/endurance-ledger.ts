@@ -68,6 +68,8 @@ export type EnduranceLedger = {
    * threshold"* in NEAR-threshold and *"notably over threshold, moving through zone 4"* in
    * OVER-threshold, and states neither edge as a number. p232 prescribes 105%, 115%, 120%, 125% and
    * 130% inside one session, so the difference is real and this module cannot draw it.
+   * ⚠️ 105% ITSELF IS NOT IN HERE (2026-09-29) — p233 prints it as near-threshold work; see
+   * `ENDURANCE_LEDGER_BOUNDARIES.nearThresholdTopPct`. These are the minutes above 105%.
    *
    * ⚠️ REPORTED RATHER THAN FILED. An honest "N minutes above threshold, unsplit" is worth more than
    * a confident wrong bucket — the same discipline as `isLowerBound` for untimed rest.
@@ -99,6 +101,18 @@ export const ENDURANCE_LEDGER_BOUNDARIES = {
    */
   vt2Pct: 1.0,
   /**
+   * ⛔⛔ "JUST OVER" VT2 HAS A PRINTED EXAMPLE, AND IT IS 105% (2026-09-29, read off p233's image).
+   * p146 puts work *"between the first ventilatory threshold and just over the second"* in the
+   * near-threshold bucket. p233 is the Near-Threshold page — *"workouts that maximize time
+   * near-threshold—whether shorter above-threshold intervals or longer below-threshold intervals"* —
+   * and it prints work at 105% as near-threshold sessions: the 5K race-specific NT session
+   * (*"2 x 5-minute repeats @ 105%"*) and *"2 sets of 4 rounds of 1 minute @ 105%"*. So a step at or
+   * under 105% is near-threshold by the book's own filing.
+   * ⚠️ ONLY THAT FAR. Above 105% the page still states no edge between "just over" and "notably
+   * over", so those minutes stay reported together in `overVt2Minutes`, unsplit, as before.
+   */
+  nearThresholdTopPct: 1.05,
+  /**
    * ⛔ THE RIDE'S VT1 CEILING IS ON THE PAGE. p239 prescribes easy riding as *"below 75%"*, and the
    * library already resolves a ride VT1 step to `ftp * 0.75` on that authority.
    */
@@ -111,7 +125,8 @@ export const ENDURANCE_LEDGER_UNSTATED =
   + 'threshold pace, and where that is not on file the minutes are reported unplaced rather than '
   + 'guessed. And above threshold, p146 puts "just over" the second ventilatory threshold in the '
   + 'near-threshold bucket and "notably over" it in the over-threshold bucket without saying where '
-  + 'one becomes the other — so those minutes are reported together, unsplit.';
+  + 'one becomes the other. p233 files work at 105 percent as near-threshold, so it is counted there; '
+  + 'above 105 percent those minutes are reported together, unsplit.';
 
 /**
  * ⛔ WHERE VT1 SITS FOR THIS ATHLETE, AS A FRACTION OF THRESHOLD — MEASURED, NOT PICKED.
@@ -170,8 +185,9 @@ export function placeStep(step: Step, anchor: AnchorReport): StepPlacement {
   const vt1 = vt1FractionFor(anchor);
   const band = i.kind === 'below_pct' ? { lo: 0, hi: i.hi } : { lo: i.lo, hi: i.hi };
 
-  // ⛔ ABOVE THE STATED VT2 LINE — the one place p146 gives two buckets and no boundary between them.
-  if (band.hi > ENDURANCE_LEDGER_BOUNDARIES.vt2Pct) return { kind: 'over_vt2', band };
+  // ⛔ ABOVE "JUST OVER" VT2 — p233 files 105% as near-threshold; past it p146 gives two buckets and no
+  // boundary between them. ⚠️ The epsilon only absorbs float noise: 1.05 written in the library is 1.05 here.
+  if (band.hi > ENDURANCE_LEDGER_BOUNDARIES.nearThresholdTopPct + 1e-9) return { kind: 'over_vt2', band };
   if (vt1 == null) {
     return { kind: 'unplaced', reason: `no measured first ventilatory threshold for ${anchor.sport}` };
   }

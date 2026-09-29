@@ -58,12 +58,14 @@ const isLift = (s: { type?: string }) => s.type === 'strength';
 const isEndurance = (s: { type?: string }) => s.type != null && s.type !== 'strength';
 
 /** The frame's long slot is the LSD family; its hard slots are MLSS / near-threshold. */
-const LONG_NAME = /Long/i;
+// ⚠️ The long slot by its own tag (`long_run` / `long_ride`), not by "Long" in a name: the hard rotation (hard-rotation.ts)
+// builds "Long Surge and Float" and "Long VO2 Repeats", which are not the long session.
+const isLong = (s: { tags?: string[] }) => (s.tags ?? []).some((t) => t === 'long_run' || t === 'long_ride');
 
 Deno.test('⛔ A PINNED LONG DAY LANDS ON THAT WEEKDAY, whatever rotation the frame picked', () => {
   for (const target of ['Tuesday', 'Thursday', 'Sunday'] as Weekday[]) {
     const w = week({ dayOffset: 0, endurancePins: { long: target } });
-    const longDays = days(w, (s) => isEndurance(s) && LONG_NAME.test(s.name));
+    const longDays = days(w, (s) => isEndurance(s) && isLong(s));
     assert(longDays.length > 0, 'the week produced no long session to pin');
     for (const d of longDays) {
       assertEquals(d, target, `the long session ignored its pin: wanted ${target}, got ${d}`);
@@ -76,7 +78,7 @@ Deno.test('⛔ THE PIN BEATS THE ROTATION — the same pin wins under every offs
   // only an input to choosing it; a pin the rotation could not reach was reported and dropped.
   for (let offset = 0; offset < 7; offset++) {
     const w = week({ dayOffset: offset, endurancePins: { long: 'Wednesday' } });
-    for (const d of days(w, (s) => isEndurance(s) && LONG_NAME.test(s.name))) {
+    for (const d of days(w, (s) => isEndurance(s) && isLong(s))) {
       assertEquals(d, 'Wednesday', `offset ${offset} overrode the pin`);
     }
   }
@@ -124,13 +126,13 @@ Deno.test('⛔ AN UNPINNED SLOT STILL ROTATES — a pin on one anchor does not f
   const a = week({ dayOffset: 0, endurancePins: { long: 'Sunday' } });
   const b = week({ dayOffset: 3, endurancePins: { long: 'Sunday' } });
   const hardish = (w: ReturnType<typeof composeWeek>) =>
-    w.sessions.filter((s) => isEndurance(s) && !LONG_NAME.test(s.name)).map((s) => s.day).join(',');
+    w.sessions.filter((s) => isEndurance(s) && !isLong(s)).map((s) => s.day).join(',');
   assert(
     hardish(a) !== hardish(b),
     'the unpinned endurance slots stopped following the rotation once one anchor was pinned',
   );
-  for (const d of days(a, (s) => isEndurance(s) && LONG_NAME.test(s.name))) assertEquals(d, 'Sunday');
-  for (const d of days(b, (s) => isEndurance(s) && LONG_NAME.test(s.name))) assertEquals(d, 'Sunday');
+  for (const d of days(a, (s) => isEndurance(s) && isLong(s))) assertEquals(d, 'Sunday');
+  for (const d of days(b, (s) => isEndurance(s) && isLong(s))) assertEquals(d, 'Sunday');
 });
 
 Deno.test('⛔ A PIN NAMING A DAY THAT IS NOT A WEEKDAY IS NOT A PIN — it degrades to the rotation', () => {

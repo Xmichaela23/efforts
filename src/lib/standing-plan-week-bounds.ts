@@ -265,7 +265,7 @@ export function slotLengthOptions(
  *
  * ⛔ WHAT IT WAS DOING. The row read *"Anaerobic · 1h05"* and his block built **1h08, 36 min and
  * 1h05** across three weeks. Neither number was wrong: the composer resolves a DIFFERENT archetype
- * every week (`rotatedArchetype`, p229's own instruction to cover the shapes), and p237's four
+ * every week (`slotRotation`, p229's own instruction to cover the shapes), and p237's four
  * printed workouts genuinely differ in length — `one_to_one` is *"10 rounds of 1 min / 1 min"*,
  * twenty minutes of work. **The row was computing a single number from an archetype-LESS ladder and
  * presenting it as the session's dose**, so the screen stated one week's answer as if it were every
@@ -735,7 +735,7 @@ export function experienceChips(
     if (spec.archetype) return top(spec.archetype);
     /**
      * ⛔ NOTHING PINNED, SO THE BLOCK ROTATES — and "up to" has to cover the longest week it will
-     * serve, not the first one. `rotatedArchetype` walks the shapes offered at this level.
+     * serve, not the first one. `slotRotation` walks the shapes offered at this level.
      */
     /**
      * ⛔ THE FRAME'S OWN LIST FIRST, where the programme names one — the block rotates exactly those
@@ -743,7 +743,7 @@ export function experienceChips(
      */
     /**
      * ⚠️ FILTERED TO THE **RESOLVED** LEVEL, exactly as the composer filters it
-     * (`frameRotatedArchetype`). The "newer" tier drops this slot's level, and the frame's three
+     * (`slotRotation`). The "newer" tier drops this slot's level, and the frame's three
      * shapes are level-3 lines — unfiltered, every one of them measured zero and the chip quoted a
      * shorter session than the week builds. When the list does not apply, the family's own rotation
      * below is what the composer will use, so it is what the chip must measure.

@@ -1238,7 +1238,7 @@ export function archetypesFor(family: FamilyId, level?: Level): { id: string; la
  * ⛔ THE SHAPES A ROW CAN BUILD WHERE IT WILL BE RIDDEN (2026-09-24, `docs/SPEC-outdoor-rides-2026-09-24.md` §3).
  * No venue on the row → the road: every shape not marked `trainer` (`RideVenueMark`). `venue:trainer` on the row →
  * every shape the level offers, the rotation as it was. Run and swim shapes carry no mark and pass either way.
- * ⛔ THE ONE FILTER. The rotation (`compose.ts rotatedArchetype`), the frame's own list (`frameRotatedArchetype`) and
+ * ⛔ THE ONE FILTER. The rotation and the frame's own list (`compose.ts slotRotation`) and
  * the workout sheet (`workout-choice.ts workoutsForSlot`) all ask this; a second copy of the road list anywhere is
  * how the built week and the sheet start disagreeing. `endurance-library.test.ts` holds that every ride family keeps
  * a road shape at every level, so the filter can never empty a slot.
