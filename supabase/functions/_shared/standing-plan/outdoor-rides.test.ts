@@ -73,10 +73,11 @@ Deno.test('⛔ §6.2 — no venue tag: no built ride carries a trainer shape, in
 
 Deno.test('⛔ §6.2 — easy and long rides: steady / mixed, the same minutes as before the road rule (Ride + Strength\'s midweek rides steady, 2026-09-27)', () => {
   // The sequences the composer built before 2026-09-24 (snapshot), per easy or long slot.
-  const alternating = (a: string, b: string) => Array.from({ length: WEEKS }, (_, i) => (i % 2 === 0 ? a : b));
   const want: Record<string, Record<string, string[]>> = {
-    'All Rounder, rides': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
-    'All Rounder, newer': { 'Thursday 4:0': alternating('steady/80', 'mixed/85') },
+    // ⛔ p239's easy ride every week since 2026-09-29 (it alternated with the structured ride, which p239's "sparingly"
+    // does not allow); the structured ride is a one-day choice on the swap sheet.
+    'All Rounder, rides': { 'Thursday 4:0': Array.from({ length: WEEKS }, () => 'steady/80') },
+    'All Rounder, newer': { 'Thursday 4:0': Array.from({ length: WEEKS }, () => 'steady/80') },
     // ⛔ The Tuesday and Friday rides are p239's plain easy ride every week (Michael, 2026-09-27, option A). ⛔ And the long
     // ride too, since 2026-09-29: it carries p239's two versions (`EnduranceSlot.versions`), builds the easy one every
     // week, and the structured ride is a one-day choice on the swap sheet (p239: "sparingly unless an event is coming").

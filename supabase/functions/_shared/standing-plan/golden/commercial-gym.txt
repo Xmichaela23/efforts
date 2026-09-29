@@ -86,7 +86,7 @@ WEEK 02  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
@@ -182,7 +182,7 @@ WEEK 04  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
@@ -278,7 +278,7 @@ WEEK 06  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
@@ -374,7 +374,7 @@ WEEK 08  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
@@ -470,7 +470,7 @@ WEEK 10  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x
@@ -564,7 +564,7 @@ WEEK 12  column=standard
       HYP    Triceps Pushdown               3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Preacher Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Pullover Machine               3x6-12       @               | RIR 1 · auto_regulated · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 100 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · how-to · plan 270x

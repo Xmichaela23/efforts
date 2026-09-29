@@ -123,3 +123,14 @@ Deno.test('⛔ Ride + Strength (cycling_base) carries p239\'s two versions too (
     }
   }
 });
+
+Deno.test('⛔ Run + Ride + Strength (all_rounder) Thursday ride: easy every week, "With efforts" on the swap sheet (2026-09-29)', () => {
+  for (const [week, column] of [[2, 'standard'], [3, 'standard'], [4, 'taper']] as const) {
+    const a = { ...args('all_rounder', week, column), sportMix: { sports: { '2:0': 'ride', '4:0': 'ride' } } };
+    const rows = rowsOf(composeWeek(a as never));
+    const thu = rows.find((r) => slotOf(r) === '4:0')!;
+    assert((thu.tags ?? []).includes('archetype:steady'), `${column} ${week}`);
+    const work = sheetOptions(ctx(thu, rows)).filter((o) => o.kind === 'workout');
+    assertEquals(work.map((o) => [optionId(o), o.label, o.line]), [['workout:mixed', 'With efforts', LINE]], `${column} ${week}`);
+  }
+});

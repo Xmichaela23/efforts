@@ -88,7 +88,7 @@ WEEK 02  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
@@ -186,7 +186,7 @@ WEEK 04  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
@@ -284,7 +284,7 @@ WEEK 06  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
@@ -382,7 +382,7 @@ WEEK 08  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
@@ -480,7 +480,7 @@ WEEK 10  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to
@@ -578,7 +578,7 @@ WEEK 12  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 85 min
+  [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @               | awaiting_test · how-to

@@ -1216,6 +1216,9 @@ const HYP_HALF_TAPER: FrameDay[] = [
  * one"*, and p275 gives none — not even on the LSD, where p246's frame carries an insert refinement.
  * Adding one here would be inventing a refinement and attributing it to the page.
  */
+/** p239's two rides at every endurance level — the easy ride first (the week's build and the one lengths apply to). */
+const P239_RIDE_VERSIONS = ['steady', 'mixed'];
+
 const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 1,
@@ -1373,8 +1376,10 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
-    // p274 day 4 endurance cell: Cyc endurance (level 1)
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+    // p274 day 4 endurance cell: Cyc endurance (level 1). ⛔ p239's EASY RIDE EVERY WEEK (2026-09-29): it alternated with
+    // p239's structured ride week to week, which p239's "sparingly unless an event is coming" does not allow; the
+    // structured ride is a one-day choice on the swap sheet (`versions`), as on Ride + Strength.
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', archetypes: ['steady'], versions: P239_RIDE_VERSIONS })],
   },
   {
     day: 5,
@@ -1480,8 +1485,8 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset', { alsoAdmits: ['dumbbell curl'] }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
-    // p274 day 4 taper endurance cell: Cyc endurance (level 1)
-    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+    // p274 day 4 taper endurance cell: Cyc endurance (level 1) — the easy ride, the structured one on the swap sheet (p239).
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', archetypes: ['steady'], versions: P239_RIDE_VERSIONS })],
   },
   {
     day: 5,
@@ -1536,8 +1541,6 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
  * ⚠️ NO OVERHEAD PRESS IS NAMED — p278's push rows are categories. `testedLifts` is bench, squat and
  * deadlift, so the entry check and the week-one test never ask for a press.
  */
-/** p239's two rides at every endurance level — the easy ride first (the week's build and the one lengths apply to). */
-const P239_RIDE_VERSIONS = ['steady', 'mixed'];
 
 // ⛔ RIDE + STRENGTH'S EASY AND LONG RIDES CARRY p239's TWO VERSIONS TOO (2026-09-29): the week still builds the easy
 // ride every week (the first version, and the 2026-09-27 option-A ruling); the structured ride is a one-day choice on
