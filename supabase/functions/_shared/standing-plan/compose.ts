@@ -240,7 +240,7 @@ import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts'
 import { archetypesFor, archetypesForVenue } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
-import { MAX_SESSIONS_A_DAY } from './week-conflicts.ts';
+import { lowerDaysOf, MAX_SESSIONS_A_DAY } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
   REST_DAY_RUNG, rungAt, rungForMinutes, sayHours, sizeFor, slotSpans, weekVolumeBounds,
@@ -535,10 +535,26 @@ export type EnduranceRelocation = { session: string; from: Weekday; to: Weekday 
  * which is what keeps two builds of one answer identical.
  * ⚠️ EVERY DAY BLOCKED IS NOT AN ERROR HERE. The session keeps its day and the week is still built —
  * `structuralConflicts` `no_day_left` is where that is reported, and this file never refuses.
+ *
+ * ⛔⛔ AND NEVER ONTO A HARD DAY OR THE LONG DAY WHILE ANOTHER DAY HAS ROOM (plan sweep, 2026-09-28; open in the
+ * 2026-09-21/22 ENGINE-STATE entry). The walk above never looked at what was on the day it picked, so a long run moved
+ * off a Sunday day off landed on Monday beside the athlete's hard run and a lift: four sessions on one day. p131: the
+ * keystone sessions are *"the ones that require you to be in the most recovered state to perform"*, and the long day
+ * is the athlete's own pick. So the tiers are now, nearest first within each:
+ *   1. a day already training, with no hard or long session on it, not a lower-body lifting day the week's rules warn
+ *      about for this session (see `warnsOn`), and room under the two-session limit (`MAX_SESSIONS_A_DAY`, OURS —
+ *      the same limit the calendar move and the extra-day placement use);
+ *   2. a clear day (it has room and nothing hard or long by definition);
+ *   3. a day already training with room, whatever is on it;
+ *   4. the old walk: the nearest day already training, then the nearest day at all.
+ * The warnings still name whatever tier 3 or 4 builds (`two_hard_one_day`, `crowded_day`).
+ * ⚠️ WHAT A DAY HOLDS IS COUNTED FROM THE WHOLE WEEK: `placeEnduranceDays` sets down every session on a day the
+ * athlete can train before it moves any off a day off, so tier 1 sees the long ride that lands later in the week.
  */
 function enduranceRelocator(args: ComposeArgs): {
-  place: (proposed: Weekday, label: string) => Weekday;
+  place: (proposed: Weekday, label: string, role?: 'long' | 'hard' | null) => Weekday;
   moves: EnduranceRelocation[];
+  isBlocked: (day: Weekday) => boolean;
 } {
   const blocked = new Set<Weekday>(
     (args.unavailableDays ?? [])
@@ -557,34 +573,66 @@ function enduranceRelocator(args: ComposeArgs): {
       .map((d) => weekdayForFrameDay(d, args.dayOffset ?? 0)),
   );
   const used = new Set<Weekday>();
+  /** Sessions on each day, the jump drills not counted (the `crowded_day` rule's own count). A lifting day is one. */
+  const count = new Map<Weekday, number>();
+  for (const d of frameFixedDaysFor(args.frame, args.column).lifting) {
+    const wd = weekdayForFrameDay(d, args.dayOffset ?? 0);
+    count.set(wd, (count.get(wd) ?? 0) + 1);
+  }
+  /** Days carrying a hard or a long endurance session. */
+  const keystone = new Set<Weekday>();
+  /**
+   * The lower-body lifting days, heavy (`me`) and speed (`de`). A moved session does not take one where the week's own
+   * rules would warn for it (`week-conflicts`, the one judge): a hard session not the heavy leg day
+   * (`hard_with_heavy_legs`, p131 counts the heavy leg session as a keystone) nor the speed leg day
+   * (`hard_on_speed_leg_day`, pp218-219); a long session not the heavy leg day (`long_after_heavy_legs`). An easy session
+   * may take either: p144 puts easy running after a hard leg workout and cuts it by a third.
+   */
+  const lowerDays = (() => {
+    const { me, de } = lowerDaysOf(args.frame, args.column);
+    const on = (xs: number[]) => new Set<Weekday>(xs.map((d) => weekdayForFrameDay(d, args.dayOffset ?? 0)));
+    return { me: on(me), de: on(de) };
+  })();
+  const warnsOn = (d: Weekday, role: 'long' | 'hard' | null): boolean =>
+    role === 'hard' ? lowerDays.me.has(d) || lowerDays.de.has(d) : role === 'long' ? lowerDays.me.has(d) : false;
+  const take = (day: Weekday, role: 'long' | 'hard' | null) => {
+    used.add(day);
+    count.set(day, (count.get(day) ?? 0) + 1);
+    if (role === 'long' || role === 'hard') keystone.add(day);
+  };
   const moves: EnduranceRelocation[] = [];
   // ⚠️ Forward, then back, widening — `[1,-1,2,-2,…]`, so "nearest" is a real answer and not a
   // one-directional walk that always drifts a session to the end of the week.
   const walk: number[] = [];
   for (let n = 1; n <= 6; n++) { walk.push(n); walk.push(-n); }
 
-  const place = (proposed: Weekday, label: string): Weekday => {
-    if (!blocked.has(proposed)) { used.add(proposed); return proposed; }
+  const place = (proposed: Weekday, label: string, role: 'long' | 'hard' | null = null): Weekday => {
+    if (!blocked.has(proposed)) { take(proposed, role); return proposed; }
     const from = WEEKDAYS.indexOf(proposed);
-    /** `training` = only days already carrying something; otherwise the first unblocked day. */
-    const pick = (training: boolean): Weekday | null => {
+    const pick = (ok: (d: Weekday) => boolean): Weekday | null => {
       for (const step of walk) {
         const cand = WEEKDAYS[(from + step + 7) % 7];
         if (blocked.has(cand)) continue;
-        if (training && !occupied.has(cand) && !used.has(cand)) continue;
-        return cand;
+        if (ok(cand)) return cand;
       }
       return null;
     };
-    const to = pick(true) ?? pick(false);
+    const training = (d: Weekday) => occupied.has(d) || used.has(d);
+    const room = (d: Weekday) => (count.get(d) ?? 0) < MAX_SESSIONS_A_DAY;
+    const clean = (d: Weekday) => !keystone.has(d) && !warnsOn(d, role);
+    const to = pick((d) => training(d) && room(d) && clean(d))
+      ?? pick((d) => !training(d))
+      ?? pick((d) => training(d) && room(d))
+      ?? pick(training)
+      ?? pick(() => true);
     // ⚠️ NOWHERE TO GO — every day blocked. It keeps its day and reports no move, because a note
     // saying it moved to the day it is still on would be the screen lying quietly.
-    if (to == null) { used.add(proposed); return proposed; }
-    used.add(to);
+    if (to == null) { take(proposed, role); return proposed; }
+    take(to, role);
     moves.push({ session: label, from: proposed, to });
     return to;
   };
-  return { place, moves };
+  return { place, moves, isBlocked: (day) => blocked.has(day) };
 }
 
 /**
@@ -614,7 +662,7 @@ export function placeEnduranceDays(
       });
     }
   }
-  const { place: relocate, moves } = enduranceRelocator(args as ComposeArgs);
+  const { place: relocate, moves, isBlocked } = enduranceRelocator(args as ComposeArgs);
   /**
    * `${frameDay}:${slotIndex}` → the weekday it ends on. ⛔ EVERY SLOT, not only the pinned ones
    * (2026-08-26).
@@ -632,12 +680,13 @@ export function placeEnduranceDays(
    * sequence this file ran before; only the point at which it runs moved.
    */
   const enduranceDays = new Map<string, Weekday>();
+  const queue: Array<{ key: string; proposed: Weekday; role: 'long' | 'hard' | null }> = [];
   for (const wantPinned of [true, false]) {
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
         const key = `${d.day}:${i}`;
         if (droppedSlots.has(key)) return; // ⛔ the stated day count removed this slot
-        if (enduranceDays.has(key)) return;
+        if (queue.some((q) => q.key === key)) return;
         const hardIndex = hardSlotIndex.get(key) ?? 0;
         // ⛔ THE FRAME'S OWN ANSWER, matching `hardSlotIndex` above — see `anchorRoleOf`. The slot's
         // stated role wins where it has one; the family decides where it does not.
@@ -647,10 +696,21 @@ export function placeEnduranceDays(
           : role === 'hard' ? !!args.endurancePins?.hard?.[hardIndex] : false);
         if (pinned !== wantPinned) return;
         if (isJoinedSlot(slot)) return; // ⛔ placed below, on the day of the half before it
-        const proposed = enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex, key);
-        enduranceDays.set(key, relocate(proposed, enduranceLabelFor(role)));
+        queue.push({ key, proposed: enduranceDayFor(args as ComposeArgs, d.day, role, hardIndex, key), role });
       });
     }
+  }
+  /**
+   * ⛔ THE SESSIONS ON DAYS THE ATHLETE CAN TRAIN ARE SET DOWN FIRST (plan sweep, 2026-09-28), then the ones on a day
+   * off are moved, in the same order as before (their own picks first, then the frame's). A moved session can then see
+   * every hard and long session in the week — see `enduranceRelocator` — not only the ones placed before it.
+   * ⚠️ With no day off nothing moves, and every session keeps the day it had.
+   */
+  for (const q of queue) {
+    if (!isBlocked(q.proposed)) enduranceDays.set(q.key, relocate(q.proposed, enduranceLabelFor(q.role), q.role));
+  }
+  for (const q of queue) {
+    if (!enduranceDays.has(q.key)) enduranceDays.set(q.key, relocate(q.proposed, enduranceLabelFor(q.role), q.role));
   }
   // ⛔ ONE SESSION, ONE DAY (p245 / p253 / p269): the second half of a joined session lands where the first half did.
   for (const d of days) {
@@ -4069,8 +4129,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ THE ATHLETE'S TAP FIRST (extra easy runs only): a pinned day wins, stepped off a day off if it is one.
         const pinned = sport === 'run' ? titleCaseDay(args.endurancePins?.easy?.[fillsPlaced]) : '';
         const picked = pinned !== '' && !blockedFill.has(pinned) ? pinned as Weekday : pickFillDay();
-        const day = picked ?? relocate(
-          dayNameFor(args, frameDay),
+        // ⚠️ A PICKED DAY GOES THROUGH THE RELOCATOR TOO (2026-09-28): it is never a day off, so it comes back
+        // unchanged, and the relocator counts it — a later session moved off a day off sees that day as taken.
+        const day = relocate(
+          picked ?? dayNameFor(args, frameDay),
           sport === 'run' ? 'the extra easy run' : 'the extra easy ride',
         );
         fillsPlaced += 1;
@@ -4801,7 +4863,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     // ⚠️ A DAY THE CONFLICT ENGINE ALREADY NAMES (two hard sessions, or hard beside long) gets its
     // own sentence with the day in it — this generic one steps aside there, or the athlete reads two
     // sentences about one day.
-    const namedByConflict = new Set(conflicts.filter((c) => c.rule === 'two_hard_one_day').flatMap((c) => c.days));
+    // ⚠️ AND A DAY WITH THREE OR MORE SESSIONS (`crowded_day`, 2026-09-28): its sentence names the day and the six to
+    // eight hours, so this one steps aside there too.
+    const namedByConflict = new Set(conflicts
+      .filter((c) => (c.rule as string) === 'two_hard_one_day' || c.rule === 'crowded_day').flatMap((c) => c.days));
     for (const d of [...perDay.keys()]) if (namedByConflict.has(d as never)) perDay.delete(d);
     if (![...perDay.values()].some((n) => n > 1)) continue;
     // ⛔ THE HOURS CLAUSE IS GONE (Michael, 2026-09-16, WORKORDER §3b item 4, option A). p143 rule 6 sets the

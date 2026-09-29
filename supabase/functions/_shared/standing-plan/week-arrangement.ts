@@ -16,19 +16,21 @@
 //   0. a lifting day the athlete dragged sits where it was dropped (2026-09-22);
 //   1. nothing the book fixes (lifts, jump drills) on a day the athlete cannot train — unchanged;
 //   2. the long session on the athlete's long day — unchanged;
-//   3. ⛔ the fewest warnings from `weekConflicts` on the week this arrangement builds, not counting
-//      a warning the book's own printed week carries, plus each day over the calendar's two-session
-//      limit (`move-check` `MAX_SESSIONS_A_DAY`);
-//   4. the fewest days moved out of the book's order (0 for any rotation);
-//   5. lifts of one pattern closest to p80's 3–4 days apart;
-//   6. the athlete's hard days on the book's hard days — unchanged;
-//   7. lifting on days that already carry a pinned session — unchanged;
-//   8. week one's test days after the start date — unchanged.
-// ⚠️ With no pins, or pins a rotation serves cleanly, terms 3–5 tie at zero for the rotations and the
+//   3. ⛔ the fewest days over the calendar's two-session limit (`move-check` `MAX_SESSIONS_A_DAY`) on the
+//      week this arrangement builds, not counting one the book's own printed week carries (2026-09-28);
+//   4. ⛔ each region's lifting days (upper, lower) spaced as the printed week spaces them, or p80's
+//      3–4 days apart (2026-09-28: moved up from below the warnings, see `better`);
+//   5. ⛔ the fewest other warnings from `weekConflicts` on that week, not counting a warning the
+//      book's own printed week carries;
+//   6. the fewest days moved out of the book's order (0 for any rotation);
+//   7. the athlete's hard days on the book's hard days — unchanged;
+//   8. lifting on days that already carry a pinned session — unchanged;
+//   9. week one's test days after the start date — unchanged.
+// ⚠️ With no pins, or pins a rotation serves cleanly, terms 3–6 tie at zero for the rotations and the
 // week is exactly the one the rotation chooser built.
 // ============================================================================
 
-import { FRAMES, isJoinedSlot, type ColumnKind, type FrameId } from './frames.ts';
+import { FRAMES, isJoinedSlot, JOINED_PART_TAG, type ColumnKind, type FrameId } from './frames.ts';
 import { isLongSlot } from './sport-slots.ts';
 import {
   WEEKDAYS, frameDayOn, frameFixedDaysFor, anchorDaysFor, titleCaseDay, weekdayForFrameDay,
@@ -108,45 +110,91 @@ function skeletonWeek(args: {
     }
     if (d.plyo === true) out.push(S(wd, 'strength', 'Plyo warm-up', ['plyo']));
     d.endurance.forEach((slot, i) => {
-      if (isJoinedSlot(slot)) return; // ⛔ the second half of one run (p245 / p253) is not a session of its own
       const long = isLongSlot(slot);
       const family = String(slot.family);
       const sport = long
         ? (args.longSlotSport === 'ride' ? 'ride' : 'run')
         : family.startsWith('ride_') ? 'ride' : 'run';
-      out.push(S(placed.get(`${d.day}:${i}`) ?? wd, sport, family, [`family:${family}`, `sport:${sport}`]));
+      /**
+       * ⛔⛔ THE SECOND HALF OF ONE SESSION IS EMITTED, TAGGED, AS `compose.ts` EMITS IT (plan sweep, 2026-09-28).
+       * Two workouts in one box are one session (p245 / p253 / p263 / p269), and `conflictsOfTyped` drops the tagged half
+       * so it is never counted as a session of its own. But `typedSessionsOf` gives each run or ride its role by
+       * POSITION in the frame's slot list, and that list has the second half in it. Skipping the half here put every
+       * session after a joined pair one slot late: the long run read as easy (Hypertrophy + 5K, + Half), the long ride
+       * and the sprint ride read as easy (Ride + Strength), and the chooser picked weeks that stacked the long ride on
+       * a hard day because it could not see it. The judged week now has the same sessions as the built one.
+       */
+      const tags = [`family:${family}`, `sport:${sport}`, ...(isJoinedSlot(slot) ? [JOINED_PART_TAG] : [])];
+      out.push(S(placed.get(`${d.day}:${i}`) ?? wd, sport, family, tags));
     });
   }
   return out;
 }
 
 /**
- * ⛔ p80 SPACING, THROUGH THE CALENDAR MOVE'S OWN RULE. Frame days that open on the same lift pattern
- * (bench on both upper days; squat and deadlift trading places on both lower days) are the same lift
- * twice a week, and p80 wants those 3–4 days apart.
+ * The frame days that open on a competition lift, by body region: `upper` (push and pull) and `lower` (hinge and press).
+ * A day with both (Ride + Strength's full-body speed day) is in both. A region with one lifting day is left out.
+ * ⚠️ BY REGION, NOT BY PATTERN (plan sweep, 2026-09-28). The All Rounder opens its two lower days on two different
+ * patterns, hinge and press (p274), so a pattern-only grouping never saw them and the chooser put both heavy leg days
+ * back to back. Every frame prints its two lower days, and its two upper days, as a pair spaced through the week.
+ */
+function regionDays(frame: FrameId, column: ColumnKind): Array<{ region: 'upper' | 'lower'; days: number[] }> {
+  const out: Array<{ region: 'upper' | 'lower'; days: number[] }> = [];
+  for (const region of ['upper', 'lower'] as const) {
+    const days = FRAMES[frame].columns[column]
+      .filter((d) => d.strength.some((s) => s.role === 'competition'
+        && [s.pattern, s.rotatesWith].some((p) => String(p ?? '').endsWith(`_${region}`))))
+      .map((d) => d.day);
+    if (days.length >= 2) out.push({ region, days });
+  }
+  return out;
+}
+
+/** Each lifting day and the days to the next one, the week wrapping round (Sunday's next is Monday). */
+function gapsFrom(weekdays: number[]): Array<{ from: number; to: number; gap: number }> {
+  const s = [...weekdays].sort((a, b) => a - b);
+  return s.map((x, i) => {
+    const j = (i + 1) % s.length;
+    return { from: x, to: s[j], gap: (j === 0 ? s[0] + 7 : s[j]) - x };
+  });
+}
+const gapKey = (weekdays: number[]): string => gapsFrom(weekdays).map((g) => g.gap).sort((a, b) => a - b).join(',');
+
+/**
+ * ⛔ p80 SPACING, JUDGED AGAINST THE PRINTED WEEK (plan sweep, 2026-09-28). p80: *"every strength movement be ideally
+ * trained at least twice per week, or once every three to four days."* Each region's lifting days cost how far their
+ * gaps sit outside 3–4 (`move-check` `offIdeal`, the app's one reader of p80) — unless the gaps are the printed week's
+ * own. The book prints two exceptions and they stay: Ride + Strength's lower days two apart (p278) and Hypertrophy +
+ * Half's upper days two apart (p252, named on p253). A week keeping those gaps costs nothing; a week pulling a 3–4 pair
+ * closer or further costs what p80 says.
  */
 function spacingCost(frame: FrameId, column: ColumnKind, order: number[]): number {
-  const byPattern = new Map<string, number[]>();
-  for (const d of FRAMES[frame].columns[column]) {
-    const patterns = new Set<string>();
-    for (const s of d.strength) {
-      if (s.intent !== 'ME' && s.intent !== 'DE') continue;
-      if (s.role !== 'competition') continue;
-      patterns.add(String(s.pattern));
-      if (s.rotatesWith) patterns.add(String(s.rotatesWith));
-    }
-    for (const p of patterns) byPattern.set(p, [...(byPattern.get(p) ?? []), order[d.day - 1]]);
-  }
   let cost = 0;
-  for (const days of byPattern.values()) {
-    if (days.length < 2) continue;
-    const sorted = [...days].sort((a, b) => a - b);
-    for (let i = 0; i < sorted.length; i++) {
-      const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 7;
-      cost += offIdeal(next - sorted[i]);
-    }
+  for (const { days } of regionDays(frame, column)) {
+    const placed = days.map((d) => order[d - 1]);
+    if (gapKey(placed) === gapKey(days.map((d) => d - 1))) continue;
+    cost += gapsFrom(placed).reduce((n, g) => n + offIdeal(g.gap), 0);
   }
   return cost;
+}
+
+/**
+ * The closest two lifting days of one region that the week could not space the way the printed week or p80 does —
+ * for the compromise sentence. Null when every region keeps them.
+ */
+function closestBrokenPair(
+  frame: FrameId, column: ColumnKind, order: number[],
+): { region: 'upper' | 'lower'; a: Weekday; b: Weekday; gap: number } | null {
+  let worst: { region: 'upper' | 'lower'; a: Weekday; b: Weekday; gap: number } | null = null;
+  for (const { region, days } of regionDays(frame, column)) {
+    const placed = days.map((d) => order[d - 1]);
+    if (gapKey(placed) === gapKey(days.map((d) => d - 1))) continue;
+    for (const g of gapsFrom(placed)) {
+      if (offIdeal(g.gap) === 0) continue;
+      if (worst == null || g.gap < worst.gap) worst = { region, a: WEEKDAYS[g.from], b: WEEKDAYS[g.to], gap: g.gap };
+    }
+  }
+  return worst;
 }
 
 /**
@@ -202,7 +250,7 @@ export function chooseDayMap(
     liftsPinned: number;
     order: number[]; offset: number; long: boolean; blockedLifts: number; blockedFixed: number;
     hard: number; stacked: number; testSafe: boolean;
-    warnings: number; moved: number; spacing: number;
+    warnings: number; crowded: number; moved: number; spacing: number;
   };
   const blockedHits = (order: number[], frameDays: number[]) =>
     frameDays.filter((d) => blockedDays.has(weekdayForFrameDay(d, order))).length;
@@ -221,6 +269,7 @@ export function chooseDayMap(
       testSafe: startIdx == null
         || testDays.every((d) => WEEKDAYS.indexOf(weekdayForFrameDay(d, order)) >= startIdx),
       warnings: -1,
+      crowded: -1,
       moved,
       spacing: spacingCost(frame, column, order),
     };
@@ -256,7 +305,7 @@ export function chooseDayMap(
   const top = candidates.reduce((best, c) => (cmpHead(c, best) < 0 ? c : best), candidates[0]);
   const finalists = candidates.filter((c) => cmpHead(c, top) === 0);
   for (const c of finalists) {
-    if (opts.rotationsOnly) { c.warnings = 0; continue; }
+    if (opts.rotationsOnly) { c.warnings = 0; c.crowded = 0; continue; }
     const sessions = skeletonWeek({
       frame, column, order: c.order,
       // ⚠️ THE RAW PINS, NOT `livePin`'s: the composer still places a pin that sits on a day off and then
@@ -265,17 +314,31 @@ export function chooseDayMap(
       hardPins: (pins.hardDays ?? []).map(titleCaseDay),
       longSlotSport, blocked: [...blockedDays], slotPins,
     });
-    // ⛔ A DAY OVER THE TWO-SESSION LIMIT IS ONE OF THE WEEK'S OWN WARNINGS NOW (`crowded_day`, 2026-09-22), so it is
-    // counted here with the rest rather than a second time on its own.
-    c.warnings = weekConflicts({ sessions, frame, column, dayOffset: c.order })
-      .filter((w) => !NOT_A_COST.includes(w.rule) && !printed.has(keyOf(w, c.order))).length;
+    // ⛔ A DAY OVER THE TWO-SESSION LIMIT IS ONE OF THE WEEK'S OWN WARNINGS NOW (`crowded_day`, 2026-09-22), and it is
+    // counted apart from the rest (2026-09-28): see `better`.
+    const costs = weekConflicts({ sessions, frame, column, dayOffset: c.order })
+      .filter((w) => !NOT_A_COST.includes(w.rule) && !printed.has(keyOf(w, c.order)));
+    c.crowded = costs.filter((w) => w.rule === 'crowded_day').length;
+    c.warnings = costs.length - c.crowded;
   }
 
-  /** ⚠️ STRICTLY BETTER, so the first candidate reaching a score keeps it — rotations first, offset 0 first. */
+  /**
+   * ⚠️ STRICTLY BETTER, so the first candidate reaching a score keeps it — rotations first, offset 0 first.
+   * ⛔ p80 SPACING COMES FIRST AMONG THESE (plan sweep, 2026-09-28). Ranked below the warnings and the days moved, it
+   * was traded away whenever that bought one warning fewer: Ride + Strength weeks with lifts outside 3–4 days rose once
+   * the judge could see the long ride, and the All Rounder put both heavy leg days back to back in 29% of the weeks an
+   * athlete moved something. The page's spacing holds unless the athlete's own picks leave no week that keeps it, and
+   * then the compromise below says so. Every rotation keeps the printed gaps, so a week a rotation serves is unchanged.
+   * ⛔ ONLY A DAY OVER THE TWO-SESSION LIMIT COMES BEFORE IT (2026-09-28). The app treats that limit as the edge of a
+   * week it will plan (`move-check` "Days that fit", the extra-day placement, the lost day), and a third session on a
+   * day is only ever the athlete's tap. Ranked below spacing, the day-off sweep measured the chooser making three-session
+   * days to keep the lifts spaced (All Rounder, a day off, weeks with one: 3,984 → 21,396).
+   */
   const better = (a: Cand, b: Cand) =>
-    a.warnings !== b.warnings ? a.warnings < b.warnings
-      : a.moved !== b.moved ? a.moved < b.moved
+    a.crowded !== b.crowded ? a.crowded < b.crowded
       : a.spacing !== b.spacing ? a.spacing < b.spacing
+      : a.warnings !== b.warnings ? a.warnings < b.warnings
+      : a.moved !== b.moved ? a.moved < b.moved
       : a.hard !== b.hard ? a.hard > b.hard
       : a.stacked !== b.stacked ? a.stacked > b.stacked
       : (a.testSafe ? 1 : 0) > (b.testSafe ? 1 : 0);
@@ -352,6 +415,26 @@ export function chooseDayMap(
         ? `${offClause} — ${nLifts} lifting days plus the ${longPin} ${longName} don't fit any other way.`
         : `${offClause} — the week's sessions don't fit without ${named.length === 1 ? 'it' : 'them'}.`,
     });
+  }
+  /**
+   * ⛔ THE LIFT SPACING THE WEEK COULD NOT HOLD (plan sweep, 2026-09-28). Spacing is ranked first after the athlete's
+   * own answers and the two-session limit, so this fires only when those leave no week that spaces a region's lifting
+   * days the way the printed week or p80 does. True by construction: every other candidate serving the same answers,
+   * with no more three-session days, was tried.
+   * p80: "every strength movement be ideally trained at least twice per week, or once every three to four days."
+   */
+  if (chosen.spacing > 0) {
+    const pair = closestBrokenPair(frame, column, chosen.order);
+    if (pair) {
+      const WORDS: Record<number, string> = { 2: 'two', 5: 'five', 6: 'six' };
+      const apart = pair.gap === 1 ? 'back to back' : `${WORDS[pair.gap] ?? String(pair.gap)} days apart`;
+      compromises.push({
+        kind: 'cost',
+        // OURS — `chooseDayMap` compromise note wording, NOT YET APPROVED by Michael (2026-09-28); the rule in it is p80.
+        text: `${pair.a} and ${pair.b} are both ${pair.region === 'lower' ? 'leg' : 'upper body'} days, ${apart}. `
+          + 'Each lift is trained every three to four days. The days picked leave no week spaced that way.',
+      });
+    }
   }
   /**
    * ⛔⛔ THE MISSED-LONG-PIN "rather than" SENTENCE IS DELETED — the same falsehood as the

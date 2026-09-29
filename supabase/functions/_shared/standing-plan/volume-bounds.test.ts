@@ -666,7 +666,15 @@ Deno.test('⛔ THE HOURS SWEEP CROSSED WITH BLOCKED DAYS — the case that was m
             // 2 ── THE REST-DAY SENTENCE MATCHES THE WEEK, BOTH WAYS.
             const said = wk.notes.some((nt) => /becomes active recovery/.test(nt.text));
             const restWeekday = DAY_ORDER[(6 + (0)) % 7];   // frame day 7 at offset 0
-            const restBusy = wk.sessions.some((x) => x.day === restWeekday);
+            /**
+             * ⚠️ THE FILL ON THE REST DAY, not any session there (changed 2026-09-28, plan sweep bug 3). The sentence is
+             * about the extra easy session the hours put on the rest day (tagged `active_recovery`). Since a session moved
+             * off a day off no longer lands beside a hard or long session when a clear day is open (p131), a moved HARD
+             * ride can now take the rest day: "ride 1h, blocked Monday" puts the Monday hard ride on Sunday. That is not
+             * active recovery, and the week says what happened in its own lines ("Monday is a day off — the hard session
+             * moved to Sunday.", and the rest-day line when no day is clear).
+             */
+            const restBusy = wk.sessions.some((x) => x.day === restWeekday && (x.tags ?? []).includes('active_recovery'));
             assertEquals(said, restBusy,
               `${sport} ${hours}h, blocked ${blocked.join(',')} → says "${said}", ${restWeekday} busy "${restBusy}"`);
           }
