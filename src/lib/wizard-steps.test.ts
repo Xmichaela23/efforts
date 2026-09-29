@@ -155,6 +155,13 @@ Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-streng
   assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
 });
 
+Deno.test('⛔ LONG RIDE + STRENGTH (p279, 2026-09-28) — the same step list as Ride + Strength, rides held, runs out', () => {
+  const st: StepRouterState = { ...strengthPath('ride'), focus: 'ride_long' };
+  assertEquals(landsOn(st), 'program');
+  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
+  assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
+});
+
 Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCREEN', () => {
   /**
    * Every build that predates the Standard card carries no focus and no Train card, so it never

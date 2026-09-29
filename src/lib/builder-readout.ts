@@ -95,14 +95,29 @@ export type EnduranceIntakeReadout = {
   } | null;
   /** The rides screen (2026-09-27): rows, the long ride's chips, and a switch on each optional ride's own row. */
   ride_strength_week: {
-    sub_line: string;
+    /** Null on a plan whose own line is not yet approved (Long Ride + Strength, 2026-09-28). */
+    sub_line: string | null;
     length_label: string;
     /** `length`: the chips on a ride whose length the rider picks, stored under `length.key` (shared by rides held to one length). */
     rows: Array<{
       key: SlotKey; line: string; is_long: boolean; optional: boolean; optional_line?: string | null;
       length: { key: SlotKey; options: number[]; labels: Record<string, string>; default: number | null; same_as?: string | null } | null;
+      /**
+       * The level chips on a ride the page prints as a range (p279 day 1). Absent from an older server. The labels are
+       * null until their words are approved, and the card draws nothing then.
+       */
+      level?: { key: SlotKey; label: string | null; default: number; options: Array<{ level: number; label: string | null }> } | null;
+      /**
+       * The version chips on an endurance ride p239 prints two ways (2026-09-28). A version with `fixed_label` is printed at
+       * one length and takes no length chips. `key` is the leader's row on a ride that follows another's. Absent from an
+       * older server.
+       */
+      version?: {
+        key: SlotKey; default: string; same_as: string | null;
+        options: Array<{ id: string; label: string; fixed_minutes: number | null; fixed_label: string | null }>;
+      } | null;
     }>;
-    easy_line: string;
+    easy_line: string | null;
   } | null;
   tier_line: string | null;
 };

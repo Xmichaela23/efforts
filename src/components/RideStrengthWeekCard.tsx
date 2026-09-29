@@ -25,6 +25,12 @@ type Props = {
   /** The optional rides switched off (screen row keys). Absent = all on, the week as printed. */
   slotsOff?: SlotKey[];
   onSlotOn: (key: SlotKey, on: boolean) => void;
+  /** The level picked on a ride the page prints as a range (p279 day 1), by row key. Absent = the ride's own level. */
+  slotLevels?: Partial<Record<SlotKey, number>>;
+  onSlotLevel?: (key: SlotKey, level: number) => void;
+  /** The version picked on an endurance ride p239 prints two ways, by the row key the pick is stored under. */
+  slotVersions?: Partial<Record<SlotKey, string>>;
+  onSlotVersion?: (key: SlotKey, version: string) => void;
 };
 
 export default function RideStrengthWeekCard(props: Props) {
@@ -41,14 +47,30 @@ export default function RideStrengthWeekCard(props: Props) {
     if (isOff(row)) continue;
     if (row.length && !asked.has(row.length.key)) { asked.add(row.length.key); chipsOn.add(row.key); }
   }
+  // ⛔ ONE SET OF VERSION CHIPS PER PICK (2026-09-28): a ride that follows another's version shows it, not the chips.
+  const versionOn = new Set<string>();
+  const versionAsked = new Set<string>();
+  for (const row of week.rows) {
+    if (isOff(row) || !row.version) continue;
+    if (!versionAsked.has(row.version.key)) { versionAsked.add(row.version.key); versionOn.add(row.key); }
+  }
+  /** The version this row builds, and the option it names (the server's default until the rider picks). */
+  const versionOf = (row: (typeof week.rows)[number]) => {
+    if (!row.version) return null;
+    const id = props.slotVersions?.[row.version.key] ?? row.version.default;
+    return row.version.options.find((o) => o.id === id) ?? row.version.options.find((o) => o.id === row.version!.default) ?? null;
+  };
 
   return (
     <div className="space-y-3">
-      <p className="text-white/55 text-sm leading-relaxed">{week.sub_line}</p>
+      {week.sub_line ? <p className="text-white/55 text-sm leading-relaxed">{week.sub_line}</p> : null}
       <div className="space-y-2">
         {week.rows.map((row) => {
           const rowOff = isOff(row);
-          const len = rowOff ? null : row.length;
+          const version = rowOff ? null : versionOf(row);
+          // ⛔ A VERSION PRINTED AT ONE LENGTH (p239's structured ride) TAKES NO LENGTH CHIPS; its length is shown instead.
+          const fixedLabel = version?.fixed_label ?? null;
+          const len = rowOff || fixedLabel ? null : row.length;
           const picked = len ? props.slotMinutes?.[len.key] : undefined;
           return (
             <div
@@ -78,6 +100,48 @@ export default function RideStrengthWeekCard(props: Props) {
                   {[len.labels[String(picked)], !chipsOn.has(row.key) ? len.same_as : null].filter(Boolean).join(' · ')}
                 </p>
               ) : null}
+              {/* ⛔ THE VERSION CHIPS (p239's two rides; 2026-09-28) on the first ride that asks; a follower names its pick. */}
+              {row.version && version && versionOn.has(row.key) ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {row.version.options.map((o) => (
+                    <GalaxyButton
+                      key={o.id}
+                      shape="chip"
+                      variant={version.id === o.id ? 'primary' : 'secondary'}
+                      data-testid={`${row.version!.key}-version-${o.id}`}
+                      onClick={() => props.onSlotVersion?.(row.version!.key, o.id)}
+                    >
+                      {o.label}
+                    </GalaxyButton>
+                  ))}
+                </div>
+              ) : null}
+              {row.version && version && (fixedLabel || !versionOn.has(row.key)) ? (
+                <p className="text-white/55 text-xs mt-1.5 leading-relaxed">
+                  {/* A follower names its version; "Same length as Day 2." rides here only when no length line carries it. */}
+                  {[!versionOn.has(row.key) ? version.label : null, fixedLabel, !versionOn.has(row.key) && fixedLabel ? row.version.same_as : null]
+                    .filter(Boolean).join(' · ')}
+                </p>
+              ) : null}
+              {/* ⛔ THE LEVEL CHIPS (p279 day 1, the rider picks 2 or 3) — drawn only when the server sends their words. */}
+              {row.level && row.level.label && row.level.options.every((o) => o.label) ? (
+                <div className="mt-2.5">
+                  <p className="text-white/80 text-[13px] mb-2">{row.level.label}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.level.options.map((o) => (
+                      <GalaxyButton
+                        key={o.level}
+                        shape="chip"
+                        variant={(props.slotLevels?.[row.level!.key] ?? row.level!.default) === o.level ? 'primary' : 'secondary'}
+                        data-testid={`${row.level!.key}-level-${o.level}`}
+                        onClick={() => props.onSlotLevel?.(row.level!.key, o.level)}
+                      >
+                        {o.label}
+                      </GalaxyButton>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {len && chipsOn.has(row.key) && len.options.length > 0 ? (
                 <div className="mt-2.5">
                   <p className="text-white/80 text-[13px] mb-2">{week.length_label}</p>
@@ -100,7 +164,7 @@ export default function RideStrengthWeekCard(props: Props) {
           );
         })}
       </div>
-      <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p>
+      {week.easy_line ? <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p> : null}
     </div>
   );
 }

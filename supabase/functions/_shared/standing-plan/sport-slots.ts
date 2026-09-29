@@ -98,6 +98,12 @@ export type SportMix = {
    * the week as printed. Replaces the ride count (p278's six-or-seven chips, 2026-09-13).
    */
   slotsOff?: string[] | null;
+  /**
+   * ⛔ THE LEVEL THE RIDER PICKED WHERE THE PAGE PRINTS A RANGE (Michael, 2026-09-27: p279's day 1 "level 2 to 3") — frame
+   * keys to a level. Only a slot with `EnduranceSlot.levelChoices` is honoured, and only a level it lists
+   * (`withPickedLevels`); any other key is ignored. Absent = the slot's own level.
+   */
+  levels?: Record<string, number> | null;
 };
 
 export type AssignedSlot = {

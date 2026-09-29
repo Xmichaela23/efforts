@@ -1035,6 +1035,44 @@ Source: Viada pp278, 280-281 · 3 lifting days · weekly rate anchor: **ZERO —
   day 7   (rest)               —
 ```
 
+### `cycling_long` — Cycling: the p279 program
+
+Source: Viada pp279-281 · 3 lifting days · weekly rate anchor: **ZERO — progression is earned, never scheduled**
+
+**standard column**
+
+```
+  day 1   ME Upper             ME:primary · ME:primary · DE:secondary · HYP:focused · HYP:focused
+                               endurance: ride_sweet_spot
+  day 2   ME Lower             ME:primary · DE:secondary · HYP:secondary · SKILL:carry
+                               endurance: ride_endurance
+  day 3   (plyometrics)        —
+                               endurance: ride_vo2
+  day 4   Full                 DE:primary · DE:primary · HYP:focused · HYP:focused · DE:primary
+  day 5   —                    —
+                               endurance: ride_endurance
+  day 6   —                    —
+                               endurance: ride_endurance
+  day 7   (rest)               —
+```
+
+**taper column**
+
+```
+  day 1   ME Upper             SKILL:primary · DE:primary · DE:secondary · HYP:focused · HYP:focused
+                               endurance: ride_sweet_spot
+  day 2   ME Lower             ME:primary · SKILL:secondary · HYP:secondary · SKILL:carry
+                               endurance: ride_endurance
+  day 3   (plyometrics)        —
+                               endurance: ride_sprints
+  day 4   Full                 DE:primary · DE:primary · HYP:focused · HYP:focused
+  day 5   —                    —
+                               endurance: ride_endurance
+  day 6   —                    —
+                               endurance: ride_endurance
+  day 7   (rest)               —
+```
+
 ---
 
 ## 3. THE PICKER — which cells each programme draws
@@ -1125,6 +1163,19 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `single_leg_b` — Leg variation  ⚠️ names no printed cell (opt-in addition)
 - `quad_iso` — Leg isolation  ⚠️ names no printed cell (opt-in addition)
 - `carry` — Carry
+
+**`cycling_long`** — 10 cells
+
+- `db_press` — Press variation  ⚠️ names no printed cell (opt-in addition)
+- `iso_push` — Push isolation
+- `iso_pull_a` — Pull isolation
+- `iso_pull_b` — Pull isolation  ⚠️ names no printed cell (opt-in addition)
+- `hinge_lower` — Hinge variation
+- `single_leg_a` — Leg variation  ⚠️ names no printed cell (opt-in addition)
+- `single_leg_b` — Leg variation  ⚠️ names no printed cell (opt-in addition)
+- `quad_iso` — Leg isolation
+- `carry` — Carry
+- `ham_iso` — Hamstring isolation
 
 ---
 

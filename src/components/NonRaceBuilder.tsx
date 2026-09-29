@@ -373,10 +373,12 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'run_muscle' | 'run_half_muscle' | 'ride_strength' | 'marathon';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'run_muscle' | 'run_half_muscle' | 'ride_strength'
+  | 'ride_long_strength' | 'marathon';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
-  standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength'],
+  // ⛔ Long Ride + Strength (p279) sits under Ride, 2026-09-28 — drawn in the server's `ride_groups` when they arrive.
+  standard: ['run_ride_strength'], run: ['run_strength', 'run_half_strength'], ride: ['ride_strength', 'ride_long_strength'],
 };
 // ⛔ THE CARDS' WORDS ARE THE SERVER'S (2026-09-13) — `builder.setup.programs`: name, description, requirements line.
 const PROGRAM_COPY: Record<ProgramId, {
@@ -384,7 +386,7 @@ const PROGRAM_COPY: Record<ProgramId, {
   /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
   goal: NonRaceGoalId | null;
   /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
-  focus: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
+  focus: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
    * ⛔ A BUILT PROGRAMME WHOSE SCREENS' WORDS ARE NOT ALL APPROVED YET STAYS DIMMED (Ride + Strength,
    * 2026-09-13: every athlete-facing line goes through Michael before the card is switched on).
@@ -425,16 +427,23 @@ const PROGRAM_COPY: Record<ProgramId, {
     Icon: Bike, color: getDisciplineColor('ride'),
     goal: 'get_stronger', focus: 'ride',
   },
+  // ⛔ LONG RIDE + STRENGTH — the p279 program, under "Go longer" (Michael approved both 2026-09-27).
+  ride_long_strength: {
+    Icon: Bike, color: getDisciplineColor('ride'),
+    goal: 'get_stronger', focus: 'ride_long',
+  },
 };
 /** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 /** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
-const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp', FrameId> = {
+const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp', FrameId> = {
   standard: 'all_rounder',
   run: 'strength_5k',
   // ⛔ Ride Focus → Ride + Strength → Cycling: Base (p278). `resolveFrame` takes the same word.
   ride: 'cycling_base',
+  // ⛔ Ride Focus → Long Ride + Strength → the p279 program (2026-09-28).
+  ride_long: 'cycling_long',
   // ⛔ 5HR + Strength → Strength + Half-Marathon (p250), 2026-09-22.
   run_half: 'strength_half',
   // ⛔ Build muscle → Hypertrophy + 5K (p244) and Hypertrophy + Half-Marathon (p252), 2026-09-23.
@@ -448,14 +457,14 @@ const FOCUS_FRAME: Record<'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' |
  * is the whole class of defect the per-slot answer exists to prevent.
  * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
-const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
 
 /**
  * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4; reshaped 2026-09-27). The page
  * fixes every ride; the athlete picks the long ride's length and may switch an optional ride off. Keyed on what the
  * frame DECLARES (`printedWeekOnly` and a `rideWeek`), never on its id.
  */
-const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
+const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
   st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.rideWeek != null;
 
 /**
@@ -472,7 +481,7 @@ const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standar
  * ⚠️ ONE OWNER, READ IN BOTH SCOPES — the payload assembler and the component. Two copies of this
  * test is how the screen and the payload come to disagree about what was asked.
  */
-const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
+const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp' }): boolean =>
   st.goal === 'get_stronger' && (frameOf(st) === 'strength_5k' || frameOf(st) === 'strength_half'
     || frameOf(st) === 'hyp_5k' || frameOf(st) === 'hyp_half');
 
@@ -917,12 +926,22 @@ export type NonRaceState = {
    * card existed. It never changes what that path builds.
    * ⚠️ `'ride'` = Ride + Strength (Cycling: Base, p278), 2026-09-13.
    */
-  focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
+  focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
    * ⛔ THE OPTIONAL RIDES SWITCHED OFF (Ride + Strength's Day 2 easy ride, 2026-09-27) — screen row keys. Absent = all
    * on, the page's five rides.
    */
   slotsOff?: SlotKey[];
+  /**
+   * ⛔ THE LEVEL PICKED ON A RIDE THE PAGE PRINTS AS A RANGE (p279 day 1, "level 2 to 3"; 2026-09-28) — screen row keys.
+   * Absent = the ride's own level. The chips are drawn only once their words are approved (`ride_strength_week`).
+   */
+  slotLevels?: Partial<Record<SlotKey, number>>;
+  /**
+   * ⛔ THE RIDE VERSION PICKED ON AN ENDURANCE RIDE (p239: the easy ride or the structured ride; 2026-09-28) — screen row
+   * keys to the library's archetype id. Absent = the server's default version.
+   */
+  slotVersions?: Partial<Record<SlotKey, string>>;
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
    * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is
@@ -1649,6 +1668,8 @@ function assemblePayload(
           // ⛔ RIDE + STRENGTH (2026-09-13): the focus, and the ride count on a printed ride week. Both
           // omitted on every other path, so those payloads are byte-identical.
           ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
+          // ⛔ Long Ride + Strength (p279), 2026-09-28 — the same forward.
+          ...(isStrengthFocusPath && state.focus === 'ride_long' ? { focus: 'ride_long' } : {}),
           // ⛔ 5HR + Strength (p250), 2026-09-22 — without this the build falls back to the 5K frame.
           ...(isStrengthFocusPath && state.focus === 'run_half' ? { focus: 'run_half' } : {}),
           // ⛔ Build muscle (p244, p252), 2026-09-23 — the same forward.
@@ -1659,6 +1680,17 @@ function assemblePayload(
             if (!printedRideWeekPath(state) || !(state.slotsOff ?? []).length) return {};
             const off = frameSlots(wizardFrame).filter((r) => state.slotsOff!.includes(r.key)).map((r) => r.frameKey);
             return off.length > 0 ? { endurance_slots_off: off } : {};
+          })(),
+          // ⛔ THE LEVEL PICKED ON A RIDE THE PAGE PRINTS AS A RANGE (p279 day 1, 2026-09-28), keyed the engine's way.
+          ...(() => {
+            if (!printedRideWeekPath(state)) return {};
+            const picked = state.slotLevels ?? {};
+            const out: Record<string, number> = {};
+            for (const row of frameSlots(wizardFrame)) {
+              const lv = Number(picked[row.key]);
+              if (lv === 1 || lv === 2 || lv === 3) out[row.frameKey] = lv;
+            }
+            return Object.keys(out).length > 0 ? { endurance_slot_levels: out } : {};
           })(),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
@@ -1762,6 +1794,14 @@ function assemblePayload(
                 : state.hardDays[hardKeys.indexOf(s.key)];
               const a = (entry as { archetype?: string } | undefined)?.archetype;
               if (a) out[s.frameKey] = a;
+            }
+            // ⛔ THE RIDE VERSION PICKED ON THE RIDES SCREEN (p239's easy ride or its structured ride, 2026-09-28) — the
+            // same variant-pick field, keyed the engine's way. A ride that follows another's takes it on the server.
+            if (printedRideWeekPath(state)) {
+              for (const s of frameSlots(wizardFrame)) {
+                const v = state.slotVersions?.[s.key];
+                if (s.role !== 'hard' && typeof v === 'string' && v) out[s.frameKey] = v;
+              }
             }
             return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
           })(),
@@ -4285,10 +4325,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               })
               : null}
             {(state.trainCard === 'run' && setupCopy?.run_sections?.length
-              ? setupCopy.run_sections.filter((sec) => sec.id === state.runSection).map((sec) => ({ title: null, programs: sec.programs as ProgramId[] }))
-              : [{ title: null, programs: PROGRAMS_BY_CARD[state.trainCard] }]
-            ).map((sec) => (
-              <div key={sec.title ?? 'all'}>
+              ? setupCopy.run_sections.filter((sec) => sec.id === state.runSection).map((sec) => ({ title: null as string | null, programs: sec.programs as ProgramId[] }))
+              // ⛔ THE RIDE LIST'S GROUPS (2026-09-28): the server's `ride_groups`; a titled group ("Go longer") prints its
+              // title above its cards. Before the setup copy arrives, the flat list.
+              : state.trainCard === 'ride' && setupCopy?.ride_groups?.length
+                ? setupCopy.ride_groups.map((g) => ({ title: g.title, programs: g.programs as ProgramId[] }))
+                : [{ title: null as string | null, programs: PROGRAMS_BY_CARD[state.trainCard] }]
+            ).map((sec, gi) => (
+              <div key={sec.title ?? `all-${gi}`}>
+                {sec.title ? (
+                  <p className="text-white/55 text-xs uppercase tracking-wide mt-4 mb-2">{sec.title}</p>
+                ) : null}
                 <div className="space-y-2">
             {sec.programs.map((p) => {
               const { Icon, color, goal, focus, held } = PROGRAM_COPY[p];
@@ -5784,6 +5831,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               ...st,
               slotsOff: on ? (st.slotsOff ?? []).filter((k) => k !== key) : [...new Set([...(st.slotsOff ?? []), key])],
             }))}
+            slotLevels={state.slotLevels}
+            onSlotLevel={(key, level) => setState((st) => ({ ...st, slotLevels: { ...(st.slotLevels ?? {}), [key]: level } }))}
+            slotVersions={state.slotVersions}
+            onSlotVersion={(key, version) => setState((st) => ({ ...st, slotVersions: { ...(st.slotVersions ?? {}), [key]: version } }))}
           />
         </StepLayout>
       )}

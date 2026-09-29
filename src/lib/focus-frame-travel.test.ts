@@ -65,7 +65,8 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
    * `all_rounder` would move every one of them onto a different programme mid-flight.
    */
   // ⚠️ `'ride'` JOINED 2026-09-13 (Ride Focus → Cycling: Base, p278). Absent still means the 5K frame.
-  assert(/focus\?: 'standard' \| 'run' \| 'ride' \| 'run_half' \| 'run_hyp' \| 'run_half_hyp';/.test(RESOLVER),
+  // ⚠️ `'ride_long'` JOINED 2026-09-28 (Long Ride + Strength, p279).
+  assert(/focus\?: 'standard' \| 'run' \| 'ride' \| 'ride_long' \| 'run_half' \| 'run_hyp' \| 'run_half_hyp';/.test(RESOLVER),
     'the resolver no longer takes an optional focus');
   assert(/position\.focus === 'run_half' \? 'strength_half' : 'strength_5k'/.test(RESOLVER),
     'the resolver default is no longer the 5K frame');
@@ -85,11 +86,22 @@ Deno.test('⛔ RIDE + STRENGTH — the focus, the switched-off rides and the lon
   assert(/\(body as Record<string, unknown>\)\.endurance_slots_off/.test(GENERATE), 'generate-strength-plan no longer reads the switched-off rides');
 });
 
+Deno.test('⛔ LONG RIDE + STRENGTH (p279, 2026-09-28) — the focus and the picked level survive every hop', () => {
+  assert(/goal: 'get_stronger', focus: 'ride_long'/.test(WIZARD), 'the Long Ride + Strength card no longer seeds its focus');
+  assert(/state\.focus === 'ride_long' \? \{ focus: 'ride_long' \} : \{\}/.test(WIZARD), 'the payload no longer sends the focus');
+  assert(/\{ endurance_slot_levels: out \}/.test(WIZARD), 'the payload no longer sends the picked level');
+  assert(/gsTp\.focus === 'ride_long'/.test(CREATE_GOAL), 'create-goal no longer forwards the focus');
+  assert(/\{ endurance_slot_levels: out \}/.test(CREATE_GOAL), 'create-goal drops the picked level');
+  assert(/if \(raw === 'ride_long'\) return raw;/.test(GENERATE), 'generate-strength-plan no longer reads the focus');
+  assert(/\(body as Record<string, unknown>\)\.endurance_slot_levels/.test(GENERATE), 'generate-strength-plan no longer reads the picked level');
+});
+
 Deno.test('⛔ MULTISPORT FOCUS — the Run + Ride + Strength card opens today\'s Standard Focus setup (2026-09-13)', () => {
   // The same goal and focus the Standard Focus Train card set, so the setup and the payload are unchanged.
   assert(/run_ride_strength: \{[\s\S]*?goal: 'get_stronger', focus: 'standard',/.test(WIZARD),
     'the Run + Ride + Strength card no longer seeds the Standard Focus goal and focus');
-  assert(/standard: \['run_ride_strength'\], run: \['run_strength', 'run_half_strength'\], ride: \['ride_strength'\]/.test(WIZARD),
+  // ⚠️ Long Ride + Strength (p279) joined the Ride list 2026-09-28; the other two lists are unchanged.
+  assert(/standard: \['run_ride_strength'\], run: \['run_strength', 'run_half_strength'\], ride: \['ride_strength', 'ride_long_strength'\]/.test(WIZARD),
     'the program lists changed');
   assert(/standard: 'programs', run: 'programs', ride: 'programs'/.test(WIZARD), 'a section no longer opens its list');
 });

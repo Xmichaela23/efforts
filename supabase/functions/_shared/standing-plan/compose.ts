@@ -70,6 +70,9 @@ import {
   experienceLevels,
   LOW_VOLUME_RIDE_LEVELS_ARE_OURS,
   PLYO_DOSE,
+  planCeilingFor,
+  pickedVersions,
+  withPickedLevels,
   type ColumnKind,
   type EnduranceExperience,
   type Frame,
@@ -2961,6 +2964,25 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * inside the level it prints (p278).
    */
   if (frame.printedWeekOnly) {
+    /**
+     * ⛔ THE RIDE VERSION EACH SLOT BUILDS (p239's easy ride or its structured ride; Michael 2026-09-28) —
+     * `pickedVersions`: the rider's pick, a follower's from its leader, else the easy ride. The same array back on a
+     * frame with no `versions`, so Ride + Strength is untouched. ⛔ A LENGTH PICK APPLIES TO THE EASY RIDE ONLY: the
+     * structured ride is printed at one length per level, so its minutes are dropped rather than climbing a level.
+     */
+    const versions = pickedVersions(frame.columns[args.column], args.sportMix?.archetypes);
+    const versionsChanged = versions !== args.sportMix?.archetypes;
+    const lengthsForVersions = (minutes: Record<string, number> | null | undefined) => {
+      if (!minutes || !versionsChanged) return minutes;
+      const out = { ...minutes };
+      for (const d of frame.columns[args.column]) {
+        d.endurance.forEach((slot, i) => {
+          const k = `${d.day}:${i}`;
+          if (slot.versions?.length && versions?.[k] !== slot.versions[0]) delete out[slot.sameLengthAs ?? k];
+        });
+      }
+      return out;
+    };
     args = {
       ...args,
       targetWeeklyMiles: undefined,
@@ -2971,15 +2993,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       demonstratedWeeklyMiles: null,
       swimEasySessions: 0,
       levelOverrides: undefined,
-      sportMix: args.sportMix
+      sportMix: args.sportMix || versionsChanged
         ? {
-          ...args.sportMix,
-          minutes: pickedLengths(frame, args.column, args.sportMix.minutes, resolveEnduranceAnchors(args.baselines)),
+          ...(args.sportMix ?? {}),
+          ...(versionsChanged ? { archetypes: versions } : {}),
+          minutes: pickedLengths(frame, args.column, lengthsForVersions(args.sportMix?.minutes), resolveEnduranceAnchors(args.baselines)),
         }
         : args.sportMix,
     };
   }
-  const days = frame.columns[args.column];
+  /**
+   * ⛔ THE RIDER'S LEVEL WHERE THE PAGE PRINTS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27) —
+   * `withPickedLevels`: only a slot with `levelChoices`, only a level it lists. Every other frame and column is the
+   * column as printed (the same array back).
+   */
+  const days = withPickedLevels(args.frame, frame.columns[args.column], args.sportMix?.levels);
   /**
    * ⛔ EACH HARD SLOT'S POSITION IN THE FRAME'S ORDER, so a pin can be matched to the slot it was
    * made for. Built once over the whole column rather than counted inside the day loop, because the
@@ -3408,10 +3436,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
      */
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
-    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`.
-    const planLongCeiling = role === 'long' && family === 'run_lsd'
-      ? FRAMES[args.frame]?.runStrengthWeek?.longRunCeilingMinutes
-      : undefined;
+    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`. And the p279 long ride's (2026-09-28,
+    // p239 level 3) — `planCeilingFor`, the one reader.
+    const planLongCeiling = planCeilingFor(args.frame, family, role);
     const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
     // ⛔ A PICKED LENGTH MAY REACH DOWN TO THE SLOT'S SMALLER TIER (`EnduranceSlot.lengthFromLevel`, Michael 2026-09-27).
     const pickRungs = fromLevel != null && fromLevel < level

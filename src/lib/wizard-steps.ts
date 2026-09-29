@@ -22,7 +22,7 @@ export type StepRouterState = {
    * carries (`skipsSportScope`, `fixedSportScope`). Absent is `run`, which is every build that
    * predates the Standard card.
    */
-  focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
+  focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp';
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07) — `standard`, `run` or `ride`. Run and Ride are
    * groupings that open a program list (`program`) before any goal exists; Standard opens the
@@ -266,7 +266,9 @@ export function fixedSportScope(
 ): typeof STANDARD_FOCUS_POSTURE | typeof RUN_STRENGTH_POSTURE | typeof RIDE_STRENGTH_POSTURE | null {
   if (state.goal !== 'get_stronger') return null;
   const focus = state.focus ?? 'run';
-  return focus === 'standard' ? STANDARD_FOCUS_POSTURE : focus === 'ride' ? RIDE_STRENGTH_POSTURE : RUN_STRENGTH_POSTURE;
+  // ⛔ LONG RIDE + STRENGTH (p279, 2026-09-28) is a ride week with no run slot, like Ride + Strength.
+  return focus === 'standard' ? STANDARD_FOCUS_POSTURE
+    : focus === 'ride' || focus === 'ride_long' ? RIDE_STRENGTH_POSTURE : RUN_STRENGTH_POSTURE;
 }
 
 export function getSteps(state: StepRouterState): StepKey[] {

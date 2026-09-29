@@ -3,7 +3,8 @@
 //
 // ⛔ THE RULE, EVERY PART OF IT THE BOOK'S OR THE OWNER'S:
 //   · WHEN — the frame's own timing on the slot (`EnduranceSlot.growth`): p281, Base's long ride "every 1 to 2 weeks",
-//     its midweek endurance rides once a "1-month cycle"; p279's long ride "every fourth week".
+//     its midweek endurance rides once a "1-month cycle"; p279's long ride "every fourth week" — weeks 4, 8 and 12 of
+//     the plan (`blockWeeks`, Michael 2026-09-27).
 //   · HOW MUCH — at most 5% of the week's easy minutes. p148: "aiming to change each of these by less than 10 percent
 //     per week, though ideally 5 percent is as high as I will usually go." Easy minutes are p146's sub-VT1 bucket, the
 //     plan's stored week ledger (`week_ledgers[week].minutes.easy`). Whole minutes, rounded down, so the step never
@@ -31,7 +32,7 @@
 // ⛔ NOTHING HERE IS OURS: no step size, no threshold. If the book gives no timing for a slot, the slot has no `growth`
 // and is never offered.
 // ============================================================================
-import { FRAMES, type FrameId } from './frames.ts';
+import { FRAMES, planCeilingFor, type FrameId } from './frames.ts';
 import { ladderOf } from './volume-bounds.ts';
 import { resolveEnduranceAnchors } from '../endurance-library/index.ts';
 
@@ -49,6 +50,16 @@ const addTo = (iso: string, every: { weeks: number } | { months: number }): stri
   else d.setUTCMonth(d.getUTCMonth() + every.months);
   return d.toISOString().slice(0, 10);
 };
+const addDays = (iso: string, n: number): string => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+/** The plan week `today` falls in, 1-based, counted in 7-day weeks from the block's first day. */
+const weekOfBlock = (blockStart: string, today: string): number => {
+  const ms = Date.parse(`${today.slice(0, 10)}T12:00:00Z`) - Date.parse(`${blockStart.slice(0, 10)}T12:00:00Z`);
+  return Math.floor(ms / (7 * 86400000)) + 1;
+};
 
 export function lengthStepOffers(args: {
   frame: FrameId;
@@ -61,6 +72,13 @@ export function lengthStepOffers(args: {
   blockStart: string;
   today: string;
   baselines?: unknown;
+  /**
+   * The plan week today falls in, as the caller's plan-week reader counts it (`resolvePlanWeekIndex`). Read only by a
+   * `blockWeeks` timing; absent, it is counted in 7-day weeks from `blockStart`.
+   */
+  currentWeek?: number | null;
+  /** The ride versions picked (`sport_mix.archetypes`) — a slot with `versions` steps up only on its easy ride. */
+  archetypes?: Record<string, string> | null;
 }): LengthOffer[] {
   const frame = FRAMES[args.frame];
   const easy = Number(args.weekEasyMinutes);
@@ -77,12 +95,35 @@ export function lengthStepOffers(args: {
     slots.forEach(({ slot, key }) => {
       const now = Math.round(Number(args.minutes?.[key]));
       if (!slot.growth || !(now > 0) || room < 1) return;
-      const last = (args.history ?? []).filter((h) => h.slot === key).map((h) => h.at.slice(0, 10)).sort().pop()
-        ?? args.blockStart.slice(0, 10);
-      if (args.today.slice(0, 10) < addTo(last, slot.growth.every)) return;
+      /**
+       * ⛔ THE STRUCTURED RIDE IS NEVER OFFERED A STEP (2026-09-28). p239 prints it at one length per level and gives no
+       * way to lengthen it, and p281's "progressively get longer" names no version — so no rule is added: a slot the rider
+       * put on its structured ride (`EnduranceSlot.versions`, anything but the first) holds its printed length.
+       */
+      const version = slot.versions?.length
+        ? (args.archetypes?.[key] && slot.versions.includes(args.archetypes[key]) ? args.archetypes[key] : slot.versions[0])
+        : undefined;
+      if (slot.versions?.length && version !== slot.versions[0]) return;
+      const every = slot.growth.every;
+      if ('blockWeeks' in every) {
+        // ⛔ THE PLAN'S OWN WEEKS (p279's "every fourth week" = weeks 4, 8 and 12, Michael 2026-09-27): offered in a week
+        // that is a multiple of N, once — an answer given in that week (accept or keep) closes it until the next one.
+        const wk = Number(args.currentWeek) > 0 ? Number(args.currentWeek) : weekOfBlock(args.blockStart, args.today);
+        if (!(every.blockWeeks > 0) || wk < every.blockWeeks || wk % every.blockWeeks !== 0) return;
+        const weekStart = addDays(args.blockStart, (wk - 1) * 7);
+        if ((args.history ?? []).some((h) => h.slot === key && h.at.slice(0, 10) >= weekStart)) return;
+      } else {
+        const last = (args.history ?? []).filter((h) => h.slot === key).map((h) => h.at.slice(0, 10)).sort().pop()
+          ?? args.blockStart.slice(0, 10);
+        if (args.today.slice(0, 10) < addTo(last, every)) return;
+      }
+      // ⛔ THE PLAN'S OWN LONG-SESSION CAP where it states one (p279's long ride, p239 level 3) — `planCeilingFor`.
+      const ceilingMin = planCeilingFor(args.frame, slot.family, slot.role);
       const rungs = ladderOf({
         family: slot.family, level: (slot.lengthFromLevel ?? slot.level) as never,
         sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run', role: slot.role,
+        ...(ceilingMin ? { ceilingMin } : {}),
+        ...(version ? { archetype: version } : {}),
       } as never, anchors);
       const rung = rungs.find((r) => now >= Math.round(r.lo) && now <= Math.round(r.hi));
       if (!rung) return;

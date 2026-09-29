@@ -124,8 +124,10 @@ const corsHeaders = {
  * Cycling: Base, anything else (including absent) → Strength + 5K, which is what every caller before
  * the focus cards existed already gets.
  */
-function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp' {
+function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp' {
   const raw = (body as Record<string, unknown> | null)?.focus;
+  // ⛔ 'ride_long' → Long Ride + Strength, the p279 program (2026-09-28).
+  if (raw === 'ride_long') return raw;
   // ⛔ 'run_half' → 5HR + Strength (p250), 2026-09-22.
   // ⛔ 'run_hyp' → Hypertrophy + 5K (p244), 'run_half_hyp' → Hypertrophy + Half-Marathon (p252), 2026-09-23.
   if (raw === 'run_hyp' || raw === 'run_half_hyp') return raw;
@@ -545,6 +547,22 @@ Deno.serve(async (req: Request) => {
           if (!Array.isArray(raw)) return null;
           if (!raw.every((k) => typeof k === 'string' && /^\d+:\d+$/.test(k))) return null;
           return raw.length > 0 ? [...raw] as string[] : null;
+        })(),
+        /**
+         * ⛔ THE LEVEL THE RIDER PICKED WHERE THE PAGE PRINTS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27) —
+         * frame keys to a level 1-3. Only a slot the frame gives `levelChoices` is honoured (`withPickedLevels`). A
+         * malformed map drops whole, the same discipline as the maps below.
+         */
+        levels: (() => {
+          const raw = (body as Record<string, unknown>).endurance_slot_levels;
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+          const out: Record<string, number> = {};
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            const n = Number(v);
+            if (!/^\d+:\d+$/.test(k) || !(n === 1 || n === 2 || n === 3)) return null;
+            out[k] = n;
+          }
+          return Object.keys(out).length > 0 ? out : null;
         })(),
         /**
          * ⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, when the wizard collected one. Counts alone do not
