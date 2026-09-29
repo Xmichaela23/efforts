@@ -61,7 +61,11 @@ export type ConflictRule =
    * composer makes the cut and this names it. ⚠️ SAME DAY ONLY — p144 covers the session and the day
    * and says nothing about tomorrow.
    */
-  | 'easy_run_with_heavy_legs';
+  | 'easy_run_with_heavy_legs'
+  /** Two hard sessions on one day (p108 / p145: 6-8 hours between two sessions in one day). */
+  | 'two_hard_one_day'
+  /** No day of the week is clear. */
+  | 'no_rest_day';
 
 /**
  * ⛔ STRUCTURED, NOT A SENTENCE (2026-08-26). A later slice attaches actions to these — *"maybe give
