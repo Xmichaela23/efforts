@@ -200,6 +200,8 @@
    "Your midweek easy rides can go from {from} to {to}.",
    "Pick how long the long ride and the midweek easy rides are.",
    "Optional. An easy ride between the hard days.",
+   "Optional. An easy ride the day before the long ride.",
+   "Easy ride",
    "Easy session",
    "Easy session {n}",
    "{n} short and easy",

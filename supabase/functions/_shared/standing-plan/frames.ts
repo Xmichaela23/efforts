@@ -1828,7 +1828,7 @@ const CYCLING_LONG_TAPER: FrameDay[] = [
     label: 'ME Upper',
     strength: [
       S('SKILL', 'competition', 'primary', 'push_upper', '1 x SKILL: Primary push'),
-      // Built as "1 x DE: Accessory: primary pull" (settled point 3) — not a competition lift.
+      // p279 deload day 1. Built as "1 x DE: Accessory: primary pull" (settled point 3) — not a competition lift.
       S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Primary pull'),
       // Built as "1 x DE: Accessory: secondary push" (settled point 3) — the standard week's cell and its movement list.
       { ...CYCLING_BASE_STANDARD[0].strength[2], sourceText: '1 x DE: Secondary push' },
