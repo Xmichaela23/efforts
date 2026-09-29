@@ -10,6 +10,7 @@ import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 // Home's two tabs (work order 2026-09-09 §1): Today opens; Week is the calendar behind a tab.
 import HomeTabs, { type HomeLens } from './HomeTabs';
+import HistoryList from './HistoryList';
 import StrengthLogger from './StrengthLogger';
 import PilatesYogaLogger from './PilatesYogaLogger';
 import AllPlansInterface from './AllPlansInterface';
@@ -1692,6 +1693,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         opens the same menu for that day. `WorkoutCalendar` owns it, and it is
                         literally the same menu (`LogTypeMenuContent`), not a copy of it. */}
                   </div>
+
+                  {/* History (2026-09-28) — every finished session, newest first, by sport. A row opens the session the
+                      way Today's card does. */}
+                  {homeLens === 'history' && (
+                    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                      <HistoryList onOpen={handleEditEffort} />
+                    </div>
+                  )}
                 </div>
               </div>
               )}

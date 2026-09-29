@@ -1,9 +1,9 @@
-// Home's two tabs (work order 2026-09-09 §1): Today is the screen Home opens on; Week is the
+// Home's tabs (work order 2026-09-09 §1; History added 2026-09-28): Today is the screen Home opens on; Week is the
 // calendar that used to sit under it. Same strip as State's Status / Adjust / Schedule
 // (`StateHubTabs`) — one segmented row, active = white + underline — so the two hubs read alike.
-import { CalendarCheck, CalendarDays } from 'lucide-react';
+import { CalendarCheck, CalendarDays, History } from 'lucide-react';
 
-export type HomeLens = 'today' | 'week';
+export type HomeLens = 'today' | 'week' | 'history';
 
 const TABS: Array<{ key: HomeLens; label: string; Icon: typeof CalendarDays }> = [
   // ⛔ NOT A SUN (Michael, 2026-09-09, on the device): a sun beside "Today" reads as the WEATHER,
@@ -14,6 +14,9 @@ const TABS: Array<{ key: HomeLens; label: string; Icon: typeof CalendarDays }> =
   // Home opens, so the stop that used to point at it points at the tab that opens it
   // (`FirstRunOverlay` HOME_STOPS). Its words are unchanged.
   { key: 'week', label: 'Week', Icon: CalendarDays },
+  // Past (Michael, 2026-09-28; "History" first, renamed the same day): every finished session, newest first, by sport —
+  // `HistoryList`. The icon is the one State's Record tab already uses for a look back.
+  { key: 'history', label: 'Past', Icon: History },
 ];
 
 export default function HomeTabs({
@@ -24,7 +27,7 @@ export default function HomeTabs({
   onChange: (v: HomeLens) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-3 rounded-t-lg overflow-hidden flex-shrink-0">
+    <div className="grid grid-cols-3 w-full bg-white/[0.04] backdrop-blur-md border-b border-white/10 mb-3 rounded-t-lg overflow-hidden flex-shrink-0">
       {TABS.map(({ key, label, Icon }) => {
         const active = value === key;
         return (
