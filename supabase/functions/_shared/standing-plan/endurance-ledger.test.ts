@@ -164,7 +164,12 @@ Deno.test('⛔⛔ ABOVE VT2 THE PAGE GIVES TWO BUCKETS AND NO LINE — so the mi
   const RUN = { sport: 'run', value: 420, unit: 'sec_per_mi', source: 'x', isEstimate: false, vt1SecPerMi: 547 } as never;
   const step = (lo: number, hi: number) =>
     ({ role: 'work', label: 'x', seconds: 60, intensity: { kind: 'pct_threshold', lo, hi }, target: {} }) as never;
-  assertEquals(placeStep(step(1.05, 1.05), RUN), { kind: 'over_vt2', band: { lo: 1.05, hi: 1.05 } });
+  // ⛔ 105% IS "JUST OVER" BY p233's OWN FILING — the page prints the 5K race-specific NT session wholly at 105%
+  // (2 x 5-minute repeats @ 105%) under the Near-Threshold heading. Past it, still unsplit.
+  assertEquals(ENDURANCE_LEDGER_BOUNDARIES.nearThresholdTopPct, 1.05);
+  assertEquals(placeStep(step(1.05, 1.05), RUN), { kind: 'bucket', bucket: 'near_threshold' });
+  assertEquals(placeStep(step(1.00, 1.05), RUN), { kind: 'bucket', bucket: 'near_threshold' });
+  assertEquals(placeStep(step(1.10, 1.10), RUN), { kind: 'over_vt2', band: { lo: 1.10, hi: 1.10 } });
   assertEquals(placeStep(step(1.30, 1.30), RUN), { kind: 'over_vt2', band: { lo: 1.30, hi: 1.30 } });
 
   const session = build('run_mlss', 2) as { anchor: unknown };
