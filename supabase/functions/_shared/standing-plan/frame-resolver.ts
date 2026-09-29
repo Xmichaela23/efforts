@@ -42,7 +42,7 @@ export type FramePosition = {
    * mid-block. **The frame is reachable; which one is the default is Michael's call and needs the
    * screen that asks.** §11 still has it open.
    */
-  focus?: 'standard' | 'run' | 'ride' | 'run_half' | 'run_hyp' | 'run_half_hyp';
+  focus?: 'standard' | 'run' | 'ride' | 'ride_long' | 'run_half' | 'run_hyp' | 'run_half_hyp';
 };
 
 export type FrameResolution =
@@ -93,6 +93,8 @@ export function resolveFrame(position: FramePosition): FrameResolution {
     const frame: FrameId = position.focus === 'standard'
       ? 'all_rounder'
       : position.focus === 'ride' ? 'cycling_base'
+        // ⛔ `'ride_long'` → Long Ride + Strength, the p279 program (2026-09-28).
+        : position.focus === 'ride_long' ? 'cycling_long'
         // ⛔ Hypertrophy + 5K (p244) and Hypertrophy + Half-Marathon (p252), 2026-09-23.
         : position.focus === 'run_hyp' ? 'hyp_5k'
           : position.focus === 'run_half_hyp' ? 'hyp_half'

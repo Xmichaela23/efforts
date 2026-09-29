@@ -25,7 +25,7 @@ import {
 } from './accessory-picks.ts';
 import { FRAMES, type FrameId } from './frames.ts';
 import { DEADLIFT_FORM_LABEL, DEFAULT_DEADLIFT_FORM, TESTED_LIFT_NAME, type DeadliftForm } from './working-number.ts';
-import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
+import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RIDE_GROUPS, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
 
 export type BuildFocusOption = { name: string; label: string; display: string };
 export type BuildFocusRow = {
@@ -83,6 +83,8 @@ export type SetupBlock = {
   programs: typeof PROGRAM_COPY;
   /** The Run screen's sections, in order (2026-09-23). */
   run_sections: typeof RUN_SECTIONS;
+  /** The Ride list's groups, in order (2026-09-28): a titled group prints its title above its cards. */
+  ride_groups: typeof RIDE_GROUPS;
   section_closed_line: string;
   plans: typeof PLAN_COPY;
   numbers: typeof NUMBERS_COPY;
@@ -160,6 +162,7 @@ export function setupBlock(equipment: string[] | null): SetupBlock {
     deadlift_form: deadliftFormRow(),
     programs: PROGRAM_COPY,
     run_sections: RUN_SECTIONS,
+    ride_groups: RIDE_GROUPS,
     section_closed_line: SECTION_CLOSED_LINE,
     plans: PLAN_COPY,
     numbers: NUMBERS_COPY,
@@ -170,6 +173,7 @@ export function setupBlock(equipment: string[] | null): SetupBlock {
       hyp_5k: buildFocusBlock('hyp_5k', equipment),
       hyp_half: buildFocusBlock('hyp_half', equipment),
       cycling_base: buildFocusBlock('cycling_base', equipment),
+      cycling_long: buildFocusBlock('cycling_long', equipment),
     },
   };
 }

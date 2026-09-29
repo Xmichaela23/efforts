@@ -37,7 +37,7 @@ import {
   type SlotSport,
 } from '../../../../src/lib/standing-plan-week-copy.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
-import { FRAMES, isJoinedSlot, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FRAMES, isJoinedSlot, planLongCeilingFor, type EnduranceExperience, type FrameId } from './frames.ts';
 import { FAMILIES } from '../endurance-library/index.ts';
 import { FAMILY_LABEL } from './session-vocabulary.ts';
 import { frameRotatedArchetype } from './compose.ts';
@@ -132,7 +132,8 @@ export type EnduranceIntakeReadout = {
    * own slots and roles, so a cycling frame that declares `rideWeek` gets it by adding the frame only.
    */
   ride_strength_week: {
-    sub_line: string;
+    /** Null where the plan's own line is not yet approved (`RIDES_COPY.sub_by_frame`). */
+    sub_line: string | null;
     length_label: string;
     /**
      * `length` — the chips on a ride whose length the rider picks (`Frame.rideWeek`). `key` is the row the pick is stored
@@ -149,8 +150,19 @@ export type EnduranceIntakeReadout = {
         /** On a ride held to another's length: "Same length as Day N." — shown while that ride is in the week. */
         same_as: string | null;
       } | null;
+      /**
+       * ⛔ THE LEVEL CHIPS on a ride the page prints as a range (p279 day 1, "level 2 to 3"; the rider picks). `key` is the
+       * row the pick is stored under; `default` the slot's own level. Null on every other ride. ⚠️ `label` and each
+       * option's `label` are null until Michael approves the words (`RIDES_COPY.level_label` / `level_chip`) — the phone
+       * draws the chips only when they are present.
+       */
+      level: {
+        key: SlotKey; label: string | null; default: number;
+        options: Array<{ level: number; label: string | null }>;
+      } | null;
     }>;
-    easy_line: string;
+    /** Null where the plan's own line is not yet approved (`RIDES_COPY.easy_line_by_frame`). */
+    easy_line: string | null;
   } | null;
   tier_line: string | null;
 };
@@ -343,9 +355,12 @@ export function enduranceIntakeReadout(args: {
       const chips = f.rideWeek!.chips[frameKey];
       const owner = all.find((r) => r.frameKey === frameKey);
       if (!slot || !chips || !owner) return null;
+      // ⛔ THE PLAN'S OWN LONG-RIDE CAP where it states one (p279, p239 level 3) — the same reader the composer uses.
+      const ceilingMin = planLongCeilingFor(frame, slot.family, slot.role);
       const ladder = (level: number) => ladderOf({
         family: slot.family as never, level: level as never, role: slot.role,
         sport: String(slot.family).startsWith('ride_') ? 'ride' : 'run',
+        ...(ceilingMin ? { ceilingMin } : {}),
       } as never, anchors);
       const pick = ladder(slot.lengthFromLevel ?? slot.level);
       const own = ladder(slot.level);
@@ -379,13 +394,28 @@ export function enduranceIntakeReadout(args: {
           const leader = all.find((r) => r.frameKey === leads);
           return { ...l, same_as: leader ? fill(RIDES_COPY.same_length, { day: leader.frameDay }) : null };
         })(),
+        level: (() => {
+          const choices = slotOf(row.frameKey)?.levelChoices ?? [];
+          if (choices.length < 2) return null;
+          return {
+            key: row.key,
+            label: RIDES_COPY.level_label,
+            default: Number(slotOf(row.frameKey)!.level),
+            options: choices.map((lv) => ({
+              level: Number(lv),
+              label: RIDES_COPY.level_chip ? fill(RIDES_COPY.level_chip, { level: lv }) : null,
+            })),
+          };
+        })(),
       };
     });
+    const perFrame = <T,>(byFrame: Partial<Record<FrameId, T>>, fallback: T): T =>
+      (frame in byFrame ? byFrame[frame] as T : fallback);
     return {
-      sub_line: RIDES_COPY.sub,
+      sub_line: perFrame<string | null>(RIDES_COPY.sub_by_frame, RIDES_COPY.sub),
       length_label: RUNS_COPY.length_label,
       rows,
-      easy_line: RIDES_COPY.easy_line,
+      easy_line: perFrame<string | null>(RIDES_COPY.easy_line_by_frame, RIDES_COPY.easy_line),
     };
   })();
 

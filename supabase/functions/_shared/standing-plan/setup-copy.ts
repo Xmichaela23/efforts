@@ -18,6 +18,16 @@ export const SECTION_COPY = {
   ride: { label: 'Ride Focus', blurb: 'Your riding, with the lifting cut around it.', list_title: 'Ride' },
 } as const;
 
+/**
+ * ⛔ PENDING MICHAEL'S WORDS (2026-09-28): the Long Ride + Strength card's description. Empty until he approves a line —
+ * the card prints its name and requirements only. Do not fill it in as tidiness.
+ */
+export const P279_BLURB_PENDING_APPROVAL = '';
+
+// OURS — the 65 lb entry minimum per lift (see `PROGRAM_COPY` below); shared by the two ride cards.
+const RIDE_STRENGTH_REQUIREMENT = 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. '
+  + 'Watts need a power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.';
+
 /** Each program card: name, description and requirements line. */
 export const PROGRAM_COPY = {
   // Viada p275, reworded (Michael approved the words 2026-09-19); the page: "This program can be used as an "all-year" program for an athlete who's interested in multiple
@@ -89,12 +99,20 @@ export const PROGRAM_COPY = {
   // ⛔ OFF 2026-09-18: "For newer riders and riders coming back." (p280 says intermediate to advanced) and "Cycling and
   // strength progress together." (no page).
   // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
+  // ⛔ LONG RIDE + STRENGTH — the p279 program (Viada pp279-281). The name is approved (Michael, 2026-09-27); the
+  // description is not, so the card carries `P279_BLURB_PENDING_APPROVAL` (empty) until he gives the words.
+  // The requirements line is Ride + Strength's, reused word for word: p279 loads the same three lifts (bench, squat,
+  // deadlift — `FRAMES.cycling_long.testedLifts`) and prints the same carry row and the same kit.
+  ride_long_strength: {
+    label: 'Long Ride + Strength',
+    blurb: P279_BLURB_PENDING_APPROVAL,
+    requirement: RIDE_STRENGTH_REQUIREMENT,
+  },
   ride_strength: {
     label: 'Ride + Strength',
     blurb: 'Options for intermediate and advanced cyclists. Four or five rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
-    requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
-      + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
+    requirement: RIDE_STRENGTH_REQUIREMENT,
   },
 } as const;
 
@@ -113,6 +131,16 @@ export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: 
 ];
 /** Under a closed section. */
 export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
+
+/**
+ * ⛔ THE RIDE LIST'S GROUPS (2026-09-28). Long Ride + Strength sits under the goal "Go longer" (both approved, Michael
+ * 2026-09-27). Ride + Strength has no approved goal word, so its group has no title and its card is drawn as it is today.
+ * A group with a title prints the title above its cards; nothing on this screen opens a second level.
+ */
+export const RIDE_GROUPS: ReadonlyArray<{ id: string; title: string | null; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
+  { id: 'base', title: null, programs: ['ride_strength'] },
+  { id: 'longer', title: 'Go longer', programs: ['ride_long_strength'] },  // Michael approved the words 2026-09-27
+];
 
 // ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────
 
@@ -142,6 +170,8 @@ export const DELOAD_LINE: Record<FrameId, string | null> = {
   hyp_half: null,
   all_rounder: null,
   cycling_base: null,
+  // pp279-281 print no sentence on when to deload this program (SOURCE Part E10c).
+  cycling_long: null,
 };
 
 // ── Build this plan? and Know your numbers? ───────────────────────────────────────────────────
@@ -198,6 +228,14 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
     confirm_line: 'A {weeks}-week plan to get faster and stronger.',
     // ⛔ "If you're coming back from a riding break, make sure your FTP is current." came off 2026-09-18 (book-language
     // pass 3): p278–p281 say nothing of it (grepped the SOURCE doc's Part E2 for "FTP", "break", "current").
+    ftp_note: null,
+  },
+  // The name is approved (Michael, 2026-09-27). The two lines are templates already approved on other plans, reused
+  // word for word (the title Ride + Strength's, the line Run Lead's) — no new sentence.
+  cycling_long: {
+    name: 'Long Ride + Strength',
+    confirm_title: '{name}, {weeks} weeks.',
+    confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
   },
 };
@@ -310,7 +348,23 @@ export const RIDES_COPY = {
   optional_line_by_frame: {
     // p278 (Day 2's easy ride between Day 1 and Day 3), p134 (easy work is cut before hard work)
     cycling_base: 'Optional. An easy ride between the hard days.',  // Michael approved the words 2026-09-27
+    // ⛔ PROPOSED, NOT APPROVED (build note decision 2, 2026-09-27): the p279 switch's words, pending Michael's yes.
+    cycling_long: 'Easy ride on Day 5',
   } as Partial<Record<FrameId, string>>,
+  /**
+   * ⛔ THE SCREEN'S TOP AND BOTTOM LINES, PER PLAN, WHERE THEY DIFFER FROM Ride + Strength's (2026-09-28). `sub` names
+   * the midweek rides and `easy_line` is p281's Base note — neither is true of the p279 week (only the long ride takes a
+   * length; p281's note for this program is a different one). Null = no line, pending Michael's words.
+   */
+  sub_by_frame: { cycling_long: null } as Partial<Record<FrameId, string | null>>,
+  easy_line_by_frame: { cycling_long: null } as Partial<Record<FrameId, string | null>>,
+  /**
+   * ⛔ THE LEVEL CHIPS ON A RIDE THE PAGE PRINTS AS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27: the rider
+   * picks). ⛔ PENDING MICHAEL'S WORDS: both null, so the phone draws no chips and the ride builds at its printed low
+   * end until he approves a heading and a chip label ({level} is the number).
+   */
+  level_label: null as string | null,
+  level_chip: null as string | null,
   /**
    * Viada p281, the Base program's cycling note, reworded (Michael approved the words 2026-09-19); the page: "Over a 1-month cycle, the Tuesday and Friday endurance rides
    * should be the same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise

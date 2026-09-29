@@ -187,13 +187,22 @@ export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
    */
   // ⛔ AND THE CARRY ROW (D-479, 2026-09-16) — p278 day 4 is the only frame cell that prints a carry.
   cycling_base: [...VIADA_PICK_KEYS.filter((k) => k !== 'core'), 'carry'],
+  /**
+   * ⛔ p279 PRINTS p278's DAY 1 CELLS (focused pull + focused push, now a superset), the DE secondary hinge on day 2, the
+   * carry (on day 2 — see `PICK_DAY_BY_FRAME`), and day 4's focused push lower + focused hinge lower superset, so it takes
+   * Base's keys plus the hamstring cell's (`ham_iso`). `picksForFrame` keeps the ones that reach a cell. ⚠️ NO CORE: p279
+   * prints no core row. ⚠️ Day 2's "HYP: Secondary pull" has no pick key (none names a secondary pull cell) — the engine fills it.
+   */
+  cycling_long: [...VIADA_PICK_KEYS.filter((k) => k !== 'core'), 'carry', 'ham_iso'],
 };
 
 /**
  * ⛔ A DAY-SCOPED KEY'S DAY, ON A FRAME THAT PRINTS THE SAME CELLS ON ANOTHER DAY (2026-09-23). p252 prints p274's
  * upper-push day (arms superset + focused push) on day 2, not day 1, so p274's day-1 keys answer day 2 there.
  */
-const PICK_DAY_BY_FRAME: Partial<Record<FrameId, Record<number, number>>> = { hyp_half: { 1: 2 } };
+// ⛔ p279 prints the carry on day 2 (p278: day 4), so the carry's day-4 key answers day 2 there. No other day-4 key reaches
+// a p279 day-2 cell (`pickReachesFrame`).
+const PICK_DAY_BY_FRAME: Partial<Record<FrameId, Record<number, number>>> = { hyp_half: { 1: 2 }, cycling_long: { 4: 2 } };
 /** The frame day a pick's spec is scoped to on this frame, or null when the spec is day-agnostic. */
 export function specDayOn(slot: { frameDay?: number } | null | undefined, frame: FrameId): number | null {
   if (slot?.frameDay == null) return null;

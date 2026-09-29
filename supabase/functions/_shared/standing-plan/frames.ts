@@ -20,7 +20,7 @@ import type { TestedLift } from './working-number.ts';
  * `strength_5k` is FROZEN AS A DESIGN — stop shaping new work around its quirks — and still fully
  * guarded by its tests, because both frames share the composer, the materializer and the progression.
  */
-export type FrameId = 'strength_5k' | 'strength_half' | 'hyp_5k' | 'hyp_half' | 'all_rounder' | 'cycling_base';
+export type FrameId = 'strength_5k' | 'strength_half' | 'hyp_5k' | 'hyp_half' | 'all_rounder' | 'cycling_base' | 'cycling_long';
 
 /**
  * ⛔⛔⛔ WHETHER THIS FRAME ASKS FOR A WEEKLY HOURS TOTAL AT ALL — Michael, 2026-08-31:
@@ -312,7 +312,16 @@ export type EnduranceSlot = {
    * minutes (p148) and it stays inside the level's printed range (p239). `weeks` counts 7-day weeks, `months` calendar
    * months. Absent = the session holds its length.
    */
-  growth?: { every: { weeks: number } | { months: number }; cite: string };
+  growth?: { every: { weeks: number } | { months: number } | { blockWeeks: number }; cite: string };
+  /**
+   * ⛔ THE PAGE PRINTS A RANGE OF LEVELS FOR THIS SESSION AND THE RIDER PICKS ONE (Michael, 2026-09-27: p279's day 1
+   * "Cyc sweet spot (level 2 to 3)" is the rider's pick, the way the book leaves p258's "level 1 to 2" to the runner,
+   * p259). The pick travels as `SportMix.levels[frameKey]` and is honoured only when it is one of these. With no pick the
+   * slot builds at its own `level` — OURS, the low end of the page's range (Ride + Strength's day 1 precedent).
+   * `blockWeeks` on `growth`: offered in the plan's weeks that are multiples of N, counted from its start (p279's "every
+   * fourth week" = weeks 4, 8 and 12, Michael 2026-09-27).
+   */
+  levelChoices?: Level[];
   /**
    * ⛔ THIS SESSION IS THE SAME LENGTH AS ANOTHER ONE, AND ONE ANSWER SETS BOTH (Michael, 2026-09-27; p281: "Over a
    * 1-month cycle, the Tuesday and Friday endurance rides should be the same duration"). The named slot key holds the
@@ -480,7 +489,20 @@ export type Frame = {
    * length p239 prints for its level (its printed ends, no middles), so the week builds the minutes on the chip. The
    * first chip at the slot's own level opens selected. A slot with `sameLengthAs` takes the named slot's pick.
    */
-  rideWeek?: { chips: Record<string, number[]> };
+  rideWeek?: {
+    chips: Record<string, number[]>;
+    /**
+     * ⛔ THE LONG RIDE'S LENGTH CAP WHEN THIS PLAN STATES ITS OWN — the ride counterpart of
+     * `runStrengthWeek.longRunCeilingMinutes`. Absent = the family cap (`LADDER_CEILING_MIN.ride_endurance`, 210, the top
+     * of p239's level 2). p279's long ride is level 3, p239's "3.5- to 5-hour easy ride", so its cap is 300.
+     */
+    longRideCeilingMinutes?: number;
+  };
+  /**
+   * ⛔ THE HIGHEST RIDE LEVEL THIS PLAN BUILDS, WHERE ITS PAGE PRINTS ABOVE `RIDE_LEVEL_CEILING` (Michael, 2026-09-27,
+   * build note decision 4). Absent = `RIDE_LEVEL_CEILING` (2). p279 prints level 3 twice, so its frame carries 3.
+   */
+  rideLevelCeiling?: Level;
 };
 
 // ── the slot vocabulary, spelled once ───────────────────────────────────────────────────────────
@@ -1668,6 +1690,169 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
 ];
 
 /**
+ * ⛔⛔ THE p279 PROGRAM (notes p280 and p281) — the Long Ride + Strength week. Transcribed from the page image,
+ * `SOURCE-viada-hybrid-athlete.md` Part E10 (2026-09-27). Build note: `NOTES-p279-frame-2026-09-27.md`.
+ * ⛔ NAMING (Michael): the book's name for this program is never written in this repo.
+ *
+ * The same lifting days as p278 (1 heavy upper, 2 heavy lower, 4 full-body), a plyo warm-up on day 3, day 7 full rest,
+ * and FIVE RIDES, ONE A DAY, on days 1, 2, 3, 5 and 6 — no box on p279 holds two workouts, so nothing is joined
+ * (E10b). **Every lifting row p279 prints and nothing else.**
+ *
+ * What differs from Base (build note §1):
+ *   · Rides: day 1 sweet spot "level 2 to 3" (the rider's pick, `levelChoices`), day 2 endurance (2), day 3 VO2 (2),
+ *     day 5 endurance (2), day 6 endurance (3)/LSR — the week's long ride (p281 "the long ride"; E10a). Level 3 is
+ *     above the app's level-2 ride cap, so this frame carries its own (`rideLevelCeiling: 3`, decision 4).
+ *   · No sprint ride in the Standard week; the Deload column's day 3 is a sprint (level 1) in place of the VO2 ride.
+ *   · Deload lifting is mostly a SUBSTITUTION (ME → SKILL or DE, DE → SKILL) plus one cut (day 4's accessory hinge).
+ *   · Day 2 has one ME row, a DE secondary hinge, a HYP secondary pull and the carry. Day 4 is headed "Full" and carries
+ *     "2 x HYP: Focused push/hinge lower (superset)" — two adjacent rows, as on p244 and p274.
+ *   · Day 5's endurance ride is the optional one (decision 2: easy riding is cut before hard work, p134; days 1 and 6
+ *     are this program's priorities, p281; day 5 sits the day before day 6). It comes out of both columns.
+ *   · The long ride is OFFERED a longer length every fourth week — weeks 4, 8 and 12 (p281; Michael 2026-09-27) — at
+ *     most 5% of the week's easy minutes (p148), inside p239's level-3 range (`length-step.ts`). No other ride grows:
+ *     p281 gives this program no bullet on the midweek rides.
+ * ⚠️ NO RUN SLOT AND NO SWIM. ⚠️ NO OVERHEAD PRESS IS NAMED — the push rows are categories, as on p278, so
+ * `testedLifts` is bench, squat and deadlift.
+ */
+const CYCLING_LONG_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME Upper',
+    strength: [
+      // p279 day 1, standard column: the first three rows are p278's day 1 rows word for word (the same cells).
+      ...CYCLING_BASE_STANDARD[0].strength.slice(0, 3),
+      // p279 prints "superset" on this row where p278 does not: two adjacent rows, one superset (the p244 / p274 pattern).
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push superset'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push superset'),
+    ],
+    // p279 Standard column, day 1: "Cyc sweet spot (level 2 to 3)". The rider picks 2 or 3 (Michael, 2026-09-27).
+    // OURS — level 2 with no pick, the low end of the page's range (the same call as Base's day 1 "level 1-2").
+    endurance: [E('ride_sweet_spot', 2, 'Cyc sweet spot (level 2 to 3)', { role: 'hard', levelChoices: [2, 3] })],
+  },
+  {
+    day: 2,
+    label: 'ME Lower',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
+      /**
+       * ⚠️ NO "Accessory:" ON THIS ROW, AND IT IS STILL NOT A COMPETITION LIFT: a secondary movement is a noncompetition
+       * lift by p220's own category, and only the day's first row opens on the competition lift (p247). p220's secondary
+       * hinge lower list, whole — the same cell as p278's day 2 DE row (see `CYCLING_BASE_STANDARD`).
+       */
+      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Secondary hinge lower', {
+        alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'],
+      }),
+      S('HYP', 'accessory', 'secondary', 'pull_upper', '1 x HYP: Secondary pull'),
+      // p279 puts the carry on day 2 (p278 has it on day 4). A carry has no pattern in his key — see p278's day 4 row.
+      S('SKILL', 'accessory', 'carry', 'hinge_lower', '1 x SKILL: Carry'),
+    ],
+    // p279 Standard column, day 2: "Cyc endurance (level 2)".
+    endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy' })],
+  },
+  // p279 Standard column, day 3: "Plyo warm-up", "Cyc VO2 (level 2)".
+  { day: 3, label: null, strength: [], plyo: true, endurance: [E('ride_vo2', 2, 'Cyc VO2 (level 2)', { role: 'hard' })] },
+  {
+    day: 4,
+    // ⚠️ p279 HEADS THIS DAY "Full" in both columns (build note settled point 4), where p278 prints "DE: Full".
+    label: 'Full',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      /**
+       * ⛔ "2 x HYP: Focused push/hinge lower (superset)" — p222-223's "Focused push lower/quads" and "Focused hinge
+       * lower/hamstrings", with "lower" written once (build note §2, read from the category names). Two adjacent rows
+       * sharing the page's text are one superset (the p244 / p274 pattern). ⚠️ No `muscle`: the row names categories,
+       * the same as p246's "focused push lower", so each cell keeps p223's list whole.
+       */
+      S('HYP', 'accessory', 'focused', 'press_lower', '2 x HYP: Focused push/hinge lower (superset)'),
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '2 x HYP: Focused push/hinge lower (superset)'),
+      S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower (rotate with primary push lower)', { rotatesWith: 'press_lower' }),
+    ],
+    endurance: [],
+  },
+  // p279 Standard column, day 5: "Cyc endurance (level 2)". Optional (Michael, 2026-09-27, decision 2).
+  { day: 5, label: null, strength: [], endurance: [E('ride_endurance', 2, 'Cyc endurance (level 2)', { role: 'easy', optional: true })] },
+  /**
+   * ⚠️ p281 CALLS THIS "THE LONG RIDE" and names Saturday a priority, so the frame states `long`. p279 Standard column,
+   * day 6: "Cyc endurance (level 3)/LSR" — "/LSR" adds no other content (build note §2). The rider picks its length
+   * (`rideWeek`) inside p239's level 3.
+   */
+  {
+    day: 6, label: null, strength: [],
+    endurance: [E('ride_endurance', 3, 'Cyc endurance (level 3)/LSR', {
+      role: 'long',
+      // p281: "The long ride every fourth week should progressively get longer" — weeks 4, 8 and 12 (Michael, 2026-09-27).
+      growth: { every: { blockWeeks: 4 }, cite: 'Viada p281 — "The long ride every fourth week should progressively get longer"' },
+    })],
+  },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ p279's DELOAD COLUMN, BOTH SIDES. The lifting is mostly a SUBSTITUTION: day 1's ME primary push becomes SKILL and its
+ * ME accessory pull and DE secondary push become DE; day 2's DE secondary hinge becomes SKILL; day 4 loses the DE
+ * accessory primary hinge. The rides are five, one a day, all level 1: sweet spot, endurance, SPRINT, endurance, endurance.
+ * Three print slips, settled by Michael 2026-09-27 (build note settled points 2-4): "DR" on day 2 is built as ME (the
+ * standard row in the same position); day 1's two rows without "Accessory:" are built as the standard rows'
+ * accessories; the "ME Upper" / "ME Lower" / "Full" headings stay as printed. `sourceText` keeps the page's words.
+ */
+const CYCLING_LONG_TAPER: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME Upper',
+    strength: [
+      S('SKILL', 'competition', 'primary', 'push_upper', '1 x SKILL: Primary push'),
+      // Built as "1 x DE: Accessory: primary pull" (settled point 3) — not a competition lift.
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Primary pull'),
+      // Built as "1 x DE: Accessory: secondary push" (settled point 3) — the standard week's cell and its movement list.
+      { ...CYCLING_BASE_STANDARD[0].strength[2], sourceText: '1 x DE: Secondary push' },
+      ...CYCLING_LONG_STANDARD[0].strength.slice(3),
+    ],
+    // p279 Deload column, day 1: "Cyc sweet spot (level 1)".
+    endurance: [E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1)', { role: 'hard' })],
+  },
+  {
+    day: 2,
+    label: 'ME Lower',
+    lowerRole: 'me',
+    strength: [
+      // p279 prints "DR"; built as ME, the standard row in the same position (settled point 2). The deload keeps the heavy hinge.
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x DR: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
+      S('SKILL', 'accessory', 'secondary', 'hinge_lower', '1 x SKILL: Secondary hinge lower', {
+        alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'],
+      }),
+      S('HYP', 'accessory', 'secondary', 'pull_upper', '1 x HYP: Secondary pull'),
+      S('SKILL', 'accessory', 'carry', 'hinge_lower', '1 x SKILL: Carry'),
+    ],
+    // p279 Deload column, day 2: "Cyc endurance (level 1)".
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+  },
+  /**
+   * p279 Deload column, day 3: "Plyo warm-up", "Cyc sprint (level 1)" — a sprint ride in place of the VO2 ride. p278's
+   * sprint slot, reused: two of p236's three level 1 sessions (the standing start is left out, Michael 2026-09-13).
+   */
+  {
+    day: 3, label: null, strength: [], plyo: true,
+    endurance: [E('ride_sprints', 1, 'Cyc sprint (level 1)', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] })],
+  },
+  {
+    day: 4,
+    label: 'Full',
+    lowerRole: 'de',
+    // p279 Deload column, day 4: the standard rows less the DE accessory primary hinge.
+    strength: CYCLING_LONG_STANDARD[3].strength.slice(0, 4),
+    endurance: [],
+  },
+  // p279 Deload column, day 5: "Cyc endurance (level 1)". The same switch as the standard week's day 5 (settled point 7).
+  { day: 5, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy', optional: true })] },
+  // p279 Deload column, day 6: "Cyc endurance (level 1)" — read by row shading (SOURCE Part E10a).
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'long' })] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
  * ⛔ HIS RATE ANCHOR, AND IT IS PER-FRAME RATHER THAN PER-ATHLETE (corrected 2026-08-23).
  *
  * p247, for Strength + 5K: *"slow gradual increases in the calculated 1RM taking place every 3 to 4
@@ -1747,6 +1932,12 @@ export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
   cycling_base: {
     perWeek: 0,
     cite: 'OURS — the all_rounder ruling (2026-08-30) applied: p280 states no rate for Cycling: Base, '
+      + 'and the double progression owns the number.',
+  },
+  /** ⚠️ THE SAME RULE AS Base (Michael, 2026-09-27, build note settled point 8): pp279-281 print no rate for this program. */
+  cycling_long: {
+    perWeek: 0,
+    cite: 'OURS — the all_rounder ruling (2026-08-30) applied, as on Base: pp279-281 state no rate for this program, '
       + 'and the double progression owns the number.',
   },
 };
@@ -1848,6 +2039,25 @@ export const FRAMES: Record<FrameId, Frame> = {
     // Each level's two printed ends (Michael, 2026-09-27): the long ride at level 2 with level 1 as the smaller tier;
     // the Tuesday easy ride (and Friday's, `sameLengthAs`) at level 1.
     rideWeek: { chips: { '6:0': [60, 100, 150, 210], '2:0': [60, 100] } },
+  },
+  cycling_long: {
+    id: 'cycling_long',
+    // ⛔ NEVER SHOWN (pivot §1), and never the book's name for the program (Michael). The card's words: `setup-copy.ts`.
+    sourceName: 'Cycling: the p279 program',
+    cite: 'Viada pp279-281',
+    liftingDays: 3,
+    columns: { standard: CYCLING_LONG_STANDARD, taper: CYCLING_LONG_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.cycling_long.perWeek,
+    testedLifts: ['bench', 'squat', 'deadlift'],
+    laysOutWeekByDay: true,
+    enduranceSports: ['ride'],
+    hardSessionsFixed: true,
+    printedWeekOnly: true,
+    // ⛔ p279 prints level 3 on day 1 (the rider's pick) and day 6 (Michael, 2026-09-27, decision 4).
+    rideLevelCeiling: 3,
+    // Viada p239's level 3 endurance ride, "3.5- to 5-hour easy ride below 75%": its two printed ends. The long ride only —
+    // p281 gives this program no note on the midweek rides, so they build at p279's level 2 and take no length pick.
+    rideWeek: { chips: { '6:0': [210, 300] }, longRideCeilingMinutes: 300 },
   },
 };
 
@@ -1985,6 +2195,8 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
  * Level 3 sweet spot exists in the session library
  * (p239); of the three cycling tables (p278, p279, p281) only p279 prints it, on day 1, so offering it on a
  * Wednesday ride in these frames hands a hybrid athlete a harder dose than p278 gives a cyclist.
+ * ⛔ AND p279's OWN FRAME CARRIES A CEILING OF 3 (Michael, 2026-09-27, build note decision 4) — `Frame.rideLevelCeiling`,
+ * read by `clampRideLevel(family, level, frame)`. Every other frame keeps 2.
  *
  * ⚠️ THE RUN SIDE IS UNTOUCHED. The Wednesday RUN stays at level 3, which is exactly what p246
  * prints for it and what p247 calls *"the hardest session of the week."*
@@ -1995,14 +2207,55 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
 export const RIDE_LEVEL_CEILING: Level = 2;
 
 export const RIDE_LEVEL_CEILING_CITE =
-  'No ride is built above level 2. p278\'s Cycling Base standard week tops out at level 2 and uses '
-  + 'it on one session; level 3 sweet spot is in the p239 library and is prescribed in none of his '
-  + 'cycling programs.';
+  'No ride is built above level 2 unless its plan prints one higher. p278\'s Cycling Base standard week tops out at '
+  + 'level 2; p279 prints level 3 sweet spot (day 1, the rider\'s pick of 2 or 3) and a level 3 long ride (day 6), so '
+  + 'that plan builds up to level 3 (`Frame.rideLevelCeiling`).';
 
-/** The level a slot is actually built at, with the bike's own ceiling applied. */
-export function clampRideLevel(family: string, level: Level): Level {
+/** The ride ceiling for this plan — its own where its page prints above level 2 (`Frame.rideLevelCeiling`). */
+export function rideLevelCeilingFor(frame?: FrameId | null): Level {
+  return (frame ? FRAMES[frame]?.rideLevelCeiling : undefined) ?? RIDE_LEVEL_CEILING;
+}
+
+/**
+ * The level a slot is actually built at, with the bike's own ceiling applied.
+ * ⚠️ `frame` absent = `RIDE_LEVEL_CEILING`, which is every caller that predates p279.
+ */
+export function clampRideLevel(family: string, level: Level, frame?: FrameId | null): Level {
   if (!family.startsWith('ride_')) return level;
-  return (level > RIDE_LEVEL_CEILING ? RIDE_LEVEL_CEILING : level) as Level;
+  const ceiling = rideLevelCeilingFor(frame);
+  return (level > ceiling ? ceiling : level) as Level;
+}
+
+/**
+ * ⛔ THE PLAN'S OWN LENGTH CAP FOR ITS LONG SESSION, where the plan states one: Run Lead's long run
+ * (`runStrengthWeek.longRunCeilingMinutes`, p235) and the p279 long ride (`rideWeek.longRideCeilingMinutes`, p239).
+ * Undefined = the family cap in `volume-bounds.ts`. One reader for the composer, the rides screen and the step offer.
+ */
+export function planLongCeilingFor(frame: FrameId | null | undefined, family: string, role?: string | null): number | undefined {
+  if (role !== 'long' || !frame) return undefined;
+  if (family === 'run_lsd') return FRAMES[frame]?.runStrengthWeek?.longRunCeilingMinutes;
+  if (family === 'ride_endurance') return FRAMES[frame]?.rideWeek?.longRideCeilingMinutes;
+  return undefined;
+}
+
+/**
+ * ⛔ THE LEVEL THE RIDER PICKED FOR A SLOT THE PAGE PRINTS AS A RANGE (`EnduranceSlot.levelChoices`), or the column as
+ * printed. A pick for a slot with no choices, or outside them, is ignored; the result never passes the plan's ride ceiling.
+ */
+export function withPickedLevels(
+  frame: FrameId, days: FrameDay[], picks: Record<string, number> | null | undefined,
+): FrameDay[] {
+  if (!picks || Object.keys(picks).length === 0) return days;
+  return days.map((d) => {
+    let changed = false;
+    const endurance = d.endurance.map((slot, i) => {
+      const want = Number(picks[`${d.day}:${i}`]);
+      if (!slot.levelChoices?.includes(want as Level) || want === slot.level) return slot;
+      changed = true;
+      return { ...slot, level: clampRideLevel(slot.family, want as Level, frame) };
+    });
+    return changed ? { ...d, endurance } : d;
+  });
 }
 
 export const LOW_VOLUME_RIDE_LEVELS_ARE_OURS =

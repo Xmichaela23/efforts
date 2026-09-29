@@ -25,6 +25,9 @@ type Props = {
   /** The optional rides switched off (screen row keys). Absent = all on, the week as printed. */
   slotsOff?: SlotKey[];
   onSlotOn: (key: SlotKey, on: boolean) => void;
+  /** The level picked on a ride the page prints as a range (p279 day 1), by row key. Absent = the ride's own level. */
+  slotLevels?: Partial<Record<SlotKey, number>>;
+  onSlotLevel?: (key: SlotKey, level: number) => void;
 };
 
 export default function RideStrengthWeekCard(props: Props) {
@@ -44,7 +47,7 @@ export default function RideStrengthWeekCard(props: Props) {
 
   return (
     <div className="space-y-3">
-      <p className="text-white/55 text-sm leading-relaxed">{week.sub_line}</p>
+      {week.sub_line ? <p className="text-white/55 text-sm leading-relaxed">{week.sub_line}</p> : null}
       <div className="space-y-2">
         {week.rows.map((row) => {
           const rowOff = isOff(row);
@@ -78,6 +81,25 @@ export default function RideStrengthWeekCard(props: Props) {
                   {[len.labels[String(picked)], !chipsOn.has(row.key) ? len.same_as : null].filter(Boolean).join(' · ')}
                 </p>
               ) : null}
+              {/* ⛔ THE LEVEL CHIPS (p279 day 1, the rider picks 2 or 3) — drawn only when the server sends their words. */}
+              {row.level && row.level.label && row.level.options.every((o) => o.label) ? (
+                <div className="mt-2.5">
+                  <p className="text-white/80 text-[13px] mb-2">{row.level.label}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.level.options.map((o) => (
+                      <GalaxyButton
+                        key={o.level}
+                        shape="chip"
+                        variant={(props.slotLevels?.[row.level!.key] ?? row.level!.default) === o.level ? 'primary' : 'secondary'}
+                        data-testid={`${row.level!.key}-level-${o.level}`}
+                        onClick={() => props.onSlotLevel?.(row.level!.key, o.level)}
+                      >
+                        {o.label}
+                      </GalaxyButton>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {len && chipsOn.has(row.key) && len.options.length > 0 ? (
                 <div className="mt-2.5">
                   <p className="text-white/80 text-[13px] mb-2">{week.length_label}</p>
@@ -100,7 +122,7 @@ export default function RideStrengthWeekCard(props: Props) {
           );
         })}
       </div>
-      <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p>
+      {week.easy_line ? <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p> : null}
     </div>
   );
 }

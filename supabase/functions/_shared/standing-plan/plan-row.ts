@@ -148,6 +148,8 @@ export type StandingPlanConfig = {
     archetypes?: Record<string, string> | null;
     /** ⛔ The optional sessions switched off ride along too (p278's Day 2) — dropped here, the restate rebuilds them. */
     slotsOff?: string[] | null;
+    /** ⛔ The picked levels ride along too (p279's day 1) — dropped here, the restate rebuilds the printed level. */
+    levels?: Record<string, number> | null;
     /**
      * ⛔⛔ THE PER-SESSION LENGTHS RIDE ALONG TOO (Michael, 2026-08-30) — see `SportMix.minutes`.
      * **THIS OBJECT IS REBUILT FIELD BY FIELD BELOW, so a field not named here is DROPPED**, and
@@ -379,6 +381,7 @@ export function buildStandingPlanRow(args: {
             // ⛔ SEE THE FIELD'S NOTE ABOVE — omitted here, the restate rebuilds a different week.
             minutes: args.compose.sportMix.minutes ?? null,
             ...((args.compose.sportMix.slotsOff ?? []).length > 0 ? { slotsOff: [...args.compose.sportMix.slotsOff!] } : {}),
+            ...(Object.keys(args.compose.sportMix.levels ?? {}).length > 0 ? { levels: { ...args.compose.sportMix.levels! } } : {}),
           }
         : null,
       // OURS — `buildStandingPlanRow` at most 2 easy swims a week (Michael, 2026-08-24), the same clamp as compose.ts; no page.

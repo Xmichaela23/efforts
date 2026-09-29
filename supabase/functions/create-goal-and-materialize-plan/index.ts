@@ -2593,7 +2593,7 @@ Deno.serve(async (req: Request) => {
             // same rule `generate-strength-plan` applies; keep the two together. No frame → all four.
             const gsEntryFrame = resolveFrame({
               enduranceSport: gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null,
-              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' || gsTp.focus === 'run_half'
+              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' || gsTp.focus === 'ride_long' || gsTp.focus === 'run_half'
                 || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? gsTp.focus : 'run',
             }).frame;
             const gsEntryLifts: string[] = gsEntryFrame ? FRAMES[gsEntryFrame].testedLifts : ['squat', 'bench', 'deadlift', 'overheadPress'];
@@ -3146,9 +3146,10 @@ Deno.serve(async (req: Request) => {
                * ⚠️ ALLOWLISTED TO THE TWO KNOWN VALUES. Anything else is dropped rather than passed
                * through, so a stale or malformed client cannot name a frame that does not exist.
                */
-              // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
-              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'run_half'
-                || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? { focus: gsTp.focus } : {}),
+              // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278). `'ride_long'` 2026-09-28 — Long Ride +
+              // Strength, the p279 program.
+              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'ride_long'
+                || gsTp.focus === 'run_half' || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? { focus: gsTp.focus } : {}),
               /**
                * ⛔ THE OPTIONAL SESSIONS SWITCHED OFF (Ride + Strength's Day 2 easy ride, 2026-09-27). Same allowlist, same
                * failure: `generate-strength-plan` reads `endurance_slots_off` off its own body, so a hop that drops it builds
@@ -3158,6 +3159,21 @@ Deno.serve(async (req: Request) => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slots_off;
                 if (!Array.isArray(raw) || raw.length === 0) return {};
                 return raw.every((k) => typeof k === 'string' && /^\d+:\d+$/.test(k)) ? { endurance_slots_off: raw } : {};
+              })(),
+              /**
+               * ⛔ THE LEVEL THE RIDER PICKED WHERE THE PAGE PRINTS A RANGE (p279 day 1, 2026-09-28). Same allowlist, same
+               * failure: `generate-strength-plan` reads `endurance_slot_levels` off its own body. Frame keys, levels 1-3.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_slot_levels;
+                if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+                const out: Record<string, number> = {};
+                for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                  const n = Number(v);
+                  if (!/^\d+:\d+$/.test(k) || !(n === 1 || n === 2 || n === 3)) return {};
+                  out[k] = n;
+                }
+                return Object.keys(out).length > 0 ? { endurance_slot_levels: out } : {};
               })(),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {

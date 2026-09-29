@@ -231,7 +231,7 @@ export function slotLengthOptions(
   const tierLevels = (opts.tier === 'newer'
     ? lowVolumeLevels([sport])
     : {}) as Record<string, Level>;
-  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level, frame);
   const rungs = ladderOf({
     family: eq.family,
     level,
@@ -299,7 +299,7 @@ export function slotFixedMinutes(
   if (!eq) return null;
   const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
   const tierLevels = (opts.tier === 'newer' ? lowVolumeLevels([sport]) : {}) as Record<string, Level>;
-  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level, frame);
   /**
    * ⛔ NO PIN, NO NUMBER. `eq.archetype` is the sport conversion's own pin, `row.archetype` the
    * frame's, `opts.archetype` the athlete's. With none of the three the session rotates and there is
@@ -358,7 +358,7 @@ export function slotLengthRange(
   if (!eq) return null;
   const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
   const tierLevels = (opts.tier === 'newer' ? lowVolumeLevels([sport]) : {}) as Record<string, Level>;
-  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level, frame);
   const offered = archetypesFor(eq.family, level).map((a) => a.id);
   // ⚠️ THE FRAME'S ROTATION, FILTERED TO THE LEVEL — the same rule `workoutsForSlot` applies.
   const named = row.archetypes?.filter((id) => offered.includes(id)) ?? [];
@@ -452,7 +452,7 @@ export function weekBounds(
   const tierLevels = experienceLevels(opts.experience);
   const levelFor = (family: string, frameLevel: Level): Level =>
     // ⛔ SAME BIKE CEILING THE COMPOSER APPLIES — see `clampRideLevel`.
-    clampRideLevel(family, (tierLevels[family] as Level | undefined) ?? frameLevel);
+    clampRideLevel(family, (tierLevels[family] as Level | undefined) ?? frameLevel, frame);
   let runLong = 0;
   let rideLong = 0;
   let anyRun = false;
@@ -698,7 +698,7 @@ export function experienceChips(
       // ⛔ THE BIKE'S OWN CEILING — `clampRideLevel`, the same clamp `assignSports` applies. A ride
       // inherits the SLOT's difficulty, and the frame's second hard slot is level 3, which his
       // cycling programs never prescribe (p278).
-      level: clampRideLevel(family, (tierLevels[family] ?? base.level) as Level),
+      level: clampRideLevel(family, (tierLevels[family] ?? base.level) as Level, frame),
       // ⛔ THE ATHLETE'S PICK, THEN THE RIDE EQUIVALENT'S, THEN THE FRAME'S. Absent means the
       // composer rotates and `longestFor` takes the max across the shapes it will rotate through.
       /**

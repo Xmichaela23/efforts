@@ -70,6 +70,8 @@ import {
   experienceLevels,
   LOW_VOLUME_RIDE_LEVELS_ARE_OURS,
   PLYO_DOSE,
+  planLongCeilingFor,
+  withPickedLevels,
   type ColumnKind,
   type EnduranceExperience,
   type Frame,
@@ -2979,7 +2981,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         : args.sportMix,
     };
   }
-  const days = frame.columns[args.column];
+  /**
+   * ⛔ THE RIDER'S LEVEL WHERE THE PAGE PRINTS A RANGE (p279 day 1, "level 2 to 3"; Michael 2026-09-27) —
+   * `withPickedLevels`: only a slot with `levelChoices`, only a level it lists. Every other frame and column is the
+   * column as printed (the same array back).
+   */
+  const days = withPickedLevels(args.frame, frame.columns[args.column], args.sportMix?.levels);
   /**
    * ⛔ EACH HARD SLOT'S POSITION IN THE FRAME'S ORDER, so a pin can be matched to the slot it was
    * made for. Built once over the whole column rather than counted inside the day loop, because the
@@ -3408,10 +3415,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
      */
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
-    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`.
-    const planLongCeiling = role === 'long' && family === 'run_lsd'
-      ? FRAMES[args.frame]?.runStrengthWeek?.longRunCeilingMinutes
-      : undefined;
+    // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`. And the p279 long ride's (2026-09-28,
+    // p239 level 3) — `planLongCeilingFor`, the one reader.
+    const planLongCeiling = planLongCeilingFor(args.frame, family, role);
     const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
     // ⛔ A PICKED LENGTH MAY REACH DOWN TO THE SLOT'S SMALLER TIER (`EnduranceSlot.lengthFromLevel`, Michael 2026-09-27).
     const pickRungs = fromLevel != null && fromLevel < level
