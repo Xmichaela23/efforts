@@ -430,9 +430,9 @@ export function chooseDayMap(
       const apart = pair.gap === 1 ? 'back to back' : `${WORDS[pair.gap] ?? String(pair.gap)} days apart`;
       compromises.push({
         kind: 'cost',
-        // OURS — `chooseDayMap` compromise note wording, NOT YET APPROVED by Michael (2026-09-28); the rule in it is p80.
+        // `chooseDayMap` compromise note — Michael approved the words 2026-09-29 ("push and deploy"); the rule in it is p80.
         text: `${pair.a} and ${pair.b} are both ${pair.region === 'lower' ? 'leg' : 'upper body'} days, ${apart}. `
-          + 'Each lift is trained every three to four days. The days picked leave no week spaced that way.',
+          + 'Each lift is spaced three to four days apart, and the days you picked leave no week that does that.',
       });
     }
   }

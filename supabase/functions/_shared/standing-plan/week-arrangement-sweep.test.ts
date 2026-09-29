@@ -206,8 +206,8 @@ Deno.test('⛔ when the athlete\'s own picks put the leg days back to back, the 
   assert(note, `no note: ${dayMap.compromises.map((c) => c.text).join(' | ')}`);
   assertEquals(
     note!.text,
-    'Monday and Tuesday are both leg days, back to back. Each lift is trained every three to four days. '
-      + 'The days picked leave no week spaced that way.',
+    'Monday and Tuesday are both leg days, back to back. '
+      + 'Each lift is spaced three to four days apart, and the days you picked leave no week that does that.',
   );
 });
 
