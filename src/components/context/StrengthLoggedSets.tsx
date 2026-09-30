@@ -48,7 +48,10 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
         return (
           <div key={lt.canonical} className="space-y-1.5">
             <div className="text-footnote text-label">{lt.display_name}</div>
-            <div className="space-y-1">
+            {/* ⛔ DESIGN_GUIDELINES rules 2 and 3 (2026-09-29, Michael: "are we following our design rules?"): one grid per
+                lift, so the set, the date, the estimate and "best" each sit in a straight column; the set is the payload,
+                one step up and bright, the date and the estimate one step down. */}
+            <div className="grid grid-cols-[auto_auto_1fr_auto] items-baseline gap-x-3 gap-y-1">
               {lt.sets.map((e, i) => {
                 const dateLabel = e.date
                   ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -58,13 +61,13 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
                 const setLine = (lt as any).set_lines?.[i] as string | undefined;
                 const e1rmLine = (lt as any).e1rm_lines?.[i] as string | null | undefined;
                 return (
-                  <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
-                    {setLine && <span className="text-label-secondary tabular-nums">{setLine}</span>}
-                    {dateLabel && <span className="text-label-secondary">{dateLabel}</span>}
-                    {e1rmLine && <span className="text-label-secondary tabular-nums">{e1rmLine}</span>}
+                  <React.Fragment key={i}>
+                    <span className="text-footnote text-label tabular-nums">{setLine ?? ''}</span>
+                    <span className="text-caption text-label-secondary">{dateLabel}</span>
+                    <span className="text-caption text-label-secondary tabular-nums text-right">{e1rmLine ?? ''}</span>
                     {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
-                    {e.best && <span className="text-strength font-medium">best</span>}
-                  </div>
+                    <span className="text-caption text-strength font-medium w-8">{e.best ? 'best' : ''}</span>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -84,14 +87,18 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
             const rows = sets.others.filter((l) => l.group === g);
             if (rows.length === 0) return null;
             return (
-              <div key={g} className="space-y-1.5">
-                <div className="text-caption text-label-secondary">{g === 'upper' ? 'Upper body' : 'Lower body'}</div>
-                {rows.map((l) => (
-                  <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
-                    <span className="text-label-secondary">{l.display_name}</span>
-                    <span className="text-label-secondary tabular-nums">{l.start_line ? `${l.start_line} → ${l.set_line}` : l.set_line}</span>
-                  </div>
-                ))}
+              <div key={g} className="space-y-1.5 pt-1">
+                {/* The group's name reads like a lift's name above it (white, one step up) — rule 3. */}
+                <div className="text-footnote text-label">{g === 'upper' ? 'Upper body' : 'Lower body'}</div>
+                {/* Rule 2: the name on the left edge, the numbers on the right edge. */}
+                <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1">
+                  {rows.map((l) => (
+                    <React.Fragment key={l.canonical}>
+                      <span className="text-caption text-label-secondary">{l.display_name}</span>
+                      <span className="text-footnote text-label tabular-nums text-right">{l.start_line ? `${l.start_line} → ${l.set_line}` : l.set_line}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
             );
           }) : sets.others.map((l) => (
