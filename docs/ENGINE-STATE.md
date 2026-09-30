@@ -1,42 +1,46 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-28, PM chat — main = `b7aa155a2` + this docs commit; every importer DEPLOYED; phone build has every client change)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-29, PM chat — main = `2eb6725f2` + this docs commit; every server importer DEPLOYED; the phone build is BEHIND — see below)
 
 > **How to talk to Michael (read first):** `~/.claude/CLAUDE.md` and the memory index. Plain spoken sentences, no
-> jargon, no idioms. A "go" is the word go. Every athlete-facing line gets his yes. Commit/push/deploy wait for him;
-> the permission check blocks pushes to main and deploys from Claude, so hand him the exact command.
+> jargon, no idioms. ⛔ NEW standing rule (memory `feedback_book_rules_need_no_approval`): where a page decides it, build
+> it and report it done — bring him only book silences, athlete-facing words, and pure design calls. A "go" is still
+> the word go (or "fix it", "push and deploy"). Every athlete-facing line gets his yes.
 >
 > **Your job, in order:**
-> 1. **Q-311** — the first surge after the standing drills read as a 4-second lap (the watch recorded 15 s), so every
->    later round moved back one ("14 of 16" on a run where all 16 were run). He pressed nothing. Trace why the app's lap
->    windows differ from the watch's lap starts first; fix waits on his go. `compute-workout-summary` `layoutLapsByOrder`.
-> 2. **Long Ride + Strength (p279, goal "Go longer")** — build it on the Ride + Strength frame. The write-up is done and
->    UNCOMMITTED in the `/Users/michaelambp/efforts-279` worktree: `docs/NOTES-p279-frame-2026-09-27.md` + SOURCE Part E10.
->    Commit those first. Test on throwaway accounts before bringing it to him.
-> 3. Leftovers: task chip "Fix State trends wipe at the week seam" (compute-snapshot writes `state_trends_v1` null for an
->    explicit past `week_start`, any time zone); Q-312 (the off-range sentence names one range when reps had two).
+> 1. **Install the latest app on his phone** — the last two builds could not reach it (`xcrun devicectl ... device
+>    DB593618-ADA6-599E-854A-F8A92D02080A`; the phone was away). Then have him look at: the Long Ride + Strength card
+>    and a block built from it; the rides-screen times; a swap to "With efforts" on an easy ride; the setup day swap
+>    (drag a lifting day onto the long-run day); State refreshing itself after a synced workout.
+> 2. **Done since this banner was drafted:** the Long Ride + Strength top line; run plans renamed (Run + Strength, Long
+>    Run + Strength, Run + Muscle, Long Run + Muscle); card lines, lifting lines and "Start here" (D-506); the Run list is one screen tiered for runners —
+>    New to lifting · up to 4 hours (Run + Muscle, Run + Strength) / New to lifting · 5 hours or more (Long Run +
+>    Strength) / Solid lifting background (Long Run + Muscle) / Race — SEEN on the website 2026-09-29. Open from D-506:
+>    p251/p253's 3-hour marathon strategy session (no printed structure) and p253's two advanced-marathoner options.
+> 3. **Open from the plan sweep** (scripts in the 2026-09-28 session scratchpad `sweep/`, harness `lib.ts` / `show.ts`):
+>    the plyo warm-up can be left alone on its book day when its run or ride moves (noticed, no book rule checked);
+>    Strength + Half's `no_rest_day` deload line reads "The program's week rests on Monday, and the hard run took it."
+>    on a week with no printed rest day — check the words; a pick loses to a frame's own rotation list on Run + Strength's
+>    Wednesday and the sprint rows (existing behaviour, flagged by the p148 agent).
 >
-> **What shipped 2026-09-27/28 — do not redo.** D-491 … D-495 in `DECISIONS-LOG-4.md`:
-> - Drift: one rule for runs and rides, intervals.icu's steady middle (first 20 and last 10 minutes out, 20 left);
->   efficiency row "Higher means more power for the same heart rate."; TrainingPeaks' registered names not printed (D-491).
-> - Ride + Strength: five rides, joined rides as one, Day 2 optional (switch on its own card), picked lengths, offered
->   step-ups (D-492).
-> - Performance card: Moving Time · Distance · Workload, then Pace/Weighted Power · Elevation · Avg Heart Rate; one time;
->   Details says "Weighted Power" (D-493).
-> - A run's easy-jog warm-up ends on the lap press on Garmin (D-494).
-> - Notes under Execution saying what pulled it down; the logger keypad keeps a typed number on a tap outside (D-495).
+> **What shipped 2026-09-28/29 — do not redo.** D-496 … D-505 in `DECISIONS-LOG-4.md`:
+> - Run laps one-for-one with the steps (Q-311, VERIFIED) · LOAD card "Fitness rising" line + form zone words (VERIFIED)
+>   · State refreshes itself · Past tab (VERIFIED) · supersets never the bench at two settings (VERIFIED).
+> - Long Ride + Strength (p279) built and live · p239's easy ride every week with "With efforts" a one-day swap on all
+>   three ride plans · ride times on the rides screen.
+> - Deload weeks are the page's · week arranger: joined pairs read right, p80 spacing held, moved sessions skip hard/long
+>   days, setup day swap · hard minutes held within 10% (one shared rotation) and 105% filed near-threshold (p233).
+> - Q-312 (two ranges) · State trends no longer blanked by a past-week recompute · ENGINE-STATE trimmed 287 → 108 KB.
 >
-> **VERIFIED on his phone:** the Performance card (Sep 26 ride, Sep 28 run). **DEPLOYED, not yet seen by him:** the
-> Details "Weighted Power" label, the Day 2 switch on its card, the Execution notes, the keypad fix (tested on a test
-> page: typed 3 + check kept the 3, no strip; the old code lost it). The open warm-up: his upcoming hard runs read back
-> with it (Sep 30 – Oct 21); not yet run on the watch.
+> **Still unverified:** everything in job 1; the deload fix appears only when a deload is built (Adjust → Deload);
+> earned sets (two logged sessions); the Edge open warm-up on a ride.
 >
-> **Carried from 2026-09-25, still unverified:** earned sets (needs two logged sessions); the Edge open warm-up on a
-> ride (Tuesday 29 Sep). Q-310 (the Swap sheet's "SECONDARY" heading word) waits on him.
->
-> **Housekeeping owed:** this file is ~286 KB, over the ~150 KB cap — trim old Solid entries into
-> `archive/ENGINE-STATE-archive.md`. The worktree `/Users/michaelambp/efforts-perfcard` (branch perf-card-2026-09-27) is
-> merged; `/Users/michaelambp/efforts-base` is merged; `/Users/michaelambp/efforts-279` holds the uncommitted p279 docs.
+> **Known trade (D-503, by p80):** All Rounder weeks with a day off now carry more "two hard sessions on one day"
+> warnings — the old chooser avoided them only by putting the heavy leg days back to back.
+
+## (older banner) NEXT SESSION — START HERE (written 2026-09-28) — superseded by the 2026-09-29 banner above
+
+> Jobs were Q-311 (done, D-496), Long Ride + Strength (done, D-500), the State trends wipe and Q-312 (done, D-505).
 
 ## (older banner) NEXT SESSION — START HERE (written 2026-09-25) — superseded by the 2026-09-28 banner above
 

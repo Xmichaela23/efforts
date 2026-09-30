@@ -471,3 +471,109 @@ rebuilt by his 9:17/mi pace update after the deploy (read back: every hard run S
    Total session length moves Execution only on an easy session. Saved screens v13. Commit `cdbe93aa1`.
 2. Logger: a tap outside the number pad saves a changed box (Strong/Hevy); before, a reserve typed and then the check
    tapped was lost and the adjust strip opened. Commit `b7aa155a2`.
+
+## D-496 — Run laps: one lap per step is the watch's own layout (2026-09-28, Q-311)
+
+When a run's laps number the plan's steps exactly and at least one lap fits its step, lap i is step i before any
+length or walk test (`compute-workout-summary` `oneForOne`, ahead of `layoutLapsByOrder`). A rep run badly reads as run
+badly on its own step. Found on Michael's 28 Sep Surge and Float (stood through the first 0:15 surge; "14 of 16" → 16 of
+16). Replayed his 25 planned runs since 2026-07-01: only that run changed. Commit `f1c02df42`. VERIFIED on his phone.
+
+## D-497 — LOAD card: the fitness line in words first; form is "today" (2026-09-28/29, Michael)
+
+1. Card order: "Fitness rising · up 8 in 3 weeks" (rising / holding / falling — the bike row's ±1 fitness point a week,
+   OURS; 3-week window OURS) → "Today: <form zone>" → fitness · fatigue · form. Coach payload 221 (`fitnessTrendLine`).
+2. Form zone names say how rested or loaded today is (FORM_ZONE_TEXT): very rested · fitness fades if it lasts / rested ·
+   race ready / in between · not rested, not loaded / loaded · the range that builds fitness / overloaded · injury and
+   illness risk rises. Ranges Friel's; words ours, approved. Payload 220. Commits `8c92f81ac` … `7064945a3`. VERIFIED.
+3. State refreshes itself: `save-baselines` marks `coach_cache` old after any write; an open State/Today rechecks 4 s
+   (OURS) after the app announces a change (`b7a82842f`). NOT yet seen on a phone.
+4. FTP: the app's number is a critical-power fit over the 90-day 2–20 min bests × 0.97 (intervals.icu / TrainerRoad
+   style); Zwift's is 95% of the single best 20 min. Michael chose ours (2026-09-29).
+
+## D-498 — Supersets never need the bench at two settings (2026-09-28, Michael: "this is a stupid superset")
+
+`benchSetting` / `benchClash` / `benchSafePick` / `supersetPartnersForPick` (accessory-picks.ts): the kit's route decides
+flat / incline / none; defaults, the composed week and the equipment rebuild's unrecorded picks all avoid a clash; a hand
+pick stays. OURS — ledger row "Superset bench setting". Commit `0c58986e8`. VERIFIED (Tate press + dumbbell curl).
+
+## D-499 — Home's Past tab (2026-09-28, Michael)
+
+Today · Week · Past: every finished session newest first, grouped by day, sport-coloured dot, filter All · Run · Ride ·
+Strength · Swim (a sport shows once logged), four weeks at a time ("Show earlier", OURS). Rows are get-week's, through
+the Week tab's own fetch and cache key. Commit `696ebe108`. VERIFIED.
+
+## D-500 — Long Ride + Strength (p279, goal "Go longer") is built (2026-09-28/29)
+
+Frame `cycling_long` (SOURCE Part E10, `docs/NOTES-p279-frame-2026-09-27.md`): five rides one a day (days 1, 2, 3, 5, 6),
+Day 5 optional ("Optional. An easy ride the day before the long ride."), Day 1 sweet spot Level 2 · Level 3 (rider's
+pick, Level 2 default OURS), long ride level 3 at 3h30 · 5h, step-ups offered at weeks 4/8/12 (≤5% of easy minutes,
+p148), midweek rides 2h30 · 3h30 (Day 5 = Day 2), deload lifting swaps, sprint on deload Day 3, day 4 superset. Card
+"Five rides and three lifting days a week. The long ride runs 3h30 to 5h." Merge `2d0dfd1fd`, words/pins `d7b8c40ae`.
+⚠️ The rides-screen top line "Pick how long the long ride is." no longer covers the whole screen — new words owed.
+
+## D-501 — p239's two rides: the easy ride every week, "With efforts" a one-day swap (2026-09-28/29, Michael)
+
+p239 prints a straight easy ride and a structured ride at every endurance level and says to use the intense ones
+"sparingly unless an event is coming". Every week builds the easy ride; the structured ride is a one-day choice on the
+swap sheet ("With efforts" — "A shorter ride with some harder work in it. Meant for occasional use, or the weeks before
+an event.", back to "Easy ride") on Long Ride + Strength (`cd89e19fb`), Ride + Strength (`1e34b69e0`) and Run + Ride +
+Strength's Thursday ride (`bc5c64dcf`, which used to alternate). Rides-screen rows with no length pick show their
+shortest–longest time across the block ("45 min–1h08"; approved format).
+
+## D-502 — Deload weeks are the page's (2026-09-29, Michael: "It should all be what the book says")
+
+Outside the standard column the weekly volume asks are not read, and a picked length is kept only inside the level the
+page prints for that column's session (Ride + Strength's existing rule, p278). Strength Lead's deload Saturday was an
+80-minute level-3 run where p246 prints VT1 level 1; now 28 min. Commit `896f300d5`. Applies when a deload is built.
+
+## D-503 — The week arranger holds the book (2026-09-29, plan sweep of 2026-09-28)
+
+1. The chooser reads the second half of a joined session (`week-arrangement.ts` skeletonWeek) — moving a ride no longer
+   stacks the long ride on a hard day (Ride + Strength engine warnings 6,293 → 252 in the sweep).
+2. p80: upper and lower heavy days 3–4 days apart wherever the printed week spaces them so (grouping by body region is
+   OURS); the book's own exceptions stay (p278, p253). `better()` order: answers, three-session days, spacing, warnings,
+   days moved. Note when no week can: "Monday and Tuesday are both leg days, back to back. Each lift is spaced three to
+   four days apart, and the days you picked leave no week that does that." (approved).
+3. A session moved off a day off avoids hard and long days (p131); relocation order OURS.
+4. Setup: dragging a lifting day moves the whole day; landing on a day with sessions swaps the two days (Michael's call —
+   the book does not cover moving; `f621fb7d6`). The calendar still moves one session.
+Merge `78f3136b5`, note words `e758cc570`.
+
+## D-504 — Hard minutes held within 10% week to week (p112 + p148); 105% is near-threshold (p233)
+
+Hard slots rotate on one shared cycle (`hard-rotation.ts` `holdRotation`): every printed shape still appears, each slot
+changes shape every week, and the cycle is the one with the fewest >10% week-to-week changes (hard minutes first, then
+p146 buckets). The ledger files work up to 105% as near-threshold (p233 prints 105% sessions as near-threshold). Sweep:
+hard-minute breaks 253 → 16 over 39 plans; totals 46 → 0. Where the page's own shapes cannot hold 10% (Run Lead's 79-min
+Threshold with a Surge; Long Ride's Tempo Blocks; All Rounder with day 3 ridden) the rotation keeps them in and says so
+in the tests. Merge `3d3198254`.
+
+## D-505 — State trends at the week seam; the Execution note's two ranges (2026-09-28)
+
+1. `compute-snapshot` leaves `state_trends_v1` out of the upsert when a historical recompute skips the build — a past-week
+   recompute no longer blanks the row the coach reads before a new week has one (`fb0865e45`).
+2. Q-312: reps asked for more than one range → "…faster than the paces asked for." / "…above the watts asked for."
+   (`6f714af43`).
+
+## D-506 — The plan list: names lead with the sport; each card says who it is for (2026-09-29, Michael)
+
+1. Run plans renamed to mirror the ride names: Run + Strength (p246, was Strength Lead), Long Run + Strength (p250, was
+   Run Lead), Run + Muscle (p244, was Strength Lead + Muscle), Long Run + Muscle (p252, was Run Lead + Muscle)
+   (`92fb9ed27`). Run + Strength's confirm line is "{name} — {weeks} weeks." (`553a40c4c`).
+2. Each card opens with who it is for, then the week, then the level (approved lines, `3205d71ff`); a lifting line from
+   the page where the page states one — new is fine (p245), some experience (p247, p251), a solid background (p253);
+   none on the ride and Standard cards, whose pages are silent (`8c3215699`). "Start here" over Ride + Strength (p280).
+3. Why (research, 2026-09-29): the customer arrives with an endurance base and little lifting; the book is often written
+   for the reverse reader (memory `project_efforts_reading_viada_inverted`). Muscle plans suit newer lifters and anyone
+   who wants muscle (Schoenfeld 2017: lighter loads build as much muscle in the untrained); strength plans suit running
+   and riding economy with little size (Rønnestad & Mujika 2014); both cut injuries (Lauersen 2014).
+4. NOT BUILT: p251/p253's 3-hour "blended strategy session" for marathoners — p107 caps easy running at 2 h in one
+   session and the page prints no structure for the strategy session, so Long Run + Muscle's card says half-marathon
+   level. Also open: p253's two advanced-marathoner options (Monday VT1 level 3, Wednesday's extended cooldown).
+5. The Run list (`RUN_GROUPS`, `e30abc399` → `2eb6725f2`): one screen, no tap-in, grouped for runners by lifting and
+   weekly running — New to lifting · up to 4 hours of running a week (Run + Muscle p245, Run + Strength p247 "most skill
+   levels") · New to lifting · 5 hours or more (Long Run + Strength: p251's lifting "similar in structure" to Strength +
+   5K, "The running program here is not for novices.") · Solid lifting background (Long Run + Muscle, p253) · Race.
+   Trails and Get faster hidden until built. Run + Muscle's card adds p245's extra easy runs and "Not for very advanced
+   runners." SEEN on the website 2026-09-29.

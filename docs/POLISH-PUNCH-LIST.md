@@ -52,6 +52,17 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
+## AWAITING MICHAEL (2026-09-29 — all PUSHED and DEPLOYED; the phone build is behind: install first)
+
+- [ ] **Install the latest app** (the phone was out of reach for the last two builds).
+- [ ] **Long Ride + Strength:** the card under Ride → "Go longer"; the rides screen (Day 1 level, Day 2 length, Day 5
+      switch, long ride 3h30 · 5h, times on Days 1 and 3); a built block.
+- [ ] **"With efforts"** on the swap sheet of an easy ride (any of the three ride plans), one day only; "Easy ride" back.
+- [ ] **Setup day swap:** drag a lifting day onto the long-run day — the two days swap.
+- [ ] **State refreshes itself** a few seconds after a synced workout or an accepted number.
+- [ ] **A deload week** (Adjust → Deload) — the book's short sessions.
+- [ ] **The plan list:** new run names, each card's who-it's-for line, the lifting lines, "Start here" on Ride.
+
 ## AWAITING MICHAEL (2026-09-25, D-485…D-490 — PUSHED through `fc89664d9`, DEPLOYED; three of five VERIFIED on his phone 2026-09-25)
 
 - [x] **Keypad:** row stays in view; drag-down closes without saving. VERIFIED on his phone 2026-09-25.
