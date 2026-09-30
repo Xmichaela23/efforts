@@ -17,7 +17,43 @@ import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
  */
 export type StrengthLoggedSetsData = NonNullable<CoachWeekContextV1['weekly_state_v1']['strength_logged_sets']>;
 
+type HistoryRows = { sets: Array<{ date: string; best: boolean }>; set_lines?: string[]; e1rm_lines?: Array<string | null> };
+
+/**
+ * ⛔ ONE SET HISTORY, TWO PLACES (2026-09-29): under each main lift, and under a best-sets lift when it is tapped (Strong
+ * and Hevy open every exercise's history). DESIGN_GUIDELINES rules 2 and 3: one grid per lift, so the set, the date,
+ * the estimate and "best" each sit in a straight column; the set is the payload, one step up and bright.
+ */
+function SetHistory({ h }: { h: HistoryRows }) {
+  return (
+    <div className="grid grid-cols-[auto_auto_1fr_auto] items-baseline gap-x-3 gap-y-1">
+      {h.sets.map((e, i) => {
+        const dateLabel = e.date
+          ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : '';
+        // ⛔ THE SET AND ITS ESTIMATE ARRIVE AS TEXT, IN THE ATHLETE'S OWN UNIT (2026-09-15, Stage 4 session 2).
+        return (
+          <React.Fragment key={i}>
+            <span className="text-footnote text-label tabular-nums">{h.set_lines?.[i] ?? ''}</span>
+            <span className="text-caption text-label-secondary">{dateLabel}</span>
+            <span className="text-caption text-label-secondary tabular-nums text-right">{h.e1rm_lines?.[i] ?? ''}</span>
+            {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
+            <span className="text-caption text-strength font-medium w-8">{e.best ? 'best' : ''}</span>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsData }) {
+  // The best-sets rows open to their history on a tap, one at a time or several.
+  const [openLifts, setOpenLifts] = useState<Set<string>>(() => new Set());
+  const toggleLift = (k: string) => setOpenLifts((prev) => {
+    const next = new Set(prev);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
   // Collapsed by default — the e1RM dot above is the read; this list is drill-down.
   const [strengthDetailOpen, setStrengthDetailOpen] = useState<boolean>(false);
   const count = sets.main.length + sets.others.length;
@@ -48,29 +84,7 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
         return (
           <div key={lt.canonical} className="space-y-1.5">
             <div className="text-footnote text-label">{lt.display_name}</div>
-            {/* ⛔ DESIGN_GUIDELINES rules 2 and 3 (2026-09-29, Michael: "are we following our design rules?"): one grid per
-                lift, so the set, the date, the estimate and "best" each sit in a straight column; the set is the payload,
-                one step up and bright, the date and the estimate one step down. */}
-            <div className="grid grid-cols-[auto_auto_1fr_auto] items-baseline gap-x-3 gap-y-1">
-              {lt.sets.map((e, i) => {
-                const dateLabel = e.date
-                  ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : '';
-                // ⛔ THE SET AND ITS ESTIMATE ARRIVE AS TEXT, IN THE ATHLETE'S OWN UNIT (2026-09-15,
-                // Stage 4 session 2). This printed "lb" on every account whatever they had chosen.
-                const setLine = (lt as any).set_lines?.[i] as string | undefined;
-                const e1rmLine = (lt as any).e1rm_lines?.[i] as string | null | undefined;
-                return (
-                  <React.Fragment key={i}>
-                    <span className="text-footnote text-label tabular-nums">{setLine ?? ''}</span>
-                    <span className="text-caption text-label-secondary">{dateLabel}</span>
-                    <span className="text-caption text-label-secondary tabular-nums text-right">{e1rmLine ?? ''}</span>
-                    {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
-                    <span className="text-caption text-strength font-medium w-8">{e.best ? 'best' : ''}</span>
-                  </React.Fragment>
-                );
-              })}
-            </div>
+            <SetHistory h={lt as unknown as HistoryRows} />
           </div>
         );
       })}
@@ -91,13 +105,30 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
                 {/* The group's name reads like a lift's name above it (white, one step up) — rule 3. */}
                 <div className="text-footnote text-label">{g === 'upper' ? 'Upper body' : 'Lower body'}</div>
                 {/* Rule 2: the name on the left edge, the numbers on the right edge. */}
-                <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1">
-                  {rows.map((l) => (
-                    <React.Fragment key={l.canonical}>
-                      <span className="text-caption text-label-secondary">{l.display_name}</span>
-                      <span className="text-footnote text-label tabular-nums text-right">{l.start_line ? `${l.start_line} → ${l.set_line}` : l.set_line}</span>
-                    </React.Fragment>
-                  ))}
+                <div className="space-y-1">
+                  {rows.map((l) => {
+                    const open = openLifts.has(l.canonical);
+                    const canOpen = (l.history?.sets?.length ?? 0) > 0;
+                    return (
+                      <div key={l.canonical} className="space-y-1.5">
+                        {/* The row is the tap (Strong / Hevy). Rule 5: the chevron is full contrast — it opens something. */}
+                        <button
+                          type="button"
+                          disabled={!canOpen}
+                          onClick={() => toggleLift(l.canonical)}
+                          aria-expanded={open}
+                          className="w-full grid grid-cols-[1fr_auto] items-baseline gap-x-3 text-left"
+                        >
+                          <span className="text-caption text-label-secondary">
+                            {canOpen && <span className={`inline-block mr-1.5 text-label transition-transform duration-200 ${open ? 'rotate-90' : ''}`}>›</span>}
+                            {l.display_name}
+                          </span>
+                          <span className="text-footnote text-label tabular-nums text-right">{l.start_line ? `${l.start_line} → ${l.set_line}` : l.set_line}</span>
+                        </button>
+                        {open && l.history && <div className="pl-4 pb-1"><SetHistory h={l.history} /></div>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

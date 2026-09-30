@@ -44,6 +44,9 @@ export interface StrengthLoggedSetsV1 {
      *  snapshot predates the session list. */
     group?: 'upper' | 'lower';
     start_line?: string;
+    /** ⛔ THE LIFT'S RECENT SESSIONS, opened by a tap on the row (2026-09-29, Michael — Strong and Hevy open every
+     *  exercise's history). The same three lists a main row carries. */
+    history?: { sets: LoggedSetRow[]; set_lines: string[]; e1rm_lines: Array<string | null> };
   }>;
   /** 'lb' | 'kg' — the unit every line above is written in. */
   unit?: string;
@@ -70,22 +73,23 @@ export function buildStrengthLoggedSets(
   const mainCanonicals = new Set(main.map((l) => String(l?.canonical_name ?? '')));
   const unit = metric ? 'kg' : 'lb';
   const inAthletesUnit = (lb: number): number => Math.round(metric ? lb * KG_PER_LB : lb);
+  // A lift's recent sessions as the athlete reads them — the main rows and, on a tap, every best-sets row (2026-09-29).
+  const historyOf = (sets: LoggedSetRow[]) => ({
+    sets,
+    // ⛔ A LOGGED SET READS THROUGH THE ONE RULE the logger's box and Performance's rows read (Stage 4
+    // session 4) — whole numbers printed a typed 82.5 kg as 83 here.
+    set_lines: sets.map((e) => `${liftInAthletesUnit(Number(e.weight), metric)} ${unit} × ${e.reps}`),
+    e1rm_lines: sets.map((e) => (e.e1rm != null && Number(e.e1rm) > 0
+      ? `e1RM ${inAthletesUnit(Number(e.e1rm))} ${unit}`
+      : null)),
+  });
   return {
     unit,
-    main: main.map((l) => {
-      const sets: LoggedSetRow[] = byCanonical.get(l.canonical_name)?.recent ?? [];
-      return {
-        canonical: l.canonical_name,
-        display_name: shownName(l.canonical_name),
-        sets,
-        // ⛔ A LOGGED SET READS THROUGH THE ONE RULE the logger's box and Performance's rows read (Stage 4
-        // session 4) — whole numbers printed a typed 82.5 kg as 83 here.
-        set_lines: sets.map((e) => `${liftInAthletesUnit(Number(e.weight), metric)} ${unit} × ${e.reps}`),
-        e1rm_lines: sets.map((e) => (e.e1rm != null && Number(e.e1rm) > 0
-          ? `e1RM ${inAthletesUnit(Number(e.e1rm))} ${unit}`
-          : null)),
-      };
-    }),
+    main: main.map((l) => ({
+      canonical: l.canonical_name,
+      display_name: shownName(l.canonical_name),
+      ...historyOf(byCanonical.get(l.canonical_name)?.recent ?? []),
+    })),
     others: lifts
       .filter((l) => !mainCanonicals.has(l.canonical))
       .filter((l) => l.heaviest != null && l.heaviest.weight > 0)
@@ -96,7 +100,7 @@ export function buildStrengthLoggedSets(
         const line = (w: number, r: number) => `${liftInAthletesUnit(Number(w), metric)} ${unit} × ${r}`;
         const name = shownName(l.canonical);
         if (!plan) {
-          return { canonical: l.canonical, display_name: name, weight: l.heaviest!.weight, reps: l.heaviest!.reps, sessions: l.sessions, set_line: line(l.heaviest!.weight, l.heaviest!.reps) };
+          return { canonical: l.canonical, display_name: name, weight: l.heaviest!.weight, reps: l.heaviest!.reps, sessions: l.sessions, set_line: line(l.heaviest!.weight, l.heaviest!.reps), history: historyOf(l.recent ?? []) };
         }
         // Upper or lower by the movement's pattern (`getMovementGroup`, the same grouping "add an exercise" uses). A
         // core or carry row has neither and sits under lower body — OURS, the two headings Michael approved.
@@ -113,6 +117,7 @@ export function buildStrengthLoggedSets(
           set_line: line(best.weight, best.reps),
           group,
           ...(first && !same ? { start_line: line(first.weight, first.reps) } : {}),
+          history: historyOf(l.recent ?? []),
         };
       }),
   };

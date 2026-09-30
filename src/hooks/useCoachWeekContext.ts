@@ -590,7 +590,7 @@ export type CoachWeekContextV1 = {
     strength_logged_sets?: {
       main: Array<{ canonical: string; display_name: string; sets: Array<{ date: string; weight: number; reps: number; e1rm: number | null; best: boolean }> }>;
       /** v222: `group` and `start_line` only with an active plan (upper / lower, "start → best"). */
-      others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number; set_line?: string; group?: 'upper' | 'lower'; start_line?: string }>;
+      others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number; set_line?: string; group?: 'upper' | 'lower'; start_line?: string; history?: { sets: Array<{ date: string; weight: number; reps: number; e1rm: number | null; best: boolean }>; set_lines: string[]; e1rm_lines: Array<string | null> } }>;
     } | null;
     trends: {
       fitness_direction: string;
