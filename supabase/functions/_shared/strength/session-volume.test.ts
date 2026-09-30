@@ -33,3 +33,15 @@ Deno.test('legacy sets with no flag count; nothing logged is zero', () => {
   assertEquals(completedStrengthVolume([], 180), { completed: [], completed_total_lb: 0 });
   assertEquals(completedStrengthVolume(null, 180).completed_total_lb, 0);
 });
+
+Deno.test('⛔ a back extension with a plate is body weight plus the plate; an empty box is body weight (2026-09-29)', () => {
+  const v = completedStrengthVolume([{ name: 'Back Extension', sets: [
+    { reps: 10, weight: 25, completed: true },
+    { reps: 10, weight: 0, completed: true },
+  ] }], 180);
+  assertEquals(v.completed_total_lb, (180 + 25) * 10 + 180 * 10);
+  // No body weight recorded: the plate alone, as a weighted chin-up prices.
+  assertEquals(completedStrengthVolume([{ name: 'Back Extension', sets: [{ reps: 10, weight: 25, completed: true }] }], null).completed_total_lb, 250);
+  // The seated machine is not the body: its weight is the load, unchanged.
+  assertEquals(completedStrengthVolume([{ name: 'Machine Back Extension', sets: [{ reps: 10, weight: 90, completed: true }] }], 180).completed_total_lb, 900);
+});

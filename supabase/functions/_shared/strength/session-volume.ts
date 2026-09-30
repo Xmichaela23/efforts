@@ -18,6 +18,7 @@
 import { strengthSetVolume, barLbForExercise } from '../workload.ts';
 import { typeForExercise } from '../../../../src/lib/exercise-role.ts';
 import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
+import { takesAddedWeight } from '../../../../src/lib/added-weight.ts';
 import { KG_PER_LB } from '../../../../src/lib/bar-types.ts';
 
 export function isPerformedSet(s: any): boolean {
@@ -85,13 +86,15 @@ export function completedStrengthVolume(
     const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
     // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
     const barLb = barLbForExercise(String(ex?.name ?? ''));
+    // A back extension's weight is a held plate on top of the body (2026-09-29).
+    const addedToBody = takesAddedWeight(String(ex?.name ?? ''));
     // An exercise logged in kilograms is converted to pounds before pricing (see `LB_PER_KG`); everything
     // downstream — the bar, bands, body weight — is already pounds.
     const isKg = String(ex?.unit ?? 'lb').toLowerCase().startsWith('kg');
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
       (sum: number, s: any) => {
         const set = isKg && Number(s?.weight) > 0 ? { ...s, weight: Number(s.weight) * LB_PER_KG } : s;
-        return sum + strengthSetVolume(set, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
+        return sum + strengthSetVolume(set, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb, addedToBody });
       },
       0,
     );

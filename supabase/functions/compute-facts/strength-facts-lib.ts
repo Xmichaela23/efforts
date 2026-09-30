@@ -14,6 +14,7 @@ import { strengthSetVolume, barLbForExercise } from "../_shared/workload.ts";
 import { estimate1RMRounded, effectiveRepsForReserve, estimateIsTrusted } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup } from "../_shared/canonicalize.ts";
 import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
+import { takesAddedWeight } from "../../../src/lib/added-weight.ts";
 import { typeForExercise } from "../../../src/lib/exercise-role.ts";
 import { topSetIndex, type SetDifficulty } from "../../../src/lib/strength-focus-copy.ts";
 
@@ -180,10 +181,12 @@ export function buildStrengthFacts(
     const bodyIsLoad = typeForExercise(rawName) === 'bodyweight' || bandIsAssistance;
     // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
     const barLb = barLbForExercise(rawName);
+    // A back extension's weight is a held plate on top of the body (2026-09-29).
+    const addedToBody = takesAddedWeight(rawName);
     for (const s of completedSets) {
       const w = Number(s.weight) || 0;
       const r = Number(s.reps) || 0;
-      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
+      exVolume += strengthSetVolume(s, { bodyweightLb, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb, addedToBody });
       const scoredSet = s.amrap === true || s.repMaxTest === true;
       if (w > bestWeight) { bestWeight = w; bestReps = r; bestWasScored = scoredSet; }
       if (w === bestWeight && r > bestReps) { bestReps = r; bestWasScored = scoredSet; }

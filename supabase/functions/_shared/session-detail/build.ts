@@ -40,6 +40,7 @@ import { strengthSetVolume, barLbForExercise } from '../workload.ts';
 // for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
 import { typeForExercise } from '../../../../src/lib/exercise-role.ts';
 import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
+import { takesAddedWeight } from '../../../../src/lib/added-weight.ts';
 // The strength Performance table's rows, count and totals (audit H-S11–H-S15).
 import { buildStrengthSlots } from './strength-slots.ts';
 // ⛔ THE COMPLETED SIDE'S PRICING LIVES IN ONE FILE (2026-09-10, audit H-T04) so `get-week` sends the
@@ -2800,6 +2801,7 @@ function buildStrengthVolume(
     // is a row that named a load, and must keep pricing exactly as it did.
     const bodyIsTheLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
     const plannedBarLb = barLbForExercise(String(ex?.name ?? ''));
+    const addedToBody = takesAddedWeight(String(ex?.name ?? ''));
     const anySetPlanWeight = Array.isArray(ex?.setPlan)
       && ex.setPlan.some((ap: any) => (Number(ap?.weight) || 0) > 0);
     const plannedNamesNoLoad = (Number(ex?.weight) || 0) <= 0 && !anySetPlanWeight
@@ -2827,7 +2829,7 @@ function buildStrengthVolume(
       for (const ap of setPlan) {
         volume_lb += strengthSetVolume(
           { weight: ap?.weight ?? ex?.weight, reps: ap?.reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb, addedToBody },
         );
       }
     } else {
@@ -2836,7 +2838,7 @@ function buildStrengthVolume(
       if (sets > 0 && Number.isFinite(reps) && reps > 0) {
         volume_lb = sets * strengthSetVolume(
           { weight: ex?.weight, reps, resistance_level },
-          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb },
+          { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad: bodyIsTheLoad, barLb: plannedBarLb, addedToBody },
         );
       }
     }

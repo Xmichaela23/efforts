@@ -297,6 +297,12 @@ export type StrengthVolumeOpts = {
    */
   bodyIsLoad?: boolean;
   /**
+   * ⛔ `takesAddedWeight(name)` (`src/lib/added-weight.ts`, 2026-09-29) — a bodyweight movement whose logged weight is
+   * a held plate: priced `(body weight + plate) × reps`, like a weighted chin-up. The logger's weight box on these
+   * rows reads the same function, so the box offered and the number computed cannot disagree.
+   */
+  addedToBody?: boolean;
+  /**
    * ⛔ THE EMPTY BAR, WHEN THE MOVEMENT HAS ONE (Michael, 2026-08-29: *"a barbell curl would have
    * the weight of the barbell"*). He is right and it is physical: a barbell set with a blank weight
    * box is not zero pounds, it is the bar.
@@ -435,7 +441,8 @@ export function strengthSetVolume(
   //
   // Matches the field: Hevy and Strong both price weighted bodyweight work as
   // `(bodyweight + added) × reps`, the mirror of the assisted formula below.
-  if (opts.bandIsAssistance && weight > 0 && bw > 0) return (bw + weight) * reps;
+  // ⛔ AND A BACK EXTENSION WITH A PLATE (2026-09-29, `addedToBody`, `src/lib/added-weight.ts`): the same sum.
+  if ((opts.bandIsAssistance || opts.addedToBody) && weight > 0 && bw > 0) return (bw + weight) * reps;
 
   if (weight > 0) return weight * reps;
 

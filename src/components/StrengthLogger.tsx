@@ -82,6 +82,7 @@ import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/li
 import { barIsTheLoad, defaultBarKeyFor } from '@/lib/strength-gear';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
+import { takesAddedWeight } from '@/lib/added-weight';
 // The plyo name test, for how a plyo row is drawn. Rest lengths are the server's (`rest_seconds` on the row).
 import { isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS, P227_DRILL_LINE, P227_SESSION_LINE, type PlyoFamily } from '@shared/standing-plan/plyo';
@@ -5558,7 +5559,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
                   // The LOAD column. An assist-capable movement always has one — the band IS the
                   // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
-                  const exShowWeight = exIsAssistCapable || !(exIsBodyweight || exIsPlyo);
+                  // ⛔ A BACK EXTENSION HAS ONE TOO (Michael, 2026-09-29: "like goblet?"): the goblet squat's box, the
+                  // number typed is the plate held, empty = body weight alone. The pricer adds the plate to the body
+                  // through the same function (`src/lib/added-weight.ts`). No plates chip: `exIsBodyweight` still gates it.
+                  const exShowWeight = exIsAssistCapable || takesAddedWeight(exercise.name) || !(exIsBodyweight || exIsPlyo);
                   // ⛔ THE UNIT IS THE EXERCISE'S, AS THE SERVER SENT IT (2026-09-16, Stage 4 session 4); it read
                   // "Lb" on every account. The band and assist boxes follow it (Stage 7 session 3, words approved).
                   const exUnit = unitOf(exercise);
