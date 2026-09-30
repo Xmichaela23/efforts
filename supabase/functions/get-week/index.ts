@@ -55,6 +55,7 @@ import { intentTitle } from '../_shared/intent-title.ts';
 // keeps the name its plan gave it (2026-09-22).
 import { sessionTitle } from '../_shared/session-title.ts';
 import { foldJoinedItems } from './joined-fold.ts';
+import { foldPlyoItems } from './plyo-fold.ts';
 import { plyoTitleNote } from '../_shared/standing-plan/plyo.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
 import { composeProgramOutline } from '../_shared/standing-plan/program-outline.ts';
@@ -1281,6 +1282,8 @@ Deno.serve(async (req)=>{
     }
     // ⛔ A joined session is one card (2026-09-27) — see `joined-fold.ts`. Before the day order and the week totals.
     foldJoinedItems(items, Array.isArray(plannedRows) ? plannedRows : []);
+    // ⛔ And the plyo warm-up into its run or ride (2026-09-29) — see `plyo-fold.ts`.
+    foldPlyoItems(items, Array.isArray(plannedRows) ? plannedRows : []);
     // Stable sort within each date by brick group/order so bricks show Bike→Run consistently
     try {
       const withIndex = items.map((it, idx)=>({
@@ -1794,6 +1797,8 @@ Deno.serve(async (req)=>{
         // move act on both.
         session_title: p.session_title ?? null,
         joined_part_ids: Array.isArray(p.joined_part_ids) ? p.joined_part_ids : [],
+        // The plyo warm-up folded into this run or ride (2026-09-29, `plyo-fold.ts`): its drills and its line.
+        plyo_warm_up: p.plyo_warm_up ?? null,
       };
     };
     const toCompletedWorkout = (item) => {

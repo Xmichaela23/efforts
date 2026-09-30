@@ -7,7 +7,8 @@
 // Explicit failures: a workout that cannot be converted is reported by id and its earlier copy is left alone; a
 // provider whose credentials cannot be used is reported and nothing of that provider's is touched this run.
 
-import { destinationFor, diffDeliveries, joinedPartners, mergeJoinedRow, syncWindow, contentHash, type Delivery, type Desired, type Destinations, type Provider } from './plan.ts';
+import { destinationFor, diffDeliveries, joinedPartners, mergeJoinedRow, syncWindow, withPlyoHead, contentHash, type Delivery, type Desired, type Destinations, type Provider } from './plan.ts';
+import { plyoPair } from '../move-check/index.ts';
 import { serializeRide } from '../intervals/serialize.ts';
 import { upsertEvents, deleteEventsByExternalId, type IntervalsAuth } from '../intervals/client.ts';
 import { convertWorkoutToGarmin } from '../garmin/convert-workout.ts';
@@ -106,7 +107,10 @@ export async function runCalendarSync(supabase: any, userId: string, now = new D
       let payload: any;
       const part = partners.get(row.id);
       const joined = part && sentWithHead.has(part.id);
-      const one = joined ? mergeJoinedRow(row, part) : row;
+      const whole = joined ? mergeJoinedRow(row, part) : row;
+      // ⛔ The plyo warm-up rides at the front of its run or ride (2026-09-29, `withPlyoHead`); the warm-up row is not sent.
+      const warm = plyoPair(row, (rows ?? []) as any[]);
+      const one = warm && warm.session.id === row.id ? withPlyoHead(whole, warm.warmUp as any) : whole;
       // The day's title in the book's terms rides on the row, as get-week sends it (2026-09-18); a joined session is
       // "{first}, then {second}".
       const title = sessionTitle(one);

@@ -318,6 +318,8 @@ Deno.serve(async (req) => {
       for (const pid of await joinedPartnerIds(db, session)) {
         const { data: part } = await db.from('planned_workouts').select('*').eq('id', pid).eq('user_id', userId).maybeSingle();
         if (!part) continue;
+        // The plyo warm-up is not swapped with its session (2026-09-29): it stays in front of whatever the session becomes.
+        if (Array.isArray(part.tags) && part.tags.map(String).includes('plyo')) continue;
         const partCtx = {
           ...(await contextFor(db, userId, part, weeks, posture, ftp, baselines, pricing)),
           workoutMinutes: await loadWorkoutMinutes(db, userId, part),

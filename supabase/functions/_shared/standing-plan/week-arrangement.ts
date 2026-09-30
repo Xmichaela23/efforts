@@ -108,7 +108,8 @@ function skeletonWeek(args: {
     if (d.strength.length > 0) {
       out.push(S(wd, 'strength', d.label ?? 'Strength', d.lowerRole ? [`lower:${d.lowerRole}`] : []));
     }
-    if (d.plyo === true) out.push(S(wd, 'strength', 'Plyo warm-up', ['plyo']));
+    // ⛔ The warm-up sits on the day its run or ride was placed (2026-09-29, `compose.ts` `WARMS_UP_TAG`), as built.
+    if (d.plyo === true) out.push(S(d.endurance.length > 0 ? (placed.get(`${d.day}:0`) ?? wd) : wd, 'strength', 'Plyo warm-up', ['plyo']));
     d.endurance.forEach((slot, i) => {
       const long = isLongSlot(slot);
       const family = String(slot.family);

@@ -2634,9 +2634,18 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
  * ⛔ AND THE DRILLS NEVER ENTER `dosing`. They are not barbell work sets: counting them would inflate
  * the day against p086's fourteen-set ceiling and push the muscle floor onto a different session.
  */
-function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[]): PlanSession {
+/**
+ * ⛔ THE PLYO WARM-UP IS PART OF ITS RUN OR RIDE (Michael, 2026-09-29: "plyo warm up should be connected to the runs they
+ * are connected to" — "I don't think it should be a separate log"). Every frame day that prints a plyo also prints that
+ * day's endurance session (p246 / p274 NT, p278 / p279 the VO2 ride), and p88 files plyos as "a warm-up before sprint work
+ * or speed work". The row stays its own planned row (the drills are strength rows), dated on the day its session was
+ * placed and tagged `warms_up:<frame day>:<slot>` — the `slot:` key of that session. Everything that pairs, moves, folds
+ * or sends the two reads that tag (`move-check` `plyoPartners`). No endurance session left on the day → the frame's own day.
+ */
+export const WARMS_UP_TAG = 'warms_up:';
+function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[], warms?: { key: string; day: Weekday } | null): PlanSession {
   return {
-    day: dayNameFor(args, day.day),
+    day: warms?.day ?? dayNameFor(args, day.day),
     type: 'strength',
     // ⛔ 2026-09-18: the page's name for the day — p246, p274 and p278 print "Plyo warm-up" (was "Plyometrics").
     name: 'Plyo warm-up',
@@ -2646,7 +2655,7 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
     // OURS — `duration` 20 min on the plyo session row: placeholder length, no page, kept as found
     duration: 20,
     strength_exercises: rows,
-    tags: ['standing_plan', 'plyo'],
+    tags: ['standing_plan', 'plyo', ...(warms ? [`${WARMS_UP_TAG}${warms.key}`] : [])],
     // ⛔ THE PLYO DAY'S DOSE IS p227's — see `PLYO_DOSE`, which the frame's own note points at.
     cite: 'Viada p227',
   };
@@ -3899,7 +3908,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 
     // ⚠️ AFTER THE STRENGTH BRANCH, so a day that ever does lift still LEADS on its lift. Order
     // inside a day is what the calendar renders.
-    if (drills.length > 0) sessions.push(plyoSession(day, args, drills));
+    if (drills.length > 0) {
+      // The session it warms up: the day's first endurance slot the week kept, on the day that slot was placed.
+      const i = day.endurance.findIndex((_, k) => !droppedSlots.has(`${day.day}:${k}`));
+      const placedDay = i >= 0 ? enduranceDays.get(`${day.day}:${i}`) : undefined;
+      sessions.push(plyoSession(day, args, drills, i >= 0 ? { key: `${day.day}:${i}`, day: placedDay ?? dayNameFor(args, day.day) } : null));
+    }
 
     // ── endurance ─────────────────────────────────────────────────────────────────────────────
     //

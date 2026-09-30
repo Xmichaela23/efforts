@@ -440,6 +440,13 @@ export const LiftSessionCard: React.FC<{
 // ── the single card ─────────────────────────────────────────────────────────────────────────────
 
 /** A ride or run: one card, name and time, the family line. Same glass object as a deck card. */
+/** get-week's `plyo_warm_up` on a run or ride (2026-09-29, `plyo-fold.ts`). */
+export type PlyoWarmUp = { id?: string; note: string | null; drills: Array<{ name: string; how_to: string | null; benefit_line: string | null }> };
+const plyoWarmUpOf = (session: TodayRow): PlyoWarmUp | null => {
+  const p = (session as { plyo_warm_up?: unknown }).plyo_warm_up as PlyoWarmUp | null | undefined;
+  return p && Array.isArray(p.drills) ? p : null;
+};
+
 export const SessionCard: React.FC<{
   title: string;
   meta: string | null;
@@ -451,9 +458,13 @@ export const SessionCard: React.FC<{
   venueLabel?: string | null;
   /** The type under the title ("Maximal Lactate Steady State"); the time joins it there instead of the name line. */
   typeLine?: string | null;
-}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, typeLine, onOpen }) => {
+  /** The plyo warm-up folded into this run or ride (get-week `plyo-fold.ts`, 2026-09-29), drawn before its steps. */
+  plyo?: PlyoWarmUp | null;
+}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, typeLine, plyo, onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
+  // Which drill's (i) is open. Closed by default, like the lift card's.
+  const [openInfo, setOpenInfo] = React.useState<Record<string, boolean>>({});
   return (
     <button
       type="button"
@@ -491,11 +502,49 @@ export const SessionCard: React.FC<{
           {meta ? `${typeLine} · ${meta}` : typeLine}
         </div>
       ) : null}
+      {/* ⛔ THE PLYO WARM-UP, FIRST, INSIDE THE RUN OR RIDE (Michael, 2026-09-29: one session, one log). Server words only:
+          "Plyo warm-up" (the page's name, p246 / p274 / p278), get-week's note (p275 / p227), each drill's how-to and, behind
+          its (i), p227's benefit. The (i) is a span: this whole card is one button. */}
+      {plyo && plyo.drills.length > 0 ? (
+        <div style={{ marginTop: 8 }}>
+          <div className="text-body font-medium" style={{ color: 'var(--label)' }}>Plyo warm-up</div>
+          {plyo.note ? (
+            <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{plyo.note}</div>
+          ) : null}
+          {plyo.drills.map((d) => (
+            <div key={d.name} style={{ marginTop: 6 }}>
+              <div className="flex items-baseline gap-x-2">
+                <span className="text-subhead font-medium" style={{ color: 'var(--label)' }}>{d.name}</span>
+                {d.benefit_line ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`About ${d.name}`}
+                    aria-expanded={!!openInfo[d.name]}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenInfo((m) => ({ ...m, [d.name]: !m[d.name] })); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setOpenInfo((m) => ({ ...m, [d.name]: !m[d.name] })); } }}
+                    className="text-white/40 self-center"
+                    style={{ lineHeight: 0, cursor: 'pointer' }}
+                  >
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                ) : null}
+              </div>
+              {d.benefit_line && openInfo[d.name] ? (
+                <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label)' }}>{d.benefit_line}</div>
+              ) : null}
+              {d.how_to ? (
+                <div className="text-subhead" style={{ lineHeight: 1.28, marginTop: 2, color: 'var(--label-secondary)' }}>{d.how_to}</div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {lines.map((line, i) => (
         <div
           key={line}
           className="text-subhead"
-          style={{ lineHeight: 1.35, marginTop: i === 0 ? 8 : 6, color: i === 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.62)' }}
+          style={{ lineHeight: 1.35, marginTop: i === 0 ? (plyo ? 12 : 8) : 6, color: i === 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.62)' }}
         >
           {line}
         </div>
@@ -773,6 +822,7 @@ const TodaySession: React.FC<{
       emphasis={emphasis}
       venueLabel={VENUE_LABEL[venueOf(session as never) ?? ''] ?? null}
       typeLine={sessionTypeFor(session as never)}
+      plyo={plyoWarmUpOf(session)}
       onOpen={onOpen}
     />
   );

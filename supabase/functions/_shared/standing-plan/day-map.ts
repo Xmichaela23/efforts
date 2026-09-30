@@ -129,8 +129,10 @@ export function frameFixedDaysFor(frame: FrameId, column: ColumnKind = 'standard
 } {
   const days = FRAMES[frame]?.columns[column] ?? [];
   const lifting = days.filter((d) => d.strength.length > 0).map((d) => d.day);
+  // ⛔ THE PLYO DAY IS NO LONGER FIXED (2026-09-29): the warm-up goes with the run or ride it warms up (`compose.ts`
+  // `WARMS_UP_TAG`), and endurance steps out of the rotation on its own. A frame day with a plyo and no lift is not fixed.
   const fixed = days
-    .filter((d) => d.strength.length > 0 || d.plyo === true)
+    .filter((d) => d.strength.length > 0)
     .map((d) => d.day);
   return { lifting, fixed };
 }

@@ -350,6 +350,8 @@ export const BUILD_FOCUS_COPY = {
  * rotates it), {second} the second part's.
  */
 export const JOINED_ROW = '{first}, then {second}';  // not-instruction: a session name joined from two names
+// ⛔ A run or ride with its plyo warm-up, as one card (Michael, 2026-09-29: "plyo - short threshold repeats").
+export const PLYO_ROW = 'Plyo - {session}';  // not-instruction: a session name with its warm-up in front
 
 /**
  * ⛔ THE LONGER-SESSION OFFER'S WORDS (2026-09-27, `length-step.ts`), per the session's role. The long ride's line and

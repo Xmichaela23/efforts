@@ -90,6 +90,65 @@ export function movesWith(session: MoveRow, rows: MoveRow[]): MoveRow[] {
 }
 
 /**
+ * ⛔ THE PLYO WARM-UP AND THE SESSION IT WARMS UP (2026-09-29, Michael: "plyo warm up should be connected to the runs").
+ * The builder tags the warm-up `warms_up:<frame day>:<slot>` — the `slot:` key of its run or ride (`compose.ts`
+ * `WARMS_UP_TAG`). Same plan, same plan day. A joined session's second part reaches the warm-up through its first part.
+ * ⚠️ Separate from `movesWith` on purpose: that one answers "the other half of one session" and several readers take
+ * its first answer as that half. `movesTogether` is the union, for anything that moves or skips a whole session.
+ */
+const warmsUpKey = (r: MoveRow): string | null => {
+  const t = tagList(r).find((x) => x.startsWith('warms_up:'));
+  return t ? t.slice('warms_up:'.length) : null;
+};
+const slotKeyOf = (r: MoveRow): string | null => {
+  const t = tagList(r).find((x) => x.startsWith('slot:'));
+  return t ? t.slice('slot:'.length) : null;
+};
+const samePlanDay = (a: MoveRow, b: MoveRow) =>
+  (a.training_plan_id ?? null) === (b.training_plan_id ?? null) && planDateOf(a) === planDateOf(b);
+const isEnduranceRow = (r: MoveRow) => ['run', 'ride'].includes(String(r.type ?? '').toLowerCase());
+/**
+ * ⚠️ A WARM-UP BUILT BEFORE THE TAG (every plan made before 2026-09-29) pairs with the first run or ride of its plan day —
+ * the lowest `slot:` index, a joined session's first half — the rule the lost-day sheet already used (`partnerOf`). The
+ * builder put the two on one frame day, so on an unmoved plan they share the plan date.
+ */
+const firstEnduranceOf = (w: MoveRow, live: MoveRow[]): MoveRow | null => {
+  const same = live.filter((r) => r.id !== w.id && !isPlyo(r) && isEnduranceRow(r) && !isJoinedPart(r) && samePlanDay(r, w));
+  const idx = (r: MoveRow) => { const k = slotKeyOf(r); const n = k ? Number(k.split(':')[1]) : NaN; return Number.isFinite(n) ? n : 99; };
+  return same.sort((a, b) => idx(a) - idx(b))[0] ?? null;
+};
+const sessionOfWarmUp = (w: MoveRow, live: MoveRow[]): MoveRow | null => {
+  const key = warmsUpKey(w);
+  if (key) return live.find((r) => r.id !== w.id && !isPlyo(r) && slotKeyOf(r) === key && samePlanDay(r, w)) ?? null;
+  return firstEnduranceOf(w, live);
+};
+/** The plyo warm-up and its session, from either side: [warm-up, session], or null when `session` has no such pair. */
+export function plyoPair(session: MoveRow, rows: MoveRow[]): { warmUp: MoveRow; session: MoveRow } | null {
+  const live = rows.filter((r) => !isSkipped(r));
+  if (isPlyo(session)) {
+    const target = sessionOfWarmUp(session, live);
+    return target ? { warmUp: session, session: target } : null;
+  }
+  const head = isJoinedPart(session) ? (movesWith(session, rows)[0] ?? null) : session;
+  if (!head) return null;
+  const w = live.find((r) => r.id !== session.id && isPlyo(r) && sessionOfWarmUp(r, live)?.id === head.id);
+  return w ? { warmUp: w, session: head } : null;
+}
+/** Everything that moves with `session`: a joined session's other half, and the plyo warm-up with its session. */
+export function movesTogether(session: MoveRow, rows: MoveRow[]): MoveRow[] {
+  const out = new Map<string, MoveRow>();
+  const add = (r: MoveRow | null | undefined) => { if (r && r.id !== session.id) out.set(String(r.id), r); };
+  for (const r of movesWith(session, rows)) add(r);
+  const pair = plyoPair(session, rows);
+  if (pair) {
+    add(pair.warmUp);
+    add(pair.session);
+    for (const r of movesWith(pair.session, rows)) add(r);
+  }
+  return [...out.values()];
+}
+
+/**
  * ⛔ A "DOWN" DAY IS CLOSED (2026-09-22, Michael): a day with nothing left on it whose sessions were moved off it (rows
  * still carry it as their original day, `moved_from:`) or came off it (skipped). Like a day off, it is never a destination: not for
  * "Days that fit" and not for a later lost day. Read off the rows' tags, the same reading get-week's "Down" line makes.
@@ -163,7 +222,7 @@ export function checkMove(args: { session: MoveRow; toDate: string; rows: MoveRo
   }
   const notes: MoveNote[] = [];
   // ⛔ The other part of a joined session goes to the same day (`movesWith`), so the check reads the week with both moved.
-  const withIds = new Set(movesWith(args.session, args.rows).map((r) => r.id));
+  const withIds = new Set(movesTogether(args.session, args.rows).map((r) => r.id));
   // Viada p108: 6–8 h between two-a-days, 4–6 h when the first is an easy session under an hour, a full meal between.
   // ⛔ ONLY WHEN A LIFT IS ONE OF THE TWO (2026-09-21): p108 is about the gap before the resistance session. A run and
   // a ride on one day get no note, and such a day still fits.

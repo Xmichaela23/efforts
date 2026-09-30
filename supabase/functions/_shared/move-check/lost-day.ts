@@ -28,7 +28,7 @@
 
 import { planDateOf } from '../moved-from.ts';
 import { fill, JOINED_ROW } from '../standing-plan/setup-copy.ts';
-import { checkMove, daysBetween, daysThatFit, downDates, isJoinedPart, isPlyo, liftGaps, MAX_SESSIONS_A_DAY, movesWith, sessionsOn, weekdayName, type MoveRow } from './index.ts';
+import { checkMove, daysBetween, daysThatFit, downDates, isJoinedPart, isPlyo, liftGaps, MAX_SESSIONS_A_DAY, movesTogether, movesWith, plyoPair, sessionsOn, weekdayName, type MoveRow } from './index.ts';
 
 export type LostDaySession = {
   id: string;
@@ -141,12 +141,15 @@ export function placeLostDay(args: {
     at.set(r.id, iso(to));
     pending.delete(r.id);
     // ⛔ A joined session's other part goes with the drag (p245 / p253 / p269) unless it was dragged too.
-    for (const w of movesWith(r, args.rows)) if (!moves[w.id]) { at.set(w.id, iso(to)); pending.delete(w.id); }
+    // ⛔ And a plyo warm-up with its run or ride, either way (2026-09-29, `movesTogether`).
+    for (const w of movesTogether(r, args.rows)) if (!moves[w.id]) { at.set(w.id, iso(to)); pending.delete(w.id); }
   }
 
   // 4a. A warm-up's session: the pool session planned on the warm-up's own day, else the first on that lost day.
+  // ⛔ The tagged session first (2026-09-29, `plyoPair`); a warm-up built before the tag falls back to the same-day rule.
   const partnerOf = (w: MoveRow): MoveRow | null =>
-    pool.find((r) => !isPlyo(r) && planDateOf(r) === planDateOf(w))
+    (() => { const p = plyoPair(w, pool); return p ? p.session : null; })()
+    ?? pool.find((r) => !isPlyo(r) && planDateOf(r) === planDateOf(w))
     ?? pool.find((r) => !isPlyo(r) && lostOf.get(r.id) === lostOf.get(w.id)) ?? null;
   // ⛔ AND THE SECOND PART OF A JOINED RUN (p245 / p253) rides with its first part, the same way (`movesWith`).
   const headOf = (r: MoveRow): MoveRow | null =>

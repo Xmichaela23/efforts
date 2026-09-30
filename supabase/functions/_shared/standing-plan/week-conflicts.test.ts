@@ -260,6 +260,9 @@ Deno.test('⛔ EVERY CONFLICT SENTENCE PASSES THE VOICE CHECK', () => {
     // ⚠️ ADDED 2026-09-09 — the ONE shape that reaches `long_after_heavy_legs` a day apart, which is
     // the only arm of that rule with approved words. See the test above for why the weekend is off.
     [{ runs: 4, rides: 0 }, 'Wednesday', [null, null], ['Saturday', 'Sunday']],
+    // ⚠️ ADDED 2026-09-29 — the plyo warm-up goes with its run now (`day-map.ts` fixed days are the lifts alone), so the
+    // blocked-day shapes above keep a rest day; a Monday long run with a Tuesday hard pick still fills every day.
+    [{ runs: 4, rides: 0 }, 'Monday', ['Tuesday', null]],
   ];
   let seen = 0;
   const rules = new Set<string>();

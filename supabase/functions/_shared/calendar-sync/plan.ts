@@ -3,7 +3,7 @@
 
 import { isJoinedPart, movesWith, type MoveRow } from '../move-check/index.ts';
 import { sessionTitle } from '../session-title.ts';
-import { fill, JOINED_ROW } from '../standing-plan/setup-copy.ts';
+import { fill, JOINED_ROW, PLYO_ROW } from '../standing-plan/setup-copy.ts';
 
 export type Provider = 'garmin' | 'intervals_icu';
 export type Destination = Provider | 'none';
@@ -92,6 +92,26 @@ export function mergeJoinedRow<R extends Record<string, any>>(head: R, part: R):
       steps: [...head.computed.steps, ...part.computed.steps],
       total_duration_seconds: sum(head.computed.total_duration_seconds, part.computed.total_duration_seconds),
     },
+  };
+}
+
+/**
+ * ⛔ THE PLYO WARM-UP GOES OUT INSIDE ITS RUN OR RIDE (Michael, 2026-09-29). One watch step before the session's own
+ * warm-up: lap button (p227 prints no length), no target, and the drill names as the step's words — "Plyo warm-up:
+ * Stiff-Legged Run · Pogo Hops". The athlete does the drills they pick (p275: one to three) and presses lap once. Titled
+ * "Plyo - {session}" (`PLYO_ROW`, Michael's words). The warm-up row itself is a strength row and is not sent.
+ * ⚠️ One step, not one per drill, so the recorded file's first lap is always the warm-up and the session's laps still
+ * line up with its own steps (D-496).
+ */
+export function withPlyoHead<R extends Record<string, any>>(session: R, warmUp: Record<string, any>): R {
+  const names = (Array.isArray(warmUp?.strength_exercises) ? warmUp.strength_exercises : [])
+    .map((e: any) => String(e?.name ?? '').trim()).filter(Boolean);
+  const step = { type: 'warmup', lap_button: true, watch_target: 'none', label: names.length ? `Plyo warm-up: ${names.join(' · ')}` : 'Plyo warm-up', plyo: true };
+  const steps = Array.isArray(session?.computed?.steps) ? session.computed.steps : [];
+  return {
+    ...session,
+    session_title: fill(PLYO_ROW, { session: sessionTitle(session as any) }),
+    computed: { ...(session.computed ?? {}), steps: [step, ...steps] },
   };
 }
 
