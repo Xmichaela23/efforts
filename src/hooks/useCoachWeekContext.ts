@@ -678,6 +678,17 @@ const COACH_CHANGE_EVENTS = ['workouts:invalidate', 'planned:invalidate', 'week:
 const COACH_EVENT_SETTLE_MS = 4 * 1000;
 let coachEventTimer: ReturnType<typeof setTimeout> | null = null;
 let coachEventRecheck: (() => void) | null = null;
+/**
+ * ⛔ AN OPEN SCREEN PICKS UP THE SERVER'S REBUILD (2026-09-30). The settled check above runs seconds after a sync;
+ * the server keeps working after it (profile, weekly snapshot) and then rebuilds State in the background
+ * (`_shared/queue-state-rebuild.ts`, 60–120 s after its last step). That rebuild never reached a screen already open.
+ * Now an open screen reads the saved row's time at each of these points after the last change, and runs one
+ * background check the first time the row is newer than what it shows. Each read is one small row, no rebuild.
+ * OURS — 1.5, 3 and 5 minutes: a sync's queued steps plus the rebuild land inside that span on the throwaway runs.
+ */
+const COACH_REBUILD_FOLLOWUP_MS = [90 * 1000, 180 * 1000, 300 * 1000];
+let coachFollowupTimers: ReturnType<typeof setTimeout>[] = [];
+let coachFollowupCheck: (() => Promise<boolean>) | null = null;
 
 export function useCoachWeekContext(date?: string) {
   const focusDate = date || new Date().toLocaleDateString('en-CA');
@@ -707,6 +718,13 @@ export function useCoachWeekContext(date?: string) {
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
         coachEventRecheck?.();
       }, COACH_EVENT_SETTLE_MS);
+      // Follow-ups for the server's own rebuild — see COACH_REBUILD_FOLLOWUP_MS. A new change restarts them.
+      coachFollowupTimers.forEach(clearTimeout);
+      let found = false;
+      coachFollowupTimers = COACH_REBUILD_FOLLOWUP_MS.map((ms) => setTimeout(() => {
+        if (found || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
+        void coachFollowupCheck?.().then((hit) => { if (hit) found = true; });
+      }, ms));
     };
     COACH_CHANGE_EVENTS.forEach((n) => window.addEventListener(n, onChange));
     return () => { COACH_CHANGE_EVENTS.forEach((n) => window.removeEventListener(n, onChange)); };
@@ -846,6 +864,27 @@ export function useCoachWeekContext(date?: string) {
     coachEventRecheck = mine;
     return () => { if (coachEventRecheck === mine) coachEventRecheck = null; };
   }, [runPipeline]);
+
+  // The follow-up read (COACH_REBUILD_FOLLOWUP_MS): true when the server's saved row was newer and a check ran.
+  useEffect(() => {
+    const mine = async (): Promise<boolean> => {
+      const userId = getStoredUserId();
+      if (!userId) return false;
+      const { data: row } = await supabase
+        .from('coach_cache')
+        .select('generated_at, invalidated_at')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const genAt = row?.generated_at != null ? new Date(String(row.generated_at)).getTime() : 0;
+      const shownAt = queryClient.getQueryState(coachKey)?.dataUpdatedAt ?? 0;
+      if (row?.invalidated_at != null || genAt <= shownAt) return false;
+      await runPipeline(true, { force: false });
+      return true;
+    };
+    coachFollowupCheck = mine;
+    return () => { if (coachFollowupCheck === mine) coachFollowupCheck = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runPipeline, queryClient, coachKey.join('|')]);
 
   useEffect(() => {
     hasCachedData.current = false;

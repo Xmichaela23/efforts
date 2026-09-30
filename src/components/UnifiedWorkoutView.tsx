@@ -381,6 +381,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     version: 'v1',
     // ⚠️ The Details tab reads it too: its Workload tile prints `session_detail_v1.load.workload` (H-D07).
     fetchSessionDetail: isCompleted && (activeTab === 'summary' || activeTab === 'completed'),
+    initialWorkout: workout,
   });
   /** §booms — the server's line (`session_detail_v1.boom`, audit H-T14). Null on anything with nothing to say. */
   const boomLine: string | null = (sessionDetailV1 as { boom?: { line?: unknown } } | null)?.boom?.line as string ?? null;

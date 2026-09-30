@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { autoCompleteGoalsFromWorkouts } from './auto-complete-goals-from-workouts.ts';
+import { queueStateRebuild } from './queue-state-rebuild.ts';
 
 /**
  * After Strava/Garmin data lands in `workouts`, warm learned profile, memory, and weekly snapshot.
@@ -48,4 +49,6 @@ export async function runPostImportAthletePipeline(
   }
   await run('recompute-athlete-memory', 'recompute-athlete-memory', { user_id: userId });
   await run('compute-snapshot', 'compute-snapshot', { user_id: userId });
+  // The snapshot State reads is new; queue State's rebuild behind it (2026-09-30, `queue-state-rebuild.ts`).
+  await queueStateRebuild(supabase, userId, logLabel);
 }

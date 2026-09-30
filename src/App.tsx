@@ -19,8 +19,12 @@ import PlansAdminImport from "./pages/PlansAdminImport";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
 import ResetPassword from "./pages/ResetPassword";
+import { restoreQueryCache, startQueryCachePersist } from "./lib/query-persist";
 
 const queryClient = new QueryClient();
+// Today and State open on the last numbers the phone had, then refresh (`lib/query-persist.ts`, 2026-09-30).
+restoreQueryCache(queryClient);
+startQueryCachePersist(queryClient);
 
 const App = () => (
 <ThemeProvider defaultTheme="light">

@@ -3,6 +3,7 @@
 // Behavior: Pre-materialize planned rows, auto-attach completed workouts, and compute summaries for a week window
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
+import { planSweep } from './sweep-plan.ts';
 
 function toISO(d: Date) {
   const y = d.getFullYear();
@@ -48,9 +49,10 @@ Deno.serve(async (req) => {
     const fromISO = toISO(mon); const toISOEnd = toISO(sun);
 
     // Pull completed workouts in window (we sweep run/ride/swim and optionally walk)
+    const WORKOUT_COLS = 'id,type,date,planned_id,overall:computed->overall,planned_steps_light:computed->planned_steps_light';
     const { data: rows, error } = await supabase
       .from('workouts')
-      .select('id,type,date,planned_id')
+      .select(WORKOUT_COLS)
       .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISOEnd)
@@ -63,7 +65,7 @@ Deno.serve(async (req) => {
     // Also include any planned rows in window that already have completed_workout_id, regardless of workout_status
     const { data: plannedRows } = await supabase
       .from('planned_workouts')
-      .select('completed_workout_id,date')
+      .select('id,completed_workout_id,workout_status,date')
       .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISOEnd)
@@ -72,8 +74,15 @@ Deno.serve(async (req) => {
     const extraIds: string[] = (Array.isArray(plannedRows)?plannedRows:[])
       .map((p:any)=>String(p.completed_workout_id||''))
       .filter((x:string)=>x.length>0 && !ids.includes(x));
-    const allIds = [...ids, ...extraIds];
-    if (!allIds.length) {
+    const { data: extraRows } = extraIds.length
+      ? await supabase.from('workouts').select(WORKOUT_COLS).eq('user_id', userId).in('id', extraIds)
+      : { data: [] };
+
+    // Skip what is already done — see sweep-plan.ts (2026-09-30).
+    const allRows: any[] = [...(Array.isArray(rows) ? rows : []), ...(Array.isArray(extraRows) ? extraRows : [])];
+    const { attachIds, computeIds } = planSweep(allRows, Array.isArray(plannedRows) ? plannedRows : []);
+    const allIds = attachIds;
+    if (!allRows.length) {
       return new Response(JSON.stringify({ success:true, processed: 0, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
@@ -104,17 +113,18 @@ Deno.serve(async (req) => {
     } catch {}
 
     const MAX = 4; let attached = 0; let computed = 0;
-    for (let i=0;i<allIds.length;i+=MAX) {
-      const batch = allIds.slice(i, i+MAX);
+    const sweepIds = [...new Set([...allIds, ...computeIds])];
+    for (let i=0;i<sweepIds.length;i+=MAX) {
+      const batch = sweepIds.slice(i, i+MAX);
       // Attach first
-      await Promise.all(batch.map(async(id)=>{
+      await Promise.all(batch.filter((id)=>allIds.includes(id)).map(async(id)=>{
         try {
           const r = await fetch(attachUrl, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: id }) });
           if (r.ok) attached += 1;
         } catch {}
       }));
       // Then compute
-      await Promise.all(batch.map(async(id)=>{
+      await Promise.all(batch.filter((id)=>computeIds.has(id)).map(async(id)=>{
         try {
           const r = await fetch(computeUrl, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: id }) });
           if (r.ok) computed += 1;
@@ -122,7 +132,7 @@ Deno.serve(async (req) => {
       }));
     }
 
-    return new Response(JSON.stringify({ success:true, attached, computed, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
+    return new Response(JSON.stringify({ success:true, attached, computed, skipped: allRows.length - sweepIds.length, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
   } catch (e) {
     const status = (e as any)?.status ?? 500;
     return new Response(JSON.stringify({ error: String(e) }), { status, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});

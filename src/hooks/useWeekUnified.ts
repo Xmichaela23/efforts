@@ -29,8 +29,17 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   useEffect(() => {
     setUserId(getStoredUserId());
+    // ⛔ ONLY A CHANGE OF ACCOUNT CLEARS THE SAVED WEEK (2026-09-30). The auth library sends every new
+    // listener an initial session event, and sends another on each token refresh (app resume). Clearing on
+    // every event re-fetched the week each time Today, the calendar or a workout opened, despite the
+    // hour-long fresh window above. The key already carries the user id, so a different account never
+    // reads another's week; this clears the old account's copies when the signed-in user changes.
+    let lastUserId = getStoredUserId();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      setUserId(getStoredUserId());
+      const nextUserId = getStoredUserId();
+      setUserId(nextUserId);
+      if (nextUserId === lastUserId) return;
+      lastUserId = nextUserId;
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
     });
     return () => subscription.unsubscribe();
@@ -64,13 +73,17 @@ export function useWeekUnified(fromISO: string, toISO: string) {
 
   // In unified mode, rely on standard query invalidation from navigations;
   // avoid global event-based invalidation to prevent render loops on calendar.
-  // Allow targeted external refresh via `week:invalidate` (keepPreviousData prevents flicker)
+  // Allow targeted external refresh via `week:invalidate` (keepPreviousData prevents flicker).
+  // A changed planned row or workout changes the week too (2026-09-30): nine senders of `planned:invalidate`
+  // or `workouts:invalidate` (link a workout, recompute, materialize, plan setup) never sent `week:invalidate`.
+  // The refetch on every mount used to hide that; with the week now held for its fresh window, they refresh it here.
   useEffect(() => {
     const handler = () => {
       try { queryClient.invalidateQueries({ queryKey: ['weekUnified'] }); } catch {}
     };
-    window.addEventListener('week:invalidate', handler);
-    return () => { window.removeEventListener('week:invalidate', handler); };
+    const events = ['week:invalidate', 'planned:invalidate', 'workouts:invalidate'];
+    events.forEach((e) => window.addEventListener(e, handler));
+    return () => { events.forEach((e) => window.removeEventListener(e, handler)); };
   }, [queryClient]);
 
   const items: UnifiedItem[] = (query.data as any)?.items || [];

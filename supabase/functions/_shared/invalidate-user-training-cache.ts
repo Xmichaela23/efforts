@@ -10,6 +10,7 @@
  */
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { refreshAthleticRecordCache } from './athletic-record/build.ts';
+import { queueStateRebuild } from './queue-state-rebuild.ts';
 
 export async function invalidateUserTrainingCache(
   supabase: SupabaseClient,
@@ -29,6 +30,8 @@ export async function invalidateUserTrainingCache(
   } catch (e) {
     console.error(`[${logPrefix}] Failed to invalidate coach_cache:`, e);
   }
+  // …and queue its rebuild, so the next State or Today open reads a finished row (2026-09-30).
+  await queueStateRebuild(supabase, userId, logPrefix);
   /**
    * ⛔ THE RECORD TAB'S CACHE IS REBUILT HERE, NOT DROPPED (2026-09-20, after it was measured on his
    * phone). Dropping the row just moves the 3.1 s and 383 KB onto whoever opens the tab next, and

@@ -12,6 +12,11 @@ export type WorkoutDetailOptions = {
   version?: string;
   /** When true, fetches `session_detail_v1` (Performance tab) in a second request. */
   fetchSessionDetail?: boolean;
+  /**
+   * The row the screen was opened with (Today / the calendar: get-week's item). Its saved
+   * `workout_analysis.session_detail_v1` paints Performance while the edge request runs.
+   */
+  initialWorkout?: unknown;
 };
 
 /** Persisted Performance payload (merge_session_detail_v1_into_workout_analysis). */
@@ -290,10 +295,21 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     return preview ? { ...preview } : null;
   }, [id, contextPreview, workoutQuery.data]);
 
+  /**
+   * ⛔ THE SAVED ANALYSIS PAINTS FIRST (2026-09-30). get-week already sends each finished workout's saved
+   * Performance payload, and the screen is opened with that row. Performance used to ignore it and spin
+   * until `workout-detail` answered — and that request rebuilds the payload when it is over a day old.
+   * Now the saved copy shows at once and the edge answer replaces it when it lands (show what the phone
+   * has, refetch behind it). The fetched workout still wins when it carries one.
+   */
+  const initialWorkout = opts?.initialWorkout;
   const embeddedSessionDetail = useMemo(() => {
-    const raw = extractSessionDetailV1FromWorkout(stableWorkout);
+    const raw = extractSessionDetailV1FromWorkout(stableWorkout)
+      ?? (initialWorkout && String((initialWorkout as { id?: unknown })?.id ?? '') === String(id ?? '')
+        ? extractSessionDetailV1FromWorkout(initialWorkout)
+        : null);
     return stripEphemeralSessionDetailFields(raw);
-  }, [stableWorkout]);
+  }, [stableWorkout, initialWorkout, id]);
 
   const sessionDetailV1 = useMemo(() => {
     // Performance tab runs scope=session_detail (edge may attach response-only `stale`).

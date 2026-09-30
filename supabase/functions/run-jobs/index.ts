@@ -33,7 +33,8 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // `rematerialize-standing-block` joined 2026-09-18: the plan refresh (`_shared/plan-refresh.ts`), queued when a plan
 // has an upcoming session written by older code or a number it is priced off was accepted.
 // `warm-athletic-record` added 2026-09-20: the Record tab's cache is rebuilt off a tap, never on one.
-const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync', 'post-import-athlete-pipeline', 'rematerialize-standing-block', 'warm-athletic-record']);
+// `coach` added 2026-09-30: State's cache is rebuilt after a sync (`_shared/queue-state-rebuild.ts`), not on the next open.
+const ALLOWED_KINDS = new Set(['recompute-workout', 'adapt-plan', 'auto-attach-planned', 'calendar-sync', 'post-import-athlete-pipeline', 'rematerialize-standing-block', 'warm-athletic-record', 'coach']);
 /** OURS — stop claiming after 40 s; a tick then ends well inside the edge wall-clock cap. */
 const CLAIM_BUDGET_MS = 40_000;
 /** OURS — one job may take at most 90 s; recompute-workout's whole chain runs in well under that. */
