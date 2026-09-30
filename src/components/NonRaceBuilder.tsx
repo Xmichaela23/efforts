@@ -4342,6 +4342,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const label = words?.label;
               const blurb = words?.blurb;
               const requirement = words?.requirement;
+              // How much lifting the plan expects, from its page (server words, 2026-09-29); absent on a plan whose page is silent.
+              const lifting = (words as { lifting?: string | null } | undefined)?.lifting ?? null;
               const live = goal != null && !held;
               return (
                 <button
@@ -4373,6 +4375,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — the same line the Standard Focus card
                           carries; this block refuses at the gate without it. */}
+                      {live && lifting ? (
+                        <span className="block text-sm mt-1.5 text-white/80">{lifting}</span>
+                      ) : null}
                       {live && requirement ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
                           {requirement}

@@ -33,6 +33,8 @@ export const PROGRAM_COPY = {
     blurb: 'This program can run all year for an athlete interested in several sports.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
       + 'week one.',
+    // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
+    lifting: null as string | null,
   },
   // Viada p246: four lifting days and four runs (the week table's count). Viada p247, Running Notes, reworded (Michael approved the words 2026-09-19); the page: "Mileage will be
   // dictated by experience level, with more proficient runners looking at runs up to 90 to 100 minutes here…".
@@ -50,6 +52,8 @@ export const PROGRAM_COPY = {
     // Michael's words, 2026-09-23. Hours: the built week's running (p246, four runs); p247: "most skill levels… advanced intermediate runners".
     blurb: 'Less running, strength focused. About 4 hours of running a week, four lifting days. Ideal for intermediate or advanced.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+    // p247: "accessible and useful for athletes of most skill levels", built for specific barbell lifts. Approved 2026-09-29.
+    lifting: 'Lifting: some experience.',
   },
   // ⛔ 5HR + STRENGTH (Strength + Half-Marathon, Viada pp250-251), 2026-09-22 — Michael approved the words.
   // OURS — "5 hours": the built week's running (five runs, p250) as composed; see the ledger. "Advanced": p251 "more
@@ -61,6 +65,8 @@ export const PROGRAM_COPY = {
     // Michael's words, 2026-09-23. p251: "more advanced hybrid athletes", 1RM "1% every four weeks"; hours: the built week's five runs (p250).
     blurb: 'For high-mile advanced runners. 5 hours or more of running a week, four lifting days. Strength progresses more slowly.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+    // p251: the strength is "similar in structure to the Strength + 5K" (Run + Strength). Approved 2026-09-29.
+    lifting: 'Lifting: some experience.',
   },
   // ⛔ BUILD MUSCLE (WORKORDER-run-programs Stage 1) — Michael approved the words 2026-09-24. Hypertrophy + 5K (Viada
   // pp244-245): p245 "can be used by athletes of most levels", "If you're interested in a first program to start with in
@@ -69,6 +75,8 @@ export const PROGRAM_COPY = {
     label: 'Run + Muscle',
     blurb: 'Built for muscle. About 3 hours of running a week and four lifting days. A first program that suits most levels.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+    // p245: "a first program" for "athletes of most levels". Michael approved 2026-09-29.
+    lifting: 'Lifting: new is fine.',
   },
   // Hypertrophy + Half-Marathon (Viada pp252-253): p253 "intended for athletes with a solid strength background", "can,
   // like many others, be run almost indefinitely". Hours: the built week's running (p252, five runs), measured at 4.9-5.7 h.
@@ -76,12 +84,16 @@ export const PROGRAM_COPY = {
     label: 'Long Run + Muscle',
     blurb: 'For runners with a solid strength background. About 5 hours of running a week and four lifting days. You can stay on it almost indefinitely.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+    // p253: "for athletes with a solid strength background". Approved 2026-09-29.
+    lifting: 'Lifting: a solid background.',
   },
   // ⛔ THE RACE CARD INSIDE RUN (Michael, 2026-09-23): opens the marathon flow, built back from the race date.
   marathon: {
     label: 'Marathon',  // not-instruction: a card name
     blurb: 'Built back from your race date.',
     requirement: '',
+    // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
+    lifting: null as string | null,
   },
   // Viada p278: three lifting days; the Standard column's seven workouts are five rides — Days 3 and 5 each print two
   // workouts in one box, which the book's convention makes one ride (p269; Michael, 2026-09-27).
@@ -101,12 +113,16 @@ export const PROGRAM_COPY = {
     label: 'Long Ride + Strength',
     blurb: 'Five rides and three lifting days a week. The long ride runs 3h30 to 5h.',  // Michael approved the words 2026-09-28
     requirement: RIDE_STRENGTH_REQUIREMENT,
+    // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
+    lifting: null as string | null,
   },
   ride_strength: {
     label: 'Ride + Strength',
     blurb: 'Options for intermediate and advanced cyclists. Four or five rides, three lifting days.',
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: RIDE_STRENGTH_REQUIREMENT,
+    // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
+    lifting: null as string | null,
   },
 } as const;
 
