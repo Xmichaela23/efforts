@@ -54,8 +54,6 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
     if (next.has(k)) next.delete(k); else next.add(k);
     return next;
   });
-  // Collapsed by default — the e1RM dot above is the read; this list is drill-down.
-  const [strengthDetailOpen, setStrengthDetailOpen] = useState<boolean>(false);
   const count = sets.main.length + sets.others.length;
 
   return (
@@ -63,20 +61,15 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
     // under the parent label column, leaving each lift cramped in ~68% width. It now runs near-full-width
     // (a light border-l keeps the nesting cue) so the sets read clean, like Strong's exercise detail.
     <div className="mt-2 ml-1 pl-3 border-l border-white/[0.07] space-y-3.5">
-      {/* Collapsed by default — the e1RM dot above is the read; this list is drill-down. */}
-      <button
-        type="button"
-        onClick={() => setStrengthDetailOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-caption uppercase tracking-wider text-label-secondary hover:text-label-secondary transition-colors"
-        aria-expanded={strengthDetailOpen}
-      >
-        <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
+      {/* ⛔ ALWAYS OPEN (Michael, 2026-09-29: "the whole card should be expanded, no menu drop"). The section label is a
+          label now (rule 4, uppercase and tracked), not a toggle. */}
+      <div className="flex items-center gap-1.5 text-caption uppercase tracking-wider text-label-secondary">
         from your logged sets
         {/* ⚠️ THE COUNT INCLUDES THE OTHER LIFTS (item 5) — it named only the main ones while
             accessories had no home, and would understate the section the moment they got one. */}
         <span className="text-label-secondary normal-case tracking-normal">· {count} {count === 1 ? 'lift' : 'lifts'}</span>
-      </button>
-      {strengthDetailOpen && sets.main.map((lt) => {
+      </div>
+      {sets.main.map((lt) => {
         // A SET HISTORY, LIKE STRONG/HEVY (2026-08-11, Michael: *"it should offer what the other apps
         // do"*). Each main lift's recent sessions (weight × reps · date · estimated 1RM), newest first.
         // Adjusting weight lives on the Adjust tab (StateAdjustLens), not as a per-row tweak here.
@@ -89,7 +82,7 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
         );
       })}
       {/* ── SECONDARIES AND ACCESSORIES: RECORDS, NOT A LINE (item 5). ── */}
-      {strengthDetailOpen && sets.others.length > 0 && (
+      {sets.others.length > 0 && (
         <div className="space-y-1.5 pt-1">
           {/* ⚠️ ITS OWN QUIET HEADING, because these answer a DIFFERENT question from the rows above.
               A main lift shows a history trending toward a max; these show the best you have done.
