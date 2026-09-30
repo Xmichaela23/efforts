@@ -887,7 +887,7 @@ const STRENGTH_HALF_TAPER: FrameDay[] = [
 ];
 
 /**
- * ⛔⛔ HYPERTROPHY + 5K (p244, notes p245) — "Strength Lead + Muscle". Transcribed from `p244.jpg` 2026-09-23,
+ * ⛔⛔ HYPERTROPHY + 5K (p244, notes p245) — "Run + Muscle" (was "Strength Lead + Muscle"). Transcribed from `p244.jpg` 2026-09-23,
  * `SOURCE-viada-hybrid-athlete.md` Part E4. Work order: `WORKORDER-run-programs-2026-09-23.md` Stage 1.
  *
  * Four lifting days named for their pattern (upper push, lower hinge, upper pull, lower push), five or six rows each,
@@ -1062,7 +1062,7 @@ const HYP_5K_TAPER: FrameDay[] = [
 ];
 
 /**
- * ⛔⛔ HYPERTROPHY + HALF-MARATHON (p252, notes p253) — "Run Lead + Muscle". Transcribed from `p252.jpg` 2026-09-23,
+ * ⛔⛔ HYPERTROPHY + HALF-MARATHON (p252, notes p253) — "Long Run + Muscle" (was "Run Lead + Muscle"). Transcribed from `p252.jpg` 2026-09-23,
  * `SOURCE-viada-hybrid-athlete.md` Part E5.
  *
  * The same four hypertrophy days as p244 in a different order — lower hinge, upper push, upper pull, lower push —

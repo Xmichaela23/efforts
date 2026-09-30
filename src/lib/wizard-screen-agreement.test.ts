@@ -122,7 +122,7 @@ Deno.test('⛔ THE 5K SCREEN IS UNCHANGED — its four rows, its header, his wor
   // ⛔ AND IT CARRIES ITS OWN ATHLETE-FACING NAME SINCE 2026-09-07 — `Run + Strength`, the Run Focus
   // card's programme (WORKORDER-train-menu-reshape-2026-09-07 §2). The goal label carries the same
   // words for readers that only have the goal id.
-  assertEquals(s.programmeName, 'Strength Lead');
+  assertEquals(s.programmeName, 'Run + Strength');
 });
 
 Deno.test('⛔ STANDARD FOCUS DRAWS ITS OWN FIVE, AND SAYS SO', () => {

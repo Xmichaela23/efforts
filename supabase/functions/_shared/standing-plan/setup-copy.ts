@@ -46,7 +46,7 @@ export const PROGRAM_COPY = {
   // Intermediate: p247 "useful for athletes of most skill levels… even advanced intermediate runners".
   run_strength: {
     // ⛔ RENAMED 2026-09-23 (Michael): named by which side leads the week.
-    label: 'Strength Lead',
+    label: 'Run + Strength',
     // Michael's words, 2026-09-23. Hours: the built week's running (p246, four runs); p247: "most skill levels… advanced intermediate runners".
     blurb: 'Less running, strength focused. About 4 hours of running a week, four lifting days. Ideal for intermediate or advanced.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
@@ -55,7 +55,7 @@ export const PROGRAM_COPY = {
   // OURS — "5 hours": the built week's running (five runs, p250) as composed; see the ledger. "Advanced": p251 "more
   // advanced hybrid athletes", "not recommended as a first program", "not for novices". Half marathon: p250's name.
   run_half_strength: {
-    label: 'Run Lead',
+    label: 'Long Run + Strength',
     // p251: "can be run indefinitely … maintain the ability to pivot toward longer distance events".
     // p251: 1RM "1% every four weeks" (4HR: every three, p247).
     // Michael's words, 2026-09-23. p251: "more advanced hybrid athletes", 1RM "1% every four weeks"; hours: the built week's five runs (p250).
@@ -66,14 +66,14 @@ export const PROGRAM_COPY = {
   // pp244-245): p245 "can be used by athletes of most levels", "If you're interested in a first program to start with in
   // this book, this is the one." Hours: the built week's running (p244, four runs), measured at 3.1-3.5 h.
   run_muscle: {
-    label: 'Strength Lead + Muscle',
+    label: 'Run + Muscle',
     blurb: 'Built for muscle. About 3 hours of running a week and four lifting days. A first program that suits most levels.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
   // Hypertrophy + Half-Marathon (Viada pp252-253): p253 "intended for athletes with a solid strength background", "can,
   // like many others, be run almost indefinitely". Hours: the built week's running (p252, five runs), measured at 4.9-5.7 h.
   run_half_muscle: {
-    label: 'Run Lead + Muscle',
+    label: 'Long Run + Muscle',
     blurb: 'For runners with a solid strength background. About 5 hours of running a week and four lifting days. You can stay on it almost indefinitely.',
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
   },
@@ -187,7 +187,7 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   },
   strength_5k: {
     // OURS — "4HR": the built week's running, 3h45–4h15 (see `PROGRAM_COPY.run_strength`).
-    name: 'Strength Lead',
+    name: 'Run + Strength',
     confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
     // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
@@ -196,20 +196,22 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   },
   strength_half: {
     // OURS — "5HR": the built week's running, about 5 hours (five runs, Viada p250).
-    name: 'Run Lead',
+    name: 'Long Run + Strength',
     confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
   },
-  // Michael approved the words 2026-09-24 — the card names; the second line is Run Lead's.
+  // Michael approved the words 2026-09-24 — the card names; the second line is Long Run + Strength's.
+  // ⛔ RENAMED 2026-09-29 (Michael): the run plans lead with the running, as the Ride names do — Run + Strength (p246),
+  // Long Run + Strength (p250), Run + Muscle (p244), Long Run + Muscle (p252). Were Strength Lead / Run Lead (+ Muscle).
   hyp_5k: {
-    name: 'Strength Lead + Muscle',
+    name: 'Run + Muscle',
     confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
   },
   hyp_half: {
-    name: 'Run Lead + Muscle',
+    name: 'Long Run + Muscle',
     confirm_title: '{name} — {weeks} weeks.',
     confirm_line: 'A {weeks}-week block.',
     ftp_note: null,
