@@ -22,7 +22,9 @@ function inputs(exerciseRows: ExerciseLogLite[], extra: Partial<StateTrendInputs
   };
 }
 
-Deno.test('H-S18: the trap bar folds into the deadlift slot before the rows are cached', () => {
+// ⛔ 2026-09-29 (Michael): the trap bar is its own card again — Strong and Hevy keep it apart, and the coach shows the one
+// the plan has (`coach/plan-lifts.ts`). This pinned the H-S18 fold; it now pins the two rows kept apart.
+Deno.test('the trap bar keeps its own row; the deadlift row is the deadlift\'s alone (was H-S18, the fold)', () => {
   const rows = [
     ...lift('deadlift', 'Deadlift', [200, 205, 210, 215, 220, 225, 230, 235, 240]),
     // the trap bar's two sessions land in the deadlift's last two ISO weeks, lighter
@@ -32,13 +34,12 @@ Deno.test('H-S18: the trap bar folds into the deadlift slot before the rows are 
     allTimeBestByLift: { deadlift: { best: 240, count: 9 }, trap_bar_deadlift: { best: 160, count: 2 } },
   })), AS_OF);
   const perLift = v1.display!.strengthFitness.perLift;
-  assertEquals(perLift.filter((l) => l.canonical === 'trap_bar_deadlift').length, 0, 'no fifth row');
+  assertEquals(perLift.filter((l) => l.canonical === 'trap_bar_deadlift').length, 1, 'the trap bar has its own row');
   const dl = perLift.filter((l) => l.canonical === 'deadlift');
   assertEquals(dl.length, 1);
-  assertEquals(dl[0].allTimeCount, 11, 'the variant\'s sessions are summed into the slot — the fold ran');
-  assertEquals(dl[0].latestE1rm, 240, 'same ISO week, the heavier reading holds the week');
-  assertEquals((dl[0] as Record<string, unknown>).__variantOf, undefined, 'no private marker in the cache');
-  assertEquals(v1.strength.per_lift, perLift, 'the flat per_lift block is the same folded rows');
+  assertEquals(dl[0].allTimeCount, 9, 'the trap bar\'s sessions are not summed into the deadlift');
+  assertEquals(dl[0].latestE1rm, 240);
+  assertEquals(v1.strength.per_lift, perLift, 'the flat per_lift block is the same rows');
 });
 
 Deno.test('H-S19: since-block creep = latest less the lowest block week\'s reading, only after week 1', () => {

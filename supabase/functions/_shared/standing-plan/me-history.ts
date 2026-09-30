@@ -475,8 +475,10 @@ export function earnedMeSets(args: {
       }
       matched.add(index.has(key) ? key : (declaredKey as string));
       const sets = setsOf(ex);
-      // ⛔ A SWAP IS A DIFFERENT BAR: the set ladder reads it, the bar ladder does not (2026-09-25). A jump earned on a
-      // substitute at its own weight must not move the pattern's heavy bar. `row.weight` is null on a swapped row.
+      // ⛔ A SWAP IS A DIFFERENT LIFT: neither ladder reads it (2026-09-25 the bar; 2026-09-29 the sets too). A jump earned
+      // on a substitute at its own weight must not move the pattern's heavy bar, and a good or bad trap bar day must not add
+      // or take a deadlift set (Michael, 2026-09-29: Strong and Hevy keep a variation's history apart from the lift's).
+      // `row.weight` is null on a swapped row.
       const onAnotherBar = (row as MeRowIndex & { swapped?: boolean }).swapped === true || (!index.has(key) && declaredKey != null);
       seen.push({
         row: onAnotherBar && row.movement.toLowerCase() !== loggedName.toLowerCase() ? { ...row, movement: loggedName } : row,
@@ -508,7 +510,8 @@ export function earnedMeSets(args: {
   const history: MeLadderReading['history'] = {};
   for (const s of seen) {
     const cur = state.get(s.row.pattern) ?? { sets: band.lo, cleanRun: 0 };
-    state.set(s.row.pattern, meLadderStep(cur, s.outcome, band));
+    // ⛔ A SWAPPED SESSION HOLDS THE SETS (2026-09-29), as it holds the bar below — see `onAnotherBar` above.
+    if (!s.onAnotherBar) state.set(s.row.pattern, meLadderStep(cur, s.outcome, band));
 
     /**
      * ⛔ THE BAR WALKS THE SAME SESSIONS ON ITS OWN AXIS (2026-08-26). The set ladder asks whether the

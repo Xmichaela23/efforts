@@ -33,7 +33,6 @@ import { canonicalize } from '../canonicalize.ts';
 import { shownName } from '../strength/shown-name.ts';
 // Audit 2026-09-10 (item 17): the slot fold, the chart trendlines and the logged-sets list, each moved
 // off the State screen — see each file's header.
-import { foldVariantSlots } from './fold-lift-slots.ts';
 import { spineTrends, fitTrend, efficiencyChangeLine, type ChartTrend } from './trend-fit.ts';
 import { KG_PER_LB } from '../strength/session-volume.ts';
 import { buildLoggedLifts, type LoggedLift } from './logged-sets.ts';
@@ -1488,10 +1487,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // Same unit as `series` above — the faint line is drawn on the same axis.
     expected: inp.expectedByCanonical?.[l.canonical]?.map((p) => ({ ...p, value: _metric ? p.value * KG_PER_LB : p.value })),
   }));
-  // ⛔ ONE SLOT, ONE ROW (audit 2026-09-10, H-S18) — the trap bar folds into the deadlift HERE, before
-  // the rows are cached, so every reader of `perLift` / `per_lift` sees the merged slot. Was folded on
-  // the State screen only. Then the since-block creep (H-S19), measured on the folded chart.
-  const strengthPerLift: StrengthPerLift[] = foldVariantSlots(unfoldedPerLift)
+  // ⛔ THE TRAP BAR IS ITS OWN CARD AGAIN (Michael, 2026-09-29 — supersedes the H-S18 fold of 2026-09-10 for the CARDS).
+  // Strong and Hevy keep "Deadlift (Trap bar)" as its own exercise with its own history, and a heavier trap bar number
+  // read as a deadlift jump. The coach shows whichever the plan has you doing (`coach/plan-lifts.ts`). ⚠️ The strength
+  // DOT still reads one ratio per slot (`strength.ts computeE1rmBand`, FIXLIST 2b) — that half of the ruling stands.
+  // Then the since-block creep (H-S19).
+  const strengthPerLift: StrengthPerLift[] = unfoldedPerLift
     // The creep and the row's number in the athlete's unit, off the same (converted) chart (Stage 7 session 3).
     .map((l) => ({
       ...l,

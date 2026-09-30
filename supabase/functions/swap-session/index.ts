@@ -179,6 +179,13 @@ Deno.serve(async (req) => {
           console.warn('[swap-session] materialize-plan after a lift swap failed:', e);
         }
       }
+      // ⛔ State's lift cards follow the plan's lifts (2026-09-29, `coach/plan-lifts.ts`): the saved coach copy is old now.
+      // Marked directly, as save-baselines does — the shared helper also rebuilds the Record tab, too slow for a swap tap.
+      try {
+        await db.from('coach_cache').update({ invalidated_at: new Date().toISOString() }).eq('user_id', userId);
+      } catch (e) {
+        console.warn('[swap-session] coach_cache invalidate failed (non-fatal):', e);
+      }
       return json({ success: true });
     }
 

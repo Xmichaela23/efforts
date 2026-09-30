@@ -42,6 +42,8 @@ export interface LoggedLift {
   recent: LoggedSetRow[];
   /** The heaviest set in the window, decided on WEIGHT (never on the estimate). Null when no weight was logged. */
   heaviest: { date: string; weight: number; reps: number } | null;
+  /** Every session in the window, oldest first — the coach picks where this plan's line starts (2026-09-29). */
+  history?: Array<{ date: string; weight: number; reps: number }>;
 }
 
 type Row = { date: string; canonical_name: string; estimated_1rm: number | null; reps?: number | null; best_weight?: number | null };
@@ -88,6 +90,7 @@ export function buildLoggedLifts(rows: ReadonlyArray<Row>, asOf: string): Logged
           best: i === bestIdx,
         })),
         heaviest: heaviest && heaviest.weight > 0 ? { date: heaviest.date, weight: heaviest.weight, reps: heaviest.reps } : null,
+        history: entries.map((e) => ({ date: e.date, weight: e.weight, reps: e.reps })),
       };
     })
     // Most-logged first — the order the screen's list has always had.

@@ -589,7 +589,8 @@ export type CoachWeekContextV1 = {
     /** Audit 2026-09-10 (H-S20): "from your logged sets" + "your best sets", decided by the coach. */
     strength_logged_sets?: {
       main: Array<{ canonical: string; display_name: string; sets: Array<{ date: string; weight: number; reps: number; e1rm: number | null; best: boolean }> }>;
-      others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number }>;
+      /** v222: `group` and `start_line` only with an active plan (upper / lower, "start → best"). */
+      others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number; set_line?: string; group?: 'upper' | 'lower'; start_line?: string }>;
     } | null;
     trends: {
       fitness_direction: string;

@@ -167,6 +167,13 @@ export function swapGroupsFor(
     // The slot's own picker list leads (the plan's own order); the cell's printed movements it does not hold follow.
     if (c === own) for (const n of slotPickNames(c, equipment)) add(n);
     for (const m of cellOptions(c.category, c.pattern, equipment)) add(m.name);
+    // ⛔ THE TRAP BAR IS A FORM OF THE DEADLIFT (2026-09-29, Michael: "everyone has a barbell we should offer the trap
+    // swap"). p219 prints it in this cell; its route is the trap bar, which no kit chip grants since the form moved onto
+    // the lift (2026-09-25, STATE-SOURCES), so the cell never offered it. A swap is the athlete's own tap: a Deadlift row
+    // offers it wherever the kit reaches the deadlift. The builder still never picks it on its own.
+    if (c === own && canonicalize(slotName) === canonicalize('Deadlift') && builderReaches('Deadlift', equipment)) {
+      add('Trap Bar Deadlift');
+    }
     // The frame's admitted movements for the slot (the row's own `swap_options`), the ones the kit reaches, after the
     // cell's own — only on the slot's cell, and only when the row says which cell that is.
     if (groups.length === 0 && cell && c === own) {

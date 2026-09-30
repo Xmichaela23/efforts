@@ -35,7 +35,6 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // moved from other blocks (the trends plate and the LOAD section); no card was restyled and no
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
 import { EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
-import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
 import LengthOfferCard from '@/components/context/LengthOfferCard';
 // ⛔ `LoadWeeksCard` WAS IMPORTED HERE AND NEVER RENDERED — a dead import, so the load bars have
@@ -1318,7 +1317,6 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   const enduranceSpine = (stateDisplay as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | null | undefined)?.enduranceSpine ?? null;
   // Each spine series' efficiency and drift chart with its fitted line — the server's (audit 2026-09-10, H-B07).
   const enduranceSpineTrends = stateDisplay?.enduranceSpineTrends ?? null;
-  const viadaWeek = (stateDisplay as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | null | undefined)?.viadaWeek ?? null;
 
   // ⛔ RUN RE-ENTERS THE COMPOSITION (Round 3 pass 2, 2026-09-01) — one owner per sport, run included.
   // It is kept OUT only when there is no run content, so a run-less athlete gets no empty run plate.
@@ -1400,11 +1398,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     same component and routes to the same undo — one signal, two placements. */}
                 <StrengthCalibrationNotice lifts={calibration.byLift} undo={calibration.undo} />
                 {strengthDetail}
-                {/* ⛔ ONE OWNER PER SPORT (Round 3 pass 1). The weekly lifting card (moved from the LOAD
-                    section) lives under strength now — same subject, one place. Its own null gate means
-                    no lifting → nothing drawn. `hasPlan` gates the coverage line inside it (a gap only
-                    means something against a prescription). */}
-                <ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} />
+                {/* ⛔ "THIS WEEK'S LIFTING" IS GONE (Michael, 2026-09-29: "what does that tell anymore?"). It counted the
+                    week's work sets, which the plan already sets; nothing on it changed what the athlete does next.
+                    `state_trends_v1.display.viadaWeek` is still on the payload; nothing on the phone reads it. */}
               </>
             );
             // ⛔ THE RIDE CARDS AND THE LIFTING CARD ALSO RIDE ALONG WHEN THE FITNESS ROW HAS NO
@@ -1413,7 +1409,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} spineTrends={enduranceSpineTrends} sport="ride" /></>;
-            if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
+            if (card.discipline === 'strength') return <>{row}{strengthDetail}</>;
             return row;
           })();
           // ⛔ DEPTH BELONGS TO THE PLATE, NOT THE ROW (2026-09-03, DESIGN_GUIDELINES "Layout Rules").

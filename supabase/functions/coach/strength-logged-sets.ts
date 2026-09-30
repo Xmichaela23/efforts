@@ -14,10 +14,13 @@ import { capabilitiesForExercise } from '../../../src/lib/exercise-role.ts';
 import { shownName } from '../_shared/strength/shown-name.ts';
 import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
 import type { LoggedLift, LoggedSetRow } from '../_shared/state-trend/logged-sets.ts';
+import { getMovementGroup } from '../../../src/lib/exercise-config.ts';
+import type { PlanLifts } from './plan-lifts.ts';
 
 /** OURS — the main rows are capped at five (the four slots, plus a variant such as the trap bar). */
 export const MAIN_LIFTS_SHOWN = 5;
-/** OURS — "your best sets" is a folded detail list, not an inventory: at most eight. */
+/** OURS — "your best sets" is a folded detail list, not an inventory: at most eight. With a plan the plan bounds it
+ *  (2026-09-29) and the cap does not apply. */
 export const OTHER_LIFTS_SHOWN = 8;
 
 export interface StrengthLoggedSetsV1 {
@@ -36,6 +39,11 @@ export interface StrengthLoggedSetsV1 {
     canonical: string; display_name: string; weight: number; reps: number; sessions: number;
     /** That heaviest set as the athlete reads it — "135 lb × 10". */
     set_line?: string;
+    /** ⛔ WITH A PLAN (2026-09-29, Michael): which heading it sits under, and the first set of this plan as the athlete
+     *  reads it ("25 lb × 12"). The row prints "start → best". No start when the first set IS the best, or when the
+     *  snapshot predates the session list. */
+    group?: 'upper' | 'lower';
+    start_line?: string;
   }>;
   /** 'lb' | 'kg' — the unit every line above is written in. */
   unit?: string;
@@ -48,12 +56,15 @@ export function buildStrengthLoggedSets(
    *  definition constant — the same rule `save-baselines/zones.ts` applies (§8.0 #7).
    *  Absent → imperial, which is today's behaviour for every account in production. */
   metric = false,
+  /** ⛔ THE PLAN'S LIFTS (2026-09-29, `plan-lifts.ts`): both lists keep only these. Null → every lift, as before. */
+  plan: PlanLifts | null = null,
 ): StrengthLoggedSetsV1 | null {
   // A snapshot written before the field existed → nothing to print, not an empty section.
   if (!Array.isArray(lifts)) return null;
   const main = (perLift ?? [])
     .filter((l) => l.sufficient)
     .filter((l) => capabilitiesForExercise(String(l?.canonical_name ?? '')).coached)
+    .filter((l) => !plan || plan.canonicals.has(String(l?.canonical_name ?? '')))
     .slice(0, MAIN_LIFTS_SHOWN);
   const byCanonical = new Map(lifts.map((l) => [l.canonical, l]));
   const mainCanonicals = new Set(main.map((l) => String(l?.canonical_name ?? '')));
@@ -78,15 +89,31 @@ export function buildStrengthLoggedSets(
     others: lifts
       .filter((l) => !mainCanonicals.has(l.canonical))
       .filter((l) => l.heaviest != null && l.heaviest.weight > 0)
+      .filter((l) => !plan || plan.canonicals.has(l.canonical))
       .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, OTHER_LIFTS_SHOWN)
-      .map((l) => ({
-        canonical: l.canonical,
-        display_name: shownName(l.canonical),
-        weight: l.heaviest!.weight,
-        reps: l.heaviest!.reps,
-        sessions: l.sessions,
-        set_line: `${liftInAthletesUnit(Number(l.heaviest!.weight), metric)} ${unit} × ${l.heaviest!.reps}`,
-      })),
+      .slice(0, plan ? undefined : OTHER_LIFTS_SHOWN)
+      .map((l) => {
+        const line = (w: number, r: number) => `${liftInAthletesUnit(Number(w), metric)} ${unit} × ${r}`;
+        const name = shownName(l.canonical);
+        if (!plan) {
+          return { canonical: l.canonical, display_name: name, weight: l.heaviest!.weight, reps: l.heaviest!.reps, sessions: l.sessions, set_line: line(l.heaviest!.weight, l.heaviest!.reps) };
+        }
+        // Upper or lower by the movement's pattern (`getMovementGroup`, the same grouping "add an exercise" uses). A
+        // core or carry row has neither and sits under lower body — OURS, the two headings Michael approved.
+        const group: 'upper' | 'lower' = getMovementGroup(name) === 'upper' ? 'upper' : 'lower';
+        type H = { date: string; weight: number; reps: number };
+        const hist: H[] = (l.history ?? []).filter((h: H) => h.weight > 0);
+        const fromPlan = plan.startDate ? hist.filter((h: H) => h.date >= plan.startDate!) : hist;
+        const first = fromPlan[0] ?? null;
+        // The best is this plan's best when the plan has sessions of it (heaviest on weight, as above); else the window's.
+        const best = fromPlan.reduce((b: H | null, h: H) => (h.weight > (b?.weight ?? 0) ? h : b), null as H | null) ?? l.heaviest!;
+        const same = first && first.weight === best.weight && first.reps === best.reps;
+        return {
+          canonical: l.canonical, display_name: name, weight: best.weight, reps: best.reps, sessions: l.sessions,
+          set_line: line(best.weight, best.reps),
+          group,
+          ...(first && !same ? { start_line: line(first.weight, first.reps) } : {}),
+        };
+      }),
   };
 }

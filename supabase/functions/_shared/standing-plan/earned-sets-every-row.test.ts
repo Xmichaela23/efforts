@@ -366,7 +366,7 @@ Deno.test('⛔ the tap-day swap and a typed rename reach the log as `substituted
   assertEquals(read.composedAliases[earnedSetsKey(first.movement, 'HYP')], earnedSetsKey(SUB, 'HYP'));
 });
 
-Deno.test('⛔ an ME row swapped the same way still moves the ME ladder; the bar ladder does not walk the other bar', () => {
+Deno.test('⛔ an ME row swapped the same way moves neither ladder: no set earned, no jump on the other bar (2026-09-29)', () => {
   const probe = composeBlock({ ...BASE, weeks: 6, taperWeeks: [] } as never);
   const me = probe.flatMap((w) => w.meRows).filter((r) => r.movement === 'Bench Press' && r.weight != null).slice(0, 3);
   assert(me.length === 3, 'the fixture has fewer than three priced bench rows');
@@ -379,7 +379,8 @@ Deno.test('⛔ an ME row swapped the same way still moves the ME ladder; the bar
   }));
   assertEquals(earnedMeSets({ composed: probe, logged, throughWeek: 6 }).sets, {}, 'without the swap the sessions were matched');
   const read = earnedMeSets({ composed: probe, logged, throughWeek: 6, liftSwaps, dateOfSlot: slotDate });
-  assertEquals(read.sets.push_upper, 2, 'three clean sessions on the swapped heavy row did not earn a second set');
+  // Michael 2026-09-29: a variation's day leaves the lift's sets alone (was: three clean swaps earned a second set).
+  assertEquals(read.sets, {}, 'three clean sessions on the swapped heavy row moved the bench\'s set count');
   assertEquals(read.history.push_upper!.map((h) => h.outcome), ['clean', 'clean', 'clean']);
   assertEquals(read.history.push_upper!.every((h) => h.movement === SUB), true);
   assertEquals(read.bar, {}, 'a jump was earned on another bar');

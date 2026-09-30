@@ -78,7 +78,23 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
               A main lift shows a history trending toward a max; these show the best you have done.
               Running them together would imply the accessory has a max line, which it does not. */}
           <div className="text-caption uppercase tracking-wider text-label-secondary">your best sets</div>
-          {sets.others.map((l) => (
+          {/* ⛔ WITH A PLAN: THE PLAN'S LIFTS, UPPER BODY THEN LOWER BODY, EACH "START → BEST" (Michael, 2026-09-29, words
+              approved). `group` and `start_line` are the coach's (`coach/strength-logged-sets.ts`); nothing is worked out here. */}
+          {sets.others.some((l) => l.group) ? (['upper', 'lower'] as const).map((g) => {
+            const rows = sets.others.filter((l) => l.group === g);
+            if (rows.length === 0) return null;
+            return (
+              <div key={g} className="space-y-1.5">
+                <div className="text-caption text-label-secondary">{g === 'upper' ? 'Upper body' : 'Lower body'}</div>
+                {rows.map((l) => (
+                  <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
+                    <span className="text-label-secondary">{l.display_name}</span>
+                    <span className="text-label-secondary tabular-nums">{l.start_line ? `${l.start_line} → ${l.set_line}` : l.set_line}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          }) : sets.others.map((l) => (
             <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-caption">
               <span className="text-label-secondary">{l.display_name}</span>
               {/* The heaviest set as the athlete reads it, from the server (2026-09-15). */}
