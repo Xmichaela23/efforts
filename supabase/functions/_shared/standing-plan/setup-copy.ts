@@ -188,7 +188,8 @@ export const PLAN_COPY: Record<FrameId, { name: string; confirm_title: string; c
   strength_5k: {
     // OURS — "4HR": the built week's running, 3h45–4h15 (see `PROGRAM_COPY.run_strength`).
     name: 'Run + Strength',
-    confirm_title: '{name} — {weeks} weeks. Strength leads; your endurance holds.',
+    // "Strength leads; your endurance holds." came off 2026-09-29 (Michael): the plan leads with the running now.
+    confirm_title: '{name} — {weeks} weeks.',
     // ⛔ 2026-09-18: "Two cycles build, the third measures… no separate retest week" came off — no page, and it
     // contradicted the block's own description (week one is the test: plan-row.ts, the one owner).
     confirm_line: 'A {weeks}-week block.',

@@ -6789,7 +6789,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             // ⛔ THE STRENGTH PLANS' LINES ARE THE SERVER'S (`builder.setup.plans`, 2026-09-13).
             : isStrengthFocus
               ? (planCopy ? planCopy.confirm_title.replace('{name}', planCopy.name).replace('{weeks}', String(state.targetWeeks)) : undefined)
-              : `${GOAL_LABELS[state.goal!]} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
+              : `${GOAL_LABELS[state.goal!]} — ${state.targetWeeks} weeks.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
