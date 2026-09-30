@@ -145,6 +145,18 @@ export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: 
   { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
 ];
+/**
+ * ⛔ THE RUN LIST, TIERED BY LIFTING EXPERIENCE (Michael, 2026-09-29: "tier out the programs based on people's
+ * abilities"). The customer arrives with an endurance base; what differs is lifting, so the tiers are each page's own
+ * word on it — p245 "a first program" for "athletes of most levels", p247 / p251 "most skill levels" with specific
+ * barbell lifts, p253 "a solid strength background". Race stays its own group. Replaces the tap-in `RUN_SECTIONS`.
+ */
+export const RUN_GROUPS: ReadonlyArray<{ id: string; title: string | null; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
+  { id: 'new', title: 'New to lifting', programs: ['run_muscle'] },  // p245 — approved 2026-09-29
+  { id: 'some', title: 'Some lifting experience', programs: ['run_strength', 'run_half_strength'] },  // p247 p251 — approved 2026-09-29
+  { id: 'solid', title: 'Solid lifting background', programs: ['run_half_muscle'] },  // p253 — approved 2026-09-29
+  { id: 'race', title: 'Race', programs: ['marathon'] },  // not-instruction: a group title
+];
 /** Under a closed section. */
 export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
 

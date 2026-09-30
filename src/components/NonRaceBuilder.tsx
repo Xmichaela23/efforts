@@ -4299,7 +4299,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {/* ⛔ THE RUN SCREEN IS SECTIONS (Michael, 2026-09-23): the server's `run_sections` as rows; a tap opens the
                 section's cards, Back returns to the rows. A section with no card yet is shown closed. The other
                 screens keep their flat list. */}
-            {state.trainCard === 'run' && setupCopy?.run_sections?.length && !state.runSection
+            {state.trainCard === 'run' && !setupCopy?.run_groups?.length && setupCopy?.run_sections?.length && !state.runSection
               ? setupCopy.run_sections.map((sec) => {
                 const open = sec.programs.length > 0;
                 const names = sec.programs.map((p) => setupCopy?.programs[p as ProgramId]?.label).filter(Boolean).join(' · ');
@@ -4323,7 +4323,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })
               : null}
-            {(state.trainCard === 'run' && setupCopy?.run_sections?.length
+            {(state.trainCard === 'run' && setupCopy?.run_groups?.length
+              // ⛔ THE RUN LIST, TIERED BY LIFTING EXPERIENCE (2026-09-29): the server's `run_groups`, drawn flat like Ride's.
+              ? setupCopy.run_groups.map((g) => ({ title: g.title, programs: g.programs as ProgramId[] }))
+              : state.trainCard === 'run' && setupCopy?.run_sections?.length
               ? setupCopy.run_sections.filter((sec) => sec.id === state.runSection).map((sec) => ({ title: null as string | null, programs: sec.programs as ProgramId[] }))
               // ⛔ THE RIDE LIST'S GROUPS (2026-09-28): the server's `ride_groups`; a titled group ("Go longer") prints its
               // title above its cards. Before the setup copy arrives, the flat list.
@@ -4343,7 +4346,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const blurb = words?.blurb;
               const requirement = words?.requirement;
               // How much lifting the plan expects, from its page (server words, 2026-09-29); absent on a plan whose page is silent.
-              const lifting = (words as { lifting?: string | null } | undefined)?.lifting ?? null;
+              // The Run list's tier heading says it already (`run_groups`), so the card does not repeat it there.
+              const lifting = state.trainCard === 'run' && setupCopy?.run_groups?.length
+                ? null
+                : (words as { lifting?: string | null } | undefined)?.lifting ?? null;
               const live = goal != null && !held;
               return (
                 <button
