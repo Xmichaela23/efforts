@@ -50,7 +50,8 @@ export const PROGRAM_COPY = {
     // ⛔ RENAMED 2026-09-23 (Michael): named by which side leads the week.
     label: 'Run + Strength',
     // Michael's words, 2026-09-23. Hours: the built week's running (p246, four runs); p247: "most skill levels… advanced intermediate runners".
-    blurb: 'Less running, strength focused. About 4 hours of running a week, four lifting days. Ideal for intermediate or advanced.',
+    // p247 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'For runners who want their lifts to go up. About 4 hours of running and four lifting days a week. Suits most levels.',  // p247
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p247: "accessible and useful for athletes of most skill levels", built for specific barbell lifts. Approved 2026-09-29.
     lifting: 'Lifting: some experience.',
@@ -63,7 +64,8 @@ export const PROGRAM_COPY = {
     // p251: "can be run indefinitely … maintain the ability to pivot toward longer distance events".
     // p251: 1RM "1% every four weeks" (4HR: every three, p247).
     // Michael's words, 2026-09-23. p251: "more advanced hybrid athletes", 1RM "1% every four weeks"; hours: the built week's five runs (p250).
-    blurb: 'For high-mile advanced runners. 5 hours or more of running a week, four lifting days. Strength progresses more slowly.',
+    // p251 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'For runners already improving their 5K or 10K times. 5 hours or more of running and four lifting days a week. Not a first program.',  // p251
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p251: the strength is "similar in structure to the Strength + 5K" (Run + Strength). Approved 2026-09-29.
     lifting: 'Lifting: some experience.',
@@ -73,7 +75,8 @@ export const PROGRAM_COPY = {
   // this book, this is the one." Hours: the built week's running (p244, four runs), measured at 3.1-3.5 h.
   run_muscle: {
     label: 'Run + Muscle',
-    blurb: 'Built for muscle. About 3 hours of running a week and four lifting days. A first program that suits most levels.',
+    // p245 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'A first program. Muscle-building lifts with running near threshold. About 3 hours of running and four lifting days a week. Suits most levels.',  // p245
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p245: "a first program" for "athletes of most levels". Michael approved 2026-09-29.
     lifting: 'Lifting: new is fine.',
@@ -82,7 +85,8 @@ export const PROGRAM_COPY = {
   // like many others, be run almost indefinitely". Hours: the built week's running (p252, five runs), measured at 4.9-5.7 h.
   run_half_muscle: {
     label: 'Long Run + Muscle',
-    blurb: 'For runners with a solid strength background. About 5 hours of running a week and four lifting days. You can stay on it almost indefinitely.',
+    // p253 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'For runners with a solid strength background. Muscle while running at half-marathon level. About 5 hours of running and four lifting days a week. You can stay on it indefinitely.',  // p253
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p253: "for athletes with a solid strength background". Approved 2026-09-29.
     lifting: 'Lifting: a solid background.',
@@ -111,14 +115,16 @@ export const PROGRAM_COPY = {
   // deadlift — `FRAMES.cycling_long.testedLifts`) and prints the same carry row and the same kit.
   ride_long_strength: {
     label: 'Long Ride + Strength',
-    blurb: 'Five rides and three lifting days a week. The long ride runs 3h30 to 5h.',  // Michael approved the words 2026-09-28
+    // p280 p279 p239 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'After four weeks of Ride + Strength. For climbing, steady efforts and long distance. Five rides and three lifting days. The long ride runs 3h30 to 5h.',  // p280 p279 p239
     requirement: RIDE_STRENGTH_REQUIREMENT,
     // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
     lifting: null as string | null,
   },
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Options for intermediate and advanced cyclists. Four or five rides, three lifting days.',
+    // p280 p278 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
+    blurb: 'The place to start. Cycling base and strength, with some hard rides. Four or five rides, three lifting days.',  // p280 p278
     // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: RIDE_STRENGTH_REQUIREMENT,
     // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
@@ -148,7 +154,7 @@ export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
  * A group with a title prints the title above its cards; nothing on this screen opens a second level.
  */
 export const RIDE_GROUPS: ReadonlyArray<{ id: string; title: string | null; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
-  { id: 'base', title: null, programs: ['ride_strength'] },
+  { id: 'base', title: 'Start here', programs: ['ride_strength'] },  // p280: Base first, "at least 4 weeks"; approved 2026-09-29
   { id: 'longer', title: 'Go longer', programs: ['ride_long_strength'] },  // Michael approved the words 2026-09-27
 ];
 
