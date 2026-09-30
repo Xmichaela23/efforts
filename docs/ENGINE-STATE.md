@@ -1,42 +1,39 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-29, PM chat — main = `2eb6725f2` + this docs commit; every server importer DEPLOYED; the phone build is BEHIND — see below)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-30, PM chat — main = `1533208a6` + this docs commit; every server importer DEPLOYED; the phone has the latest build)
 
 > **How to talk to Michael (read first):** `~/.claude/CLAUDE.md` and the memory index. Plain spoken sentences, no
-> jargon, no idioms. ⛔ NEW standing rule (memory `feedback_book_rules_need_no_approval`): where a page decides it, build
-> it and report it done — bring him only book silences, athlete-facing words, and pure design calls. A "go" is still
-> the word go (or "fix it", "push and deploy"). Every athlete-facing line gets his yes.
+> jargon, no idioms. Where a page decides it, build it; bring him book silences, athlete-facing words and pure design
+> calls. A "go" is the word go. Every athlete-facing line gets his yes. Don't tune anything to his own numbers.
 >
 > **Your job, in order:**
-> 1. **Install the latest app on his phone** — the last two builds could not reach it (`xcrun devicectl ... device
->    DB593618-ADA6-599E-854A-F8A92D02080A`; the phone was away). Then have him look at: the Long Ride + Strength card
->    and a block built from it; the rides-screen times; a swap to "With efforts" on an easy ride; the setup day swap
->    (drag a lifting day onto the long-run day); State refreshing itself after a synced workout.
-> 2. **Done since this banner was drafted:** the Long Ride + Strength top line; run plans renamed (Run + Strength, Long
->    Run + Strength, Run + Muscle, Long Run + Muscle); card lines, lifting lines and "Start here" (D-506); the Run list is one screen tiered for runners —
->    New to lifting · up to 4 hours (Run + Muscle, Run + Strength) / New to lifting · 5 hours or more (Long Run +
->    Strength) / Solid lifting background (Long Run + Muscle) / Race — SEEN on the website 2026-09-29. Open from D-506:
->    p251/p253's 3-hour marathon strategy session (no printed structure) and p253's two advanced-marathoner options.
-> 3. **Open from the plan sweep** (scripts in the 2026-09-28 session scratchpad `sweep/`, harness `lib.ts` / `show.ts`):
->    the plyo warm-up can be left alone on its book day when its run or ride moves (noticed, no book rule checked);
->    Strength + Half's `no_rest_day` deload line reads "The program's week rests on Monday, and the hard run took it."
->    on a week with no printed rest day — check the words; a pick loses to a frame's own rotation list on Run + Strength's
->    Wednesday and the sprint rows (existing behaviour, flagged by the p148 agent).
+> 1. **Have him look at what is live and unseen:** a plyo day (Today: one card "Plyo - {run}", drills first; the watch
+>    opens on one "Plyo warm-up: …" step, lap once); a back extension set with a plate (Lb box, empty still checks);
+>    a Deadlift → Trap Bar Deadlift swap keeps 165-style weights set by set; "Rest of plan" to the trap bar renames the
+>    later rows and gives them a weight; State's trap bar card and best-sets "first → best" lines appear after his next
+>    logged workout (the snapshot rebuilds on ingest).
+> 2. **After his next run on a plyo day:** check the recorded file's first lap is read as the warm-up and the run's laps
+>    still line up (D-496 `oneForOne`; the warm-up step is in `plannedWhole`'s steps).
+> 3. **Still open from 2026-09-29:** p251/p253's 3-hour marathon strategy session and p253's two advanced options (D-506);
+>    Strength + Half's `no_rest_day` deload line words; a pick losing to a frame's own rotation list (p148 agent).
 >
-> **What shipped 2026-09-28/29 — do not redo.** D-496 … D-505 in `DECISIONS-LOG-4.md`:
-> - Run laps one-for-one with the steps (Q-311, VERIFIED) · LOAD card "Fitness rising" line + form zone words (VERIFIED)
->   · State refreshes itself · Past tab (VERIFIED) · supersets never the bench at two settings (VERIFIED).
-> - Long Ride + Strength (p279) built and live · p239's easy ride every week with "With efforts" a one-day swap on all
->   three ride plans · ride times on the rides screen.
-> - Deload weeks are the page's · week arranger: joined pairs read right, p80 spacing held, moved sessions skip hard/long
->   days, setup day swap · hard minutes held within 10% (one shared rotation) and 105% filed near-threshold (p233).
-> - Q-312 (two ranges) · State trends no longer blanked by a past-week recompute · ENGINE-STATE trimmed 287 → 108 KB.
+> **What shipped 2026-09-29/30 — do not redo.** D-507 … D-510 in `DECISIONS-LOG-4.md`:
+> - Back extension takes a plate, priced body weight + plate (D-507).
+> - Trap bar: on every Deadlift swap sheet (VERIFIED); a swapped heavy day moves no deadlift set; "Rest of plan" runs
+>   Adjust's form switch; the swap keeps the row's weight, unconverted (+8% / +15% in the research, no app converts) (D-508).
+> - State follows the plan's lifts (VERIFIED: the overhead press card left); trap bar its own card; best sets upper /
+>   lower, first → best, tap for history, straight columns, always open (VERIFIED); "This week's lifting" deleted (D-509).
+> - The plyo warm-up is part of its run or ride everywhere: dated with it, moves with it, one card, one Garmin step (D-510).
 >
-> **Still unverified:** everything in job 1; the deload fix appears only when a deload is built (Adjust → Deload);
-> earned sets (two logged sessions); the Edge open warm-up on a ride.
->
-> **Known trade (D-503, by p80):** All Rounder weeks with a day off now carry more "two hard sessions on one day"
-> warnings — the old chooser avoided them only by putting the heavy leg days back to back.
+> **Known failing tests on main, not from this work:** `cycling-long-frame.test.ts` (the words check),
+> `inventory.test.ts` (INVENTORY.md stale at line 36), `workload-bar-lb.test.ts` (Drag Curl priced with a bar),
+> `enforcement.test.ts` (a discipline ladder in `SessionZoneCards.tsx:32`), `logger-prints.test.ts` (the plyo list).
+
+## (older banner) NEXT SESSION — START HERE (written 2026-09-29) — superseded by the 2026-09-30 banner above
+
+> Jobs were the phone install (done 2026-09-29) and his look at Long Ride + Strength, "With efforts", the setup day swap,
+> State refreshing and a deload week — still in POLISH-PUNCH-LIST's 2026-09-29 AWAITING block. The plyo item it listed
+> ("left alone on its book day when its run or ride moves") is fixed by D-510.
 
 ## (older banner) NEXT SESSION — START HERE (written 2026-09-28) — superseded by the 2026-09-29 banner above
 

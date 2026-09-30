@@ -52,6 +52,19 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
+## AWAITING MICHAEL (2026-09-30 — D-507…D-510, all PUSHED, DEPLOYED and on his phone)
+
+- [ ] **Plyo day:** Today shows one card "Plyo - {run}" with the drills first; no separate plyo card; moving the run
+      takes the drills; the watch opens on one "Plyo warm-up: …" step, lap once, then the run's warm-up.
+- [ ] **After that run:** the first lap reads as the warm-up; the run's laps still line up with its steps.
+- [ ] **Back extension:** an Lb box; a plate typed on one set, an empty box on the next — both check off.
+- [ ] **Deadlift → Trap Bar Deadlift swap:** every set keeps its weight. "Rest of plan": later rows read Trap Bar Deadlift
+      with a weight; Deadlift for the rest of the plan switches back.
+- [ ] **State after the next logged workout:** the trap bar card (if logged) and best sets' "first → best" lines.
+- [x] Trap Bar Deadlift on the Deadlift swap sheet — VERIFIED 2026-09-29.
+- [x] State shows only the plan's lifts (overhead press card gone); best sets in columns, always open, tap for history —
+      VERIFIED 2026-09-29/30.
+
 ## AWAITING MICHAEL (2026-09-29 — all PUSHED and DEPLOYED; the phone build is behind: install first)
 
 - [ ] **Install the latest app** (the phone was out of reach for the last two builds).

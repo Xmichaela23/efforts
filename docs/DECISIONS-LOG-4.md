@@ -401,6 +401,9 @@ the page's own guess line covers here.
 
 ## D-489 — Sets are earned on every row (2026-09-25, Michael)
 
+> 2026-09-29: the HEAVY-day (ME) set ladder no longer reads a swapped session — a trap bar day adds or removes no deadlift
+> set (D-508 §2, `me-history.ts`). Point 3 below still holds for DE, SKILL and HYP rows. Everything below is history.
+
 1. The ME ladder's rule on DE, SKILL and HYP: start at p218's low end; two sessions in a row within one rep of the
    top with reserve inside the band add a set (p245's two-in-a-row bar; "clean" = Michael 2026-08-24); a session under
    the floor takes one off; capped at the band. Keyed by movement + intent. OURS extension, ledgered.
@@ -577,3 +580,56 @@ in the tests. Merge `3d3198254`.
    5K, "The running program here is not for novices.") · Solid lifting background (Long Run + Muscle, p253) · Race.
    Trails and Get faster hidden until built. Run + Muscle's card adds p245's extra easy runs and "Not for very advanced
    runners." SEEN on the website 2026-09-29.
+
+## D-507 — Back extension takes a plate (2026-09-29, Michael: "like goblet?")
+
+The back extension row (any bench; `ghd back extension` and the names that resolve to it) draws the goblet squat's
+Lb box: the number is the plate held, empty = body weight alone and still checkable. Priced `(body weight + plate) ×
+reps`, the weighted chin-up rule (D-351; Hevy / Strong price weighted bodyweight work that way). One test for the logger
+and the pricer: `src/lib/added-weight.ts` `takesAddedWeight`; `strengthSetVolume` `addedToBody`. The seated machine is
+unchanged. Commit `e0455599a`.
+
+## D-508 — The trap bar is a form of the deadlift, on the swap sheet and in the heavy-day ladders (2026-09-29, Michael)
+
+1. Every Deadlift row's Swap sheet offers Trap Bar Deadlift wherever the kit reaches the deadlift (p219 prints it in the
+   primary hinge cell; the route needed a key no chip grants since D-487's form switch) — `swap-groups.ts`.
+2. A swapped heavy session holds the pattern's SET count as it already held the bar (`me-history.ts`, `onAnotherBar`):
+   Strong and Hevy keep a variation's history apart from the lift's. Supersedes the 2026-09-25 "the set ladder reads it".
+3. A "Rest of plan" swap between Deadlift and Trap Bar Deadlift runs Adjust's form switch (`deadlift_form`, D-487) —
+   the trap bar becomes the block's hinge lift, priced and progressed as itself (`swap-session`, `958847aa7`).
+4. The swap keeps the row's weights set by set, unconverted (`resolve-exercise-weight` → `deadlift_form`). Research:
+   the trap bar lifts +8% (Swinton 2011, JSCR, powerlifters, low handles) to +15% (Lockie 2018, PMID 28394830, high
+   handles) with no fixed amount; Strong, Hevy and Juggernaut convert nothing. Light is the safe side on an ME day; the
+   trap bar's own sets and its test move it (`b90c90826`). Michael: build for any athlete, not for his own numbers.
+Commits `3ff9f9331`, `958847aa7`, `b90c90826`. The trap bar swap sheet is VERIFIED on his phone.
+
+## D-509 — State follows the plan's lifts (2026-09-29, Michael: "it should just know what you're doing")
+
+1. Lift cards and "from your logged sets" keep only the lifts on the active plan's strength rows this week and the next
+   three (OURS, `coach/plan-lifts.ts` `PLAN_LIFTS_WEEKS`), swaps included — the planned row carries the substitute. No
+   plan → every lift, as before. Field: JuggernautAI's home screen and StrongLifts' Progress tab show their programme's
+   lifts; none documents following a swap. `swap-session` marks the coach copy old on a lift swap.
+2. The trap bar keeps its own card: the display fold into the deadlift (H-S18, 2026-09-10) is gone for the cards; the
+   strength dot still reads one ratio per slot (FIXLIST 2b stands for the dot).
+3. Best sets: this plan's lifts only, "Upper body" / "Lower body" (`getMovementGroup`; core and carries under lower
+   body, OURS), each "first set this plan → best this plan"; a tap opens the lift's last five sessions (Strong / Hevy
+   open every exercise's history). DESIGN_GUIDELINES rules 2–3: straight columns, the set one step up. The section is
+   always open. "This week's lifting" (the ViadaWeekCard) is deleted: it counted what the plan already sets.
+4. Up/down % instead of the chart: declined — every lifting app charts; the card's "over N weeks: a → b" line carries the
+   change. Coach payload 222 → 223. Commits `3ff9f9331` … `64fccc206`. Plan filter and columns VERIFIED on his phone.
+
+## D-510 — The plyo warm-up is part of its run or ride (2026-09-29, Michael: "I don't think it should be a separate log")
+
+1. Every frame day that prints a plyo also prints that day's endurance session (checked over all frames); p88 files
+   plyos as "a warm-up before sprint work or speed work". The warm-up row is dated on its session's placed day and
+   tagged `warms_up:<frame day>:<slot>` (`compose.ts` `WARMS_UP_TAG`); the plyo day is no longer a fixed day for the
+   arranger (`day-map.ts`). A warm-up built before the tag pairs with the first run or ride of its plan day.
+2. `move-check` `plyoPair` / `movesTogether`: the calendar move, the lost day, mark done, link / unlink and the Garmin
+   send reach both rows. A sport swap leaves the warm-up in front of whatever the session becomes.
+3. Today: one card, "Plyo - {session}" (`PLYO_ROW`, Michael's words), the drills first with how-to and (i), p275 / p227's
+   line, then the session's steps (`get-week/plyo-fold.ts`, `SessionDeck` `SessionCard`).
+4. Garmin: ONE lap-button warm-up step in front, "Plyo warm-up: <drills>", no target (`withPlyoHead`) — the athlete
+   picks one to three drills (p275) and presses lap once, so the first lap is always the warm-up and the session's laps
+   still line up with its steps (D-496; `plannedWhole` gives the analysis the same steps). The drills are the plan's:
+   one per p227 family, walking p89's order weekly, ladder drills only with a ladder.
+Commit `1533208a6`. DEPLOYED, installed; NOT yet seen on a plyo day or on the watch.
