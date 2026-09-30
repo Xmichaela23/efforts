@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     const fromISO = toISO(mon); const toISOEnd = toISO(sun);
 
     // Pull completed workouts in window (we sweep run/ride/swim and optionally walk)
-    const WORKOUT_COLS = 'id,type,date,planned_id,overall:computed->overall,planned_steps_light:computed->planned_steps_light';
+    const WORKOUT_COLS = 'id,type,date,planned_id,overall:computed->overall,intervals:computed->intervals';
     const { data: rows, error } = await supabase
       .from('workouts')
       .select(WORKOUT_COLS)
