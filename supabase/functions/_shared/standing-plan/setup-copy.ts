@@ -76,7 +76,7 @@ export const PROGRAM_COPY = {
   run_muscle: {
     label: 'Run + Muscle',
     // p245 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
-    blurb: 'A first program. Muscle-building lifts with running near threshold. About 3 hours of running and four lifting days a week. Suits most levels.',  // p245
+    blurb: 'A first program. Muscle-building lifts with running near threshold. About 3 hours of running and four lifting days a week, with room for one or two more short easy runs. Not for very advanced runners.',  // p245
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p245: "a first program" for "athletes of most levels". Michael approved 2026-09-29.
     lifting: 'Lifting: new is fine.',
