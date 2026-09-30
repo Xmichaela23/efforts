@@ -3480,7 +3480,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const resolveSeedWeight = async (
     name: string,
     opts?: { previousName?: string; currentWeight?: number; currentWeightUnit?: 'kg' | 'lb' | null; targetReps?: number; plannedPercent?: number | null },
-  ): Promise<{ weight: number; weight_lb: number; unit: 'kg' | 'lb' } | null> => {
+  ): Promise<{ weight: number; weight_lb: number; unit: 'kg' | 'lb'; source?: string } | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('resolve-exercise-weight', {
         body: {
@@ -3502,7 +3502,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const shown = Number(data.weight_in_unit);
       if (!(Number.isFinite(lb) && lb > 0) || !(Number.isFinite(shown) && shown > 0)) return null;
       if (data.unit !== 'kg' && data.unit !== 'lb') return null;
-      return { weight: shown, weight_lb: lb, unit: data.unit };
+      return { weight: shown, weight_lb: lb, unit: data.unit, source: typeof data.source === 'string' ? data.source : undefined };
     } catch {
       return null; // graceful: a blank weight box the athlete fills in beats a guessed one
     }
@@ -5403,6 +5403,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const curW = exercise.sets.find((s) => typeof s.weight === 'number' && s.weight > 0)?.weight ?? 0;
                         const targetReps = exercise.sets.find((s) => typeof s.reps === 'number')?.reps;
                         const prevName = exercise.planned_name || exercise.name;
+                        // Each set's weight before the swap zeroes it — put back on a deadlift ⇄ trap bar swap (below).
+                        const priorSets = exercise.sets.map((st) => ({ weight: st.weight, weight_lb: (st as { weight_lb?: number }).weight_lb }));
                         void (async () => {
                           const seed = await resolveSeedWeight(altName, {
                             previousName: prevName,
@@ -5413,6 +5415,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               ? exercise.planned_percent_1rm : null,
                           });
                           if (seed == null) return;
+                          // ⛔ Deadlift ⇄ Trap Bar Deadlift: the server says the row keeps its weight (2026-09-29) — every set gets
+                          // its own weight back, so a warm-up ramp is not flattened to one number.
+                          if (seed.source === 'deadlift_form') {
+                            setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : {
+                              ...ex,
+                              sets: ex.sets.map((st, i) => (st.completed || !priorSets[i] ? st : { ...st, ...priorSets[i] })),
+                            }));
+                            return;
+                          }
                           setExercises((prev) => prev.map((ex) => (ex.id !== exercise.id || (ex.unit != null && ex.unit !== seed.unit)) ? ex : {
                             ...ex,
                             unit: seed.unit,

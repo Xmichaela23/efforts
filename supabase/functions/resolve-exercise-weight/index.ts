@@ -34,6 +34,7 @@ import {
   normalizeLiftKey,
 } from '../../../src/lib/exercise-config.ts';
 import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
+import { canonicalize } from '../_shared/canonicalize.ts';
 
 /**
  * ⛔ THE DEFAULT INTENSITY, AND IT IS THE LAST RESORT — not the first answer.
@@ -108,6 +109,18 @@ Deno.serve(async (req) => {
       ? { unit: metric ? 'kg' : 'lb', weight_in_unit: liftInAthletesUnit(lb, metric) }
       : {});
     const learned1rms = ((baselines?.learned_fitness as any)?.strength_1rms ?? {}) as Record<string, any>;
+
+    // ── DEADLIFT ⇄ TRAP BAR: THE ROW KEEPS ITS WEIGHT (Michael, 2026-09-29) ────────────────────────────
+    // The trap bar is a form of the deadlift. The row's weight is the plan's percentage of the deadlift's estimated max,
+    // and it carries across unconverted — the rule the Adjust form switch already follows (2026-09-25). FIELD: the
+    // trap bar lifts heavier by no fixed amount — +8% for powerlifters on low handles (Swinton 2011, JSCR 25(7)), +15% on
+    // high handles (Lockie 2018, JSCR, PMID 28394830) — and Strong, Hevy and Juggernaut convert nothing. Light is the
+    // safe side on a heavy day; the trap bar's own sets and its next test move it from there. `deadlift_form` tells
+    // the logger to leave the row's sets as they are (a warm-up ramp keeps its steps).
+    const FORMS = new Set(['deadlift', 'trap_bar_deadlift']);
+    if (previousName && currentWeight > 0 && FORMS.has(canonicalize(name)) && FORMS.has(canonicalize(previousName))) {
+      return json({ success: true, weight: currentWeight, ...inUnit(currentWeight), source: 'deadlift_form' });
+    }
 
     // ── THE PERCENTAGE ────────────────────────────────────────────────────────
     let percent = plannedPercent;
