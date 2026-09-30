@@ -53,8 +53,8 @@ export const PROGRAM_COPY = {
     // p247 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
     blurb: 'For runners who want their lifts to go up. About 4 hours of running and four lifting days a week. Suits most levels.',  // p247
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
-    // p247: "accessible and useful for athletes of most skill levels", built for specific barbell lifts. Approved 2026-09-29.
-    lifting: 'Lifting: some experience.',
+    // p247: "accessible and useful for athletes of most skill levels" — an entry plan (regrouped 2026-09-29).
+    lifting: 'Lifting: new is fine.',
   },
   // ⛔ 5HR + STRENGTH (Strength + Half-Marathon, Viada pp250-251), 2026-09-22 — Michael approved the words.
   // OURS — "5 hours": the built week's running (five runs, p250) as composed; see the ledger. "Advanced": p251 "more
@@ -65,10 +65,10 @@ export const PROGRAM_COPY = {
     // p251: 1RM "1% every four weeks" (4HR: every three, p247).
     // Michael's words, 2026-09-23. p251: "more advanced hybrid athletes", 1RM "1% every four weeks"; hours: the built week's five runs (p250).
     // p251 — card line approved by Michael 2026-09-29 (who it is for, the week, the level).
-    blurb: 'For runners already improving their 5K or 10K times. 5 hours or more of running and four lifting days a week. Not a first program.',  // p251
+    blurb: 'For runners already improving their 5K or 10K times. 5 hours or more of running and four lifting days a week. The running is not for novices.',  // p251: "The running program here is not for novices."
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
     // p251: the strength is "similar in structure to the Strength + 5K" (Run + Strength). Approved 2026-09-29.
-    lifting: 'Lifting: some experience.',
+    lifting: 'Lifting: new is fine.',
   },
   // ⛔ BUILD MUSCLE (WORKORDER-run-programs Stage 1) — Michael approved the words 2026-09-24. Hypertrophy + 5K (Viada
   // pp244-245): p245 "can be used by athletes of most levels", "If you're interested in a first program to start with in
@@ -152,9 +152,12 @@ export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: 
  * barbell lifts, p253 "a solid strength background". Race stays its own group. Replaces the tap-in `RUN_SECTIONS`.
  */
 export const RUN_GROUPS: ReadonlyArray<{ id: string; title: string | null; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
-  { id: 'new', title: 'New to lifting', programs: ['run_muscle'] },  // p245 — approved 2026-09-29
-  { id: 'some', title: 'Some lifting experience', programs: ['run_strength', 'run_half_strength'] },  // p247 p251 — approved 2026-09-29
-  { id: 'solid', title: 'Solid lifting background', programs: ['run_half_muscle'] },  // p253 — approved 2026-09-29
+  // ⛔ REGROUPED 2026-09-29 (Michael: "a clear entry for new to lifting for shorter and longer runners"). Both 5K plans
+  // are open to most levels (p245, p247); Long Run + Strength's lifting is "similar in structure" to Strength + 5K (p251),
+  // its "not for novices" is the running — so it is the entry for a runner of 5 hours or more. Words approved 2026-09-29.
+  { id: 'new_short', title: 'New to lifting · up to 4 hours of running a week', programs: ['run_muscle', 'run_strength'] },  // p245 p247
+  { id: 'new_long', title: 'New to lifting · 5 hours or more', programs: ['run_half_strength'] },  // p251
+  { id: 'solid', title: 'Solid lifting background', programs: ['run_half_muscle'] },  // p253
   { id: 'race', title: 'Race', programs: ['marathon'] },  // not-instruction: a group title
 ];
 /** Under a closed section. */
