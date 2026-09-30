@@ -25,6 +25,7 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser, AuthError } from '../_shared/require-user.ts';
+import { canonicalize } from '../_shared/canonicalize.ts';
 import { sanitizePosture } from '../_shared/state-trend/posture.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 /**
@@ -161,6 +162,43 @@ Deno.serve(async (req) => {
       const scope = lift.scope === 'rest_of_plan' ? 'rest_of_plan' : 'today';
       // ⛔ THE SLOT'S OWN MOVEMENT IS BACK TO THE PLAN — the swap list offers it first after a swap (`swapGroupsFor`).
       const back = substitute.toLowerCase() === slot.toLowerCase();
+      /**
+       * ⛔ DEADLIFT ⇄ TRAP BAR FOR THE REST OF THE PLAN IS THE PLAN'S DEADLIFT FORM (Michael, 2026-09-29: "whatever that
+       * slot gets filled with gets the weight added in the logger and then progresses"). A swap row alone leaves the
+       * hinge lift as the Deadlift, so every trap bar day was a swapped day: a weight from baselines, no step up, no
+       * set earned. The Adjust tab's form switch (`deadlift_form`, 2026-09-25) already makes the trap bar the block's
+       * hinge lift — priced, progressed and tested as itself, starting from the same number (not converted). This tap
+       * runs that same rebuild. The slot's older swaps from this date go first, so none overrides the renamed rows.
+       * A block that is not a standing plan answers `success: false` and the tap falls through to the ordinary swap.
+       */
+      const formOf = (n: string): 'barbell' | 'trap_bar' | null => {
+        const k = canonicalize(n);
+        return k === 'trap_bar_deadlift' ? 'trap_bar' : k === 'deadlift' ? 'barbell' : null;
+      };
+      const toForm = formOf(substitute);
+      if (scope === 'rest_of_plan' && !back && row.training_plan_id && toForm && formOf(slot) && formOf(slot) !== toForm) {
+        await writeSwapAdjustment(db, {
+          userId, planId: row.training_plan_id, slot, date, scope, substitute: null, sameClass: () => true, reason: 'exercise swap',
+        });
+        try {
+          const res = await fetch(`${supabaseUrl}/functions/v1/rematerialize-standing-block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({ user_id: userId, plan_id: row.training_plan_id, apply: true, deadlift_form: toForm }),
+          });
+          const out = await res.json().catch(() => null);
+          if (out?.success === true) {
+            try {
+              await db.from('coach_cache').update({ invalidated_at: new Date().toISOString() }).eq('user_id', userId);
+            } catch (e) {
+              console.warn('[swap-session] coach_cache invalidate failed (non-fatal):', e);
+            }
+            return json({ success: true, deadlift_form: toForm });
+          }
+        } catch (e) {
+          console.warn('[swap-session] deadlift form rebuild failed — writing an ordinary swap:', e);
+        }
+      }
       const w = await writeSwapAdjustment(db, {
         userId, planId: row.training_plan_id ?? null, slot, date, scope,
         substitute: back ? null : substitute, sameClass: () => true, reason: 'exercise swap',
