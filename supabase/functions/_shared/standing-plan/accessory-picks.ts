@@ -1784,7 +1784,32 @@ function dedupeByCanonical(movements: GridMovement[]): GridMovement[] {
  * separate keys; offering both is the picker asking the athlete to choose between two spellings of
  * one lift. `canonicalize` is the app's one owner of "are these the same movement".
  */
+/**
+ * ⚠️ REMEMBERED PER QUESTION (2026-10-01). Every week of a block asks the same few cells the same question — a 52-week
+ * p252 block asked 1,650 times for 12 answers and ran out of edge compute. The answer is a pure function of its
+ * arguments (the catalogue is fixed), and every caller only reads it, so the list is frozen and shared.
+ */
+const PICK_OPTIONS_CACHE = new Map<string, readonly PickOption[]>();
+/** OURS — a cache's size, not a training number: room for every cell and kit a build asks about several times over. */
+const PICK_OPTIONS_CACHE_MAX = 400;
+
 export function pickOptions(
+  key: ViadaPickKey,
+  equipment: string[] | null | undefined,
+  muscle?: string | null,
+  alsoAdmits?: string[] | null,
+  widenAll = false,
+): PickOption[] {
+  const memo = JSON.stringify([key, equipment ?? null, muscle ?? null, alsoAdmits ?? null, widenAll]);
+  const hit = PICK_OPTIONS_CACHE.get(memo);
+  if (hit) return hit as PickOption[];
+  const opts = Object.freeze(pickOptionsUncached(key, equipment, muscle, alsoAdmits, widenAll));
+  if (PICK_OPTIONS_CACHE.size >= PICK_OPTIONS_CACHE_MAX) PICK_OPTIONS_CACHE.delete(PICK_OPTIONS_CACHE.keys().next().value as string);
+  PICK_OPTIONS_CACHE.set(memo, opts);
+  return opts as PickOption[];
+}
+
+function pickOptionsUncached(
   key: ViadaPickKey,
   equipment: string[] | null | undefined,
   /**
