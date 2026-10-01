@@ -708,6 +708,11 @@ export function placeEnduranceDays(
 export type ComposeArgs = {
   /** ⛔ The race a race block builds toward (`race-week.ts`, WORKORDER-race-builds). Absent on every other block. */
   race?: StandingRace | null;
+  /**
+   * ⛔ THE LENGTHS THE HELD HARD CYCLE IS SOLVED ON, when they differ from this week's (a race block's grown weeks, 2026-09-30).
+   * Absent = `sportMix.minutes`, as before.
+   */
+  holdMinutes?: Record<string, number> | null;
   frame: FrameId;
   week: number;
   column: ColumnKind;
@@ -3367,7 +3372,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           const omit = joinsNext || joinedPart ? { cooldown: joinsNext, warmup: joinedPart } : null;
           if (!isHardSlot(slot)) {
             // The sub-VT1 base only — see above. A picked length is the session's own number.
-            const picked = Number(args.sportMix?.minutes?.[key]);
+            // ⛔ A race block's grown lengths do not move the held cycle: it is solved once, on the block's starting
+            // lengths (`holdMinutes`, WORKORDER-race-builds 2026-09-30) — held means one cycle for the block.
+            const picked = Number((args.holdMinutes ?? args.sportMix?.minutes)?.[key]);
             base.sub += Number.isFinite(picked) && picked > 0
               ? picked
               : measure(a.family, level, archetypeForSlot(slot, a, level, 1, false, 'road'), omit).sub;
@@ -5063,7 +5070,8 @@ export function composeBlock(
     const column = taper.has(week) ? 'taper' : 'standard';
     // ⛔ A race block's standard weeks carry the grown lengths and the race-pace long run (`raceStandardWeeks`).
     const sportMix = column === 'standard' && raceWeeks?.[week] ? raceWeeks[week] : args.sportMix;
-    out.push(composeWeek({ ...args, week, column, ...(sportMix ? { sportMix } : {}) }));
+    const holdMinutes = column === 'standard' && raceWeeks?.[week] ? raceWeeks[1]?.minutes ?? null : null;
+    out.push(composeWeek({ ...args, week, column, ...(sportMix ? { sportMix } : {}), ...(holdMinutes ? { holdMinutes } : {}) }));
   }
   /**
    * ⛔ THE SET-COUNT LINE IS SAID ONCE PER MOVEMENT (2026-09-25): on the first week that carries the new count, and on

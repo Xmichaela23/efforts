@@ -333,3 +333,17 @@ Deno.test('⛔⛔ THE LONG RUN REACHES RACE LENGTH — half up to the 2-hour eas
     assert(steps.some((t) => /racepace/.test(t)), `${frame} ${distance}: the long run carries no race-pace finish`);
   }
 });
+
+Deno.test('⛔ THE HELD HARD CYCLE IS THE BLOCK\'S — a race block rotates its hard sessions exactly as the same block with no race', () => {
+  for (const frame of FRAMES_RACED) for (const distance of DISTANCES) {
+    const c: Case = { frame, distance, longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, 15 * 7 + 6) };
+    const { row, race } = build(c);
+    const taper = raceTaperWeeks(race.week, race.distance);
+    const plain = plainRow(c, race.week, taper);
+    const hardOf = (ss: PlanSession[]) => ss.filter((s) => s.type === 'run' && ['1:0', '3:0'].includes(slotOf(s) ?? '')).map((s) => `${slotOf(s)} ${s.name}`).sort().join(' · ');
+    for (let w = 2; w < race.week; w++) {
+      if (taper.includes(w)) continue;
+      assertEquals(hardOf(row.sessions_by_week[String(w)]), hardOf(plain.sessions_by_week[String(w)]), `${frame} ${distance} week ${w}`);
+    }
+  }
+});

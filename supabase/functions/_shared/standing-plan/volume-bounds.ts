@@ -290,25 +290,32 @@ function sizeWhereBuildTops(spec: SlotSpec, level: Level, anchors: EnduranceAnch
  * about holding MORE hours, so a slot never drops below the dose the frame prescribed.
  */
 /**
- * ⛔ ONE MEASUREMENT PER SLOT SHAPE PER BUILD (2026-09-30). `ladderOf` is pure in its spec and anchors, and a block asks the
- * same slot the same question every week — a 16-week marathon race block asked it hundreds of times and ran out of edge
- * compute. Held per (spec, anchors) in a small module cache; a copy is returned so no caller can edit the stored rungs.
+ * ⛔ ONE MEASUREMENT PER SLOT SHAPE PER ANCHORS (2026-09-30). `ladderOf` is pure in its spec and anchors, and a block asks
+ * the same slot the same question every week. A race block asks it for every easy run too (its lengths grow), and a
+ * 14-week marathon block ran out of edge compute re-measuring the same ladders. Keyed on the spec's fields and the
+ * anchors' contents (the anchors' text worked out once per anchors object); copies in and out, so no caller edits it.
  */
 const LADDER_CACHE = new Map<string, Rung[]>();
-const LADDER_CACHE_MAX = 500;
+const LADDER_CACHE_MAX = 400;
+const ANCHOR_TEXT = new WeakMap<object, string>();
+function anchorsText(anchors: EnduranceAnchors): string {
+  if (!anchors || typeof anchors !== 'object') return String(anchors);
+  let t = ANCHOR_TEXT.get(anchors as object);
+  if (t == null) {
+    try { t = JSON.stringify(anchors); } catch { t = `#${Math.random()}`; }
+    ANCHOR_TEXT.set(anchors as object, t);
+  }
+  return t;
+}
 
 export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
-  let key: string | null = null;
-  try { key = JSON.stringify([spec, anchors]); } catch { key = null; }
-  if (key != null) {
-    const hit = LADDER_CACHE.get(key);
-    if (hit) return hit.map((r) => ({ ...r }));
-  }
+  const key = [spec.family, spec.level, spec.archetype ?? '', spec.sport, spec.role ?? '', spec.ceilingMin ?? '',
+    spec.easyBoutCapSeconds ?? '', (spec.rotation ?? []).join(','), anchorsText(anchors)].join('|');
+  const hit = LADDER_CACHE.get(key);
+  if (hit) return hit.map((r) => ({ ...r }));
   const rungs = ladderOfUncached(spec, anchors);
-  if (key != null) {
-    if (LADDER_CACHE.size >= LADDER_CACHE_MAX) LADDER_CACHE.delete(LADDER_CACHE.keys().next().value as string);
-    LADDER_CACHE.set(key, rungs.map((r) => ({ ...r })));
-  }
+  if (LADDER_CACHE.size >= LADDER_CACHE_MAX) LADDER_CACHE.delete(LADDER_CACHE.keys().next().value as string);
+  LADDER_CACHE.set(key, rungs.map((r) => ({ ...r })));
   return rungs;
 }
 
