@@ -58,6 +58,8 @@ plans already built on it keep working and its code stays.
 ## Stages
 
 ### Stage 0 — The book, written down (docs only)
+**✅ DONE 2026-09-30 — `66d0fb47a`.** SOURCE Part K + E3c; Part B's "not yet found" list back-annotated.
+
 - Add a SOURCE Part for p108, p148–151, p120's taper line, p235's race-pace finishes, and the p251/p253 re-read.
 - ⛔ Back-annotate SOURCE Part B §"NOT YET FOUND ON A PAGE": the 10% rule is **found, p148**; the 2-hour ceiling is
   **p108**; the one-third maintenance is **p151**.
