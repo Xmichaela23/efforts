@@ -60,7 +60,7 @@ Deno.test('⛔ Build focus: Run + Ride + Strength day 5 carries the day-2 supers
 
 Deno.test('⛔ Train, program cards, Build this plan? and the FTP line — the approved words', () => {
   const s = setupBlock(HOME);
-  assertEquals(s.sections.standard, { label: 'Multisport Focus', blurb: 'Running, riding and lifting in one plan.', list_title: 'Multisport' });
+  assertEquals(s.sections.standard, { label: 'Multisport Focus', blurb: 'Running, riding and lifting.', list_title: 'Multisport' });
   assertEquals(s.programs.ride_strength.requirement, 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.');
   assertEquals(s.plans.all_rounder.name, 'Run + Ride + Strength');
   // ⛔ The FTP line came off 2026-09-18 (book-language pass 3): on no page.

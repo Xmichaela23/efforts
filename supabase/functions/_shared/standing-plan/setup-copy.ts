@@ -13,9 +13,10 @@ import { intentLine } from '../strength-grid/intents.ts';
 
 /** The three sections on Train, and the title of each one's program list. */
 export const SECTION_COPY = {
-  standard: { label: 'Multisport Focus', blurb: 'Running, riding and lifting in one plan.', list_title: 'Multisport' },
-  run: { label: 'Run Focus', blurb: 'Your running, with the lifting cut around it.', list_title: 'Run' },
-  ride: { label: 'Ride Focus', blurb: 'Your riding, with the lifting cut around it.', list_title: 'Ride' },
+  // Michael's words, 2026-09-30.
+  standard: { label: 'Multisport Focus', blurb: 'Running, riding and lifting.', list_title: 'Multisport' },
+  run: { label: 'Run Focus', blurb: 'Run and lift.', list_title: 'Run' },
+  ride: { label: 'Ride Focus', blurb: 'Ride and lift.', list_title: 'Ride' },
 } as const;
 
 // OURS — the 65 lb entry minimum per lift (see `PROGRAM_COPY` below); shared by the two ride cards.
