@@ -197,7 +197,8 @@ export const RIDE_GROUPS: ReadonlyArray<{ id: string; title: string | null; prog
  */
 export const RACE_DATE_COPY = {
   program_title: 'Which week?',  // not-instruction: a screen title
-  program_subtitle: 'Both are the book\'s half-marathon weeks. The plan builds toward your race day.',
+  // Approved 2026-10-01 (Michael). p251: "The running program here is not for novices."
+  program_subtitle: 'Both are half-marathon weeks for runners with intermediate running skills. The plan builds toward your race day.',  // not-instruction: who the race plans are for (p251)
   title: 'Race day',  // not-instruction: a screen title
   subtitle: 'The plan runs from the week you start to race day.',
   race_day_label: 'Race day',  // not-instruction: a field label
