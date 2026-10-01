@@ -90,7 +90,8 @@ The goal row stays non-event (race in `training_prefs` + `config.standing_plan.r
   kept at a reduced length (that reduction would be field-sourced, not the book's).
 
 ### Stage 2 — The long run grows to race length
-**BUILT 2026-09-30 (branch `race-stage2`).** `raceStandardWeeks` (compose.ts) + `raceGrowthSchedule` (race-week.ts): the
+**PUSHED + DEPLOYED 2026-10-01 (`d6df884b3`, `c24289af3`); CHECKED LIVE on a throwaway account (deleted):** half 12 wk p250 long run 105→145, taper 11–12; marathon 16 wk p250 105→180 by wk 9, p252 by wk 8, taper 14–16; race day ends the block; threshold 7:30 → race pace 7:54 (half) / 8:09 (marathon) on the 15-min finish, 95% insert 7:54. A 14+ week marathon first ran out of edge compute (the held hard cycle re-solved every grown week) — fixed in `c24289af3`.
+ `raceStandardWeeks` (compose.ts) + `raceGrowthSchedule` (race-week.ts): the
 sub-VT1 bucket (easy runs + long run) grows 5% a week (p148), easy runs first to their level's printed top (p235 VT1
 L1 30, L2 60), then the long run; taper weeks untouched. The long run is p235's `race_pace_finish` at level 3 (10 min
 @95% mid, 15 min race pace). Half: 105 → 145 (p107's two hours of easy running). Marathon: 105 → 180 — p251/p253's
