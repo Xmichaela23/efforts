@@ -296,6 +296,7 @@ function sizeWhereBuildTops(spec: SlotSpec, level: Level, anchors: EnduranceAnch
  * anchors' contents (the anchors' text worked out once per anchors object); copies in and out, so no caller edits it.
  */
 const LADDER_CACHE = new Map<string, Rung[]>();
+/** OURS — a cache's size, not a training number: room for every slot shape of a block several times over. */
 const LADDER_CACHE_MAX = 400;
 const ANCHOR_TEXT = new WeakMap<object, string>();
 function anchorsText(anchors: EnduranceAnchors): string {

@@ -1075,7 +1075,7 @@ export const FAMILIES: Record<FamilyId, {
         repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 3, hi: 3 }, 3: { lo: 3, hi: 3 } },
         work: pct(0.95),
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
-        cite: 'Viada pp233-234 — half-marathon race-specific NT; 3- to 5-minute recovery walk/jog between sets',
+        cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
       },
       {
         /**
@@ -1097,7 +1097,7 @@ export const FAMILIES: Record<FamilyId, {
         repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 2, hi: 2 }, 3: { lo: 3, hi: 3 } },
         work: pct(0.92),
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
-        cite: 'Viada pp233-234 — marathon race-specific NT; 3- to 5-minute recovery walk/jog between sets',
+        cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
       },
       // ⛔ `race_repeats_long` ("Sustained race-specific repeats") WAS DELETED HERE 2026-09-11. It
       // blended the page's half-marathon and marathon lines into one band; this programme is the
