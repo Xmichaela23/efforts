@@ -74,7 +74,9 @@ plans already built on it keep working and its code stays.
 - The goal row stores the race (`goal_type: 'event'`, `target_date`, `distance`) so race-pace and the race-readiness
   readout can read it. Check every reader of `goal_type: 'event'` first — today they all assume `generate-run-plan`.
 - The marathon card no longer reaches `generate-run-plan`. Existing plans built there keep working (no migration).
-- ⚠️ **Open for Michael before this stage ships:** `STRENGTH_HALF_TAPER` (p250's taper column) **has no long run at all**
+- ✅ **RULED (Michael, 2026-09-30: "whatever the book says"): the taper weeks are the page's column as printed** — on p250
+  no long run in the taper weeks; on p252 its LSD L1. Below is the question as it was put.
+- `STRENGTH_HALF_TAPER` (p250's taper column) **has no long run at all**
   (`frames.ts:832-887`; `HYP_HALF_TAPER` keeps an L1 LSD). A 3-week marathon taper on p250 means three weeks with no long
   run. Bring him the two readings: the page as printed, or the taper column's runs with the standard week's long run
   kept at a reduced length (that reduction would be field-sourced, not the book's).
@@ -109,8 +111,8 @@ plans already built on it keep working and its code stays.
 - Early start: race more than **26 weeks** away (Runna and Garmin cap there) — the race block starts 26 weeks out;
   until then the athlete runs the matching training programme. Ask Michael whether that is offered on the screen or the
   start date simply moves.
-- ⚠️ Running weekly volume itself: p151 describes mileage doubling over 8–12 weeks, and p148 caps each bucket's weekly
-  change. Stage 2 grows the long run; whether the easy runs grow too is a question for Michael with p151 open.
+- ✅ Running weekly volume (Michael, 2026-09-30: "whatever the book says"): p151 raises the **mileage**, not only the long
+  run, so the easy runs grow too, every bucket under p148's 10% a week (5% the usual step). Stage 2 covers both.
 
 ### Stage 6 — Seen on real builds
 - Throwaway accounts, through the real path, each read end to end: marathon 16 weeks on p250 and on p252; marathon 6
