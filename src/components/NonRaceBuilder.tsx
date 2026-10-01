@@ -1215,7 +1215,8 @@ export type NonRaceState = {
 // test on the path passed. ⚠️ Re-exported so every `StepKey` reference here is unchanged.
 export type { StepKey } from '@/lib/wizard-steps';
 import { getSteps, skipsSportScope, fixedSportScope, type StepKey } from '@/lib/wizard-steps';
-import { raceBlockWeeks, RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS } from '@/lib/race-weeks';
+import { raceBlockWeeks, racePlanFromWeek, RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_USUAL_MIN_WEEKS } from '@/lib/race-weeks';
+import { mondayOfCalendarYmd } from '../../supabase/functions/_shared/parse-local-date.ts';
 
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -1330,7 +1331,8 @@ function assemblePayload(
         name: isRace && state.raceName.trim() ? state.raceName.trim() : (planName ?? GOAL_LABELS[goal]),
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
-        ...(isRace ? {} : { target_weeks: raceBlockWeeksNow ?? state.targetWeeks }),
+        // The goal row keeps its own 4–52 range; a shorter race block's length is the race's week (`race.week`).
+        ...(isRace ? {} : { target_weeks: raceBlockWeeksNow != null ? Math.min(52, Math.max(4, raceBlockWeeksNow)) : state.targetWeeks }),
         sport: shape.sport,
         distance: isRace ? state.raceDistance : null,
         /**
@@ -4434,13 +4436,37 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
               />
             </div>
           </div>
-          {raceBlockWeeksOk && (
+          {/* ⛔ THE RACE DAY LINES (Michael approved the words 2026-10-01): the weeks; a late start's note; a race more than
+              26 weeks out starts on the programme (`racePlanFromWeek`); a date that cannot build says why. */}
+          {raceBlockWeeksOk && raceBlockWeeksNow != null && racePlanFromWeek(raceBlockWeeksNow) > 1 && (
+            <p className="text-white/70 text-sm mt-1.5">
+              {(setupCopy?.race_date?.far_line ?? '')
+                .replace('{weeks}', String(raceBlockWeeksNow))
+                .replace('{program}', setupCopy?.programs?.[state.focus === 'run_half_hyp' ? 'run_half_muscle' : 'run_half_strength']?.label ?? '')
+                .replace('{date}', (() => {
+                  const d = new Date(`${mondayOfCalendarYmd(state.startDate)}T12:00:00Z`);
+                  d.setUTCDate(d.getUTCDate() + 7 * (racePlanFromWeek(raceBlockWeeksNow) - 1));
+                  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+                })())}
+            </p>
+          )}
+          {raceBlockWeeksOk && raceBlockWeeksNow != null && racePlanFromWeek(raceBlockWeeksNow) === 1 && (
             <p className="text-white/70 text-sm mt-1.5">
               {(setupCopy?.race_date?.weeks_line ?? '').replace('{weeks}', String(raceBlockWeeksNow))}
             </p>
           )}
+          {raceBlockWeeksOk && raceBlockWeeksNow != null && state.raceBlockDistance
+            && raceBlockWeeksNow < RACE_USUAL_MIN_WEEKS[state.raceBlockDistance] && (
+            <p className="text-white/70 text-sm mt-1.5">
+              {(setupCopy?.race_date?.late_line?.[state.raceBlockDistance] ?? '').replace('{weeks}', String(raceBlockWeeksNow))}
+            </p>
+          )}
           {state.raceBlockDate && !raceBlockWeeksOk && (
-            <p className="text-amber-400/70 text-sm mt-1.5">{setupCopy?.race_date?.out_of_range_line ?? ''}</p>
+            <p className="text-amber-400/70 text-sm mt-1.5">
+              {raceBlockWeeksNow != null && raceBlockWeeksNow > RACE_BLOCK_MAX_WEEKS
+                ? setupCopy?.race_date?.over_year_line ?? ''
+                : setupCopy?.race_date?.before_start_line ?? ''}
+            </p>
           )}
         </StepLayout>
       )}

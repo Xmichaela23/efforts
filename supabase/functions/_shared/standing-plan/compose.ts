@@ -5063,7 +5063,7 @@ function raceStandardWeeks(
       const top = Math.min(caps[x.key] ?? start, x.levelTopMin ?? Infinity);
       return { key: x.key, role: x.role, start, cap: Math.max(start, top) };
     });
-  const schedule = raceGrowthSchedule(growth, args.weeks, args.taperWeeks ?? []);
+  const schedule = raceGrowthSchedule(growth, args.weeks, args.taperWeeks ?? [], Math.max(1, Number(args.race?.from_week) || 1));
   const out: Record<number, SportMix> = {};
   for (const [w, minutes] of Object.entries(schedule)) {
     out[Number(w)] = { ...raceMix, minutes: { ...(base.minutes ?? {}), ...minutes } };
@@ -5077,11 +5077,18 @@ export function composeBlock(
   const out: ComposedWeek[] = [];
   const taper = new Set(args.taperWeeks ?? []);
   const raceWeeks = args.race ? raceStandardWeeks(args) : null;
+  // ⛔ A RACE MORE THAN 26 WEEKS OUT (`race.from_week`, race-week.ts): the weeks before the race plan are the plain
+  // programme — composed with no race, exactly as the training programme builds them.
+  const fromWeek = Math.max(1, Number(args.race?.from_week) || 1);
   for (let week = 1; week <= args.weeks; week++) {
     const column = taper.has(week) ? 'taper' : 'standard';
+    if (args.race && week < fromWeek) {
+      out.push(composeWeek({ ...args, race: null, week, column }));
+      continue;
+    }
     // ⛔ A race block's standard weeks carry the grown lengths and the race-pace long run (`raceStandardWeeks`).
     const sportMix = column === 'standard' && raceWeeks?.[week] ? raceWeeks[week] : args.sportMix;
-    const holdMinutes = column === 'standard' && raceWeeks?.[week] ? raceWeeks[1]?.minutes ?? null : null;
+    const holdMinutes = column === 'standard' && raceWeeks?.[week] ? raceWeeks[fromWeek]?.minutes ?? raceWeeks[1]?.minutes ?? null : null;
     out.push(composeWeek({ ...args, week, column, ...(sportMix ? { sportMix } : {}), ...(holdMinutes ? { holdMinutes } : {}) }));
   }
   /**
@@ -5106,7 +5113,8 @@ export function composeBlock(
     const runMinutes = (wk: ComposedWeek) => wk.sessions
       .filter((x) => x.type === 'run' && !(x.tags ?? []).includes('race_day'))
       .reduce((a, x) => a + (Number(x.duration) || 0), 0);
-    const ref = out.find((wk) => wk.week === 2 && wk.column === 'standard');
+    const refWeek = Math.max(2, fromWeek);
+    const ref = out.find((wk) => wk.week === refWeek && wk.column === 'standard');
     const refMin = ref ? runMinutes(ref) : 0;
     if (refMin > 0) {
       // Gradual and one-way (p151 "steadily"): the ratio is the highest the running has reached so far, so a week whose
@@ -5114,7 +5122,7 @@ export function composeBlock(
       // row holding the most, so no row drops by a third at once and every row keeps at least one ("at least once a week").
       let highest = 1;
       for (const wk of out) {
-        if (wk.week <= 2 || wk.column !== 'standard') continue;
+        if (wk.week <= refWeek || wk.column !== 'standard') continue;
         highest = Math.max(highest, runMinutes(wk) / refMin);
         const factor = hypertrophySetFactor(highest);
         if (factor >= 1) continue;

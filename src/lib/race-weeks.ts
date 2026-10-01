@@ -13,9 +13,8 @@ export function raceBlockWeeks(startIso: string | null | undefined, raceIso: str
   return planWeekContaining(mondayOfCalendarYmd(start), race);
 }
 
-/** The goal row's own range (create-goal `target_weeks` 4 to 52); the server refuses outside it too. */
-export const RACE_BLOCK_MIN_WEEKS = 4;
-export const RACE_BLOCK_MAX_WEEKS = 52;
+// The block's limits and the race-plan rules are the server's (race-week.ts), one copy.
+export { RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_PLAN_MAX_WEEKS, RACE_USUAL_MIN_WEEKS, racePlanFromWeek } from '../../supabase/functions/_shared/standing-plan/race-week.ts';
 
 /**
  * ⛔ WHETHER THE GOALS SCREEN OFFERS A RACE PLAN (WORKORDER-race-builds, 2026-09-30). False until the race builds are live:

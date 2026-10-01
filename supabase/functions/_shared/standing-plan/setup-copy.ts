@@ -204,8 +204,19 @@ export const RACE_DATE_COPY = {
   race_day_label: 'Race day',  // not-instruction: a field label
   start_label: 'Start the week of',  // not-instruction: a field label
   weeks_line: '{weeks} weeks of training.',  // not-instruction: the plan's length
-  // OURS — 4 to 52: the goal row's own range (create-goal `target_weeks`), not a book number. Stage 5 replaces it.
-  out_of_range_line: 'This plan needs 4 to 52 weeks between the start and race day.',
+  /**
+   * ⛔ A LATE START GETS A PLAN AND A NOTE, NEVER A GREYED-OUT DATE (Michael, 2026-10-01). Shown under the weeks line when
+   * the plan is shorter than the field's usual minimum (`RACE_USUAL_MIN_WEEKS`, race-week.ts). Words approved 2026-10-01.
+   */
+  late_line: {
+    marathon: 'Twelve weeks or more is the usual time to train for a marathon. This plan has {weeks}, so it builds from the running you do now.',  // not-instruction: FIELD minimum (race-week.ts RACE_USUAL_MIN_WEEKS)
+    half: 'Eight weeks or more is the usual time to train for a half marathon. This plan has {weeks}, so it builds from the running you do now.',  // not-instruction: FIELD minimum (race-week.ts RACE_USUAL_MIN_WEEKS)
+  },
+  /** A race more than 26 weeks away (`RACE_PLAN_MAX_WEEKS`): the programme now, the race plan from {date}. Approved 2026-10-01. */
+  far_line: 'Your race is {weeks} weeks away. You start on {program} now, and the race plan begins on {date}.',  // not-instruction: FIELD cap (race-week.ts RACE_PLAN_MAX_WEEKS)
+  // OURS — a race block needs a week after the start week (week one is the test week) and fits the goal row's year.
+  before_start_line: 'Race day needs to be after the week you start.',  // not-instruction: a date that cannot build
+  over_year_line: 'Race day needs to be within a year.',  // not-instruction: the goal row's 52-week range
 } as const;
 
 // ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────

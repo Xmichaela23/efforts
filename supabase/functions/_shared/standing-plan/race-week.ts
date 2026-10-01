@@ -19,6 +19,24 @@ import type { DayArrangement } from './day-map.ts';
 
 export type RaceDistance = 'half' | 'marathon';
 
+/**
+ * ⛔ THE LENGTHS AROUND A RACE BLOCK (WORKORDER-race-builds Stage 5, 2026-10-01).
+ * FIELD — `RACE_USUAL_MIN_WEEKS`: Nike Run Club recommends at least 12 weeks for a marathon; Runna's shortest plans are
+ * 12 (marathon) and 8 (half, "Fast-Track"). Under it the plan still builds, with a note.
+ * FIELD — `RACE_PLAN_MAX_WEEKS`: Runna and Garmin cap a race plan at 26 weeks; further out, the athlete is on the training
+ * programme and the race plan takes over 26 weeks out (Runna puts a base plan first).
+ * OURS — 2 to 52: the race must fall after the start week (week one is the test week), within the goal row's year.
+ */
+export const RACE_USUAL_MIN_WEEKS: Record<'half' | 'marathon', number> = { half: 8, marathon: 12 };
+export const RACE_PLAN_MAX_WEEKS = 26;
+export const RACE_BLOCK_MIN_WEEKS = 2;
+export const RACE_BLOCK_MAX_WEEKS = 52;
+
+/** The block week the race plan starts in: 1, or the week that leaves `RACE_PLAN_MAX_WEEKS` to race day. */
+export function racePlanFromWeek(raceWeek: number): number {
+  return raceWeek > RACE_PLAN_MAX_WEEKS ? raceWeek - RACE_PLAN_MAX_WEEKS + 1 : 1;
+}
+
 /** FIELD — see the header; ledger row in docs/STATE-SOURCES.md. */
 export const RACE_TAPER_WEEKS: Record<RaceDistance, number> = { half: 2, marathon: 3 };
 
@@ -38,6 +56,11 @@ export type StandingRace = {
   distance: RaceDistance;
   /** The calendar length of the race row, minutes. */
   duration_min: number;
+  /**
+   * The block week the race plan begins (`racePlanFromWeek`). Before it the block is the plain programme — no growth,
+   * no race band, no lifting decrease. Absent = 1.
+   */
+  from_week?: number;
 };
 
 /** The weekday a YYYY-MM-DD date falls on, or null. */
@@ -155,6 +178,8 @@ export function raceGrowthSchedule(
   slots: GrowthSlot[],
   weeks: number,
   taperWeeks: number[],
+  /** The block week the race plan begins; weeks before it hold the starting lengths. */
+  fromWeek = 1,
 ): Record<number, Record<string, number>> {
   const taper = new Set(taperWeeks);
   const order = [...slots.filter((s) => s.role === 'easy'), ...slots.filter((s) => s.role === 'long')];
@@ -162,7 +187,7 @@ export function raceGrowthSchedule(
   const out: Record<number, Record<string, number>> = {};
   for (let w = 1; w <= weeks; w++) {
     if (taper.has(w)) continue;
-    if (w >= 2) {
+    if (w >= Math.max(2, fromWeek + 1)) {
       const bucket = Object.values(cur).reduce((a, b) => a + b, 0);
       let step = Math.floor(bucket * RACE_WEEKLY_GROWTH);
       for (const s of order) {

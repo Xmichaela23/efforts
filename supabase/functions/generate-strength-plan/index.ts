@@ -113,7 +113,7 @@ import {
   RUN_DAYS_DEFAULT,
 } from '../_shared/athlete-weekly-intent.ts';
 // ⛔ Half marathon (Stage 2, 2026-09-24): the race week, the plan week a date falls in, and the Monday a block opens on.
-import { RACE_MILES, raceTaperWeeks, weekdayOfIso, type RaceDistance, type StandingRace } from '../_shared/standing-plan/race-week.ts';
+import { RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_MILES, racePlanFromWeek, raceTaperWeeks, weekdayOfIso, type RaceDistance, type StandingRace } from '../_shared/standing-plan/race-week.ts';
 import { planWeekContaining } from '../_shared/planning-context.ts';
 import { mondayOfCalendarYmd, mondayOfToday } from '../_shared/parse-local-date.ts';
 import { FALLBACK_EASY_MIN_PER_MILE } from '../_shared/athlete-weekly-intent.ts';
@@ -976,11 +976,11 @@ Deno.serve(async (req: Request) => {
             : mondayOfToday();
           const raceWeek = planWeekContaining(startMonday, raceDate);
           const raceDay = /^\d{4}-\d{2}-\d{2}$/.test(raceDate) ? weekdayOfIso(raceDate) : null;
-          // The goal row's own range (create-goal: target_weeks 4 to 52), so the two cannot disagree.
-          if (raceWeek == null || raceDay == null || raceWeek < 4 || raceWeek > 52) {
+          // `RACE_BLOCK_MIN_WEEKS`–`RACE_BLOCK_MAX_WEEKS` (race-week.ts): after the start week, within a year.
+          if (raceWeek == null || raceDay == null || raceWeek < RACE_BLOCK_MIN_WEEKS || raceWeek > RACE_BLOCK_MAX_WEEKS) {
             return json({
               success: false,
-              error: `The race date needs to be 4 to 52 weeks after the start (race week ${raceWeek ?? 'unknown'}).`,
+              error: `The race date needs to be ${RACE_BLOCK_MIN_WEEKS} to ${RACE_BLOCK_MAX_WEEKS} weeks after the start (race week ${raceWeek ?? 'unknown'}).`,
               reason: 'race_date_out_of_range',
             }, 422);
           }
@@ -990,6 +990,8 @@ Deno.serve(async (req: Request) => {
             week: raceWeek,
             day: raceDay,
             distance: raceDistance,
+            // A race more than 26 weeks out starts on the plain programme; the race plan takes over 26 weeks out.
+            ...(racePlanFromWeek(raceWeek) > 1 ? { from_week: racePlanFromWeek(raceWeek) } : {}),
             // OURS — the calendar's length only: the race distance at the athlete's easy pace (race-week.ts).
             duration_min: Math.round(RACE_MILES[raceDistance] * (easyPaceMin ?? FALLBACK_EASY_MIN_PER_MILE)),
           };

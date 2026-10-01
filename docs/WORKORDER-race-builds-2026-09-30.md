@@ -132,6 +132,12 @@ a time as the running rises (the highest ratio so far, so never back up); ME/DE/
 - The p251 rate (1% every 4 weeks) is unchanged.
 
 ### Stage 5 — Length, late and early starts (words through Michael)
+**BUILT 2026-10-01 (branch `race-stage2`), words approved by Michael 2026-10-01.** Late start: the plan builds and the
+race day screen adds "Twelve weeks or more is the usual time to train for a marathon. This plan has {weeks}, so it builds
+from the running you do now." (half: eight / half marathon). Over 26 weeks: one block — the plain programme until
+26 weeks out (`race.from_week`, `racePlanFromWeek`), then the race plan; the screen says "Your race is {weeks} weeks away.
+You start on {program} now, and the race plan begins on {date}." Limits 2–52 weeks: "Race day needs to be after the week
+you start." / "Race day needs to be within a year."
 - Late start: build anyway; one note when the weeks are under the field minimum — marathon **12**, half **8** (Nike Run
   Club recommends 12 for a marathon; Runna's fast-track plans 12 / 8). The note names no app.
 - ✅ Early start (Michael, 2026-09-30: "good"): race more than **26 weeks** away — FIELD, Runna caps plans at 26 weeks

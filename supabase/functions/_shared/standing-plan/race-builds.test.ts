@@ -25,7 +25,7 @@ import {
   type PlanSession,
   type Weekday,
 } from './index.ts';
-import { applyRaceWeek, hypertrophySetFactor, raceGrowthSchedule, raceNtRotation, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
+import { applyRaceWeek, hypertrophySetFactor, racePlanFromWeek, raceGrowthSchedule, raceNtRotation, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
 import { planWeekContaining } from '../planning-context.ts';
 import { FAMILIES as FAMILIES_LIB, archetypesFor as archetypesForLib } from '../endurance-library/index.ts';
 import { mondayOfCalendarYmd, parseLocalDate, formatLocalDate } from '../parse-local-date.ts';
@@ -413,4 +413,28 @@ Deno.test('⛔ THE LIFTING DECREASES AS THE MILES INCREASE (p151) — hypertroph
     const want = Math.max(0, sets(row.sessions_by_week['2'], true) - Math.round(sets(row.sessions_by_week['2'], true) * hypertrophySetFactor(peak)));
     assertEquals(sets(row.sessions_by_week['2'], true) - prev, want, `${frame}: running rose ×${peak.toFixed(2)}, sets came down ${sets(row.sessions_by_week['2'], true) - prev}`);
   }
+});
+
+Deno.test('⛔ A RACE MORE THAN 26 WEEKS OUT — the plain programme first, the race plan from 26 weeks out', () => {
+  assertEquals(racePlanFromWeek(26), 1);
+  assertEquals(racePlanFromWeek(27), 2);
+  assertEquals(racePlanFromWeek(34), 9);
+  const c: Case = { frame: 'strength_half', distance: 'marathon', longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, 33 * 7 + 6) };
+  const race = { ...raceFor(c.raceDate, c.distance), from_week: racePlanFromWeek(34) };
+  assertEquals(race.week, 34);
+  const sports: Record<string, 'run'> = {};
+  for (const d of FRAMES[c.frame].columns.standard) d.endurance.forEach((_, i) => { sports[`${d.day}:${i}`] = 'run'; });
+  const mix = fenceMixToFrame(c.frame, { runs: Object.keys(sports).length, rides: 0, swimDays: 0, rideCount: null, slots: sports, archetypes: null, minutes: { '6:0': 105 } });
+  assignSports(FRAMES[c.frame].columns.standard, mix);
+  const dayMap = chooseDayMap(c.frame, { longRunDay: 'Saturday', longRideDay: null, longSlotSport: 'run', hardDays: [], unavailableDays: [] });
+  const compose = { frame: c.frame, competitionLifts: defaultCompetitionLifts(), seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+    workingNumbers: WORKING, baselines: BASELINES, equipment: ['Commercial gym'], roundTo: 5, sportMix: mix } as never;
+  const row = buildStandingPlanRow({ compose, weeks: 34, taperWeeks: raceTaperWeeks(34, 'marathon'), race, dayMap });
+  const plain = buildStandingPlanRow({ compose, weeks: 34, taperWeeks: [], dayMap });
+  const longOf = (r: typeof row, w: number) => r.sessions_by_week[String(w)].find((s) => slotOf(s) === '6:0')?.duration;
+  for (let w = 1; w < 9; w++) {
+    assertEquals(row.sessions_by_week[String(w)].map((s) => `${s.day} ${s.name} ${s.duration}`), plain.sessions_by_week[String(w)].map((s) => `${s.day} ${s.name} ${s.duration}`), `week ${w} is the plain programme`);
+  }
+  assert(Number(longOf(row, 20)) > Number(longOf(row, 9)), 'the long run grows once the race plan begins');
+  assertEquals(Object.keys(row.sessions_by_week).length, 34);
 });
