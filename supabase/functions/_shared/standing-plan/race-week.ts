@@ -176,3 +176,47 @@ export function raceGrowthSchedule(
   }
   return out;
 }
+
+/**
+ * ⛔ THE THRESHOLD WORK IS SET BY THE RACE (WORKORDER-race-builds Stage 3, 2026-10-01). p251 and p253: "Half-marathoners
+ * may choose NT workouts that focus on the 92 to 97 percent intensity, whereas marathon runners may want to incorporate
+ * more NT intervals in the 89 to 94 percent range." On a race block the NT slot rotates through the book's NT sessions
+ * whose work sits in the race's band, plus that race's own race-specific line (pp233–234).
+ * OURS — "sits in the band" = the middle of the session's printed work range falls inside it.
+ */
+export const RACE_NT_BAND: Record<RaceDistance, { lo: number; hi: number }> = {
+  half: { lo: 0.92, hi: 0.97 },
+  marathon: { lo: 0.89, hi: 0.94 },
+};
+
+/** The NT session ids a race block rotates through, given the family's archetypes (the library's own list). */
+export function raceNtRotation(
+  archetypes: Array<{ id: string; raceOnly?: RaceDistance; work?: { kind?: string; lo?: number; hi?: number } }>,
+  distance: RaceDistance,
+): string[] {
+  const band = RACE_NT_BAND[distance];
+  return archetypes
+    .filter((a) => {
+      if (a.raceOnly) return a.raceOnly === distance;
+      const w = a.work;
+      if (!w || w.kind !== 'pct_threshold' || typeof w.lo !== 'number') return false;
+      const mid = (w.lo + (typeof w.hi === 'number' ? w.hi : w.lo)) / 2;
+      return mid >= band.lo - 1e-9 && mid <= band.hi + 1e-9;
+    })
+    .map((a) => a.id);
+}
+
+/**
+ * ⛔ THE LIFTING DECREASES AS THE MILES INCREASE (WORKORDER-race-builds Stage 4, 2026-10-01; the marathon card Michael
+ * approved: "The lifting decreases as the miles increase and holds your strength").
+ * p151, whole: "steadily decrease your nonevent training as you increase your event training"; maintenance is about
+ * one-third of productive volume, at least once a week; the worked example doubles the miles (30 → 60 a week) and takes
+ * hypertrophy reps from 50 / 60 to about 15–16 / 20 — one-third; skill and speed work stay.
+ * The factor on a week's hypertrophy sets, given its running minutes over the block's first standard week's (`ratio`):
+ * 1 at the start, one-third once the running has doubled, never below one-third.
+ * OURS — the straight line between p151's two printed points (ratio 1 → 1, ratio 2 → 1/3); the page prints the ends only.
+ */
+export function hypertrophySetFactor(ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 1) return 1;
+  return Math.max(1 / 3, 1 - (ratio - 1) * (2 / 3));
+}

@@ -1005,7 +1005,8 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
   // ⚠️ A shape the source does not offer at this level is not offered here either.
   const offered = familyRules.archetypes.filter((a) => !a.levels || a.levels.includes(req.level));
   if (offered.length === 0) throw new Error(`no archetype for ${req.family} at level ${req.level}`);
-  const archetype = req.archetype ? offered.find((a) => a.id === req.archetype) : offered[0];
+  // A race-only shape builds when asked for by id; it is never the default (`Archetype.raceOnly`).
+  const archetype = req.archetype ? offered.find((a) => a.id === req.archetype) : (offered.find((a) => !a.raceOnly) ?? offered[0]);
   if (!archetype) {
     throw new Error(`archetype ${req.archetype} is not offered for ${req.family} at level ${req.level}`);
   }
@@ -1238,9 +1239,11 @@ export function sessionDurationBandSeconds(
 }
 
 /** Every archetype a family offers — at a level, when one is given, because the source varies. */
-export function archetypesFor(family: FamilyId, level?: Level): { id: string; label: string; cite: string; venue?: RideVenueMark }[] {
+export function archetypesFor(family: FamilyId, level?: Level, race?: 'half' | 'marathon' | null): { id: string; label: string; cite: string; venue?: RideVenueMark }[] {
   return FAMILIES[family].archetypes
     .filter((a) => level === undefined || !a.levels || a.levels.includes(level))
+    // ⛔ A race-only shape is offered to its own race block and nowhere else (`Archetype.raceOnly`).
+    .filter((a) => !a.raceOnly || a.raceOnly === race)
     .map((a) => ({ id: a.id, label: a.label, cite: a.cite, ...(a.venue ? { venue: a.venue } : {}) }));
 }
 
@@ -1257,8 +1260,9 @@ export function archetypesForVenue(
   family: FamilyId,
   level: Level | undefined,
   venue: 'road' | 'trainer',
+  race?: 'half' | 'marathon' | null,
 ): ReturnType<typeof archetypesFor> {
-  return archetypesFor(family, level).filter((a) => venue === 'trainer' || a.venue !== 'trainer');
+  return archetypesFor(family, level, race).filter((a) => venue === 'trainer' || a.venue !== 'trainer');
 }
 
 export const ALL_FAMILIES = Object.keys(FAMILIES) as FamilyId[];

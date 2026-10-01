@@ -545,7 +545,7 @@ function applyVariantPicks(
       const held = heldByFamily.get(a.family);
       if (!held?.has(a.archetype)) { hold(a.family, a.archetype); continue; }
       const free = (FAMILIES[a.family]?.archetypes ?? [])
-        .filter((x) => !x.levels || x.levels.includes(a.level))
+        .filter((x) => (!x.levels || x.levels.includes(a.level)) && !x.raceOnly)
         .find((x) => !held.has(x.id));
       // ⚠️ NOWHERE TO MOVE — a family with one usable shape keeps it rather than being emptied.
       // The week then genuinely has two of it, and that is the library's ceiling, not a defect here.

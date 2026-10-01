@@ -25,8 +25,9 @@ import {
   type PlanSession,
   type Weekday,
 } from './index.ts';
-import { applyRaceWeek, raceGrowthSchedule, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
+import { applyRaceWeek, hypertrophySetFactor, raceGrowthSchedule, raceNtRotation, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
 import { planWeekContaining } from '../planning-context.ts';
+import { FAMILIES as FAMILIES_LIB, archetypesFor as archetypesForLib } from '../endurance-library/index.ts';
 import { mondayOfCalendarYmd, parseLocalDate, formatLocalDate } from '../parse-local-date.ts';
 import { raceBlockWeeks } from '../../../../src/lib/race-weeks.ts';
 
@@ -334,16 +335,82 @@ Deno.test('⛔⛔ THE LONG RUN REACHES RACE LENGTH — half up to the 2-hour eas
   }
 });
 
-Deno.test('⛔ THE HELD HARD CYCLE IS THE BLOCK\'S — a race block rotates its hard sessions exactly as the same block with no race', () => {
+Deno.test('⛔ THE HELD HARD CYCLE IS THE BLOCK\'S — the growing long run never moves it (the cycle is solved on the starting lengths)', () => {
+  // Two race blocks that differ only in how long the long run starts: their hard sessions match week for week.
+  const buildWith = (c: Case, longStart: number) => {
+    const sports: Record<string, 'run'> = {};
+    for (const d of FRAMES[c.frame].columns.standard) d.endurance.forEach((_, i) => { sports[`${d.day}:${i}`] = 'run'; });
+    const mix = fenceMixToFrame(c.frame, { runs: Object.keys(sports).length, rides: 0, swimDays: 0, rideCount: null, slots: sports, archetypes: null, minutes: { '6:0': longStart } });
+    assignSports(FRAMES[c.frame].columns.standard, mix);
+    const dayMap = chooseDayMap(c.frame, { longRunDay: c.longDay, longRideDay: null, longSlotSport: 'run', hardDays: c.hardDays, unavailableDays: c.blocked });
+    const race = raceFor(c.raceDate, c.distance);
+    return buildStandingPlanRow({
+      compose: { frame: c.frame, competitionLifts: defaultCompetitionLifts(), seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+        workingNumbers: WORKING, baselines: BASELINES, equipment: ['Commercial gym'], roundTo: 5, sportMix: mix } as never,
+      weeks: race.week, taperWeeks: raceTaperWeeks(race.week, race.distance), race, dayMap,
+    });
+  };
+  const hardOf = (ss: PlanSession[]) => ss.filter((s) => s.type === 'run' && ['1:0', '3:0'].includes(slotOf(s) ?? '')).map((s) => `${slotOf(s)} ${s.name}`).sort().join(' · ');
   for (const frame of FRAMES_RACED) for (const distance of DISTANCES) {
     const c: Case = { frame, distance, longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, 15 * 7 + 6) };
+    const a = buildWith(c, 105), b = buildWith(c, 134);
+    for (const w of Object.keys(a.sessions_by_week)) {
+      assertEquals(hardOf(a.sessions_by_week[w]), hardOf(b.sessions_by_week[w]), `${frame} ${distance} week ${w}`);
+    }
+  }
+});
+
+Deno.test('⛔ THE THRESHOLD WORK IS SET BY THE RACE (p251, p253) — every NT session in the race band or the race\'s own line', () => {
+  const NT_IDS_BY_NAME: Record<string, string> = {};
+  for (const frame of FRAMES_RACED) for (const distance of DISTANCES) {
+    const weeks = distance === 'marathon' ? 16 : 12;
+    const c: Case = { frame, distance, longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, (weeks - 1) * 7 + 6) };
+    const { row, race } = build(c);
+    const taper = raceTaperWeeks(race.week, race.distance);
+    const allowed = new Set(raceNtRotation(FAMILIES_LIB.run_near_threshold.archetypes as never, distance));
+    let raceLine = 0;
+    for (let w = 2; w <= race.week; w++) {
+      if (taper.includes(w)) continue;
+      for (const s of row.sessions_by_week[String(w)] ?? []) {
+        const arch = (s.tags ?? []).find((t) => t.startsWith('archetype:'))?.slice(10);
+        if (!arch || !(FAMILIES_LIB.run_near_threshold.archetypes as Array<{ id: string }>).some((a) => a.id === arch)) continue;
+        assert(allowed.has(arch), `${frame} ${distance} week ${w}: ${arch} is outside the race band`);
+        if (arch === `race_repeats_${distance}`) raceLine++;
+      }
+    }
+    assert(raceLine > 0, `${frame} ${distance}: the race-specific line never appears`);
+  }
+  // No other plan is offered a race-only shape.
+  assert(!archetypesForLib('run_near_threshold', 2).some((a) => a.id.startsWith('race_repeats_')), 'a race-only shape leaked into the plain list');
+  void NT_IDS_BY_NAME;
+});
+
+Deno.test('⛔ THE LIFTING DECREASES AS THE MILES INCREASE (p151) — hypertrophy sets only, gradual, one-way, never below one a row', () => {
+  assertEquals(hypertrophySetFactor(1), 1);
+  assert(Math.abs(hypertrophySetFactor(2) - 1 / 3) < 1e-9);
+  assertEquals(hypertrophySetFactor(3), 1 / 3);
+  for (const frame of FRAMES_RACED) {
+    const c: Case = { frame, distance: 'marathon', longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, 15 * 7 + 6) };
     const { row, race } = build(c);
     const taper = raceTaperWeeks(race.week, race.distance);
     const plain = plainRow(c, race.week, taper);
-    const hardOf = (ss: PlanSession[]) => ss.filter((s) => s.type === 'run' && ['1:0', '3:0'].includes(slotOf(s) ?? '')).map((s) => `${slotOf(s)} ${s.name}`).sort().join(' · ');
+    const sets = (ss: PlanSession[], hyp: boolean) => ss.flatMap((s) => s.strength_exercises ?? [])
+      .filter((e) => (e.slot_intent === 'HYP') === hyp).reduce((a, e) => a + (Number(e.sets) || 0), 0);
+    let prev = Infinity;
     for (let w = 2; w < race.week; w++) {
       if (taper.includes(w)) continue;
-      assertEquals(hardOf(row.sessions_by_week[String(w)]), hardOf(plain.sessions_by_week[String(w)]), `${frame} ${distance} week ${w}`);
+      const ss = row.sessions_by_week[String(w)];
+      const h = sets(ss, true);
+      assert(h <= prev, `${frame} week ${w}: hypertrophy sets went back up (${prev} → ${h})`);
+      assert(prev === Infinity || prev - h <= 3, `${frame} week ${w}: dropped ${prev - h} sets in one week`);
+      prev = h;
+      assertEquals(sets(ss, false), sets(plain.sessions_by_week[String(w)], false), `${frame} week ${w}: a non-hypertrophy row changed`);
+      for (const e of ss.flatMap((s) => s.strength_exercises ?? []).filter((e) => e.slot_intent === 'HYP')) assert(Number(e.sets) >= 1);
     }
+    const runOf = (w: number) => row.sessions_by_week[String(w)].filter((s) => s.type === 'run' && !(s.tags ?? []).includes('race_day')).reduce((a, s) => a + (s.duration || 0), 0);
+    let peak = 1;
+    for (let w = 3; w < race.week; w++) if (!taper.includes(w)) peak = Math.max(peak, runOf(w) / runOf(2));
+    const want = Math.max(0, sets(row.sessions_by_week['2'], true) - Math.round(sets(row.sessions_by_week['2'], true) * hypertrophySetFactor(peak)));
+    assertEquals(sets(row.sessions_by_week['2'], true) - prev, want, `${frame}: running rose ×${peak.toFixed(2)}, sets came down ${sets(row.sessions_by_week['2'], true) - prev}`);
   }
 });

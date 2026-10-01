@@ -155,7 +155,7 @@ import { FAMILIES } from '../endurance-library/index.ts';
 type SlotRotation = { fixed: string | undefined } | { rotates: string[] };
 
 function slotRotation(
-  slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
+  slot: { archetypes?: string[]; family: FamilyId; role?: string | null; raceDistance?: 'half' | 'marathon' },
   assigned: { substituted?: boolean; family: string; archetype?: string },
   level: number,
   lengthPicked: boolean,
@@ -163,7 +163,7 @@ function slotRotation(
 ): SlotRotation {
   const list = slot.archetypes;
   if (!assigned.substituted && Array.isArray(list) && list.length > 0) {
-    const offered = new Set(archetypesForVenue(assigned.family as never, level as never, venue).map((a) => a.id));
+    const offered = new Set(archetypesForVenue(assigned.family as never, level as never, venue, slot.raceDistance).map((a) => a.id));
     const usable = list.filter((id) => offered.has(id));
     if (usable.length > 0) return { rotates: usable };
   }
@@ -191,7 +191,7 @@ export type RideVenue = 'road' | 'trainer';
  * number, as every slot did before.
  */
 function archetypeForSlot(
-  slot: { archetypes?: string[]; family: FamilyId; role?: string | null },
+  slot: { archetypes?: string[]; family: FamilyId; role?: string | null; raceDistance?: 'half' | 'marathon' },
   assigned: { substituted?: boolean; family: string; archetype?: string },
   level: number,
   week: number,
@@ -237,7 +237,7 @@ import {
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
 import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
 // ⛔ Half marathon (Stage 2, 2026-09-24): race week at the end of a Run Lead block — `race-week.ts`.
-import { applyRaceWeek, raceGrowthSchedule, type GrowthSlot, type StandingRace } from './race-week.ts';
+import { applyRaceWeek, hypertrophySetFactor, raceGrowthSchedule, raceNtRotation, type GrowthSlot, type StandingRace } from './race-week.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -3099,7 +3099,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * `withPickedLevels`: only a slot with `levelChoices`, only a level it lists. Every other frame and column is the
    * column as printed (the same array back).
    */
-  const days = withPickedLevels(args.frame, frame.columns[args.column], args.sportMix?.levels);
+  const pickedDays = withPickedLevels(args.frame, frame.columns[args.column], args.sportMix?.levels);
+  // ⛔ A race block's NT slots rotate through the race's band and its race-specific line (`raceNtRotation`, p251/p253).
+  const raceNt = args.race
+    ? raceNtRotation(FAMILIES.run_near_threshold.archetypes as never, args.race.distance)
+    : null;
+  const days = raceNt && raceNt.length > 0
+    ? pickedDays.map((d) => ({
+      ...d,
+      endurance: d.endurance.map((sl) => (sl.family === 'run_near_threshold'
+        ? { ...sl, archetypes: raceNt, raceDistance: args.race!.distance } : sl)),
+    }))
+    : pickedDays;
   /**
    * ⛔ EACH HARD SLOT'S POSITION IN THE FRAME'S ORDER, so a pin can be matched to the slot it was
    * made for. Built once over the whole column rather than counted inside the day loop, because the
@@ -5085,6 +5096,38 @@ export function composeBlock(
         if (typeof ex.sets_line !== 'string') continue;
         const key = earnedSetsKey(ex.name, String(ex.slot_intent ?? ''));
         if (said.has(key)) delete ex.sets_line; else said.add(key);
+      }
+    }
+  }
+  // ⛔ A race block's hypertrophy sets come down as its running goes up (p151, `hypertrophySetFactor`). The block's first
+  // standard week after the test week is the reference; taper weeks are the page's column, untouched. ME, DE, SKILL and
+  // the plyo stay (p151: "maintain skill work" — the dynamic effort / speed work).
+  if (args.race) {
+    const runMinutes = (wk: ComposedWeek) => wk.sessions
+      .filter((x) => x.type === 'run' && !(x.tags ?? []).includes('race_day'))
+      .reduce((a, x) => a + (Number(x.duration) || 0), 0);
+    const ref = out.find((wk) => wk.week === 2 && wk.column === 'standard');
+    const refMin = ref ? runMinutes(ref) : 0;
+    if (refMin > 0) {
+      // Gradual and one-way (p151 "steadily"): the ratio is the highest the running has reached so far, so a week whose
+      // hard-session rotation runs shorter never puts sets back; the week's total comes off one set at a time, from the
+      // row holding the most, so no row drops by a third at once and every row keeps at least one ("at least once a week").
+      let highest = 1;
+      for (const wk of out) {
+        if (wk.week <= 2 || wk.column !== 'standard') continue;
+        highest = Math.max(highest, runMinutes(wk) / refMin);
+        const factor = hypertrophySetFactor(highest);
+        if (factor >= 1) continue;
+        const rows = wk.sessions.flatMap((sess) => (sess.strength_exercises ?? []))
+          .filter((ex) => ex.slot_intent === 'HYP' && typeof ex.sets === 'number' && ex.sets > 0);
+        const total = rows.reduce((a, ex) => a + (ex.sets as number), 0);
+        let cut = total - Math.max(rows.length, Math.round(total * factor));
+        while (cut > 0) {
+          const top = rows.reduce((m, ex) => ((ex.sets as number) > (m.sets as number) ? ex : m), rows[0]);
+          if (!top || (top.sets as number) <= 1) break;
+          top.sets = (top.sets as number) - 1;
+          cut--;
+        }
       }
     }
   }

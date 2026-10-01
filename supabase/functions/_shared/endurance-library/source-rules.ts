@@ -643,6 +643,12 @@ export type Archetype = {
   repSecondsByLevel?: Partial<Record<Level, number>>;
   /** Which levels the source offers this shape at. Absent = all three. */
   levels?: Level[];
+  /**
+   * ⛔ OFFERED ONLY TO A RACE BLOCK OF THIS DISTANCE (WORKORDER-race-builds Stage 3, 2026-10-01) — p233–234's
+   * race-specific lines for the half marathon and the marathon. `archetypesFor` leaves them out unless asked for that
+   * race, so no other programme's rotation, swap sheet or default ever reaches them.
+   */
+  raceOnly?: 'half' | 'marathon';
   /** Repeats are grouped into sets with their own stated between-set recovery. */
   set?: { repeatsPerSet: Range; restBand: Range; intensity: Intensity };
   /**
@@ -1047,6 +1053,51 @@ export const FAMILIES: Record<FamilyId, {
         work: pct(1.00, 1.05),
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
+      },
+      {
+        /**
+         * ⛔ p233–234's RACE-SPECIFIC NT, THE HALF-MARATHON LINE, AS PRINTED (WORKORDER-race-builds Stage 3, 2026-10-01).
+         *   L1 2 × 12-min repeats @ 95%   L2 3 × 10-min repeats @ 95%   L3 3 × 12-min repeats @ 95%
+         *   3- to 5-minute recovery walk/jog between — the shortest the page states, 3 minutes (as `race_repeats`).
+         * Offered only to a half-marathon race block (`raceOnly`).
+         */
+        id: 'race_repeats_half',
+        shape: 'intervals',
+        raceOnly: 'half',
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 2, round: [W(720, 0.95)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 3, round: [W(600, 0.95)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          3: { sets: 1, rounds: 3, round: [W(720, 0.95)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+        },
+        label: 'Race-Specific Repeats',  // not-instruction: workout name, the 5K line's approved name (2026-09-19)
+        repBand: { lo: 600, hi: 720 },
+        repsBand: { lo: 2, hi: 3 },
+        repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 3, hi: 3 }, 3: { lo: 3, hi: 3 } },
+        work: pct(0.95),
+        recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — half-marathon race-specific NT; 3- to 5-minute recovery walk/jog between sets',
+      },
+      {
+        /**
+         * ⛔ p233–234's RACE-SPECIFIC NT, THE MARATHON LINE, AS PRINTED (WORKORDER-race-builds Stage 3, 2026-10-01).
+         *   L1 2 × 15-min repeats @ 92%   L2 2 × 20-min repeats @ 92%   L3 3 × 15-min repeats @ 92%
+         *   3- to 5-minute recovery walk/jog between — 3 minutes, as above. Offered only to a marathon race block.
+         */
+        id: 'race_repeats_marathon',
+        shape: 'intervals',
+        raceOnly: 'marathon',
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 2, round: [W(900, 0.92)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 2, round: [W(1200, 0.92)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          3: { sets: 1, rounds: 3, round: [W(900, 0.92)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+        },
+        label: 'Race-Specific Repeats',  // not-instruction: workout name, the 5K line's approved name (2026-09-19)
+        repBand: { lo: 900, hi: 1200 },
+        repsBand: { lo: 2, hi: 3 },
+        repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 2, hi: 2 }, 3: { lo: 3, hi: 3 } },
+        work: pct(0.92),
+        recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — marathon race-specific NT; 3- to 5-minute recovery walk/jog between sets',
       },
       // ⛔ `race_repeats_long` ("Sustained race-specific repeats") WAS DELETED HERE 2026-09-11. It
       // blended the page's half-marathon and marathon lines into one band; this programme is the
