@@ -2191,6 +2191,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
   // the Strength Focus path — so the bar read "5 of 4". Derive the position from the flow that is
   // actually running; a screen cannot know its own number in a flow that varies.
   const stepNo = (k: StepKey) => steps.indexOf(k) + 1;
+  // The Run list's kit line, when every card on it carries the same one (printed once at the top; see the program step).
+  const runSharedRequirement: string | null = (() => {
+    if (state.trainCard !== 'run' || !setupCopy?.run_groups?.length) return null;
+    const lines = setupCopy.run_groups.flatMap((g) => g.programs).map((p) => setupCopy.programs[p as ProgramId]?.requirement ?? null);
+    return lines.length > 0 && lines[0] && lines.every((l) => l === lines[0]) ? lines[0] : null;
+  })();
   // Embedded in GoalsScreen → step-0 back closes the builder view (onClose); standalone route falls
   // back to history navigation.
   const back = () => {
@@ -4281,6 +4287,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
                 );
               })
               : null}
+            {/* ⛔ THE KIT LINE ONCE, AT THE TOP OF THE RUN LIST (Michael, 2026-10-01): every card printed the same line, so it
+                sits under "Pick a program." and the cards drop it. Only when every card's line is the same. */}
+            {runSharedRequirement ? (
+              <p className="text-sm leading-relaxed text-white/55 -mt-1 mb-1">{runSharedRequirement}</p>
+            ) : null}
             {(state.trainCard === 'run' && setupCopy?.run_groups?.length
               // ⛔ THE RUN LIST, TIERED BY LIFTING EXPERIENCE (2026-09-29): the server's `run_groups`, drawn flat like Ride's.
               ? setupCopy.run_groups.map((g) => ({ title: g.title, programs: g.programs as ProgramId[] }))
@@ -4293,8 +4304,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
                 : [{ title: null as string | null, programs: PROGRAMS_BY_CARD[state.trainCard] }]
             ).map((sec, gi) => (
               <div key={sec.title ?? `all-${gi}`}>
+                {/* ⛔ THE GROUP HEADING IS THE CHOICE (Michael, 2026-10-01: "larger and clear"): the plan name's size, in white. */}
                 {sec.title ? (
-                  <p className="text-white/55 text-xs uppercase tracking-wide mt-4 mb-2">{sec.title}</p>
+                  <p className="text-white text-base font-medium mt-6 mb-2">{sec.title}</p>
                 ) : null}
                 <div className="space-y-2">
             {sec.programs.map((p) => {
@@ -4343,7 +4355,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
                       {live && lifting ? (
                         <span className="block text-sm mt-1.5 text-white/80">{lifting}</span>
                       ) : null}
-                      {live && requirement ? (
+                      {live && requirement && !runSharedRequirement ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
                           {requirement}
                         </span>
