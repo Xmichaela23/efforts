@@ -90,6 +90,16 @@ The goal row stays non-event (race in `training_prefs` + `config.standing_plan.r
   kept at a reduced length (that reduction would be field-sourced, not the book's).
 
 ### Stage 2 — The long run grows to race length
+**BUILT 2026-09-30 (branch `race-stage2`).** `raceStandardWeeks` (compose.ts) + `raceGrowthSchedule` (race-week.ts): the
+sub-VT1 bucket (easy runs + long run) grows 5% a week (p148), easy runs first to their level's printed top (p235 VT1
+L1 30, L2 60), then the long run; taper weeks untouched. The long run is p235's `race_pace_finish` at level 3 (10 min
+@95% mid, 15 min race pace). Half: 105 → 145 (p107's two hours of easy running). Marathon: 105 → 180 — p251/p253's
+"up to 3 hours" lifts p107's cap for that one session (`SessionRequest.easyBoutCapSeconds`, ceiling 180).
+⛔ **Race pace (Michael, 2026-09-30, "Yeah"): the athlete's current threshold at the book's race percentage** —
+half 95%, marathon 92% (pp233–234), in materialize-plan for any plan whose config carries `standing_plan.race`;
+`qualityRunSteps` prices the race-pace step from it. No goal-time field (the field starts from current ability:
+Runna asks for a recent race time and does not train to a goal time). A newcomer gets a threshold from week one's
+time trial (p210), so the pace is real from the first run it appears in. Other plans keep the goal-time rule.
 - New: a run long slot that grows week to week. The athlete's long-run chip becomes **"your long run now"**; each standard
   week grows it by **5%** (p148's "ideally 5 percent"; never over 10%) up to the cap, and the peak lands in the last
   standard week. Cap: half = the frame's existing ceiling (`planCeilingFor` run_lsd long = 150); marathon = **180 min**

@@ -216,6 +216,7 @@ import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
 import { heldRowFor, holdRotation, type HoldSlot, type HoldVector } from './hard-rotation.ts';
 import { archetypesFor, archetypesForVenue } from '../endurance-library/index.ts';
+import { WORK_BANDS } from '../endurance-library/source-rules.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import { lowerDaysOf, MAX_SESSIONS_A_DAY } from './week-conflicts.ts';
@@ -236,7 +237,7 @@ import {
 import { restFieldsForRow } from '../strength/rest-seconds.ts';
 import { TEST_LAST_SET_LINE } from '../strength/test-session.ts';
 // ⛔ Half marathon (Stage 2, 2026-09-24): race week at the end of a Run Lead block — `race-week.ts`.
-import { applyRaceWeek, type StandingRace } from './race-week.ts';
+import { applyRaceWeek, raceGrowthSchedule, type GrowthSlot, type StandingRace } from './race-week.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -705,6 +706,8 @@ export function placeEnduranceDays(
 }
 
 export type ComposeArgs = {
+  /** ⛔ The race a race block builds toward (`race-week.ts`, WORKORDER-race-builds). Absent on every other block. */
+  race?: StandingRace | null;
   frame: FrameId;
   week: number;
   column: ColumnKind;
@@ -3598,6 +3601,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     role?: 'hard' | 'long' | 'easy',
     /** The lowest level a picked length may reach — `EnduranceSlot.lengthFromLevel`. Read only with a pick. */
     fromLevel?: Level,
+    /** p251's marathon long run — `marathonLong` below. Absent everywhere else. */
+    marathon?: { ceilingMin: number; easyBoutCapSeconds: number } | null,
   ): { level: Level; size: number } => {
     const override = args.levelOverrides?.[family] as Level | undefined;
     if (override != null) return { level: override, size: dialForSport(sport) };
@@ -3617,11 +3622,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
     // ⛔ THE PLAN'S OWN LONG-RUN CEILING (2026-09-22) — see `SlotSpec.ceilingMin`. And the p279 long ride's (2026-09-28,
     // p239 level 3) — `planCeilingFor`, the one reader.
-    const planLongCeiling = planCeilingFor(args.frame, family, role);
-    const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
+    const planLongCeiling = marathon?.ceilingMin ?? planCeilingFor(args.frame, family, role);
+    const capSpec = marathon ? { easyBoutCapSeconds: marathon.easyBoutCapSeconds } : {};
+    const rungs = ladderOf({ family: family as never, level, archetype, sport, role, ...capSpec, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors);
     // ⛔ A PICKED LENGTH MAY REACH DOWN TO THE SLOT'S SMALLER TIER (`EnduranceSlot.lengthFromLevel`, Michael 2026-09-27).
     const pickRungs = fromLevel != null && fromLevel < level
-      ? ladderOf({ family: family as never, level: fromLevel, archetype, sport, role, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors)
+      ? ladderOf({ family: family as never, level: fromLevel, archetype, sport, role, ...capSpec, ...(planLongCeiling ? { ceilingMin: planLongCeiling } : {}) }, anchors)
       : rungs;
     /**
      * ⛔⛔ THE ATHLETE'S OWN ANSWER FIRST, AND BEFORE THE `no_target` BRANCH. A screen that asks per
@@ -3965,11 +3971,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         ? null
         : Number(args.sportMix?.minutes?.[`${day.day}:${i}`] ?? NaN);
       // ⛔ THE LEVEL IS THE DIAL'S ANSWER FOR A BASE SLOT — see `rungForSlot`. Quality is unmoved.
+      /**
+       * ⛔ A MARATHON RACE BLOCK'S LONG RUN GOES UP TO 3 HOURS (Viada p251, p253: "Marathon runners can extend the weekend
+       * LSD up to 3 hours as blended 'strategy sessions,' with fast finishes and food/drink tolerance"). p107's two hours
+       * of easy running is lifted for this one session: 180 min in all, less p235 level 3's 10-min insert and 15-min
+       * race-pace finish. Standard weeks only; every other session keeps p107's cap.
+       */
+      const marathonLong = args.race?.distance === 'marathon' && args.column === 'standard'
+        && assigned.family === 'run_lsd' && slotRoleOf(slot) === 'long'
+        ? { ceilingMin: 180, easyBoutCapSeconds: (180 - 10 - 15) * 60 } : null;
       const rung = rungForSlot(
         assigned.family, assigned.level, slotArchetype, assigned.sport,
         Number.isFinite(askedMinutes) ? askedMinutes : null,
         slotRoleOf(slot),
         slot.lengthFromLevel,
+        marathonLong,
       );
       const level = rung.level;
       /**
@@ -4017,6 +4033,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ §3c — the dial the athlete's typed number set. See `volume-bounds.ts`.
         size: rung.size,
         ...(carriesStrides ? { addOn: 'strides' as const } : {}),
+        ...(marathonLong ? { easyBoutCapSeconds: marathonLong.easyBoutCapSeconds } : {}),
       });
       builtEndurance.push(built);
       const row = translateEnduranceSession(built, { raceTempo: assigned.raceTempo });
@@ -4982,13 +4999,71 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
 }
 
 /** Every week of a block. ⛔ Week one is the test week; the taper column is the hold variant. */
+/**
+ * ⛔ A RACE BLOCK'S STANDARD WEEKS (WORKORDER-race-builds Stage 2, 2026-09-30): the long run is p235's race-pace finish,
+ * and the easy runs and the long run grow week to week (`raceGrowthSchedule`, p148). Each session's start is the length
+ * the athlete picked, or the frame's own build where nothing was picked; its cap is the most its level builds, measured
+ * by asking the composer for more than any ladder holds. Returns the `sportMix` for each standard week.
+ */
+function raceStandardWeeks(
+  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[] },
+): Record<number, SportMix> | null {
+  const frame = FRAMES[args.frame];
+  // An easy run grows inside its own level's printed range (p235 VT1: level 1 25–30 min, level 2 45–60) — the ladder
+  // reaches into the next level, so its top is not the cap. The long run's cap is the most its level-3 race-pace build holds.
+  const slots: Array<{ key: string; role: 'easy' | 'long'; levelTopMin: number | null }> = [];
+  for (const day of frame.columns.standard) {
+    day.endurance.forEach((slot, i) => {
+      if (isHardSlot(slot)) return;
+      if (slot.family === 'run_lsd' && isLongSlot(slot)) slots.push({ key: `${day.day}:${i}`, role: 'long', levelTopMin: null });
+      else if (slot.family === 'run_vt1') {
+        const band = WORK_BANDS.run_vt1[slot.level as 1 | 2 | 3];
+        slots.push({ key: `${day.day}:${i}`, role: 'easy', levelTopMin: band ? Math.floor(band.hi / 60) : null });
+      }
+    });
+  }
+  const long = slots.find((x) => x.role === 'long');
+  if (!long) return null;
+  const base = args.sportMix ?? {};
+  const raceMix: SportMix = { ...base, archetypes: { ...(base.archetypes ?? {}), [long.key]: 'race_pace_finish' } };
+  const builtMinutes = (mix: SportMix): Record<string, number> => {
+    const wk = composeWeek({ ...args, sportMix: mix, week: 2, column: 'standard' });
+    const got: Record<string, number> = {};
+    for (const sess of wk.sessions) {
+      const key = (sess.tags ?? []).find((t) => t.startsWith('slot:'))?.slice(5);
+      if (key && slots.some((x) => x.key === key) && Number(sess.duration) > 0) got[key] = Number(sess.duration);
+    }
+    return got;
+  };
+  const built = builtMinutes(raceMix);
+  const caps = builtMinutes({ ...raceMix, minutes: { ...(base.minutes ?? {}), ...Object.fromEntries(slots.map((x) => [x.key, 999])) } });
+  const growth: GrowthSlot[] = slots
+    .filter((x) => built[x.key] != null)
+    .map((x) => {
+      const picked = Number(base.minutes?.[x.key]);
+      const start = Number.isFinite(picked) && picked > 0 ? Math.min(picked, caps[x.key] ?? picked) : built[x.key];
+      const top = Math.min(caps[x.key] ?? start, x.levelTopMin ?? Infinity);
+      return { key: x.key, role: x.role, start, cap: Math.max(start, top) };
+    });
+  const schedule = raceGrowthSchedule(growth, args.weeks, args.taperWeeks ?? []);
+  const out: Record<number, SportMix> = {};
+  for (const [w, minutes] of Object.entries(schedule)) {
+    out[Number(w)] = { ...raceMix, minutes: { ...(base.minutes ?? {}), ...minutes } };
+  }
+  return out;
+}
+
 export function composeBlock(
-  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[]; race?: StandingRace | null },
+  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[] },
 ): ComposedWeek[] {
   const out: ComposedWeek[] = [];
   const taper = new Set(args.taperWeeks ?? []);
+  const raceWeeks = args.race ? raceStandardWeeks(args) : null;
   for (let week = 1; week <= args.weeks; week++) {
-    out.push(composeWeek({ ...args, week, column: taper.has(week) ? 'taper' : 'standard' }));
+    const column = taper.has(week) ? 'taper' : 'standard';
+    // ⛔ A race block's standard weeks carry the grown lengths and the race-pace long run (`raceStandardWeeks`).
+    const sportMix = column === 'standard' && raceWeeks?.[week] ? raceWeeks[week] : args.sportMix;
+    out.push(composeWeek({ ...args, week, column, ...(sportMix ? { sportMix } : {}) }));
   }
   /**
    * ⛔ THE SET-COUNT LINE IS SAID ONCE PER MOVEMENT (2026-09-25): on the first week that carries the new count, and on

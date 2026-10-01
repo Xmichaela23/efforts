@@ -25,7 +25,7 @@ import {
   type PlanSession,
   type Weekday,
 } from './index.ts';
-import { applyRaceWeek, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
+import { applyRaceWeek, raceGrowthSchedule, raceTaperWeeks, weekdayOfIso, RACE_TAPER_WEEKS, type RaceDistance, type StandingRace } from './race-week.ts';
 import { planWeekContaining } from '../planning-context.ts';
 import { mondayOfCalendarYmd, parseLocalDate, formatLocalDate } from '../parse-local-date.ts';
 import { raceBlockWeeks } from '../../../../src/lib/race-weeks.ts';
@@ -296,4 +296,40 @@ Deno.test('⛔⛔ RACE WEEK NAMES NO DAY AFTER THE RACE AND NO SESSION IT DOES N
   }
   console.log(`   race-week notes: ${builds} builds, ${fails.length} failing; before the fix ${wouldHaveNamed} would have named a closed day`);
   assertEquals(fails.slice(0, 10), [], `${fails.length} failing`);
+});
+
+Deno.test('⛔ THE RUNNING BUILDS TOWARD RACE DAY — the schedule: 5% of the bucket a week, easy runs first, each to its cap', () => {
+  const s = raceGrowthSchedule([
+    { key: '4:0', role: 'easy', start: 45, cap: 60 },
+    { key: '7:0', role: 'easy', start: 30, cap: 30 },
+    { key: '6:0', role: 'long', start: 105, cap: 180 },
+  ], 10, [9, 10]);
+  assertEquals(s[1], { '4:0': 45, '7:0': 30, '6:0': 105 });
+  assert(!(9 in s) && !(10 in s), 'taper weeks carry no grown lengths');
+  for (let w = 2; w <= 8; w++) {
+    const prev = Object.values(s[w - 1]).reduce((a, b) => a + b, 0);
+    const now = Object.values(s[w]).reduce((a, b) => a + b, 0);
+    assert(now - prev <= Math.floor(prev * 0.05), `week ${w} grew ${now - prev} on ${prev}`);
+  }
+  assertEquals(s[2]['6:0'], 105, 'the easy run takes the step first');
+  assert(s[8]['4:0'] === 60 && s[8]['6:0'] > 105 && s[8]['6:0'] <= 180);
+});
+
+Deno.test('⛔⛔ THE LONG RUN REACHES RACE LENGTH — half up to the 2-hour easy cap (p107), marathon up to 3 hours (p251)', () => {
+  for (const frame of FRAMES_RACED) for (const distance of DISTANCES) {
+    const weeks = distance === 'marathon' ? 16 : 12;
+    const c: Case = { frame, distance, longDay: 'Saturday', hardDays: [], blocked: [], raceDate: addDays(START, (weeks - 1) * 7 + 6) };
+    const { row, race } = build(c);
+    const taper = raceTaperWeeks(race.week, race.distance);
+    const longs = Object.keys(row.sessions_by_week).map(Number).sort((a, b) => a - b)
+      .filter((w) => w > 1 && !taper.includes(w))
+      .map((w) => row.sessions_by_week[String(w)].find((s) => slotOf(s) === '6:0' && (s.tags ?? []).some((t) => t === 'slot:6:0'))?.duration ?? 0);
+    const peak = Math.max(...longs);
+    for (let i = 1; i < longs.length; i++) assert(longs[i] >= longs[i - 1] - 1, `${frame} ${distance}: the long run shrank ${longs.join(' ')}`);
+    if (distance === 'marathon') assert(peak >= 175 && peak <= 181, `${frame} marathon peak ${peak}: ${longs.join(' ')}`);
+    else assert(peak >= 140 && peak <= 146, `${frame} half peak ${peak}: ${longs.join(' ')}`);
+    const steps = row.sessions_by_week[String(Math.max(...Object.keys(row.sessions_by_week).map(Number).filter((w) => !taper.includes(w))))]
+      .find((s) => slotOf(s) === '6:0')?.steps_preset ?? [];
+    assert(steps.some((t) => /racepace/.test(t)), `${frame} ${distance}: the long run carries no race-pace finish`);
+  }
 });

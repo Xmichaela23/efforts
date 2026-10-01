@@ -39,6 +39,8 @@ export type SlotSpec = {
    */
   ceilingMin?: number;
   archetype?: string;
+  /** `SessionRequest.easyBoutCapSeconds` — measured with the same cap it is built with (p251 marathon long run). */
+  easyBoutCapSeconds?: number;
   sport: 'run' | 'ride' | 'swim';
   /**
    * ⛔ THE SHAPES THE FRAME ROTATES THIS SLOT THROUGH, where a programme names them — see
@@ -211,6 +213,7 @@ function at(spec: SlotSpec, anchors: EnduranceAnchors, size: number) {
   try {
     return buildEnduranceSession({
       family: spec.family, level: spec.level, archetype: spec.archetype, anchors, size,
+      ...(spec.easyBoutCapSeconds ? { easyBoutCapSeconds: spec.easyBoutCapSeconds } : {}),
     });
   } catch {
     // ⚠️ AN ARCHETYPE THE LEVEL DOES NOT OFFER IS NOT A CRASH HERE. The composer resolves that
@@ -296,6 +299,7 @@ export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
       try {
         return sessionDurationBandSeconds(spec.family, level as Level, {
           anchors, archetype: spec.archetype,
+          ...(spec.easyBoutCapSeconds ? { easyBoutCapSeconds: spec.easyBoutCapSeconds } : {}),
         });
       } catch {
         return null;

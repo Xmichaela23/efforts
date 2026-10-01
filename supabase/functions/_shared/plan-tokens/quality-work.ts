@@ -282,9 +282,12 @@ export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_ra
  */
 export function qualityRunSteps(
   work: QualityWork,
-  paces: { thresholdSecPerMi?: number | null; easySecPerMi?: number | null },
+  paces: { thresholdSecPerMi?: number | null; easySecPerMi?: number | null; racePaceSecPerMi?: number | null },
 ): RunStep[] {
   const thr = paces.thresholdSecPerMi ?? null;
+  // ⛔ Race pace is the goal time over the race distance (materialize-plan `goalRacePaceFromTargetTime`); none → the
+  // step runs by feel, as before (WORKORDER-race-builds Stage 2).
+  const race = Number(paces.racePaceSecPerMi) > 0 ? Math.round(Number(paces.racePaceSecPerMi)) : undefined;
   const easy = paces.easySecPerMi ?? null;
   const easyPace = Number(easy) > 0 ? Math.round(Number(easy)) : undefined;
   const out: RunStep[] = [];
@@ -295,7 +298,10 @@ export function qualityRunSteps(
           // ⛔ PRESCRIBED WORK WITH NO PACE, and the library says so itself: race pace is set by the
           // race, not by this library. The step reaches the watch; the number does not, because
           // there is no number.
-          out.push({ kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out' });
+          out.push({
+            kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out',
+            ...(seg.at === 'racepace' && race ? { pace_sec_per_mi: race } : {}),
+          });
         } else if (seg.role === 'recovery') {
           const paced = pacedAt(seg.pct, thr) ?? easyPace;
           out.push({ kind: 'recovery', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}), ...(seg.at === 'easy' ? { place: 'in_round' as const } : {}) });

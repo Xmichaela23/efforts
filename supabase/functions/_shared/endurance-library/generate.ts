@@ -102,6 +102,12 @@ export type SessionRequest = {
    * ride days are joined the same way (p269, 2026-09-27). Any sport. Absent = both kept.
    */
   omit?: { warmup?: boolean; cooldown?: boolean };
+  /**
+   * ⛔ THE MARATHONER'S LONG RUN MAY PASS TWO HOURS OF EASY RUNNING (Viada p251, p253: "Marathon runners can extend the
+   * weekend LSD up to 3 hours as blended 'strategy sessions'"). The cap on this session's easy running, in seconds,
+   * in place of p107's two hours. Absent = p107's two hours, as before. Set only by a marathon race block's long run.
+   */
+  easyBoutCapSeconds?: number;
 };
 
 // ── small arithmetic ────────────────────────────────────────────────────────────────────────────
@@ -270,6 +276,8 @@ type BuildContext = {
   anchor: AnchorReport;
   /** The dose target, in the band's own unit. */
   target: number;
+  /** `SessionRequest.easyBoutCapSeconds` — p251's longer easy running on a marathon race block's long run. */
+  easyCap?: number;
   notes: SessionNote[];
 };
 
@@ -636,6 +644,8 @@ export function applyEasyBoutBounds(
 }
 
 function boundEasyBout(ctx: BuildContext, seconds: number, archetypeId: string): number {
+  // p251's marathon long run: its own cap, up to 3 hours in all (`SessionRequest.easyBoutCapSeconds`).
+  if (ctx.easyCap) return Math.min(Math.max(seconds, VT1_BOUT_FLOOR_SECONDS), ctx.easyCap);
   const exempt = archetypeId === 'hike' || ctx.family === 'ride_endurance';
   const { seconds: out, exceedsGuidance } = applyEasyBoutBounds(seconds, exempt);
   if (exceedsGuidance) {
@@ -1034,7 +1044,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       ? added.repeat * added.steps.reduce((t, st) => t + (st.seconds ?? 0), 0)
       : 0;
     const target = Math.max(0, full - openerMeters - addedSeconds);
-    const ctx: BuildContext = { family: req.family, sport, level: req.level, size, archetype, anchor, target, notes: scoped };
+    const ctx: BuildContext = { family: req.family, sport, level: req.level, size, archetype, anchor, target, notes: scoped, ...(Number(req.easyBoutCapSeconds) > 0 ? { easyCap: Number(req.easyBoutCapSeconds) } : {}) };
 
     let blocks: Block[];
     switch (archetype.shape) {
@@ -1203,7 +1213,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
 export function sessionDurationBandSeconds(
   family: FamilyId,
   level: Level,
-  opts?: { baselines?: EnduranceBaselines; anchors?: EnduranceAnchors; archetype?: string },
+  opts?: { baselines?: EnduranceBaselines; anchors?: EnduranceAnchors; archetype?: string; easyBoutCapSeconds?: number },
 ): { shortest: number; longest: number; isLowerBound: boolean } {
   const anchors = opts?.anchors ?? (opts?.baselines !== undefined ? resolveEnduranceAnchors(opts.baselines) : UNKNOWN_ANCHORS);
   /**
@@ -1218,7 +1228,7 @@ export function sessionDurationBandSeconds(
   let isLowerBound = false;
   for (const archetype of ids) {
     for (const size of [0, 1]) {
-      const t = buildEnduranceSession({ family, level, size, archetype, anchors }).totals;
+      const t = buildEnduranceSession({ family, level, size, archetype, anchors, ...(opts?.easyBoutCapSeconds ? { easyBoutCapSeconds: opts.easyBoutCapSeconds } : {}) }).totals;
       shortest = Math.min(shortest, t.clockedSeconds);
       longest = Math.max(longest, t.clockedSeconds);
       isLowerBound = isLowerBound || t.isLowerBound;

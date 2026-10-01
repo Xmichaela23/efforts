@@ -130,3 +130,49 @@ export function applyRaceWeek(
     return { ...wk, sessions, conflicts, notes };
   });
 }
+
+/**
+ * ⛔ THE RUNNING BUILDS TOWARD RACE DAY (WORKORDER-race-builds Stage 2, 2026-09-30; the cards Michael approved:
+ * "The running builds toward race day").
+ *
+ * What the pages print:
+ * - p148: change each bucket "by less than 10 percent per week, though ideally 5 percent is as high as I will usually
+ *   go". The easy runs and the long run are p146's sub-VT1 bucket, so the bucket grows `RACE_WEEKLY_GROWTH` a week.
+ * - p151: a marathon programme "steadily increases mileage". p251: "progressive increases in the duration of the longer
+ *   weekend run is an important variable".
+ * - Where the week's step goes when two sessions can take it: the easy runs first, the long run after — the same order
+ *   the ride length step already uses (`length-step.ts`; p107, p108, p149).
+ * - How far: each session up to the most its level builds (the caller measures it), never past it.
+ * OURS — whole minutes, rounded down, so the step never passes 5%; growth starts in week 2 (week one is the test week)
+ * and the taper weeks are the page's column, untouched.
+ */
+export const RACE_WEEKLY_GROWTH = 0.05;
+
+export type GrowthSlot = { key: string; role: 'easy' | 'long'; start: number; cap: number };
+
+/** Minutes per slot for every standard week of a race block, keyed by week. Taper weeks are absent. */
+export function raceGrowthSchedule(
+  slots: GrowthSlot[],
+  weeks: number,
+  taperWeeks: number[],
+): Record<number, Record<string, number>> {
+  const taper = new Set(taperWeeks);
+  const order = [...slots.filter((s) => s.role === 'easy'), ...slots.filter((s) => s.role === 'long')];
+  const cur: Record<string, number> = Object.fromEntries(slots.map((s) => [s.key, Math.min(s.start, Math.max(s.start, s.cap))]));
+  const out: Record<number, Record<string, number>> = {};
+  for (let w = 1; w <= weeks; w++) {
+    if (taper.has(w)) continue;
+    if (w >= 2) {
+      const bucket = Object.values(cur).reduce((a, b) => a + b, 0);
+      let step = Math.floor(bucket * RACE_WEEKLY_GROWTH);
+      for (const s of order) {
+        if (step <= 0) break;
+        const add = Math.max(0, Math.min(s.cap - cur[s.key], step));
+        cur[s.key] += add;
+        step -= add;
+      }
+    }
+    out[w] = { ...cur };
+  }
+  return out;
+}

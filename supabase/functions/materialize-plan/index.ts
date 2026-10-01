@@ -1919,6 +1919,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       for (const st of qualityRunSteps(work, {
         thresholdSecPerMi: secPerMiFromBaseline(baselines, 'threshold'),
         easySecPerMi: secPerMiFromBaseline(baselines, 'easy'),
+        racePaceSecPerMi: (baselines as any)?._racePaceSecPerMi ?? null,
       })) out.push({ id: uid(), ...st });
       return out;
     }
@@ -1944,6 +1945,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       for (const st of qualityRunSteps(work, {
         thresholdSecPerMi: secPerMiFromBaseline(baselines, 'threshold'),
         easySecPerMi: secPerMiFromBaseline(baselines, 'easy'),
+        racePaceSecPerMi: (baselines as any)?._racePaceSecPerMi ?? null,
       })) out.push({ id: uid(), ...st });
       return out;
     }
@@ -4239,12 +4241,20 @@ Deno.serve(async (req) => {
       let explicitGoalEquipmentType: string | undefined;
       // ⛔ RACE PACE IS THE ENTERED GOAL TIME ÷ THE RACE DISTANCE (Michael, 2026-09-02, final). Not a
       // ratio off threshold, not the vDOT table. No goal time → no race-pace target (effort only).
+      // > ⛔ SUPERSEDED FOR THE RACE BUILDS (Michael, 2026-09-30, "Yeah" to threshold-based race pace): a standing race
+      // > block (`config.standing_plan.race`) prices race pace from the athlete's current threshold at the book's race
+      // > percentages — see `raceBlockRacePace` below. The field starts from current ability, not a goal time (Runna asks
+      // > for a recent race time and "does not train you to a goal time"). The goal-time rule stands for other plans.
       let goalRacePaceSecPerMi: number | null = null;
+      // The race a standing race block builds toward, if any (`race-week.ts`); read with the goal.
+      let standingRaceDistance: 'half' | 'marathon' | null = null;
       try {
         const planIdRef = rows[0]?.training_plan_id;
         if (planIdRef) {
-          const { data: planRow } = await supabase.from('plans').select('goal_id').eq('id', planIdRef).maybeSingle();
+          const { data: planRow } = await supabase.from('plans').select('goal_id, config').eq('id', planIdRef).maybeSingle();
           const gid = planRow?.goal_id as string | undefined;
+          const raceDist = (planRow?.config as { standing_plan?: { race?: { distance?: unknown } } } | null)?.standing_plan?.race?.distance;
+          if (raceDist === 'half' || raceDist === 'marathon') standingRaceDistance = raceDist;
           if (gid) {
             const { data: goalRow } = await supabase.from('goals').select('training_prefs, target_time, distance').eq('id', gid).maybeSingle();
             const tp = goalRow?.training_prefs as Record<string, unknown> | null | undefined;
@@ -4325,6 +4335,17 @@ Deno.serve(async (req) => {
       // handing the resolver the stale row would make it answer about a different set of numbers
       // than the chain below it reads, which is the divergence this whole file keeps deleting.
       const thrResolved = resolveCurrentRunThresholdPace(ub as any);
+      /**
+       * ⛔ A RACE BLOCK'S RACE PACE IS THE ATHLETE'S CURRENT THRESHOLD AT THE BOOK'S RACE PERCENTAGE (Michael, 2026-09-30).
+       * Viada pp233–234 print the race-specific NT work at 95% of threshold for a half marathon and 92% for a marathon;
+       * percentages are of threshold SPEED, so the pace divides. It moves with the threshold the athlete accepts, and a
+       * newcomer gets one from week one's time trial (p210). FIELD: Runna sets race pace from current ability.
+       */
+      if (standingRaceDistance && thrResolved.sec_per_mi != null) {
+        const pct = standingRaceDistance === 'marathon' ? 0.92 : 0.95;
+        goalRacePaceSecPerMi = Math.round(thrResolved.sec_per_mi / pct);
+        console.log(`[Paces] Race block (${standingRaceDistance}) race pace: ${goalRacePaceSecPerMi}s/mi = threshold ${thrResolved.sec_per_mi} / ${pct}`);
+      }
       if (thrResolved.sec_per_mi != null) {
         (baselines as any)._resolvedThresholdSecPerMi = thrResolved.sec_per_mi;
         (baselines as any)._thresholdBasis = describeThresholdBasis(thrResolved).state;
