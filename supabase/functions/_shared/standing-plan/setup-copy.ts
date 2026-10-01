@@ -157,7 +157,7 @@ export const PROGRAM_COPY = {
 export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
   { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
   { id: 'muscle', title: 'Build muscle', programs: ['run_muscle', 'run_half_muscle'] },  // Viada pp244, 252
-  { id: 'race', title: 'Race', programs: [] },  // closed until the race builds are live (RUN_GROUPS, below)
+  { id: 'race', title: 'Race', programs: ['race_half', 'race_marathon'] },  // Viada pp250, 252 — live 2026-10-01
   { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
 ];
@@ -174,10 +174,9 @@ export const RUN_GROUPS: ReadonlyArray<{ id: string; title: string | null; progr
   { id: 'new_short', title: 'New to lifting · up to 4 hours of running a week', programs: ['run_muscle', 'run_strength'] },  // p245 p247
   { id: 'new_long', title: 'New to lifting · 5 hours or more', programs: ['run_half_strength'] },  // p251
   { id: 'solid', title: 'Solid lifting background', programs: ['run_half_muscle'] },  // p253
-  // ⛔ NO RACE GROUP UNTIL THE RACE BUILDS ARE LIVE (Michael, 2026-09-30). The old marathon card is off every door
-  // (WORKORDER-race-builds Stage 5b), and the new cards promise running that builds and lifting that decreases as the
-  // miles increase (Stages 2–4). When those ship, add back: { id: 'race', title: 'Race', programs: ['race_half',
-  // 'race_marathon'] } — and flip `RACE_PLANS_OFFERED` in `src/lib/race-weeks.ts`.
+  // ⛔ THE RACE GROUP (WORKORDER-race-builds, live 2026-10-01, Michael: "races sit in their sport"). Half and marathon,
+  // each built on p250 or p252 back from race day. The old marathon card is off every door (Stage 5b).
+  { id: 'race', title: 'Race', programs: ['race_half', 'race_marathon'] },  // Viada pp250, 252
 ];
 /** Under a closed section. */
 export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction

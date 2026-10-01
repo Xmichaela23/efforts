@@ -17,8 +17,8 @@ export function raceBlockWeeks(startIso: string | null | undefined, raceIso: str
 export { RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_PLAN_MAX_WEEKS, RACE_USUAL_MIN_WEEKS, racePlanFromWeek } from '../../supabase/functions/_shared/standing-plan/race-week.ts';
 
 /**
- * ⛔ WHETHER THE GOALS SCREEN OFFERS A RACE PLAN (WORKORDER-race-builds, 2026-09-30). False until the race builds are live:
- * the old marathon builder is off every door (Stage 5b), and the new race cards wait for Stages 2–4. Flip with the Run
- * list's Race group (`setup-copy.ts` RUN_GROUPS).
+ * ⛔ WHETHER THE GOALS SCREEN'S EVENT FORM SHOWS "Running a race?" (WORKORDER-race-builds). Stays false: the race plans
+ * are live on the Run list's Race group (`setup-copy.ts` RUN_GROUPS, 2026-10-01 — "races sit in their sport"), and that
+ * button's words describe the old run builder.
  */
 export const RACE_PLANS_OFFERED = false;
