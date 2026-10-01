@@ -114,7 +114,7 @@ time trial (p210), so the pace is real from the first run it appears in. Other p
 - Advanced marathoners (p251 / p253 options) only if the experience answer is asked on this path; today it is not.
 
 ### Stage 3 — Threshold work by race
-**BUILT 2026-10-01 (branch `race-stage2`).** `race_repeats_half` / `race_repeats_marathon` (pp233–234, `raceOnly` —
+**PUSHED + DEPLOYED 2026-10-01 (`bf44b0818`, `8a6611386`); CHECKED LIVE on a throwaway account (deleted).** `race_repeats_half` / `race_repeats_marathon` (pp233–234, `raceOnly` —
 `archetypesFor` leaves them out of every other plan); `raceNtRotation` (race-week.ts) rotates a race block's NT slot
 through the sessions whose work sits in p251/p253's band plus the race's line. Half: 3×10′@95%, Surge into Steady 92%,
 Threshold with a Surge 92–95%. Marathon: 2×20′@92%, those two, Sub-Threshold Repeats 90%. Non-race plans unchanged.
@@ -123,7 +123,7 @@ Threshold with a Surge 92–95%. Marathon: 2×20′@92%, those two, Sub-Threshol
   distance. The 5K `race_repeats` stays the 5K's.
 
 ### Stage 4 — Lifting eases as the miles climb (p151)
-**BUILT 2026-10-01 (branch `race-stage2`).** `hypertrophySetFactor` + `composeBlock`: the week's HYP sets come down one at
+**PUSHED + DEPLOYED 2026-10-01 (`bf44b0818`, `8a6611386`); CHECKED LIVE on a throwaway account (deleted).** `hypertrophySetFactor` + `composeBlock`: the week's HYP sets come down one at
 a time as the running rises (the highest ratio so far, so never back up); ME/DE/SKILL/plyo untouched. Marathon p250
 21 → 17 HYP sets a week, p252 57 → 45; half p250 21 → 18. Taper weeks are the page's column as printed.
 - As the week's running minutes rise above week one's, HYP sets step down toward one-third of week one's, never below
