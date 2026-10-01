@@ -289,7 +289,30 @@ function sizeWhereBuildTops(spec: SlotSpec, level: Level, anchors: EnduranceAnch
  * ⚠️ CLIMBING STARTS AT THE FRAME'S LEVEL AND ONLY GOES UP. p246 assigns the level; the ladder is
  * about holding MORE hours, so a slot never drops below the dose the frame prescribed.
  */
+/**
+ * ⛔ ONE MEASUREMENT PER SLOT SHAPE PER BUILD (2026-09-30). `ladderOf` is pure in its spec and anchors, and a block asks the
+ * same slot the same question every week — a 16-week marathon race block asked it hundreds of times and ran out of edge
+ * compute. Held per (spec, anchors) in a small module cache; a copy is returned so no caller can edit the stored rungs.
+ */
+const LADDER_CACHE = new Map<string, Rung[]>();
+const LADDER_CACHE_MAX = 500;
+
 export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
+  let key: string | null = null;
+  try { key = JSON.stringify([spec, anchors]); } catch { key = null; }
+  if (key != null) {
+    const hit = LADDER_CACHE.get(key);
+    if (hit) return hit.map((r) => ({ ...r }));
+  }
+  const rungs = ladderOfUncached(spec, anchors);
+  if (key != null) {
+    if (LADDER_CACHE.size >= LADDER_CACHE_MAX) LADDER_CACHE.delete(LADDER_CACHE.keys().next().value as string);
+    LADDER_CACHE.set(key, rungs.map((r) => ({ ...r })));
+  }
+  return rungs;
+}
+
+function ladderOfUncached(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
   const ceiling = ladderCeilingFor(spec);
   // Viada p235 / p239: the base families print three levels, so level 3 is the top rung.
   const top: Level = isBaseFamily(spec.family) ? 3 : spec.level;
