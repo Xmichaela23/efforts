@@ -108,9 +108,11 @@ plans already built on it keep working and its code stays.
 ### Stage 5 — Length, late and early starts (words through Michael)
 - Late start: build anyway; one note when the weeks are under the field minimum — marathon **12**, half **8** (Nike Run
   Club recommends 12 for a marathon; Runna's fast-track plans 12 / 8). The note names no app.
-- Early start: race more than **26 weeks** away (Runna and Garmin cap there) — the race block starts 26 weeks out;
-  until then the athlete runs the matching training programme. Ask Michael whether that is offered on the screen or the
-  start date simply moves.
+- ✅ Early start (Michael, 2026-09-30: "good"): race more than **26 weeks** away — FIELD, Runna caps plans at 26 weeks
+  and puts a base plan first. The athlete starts on the matching training programme now (Long Run + Strength or Long
+  Run + Muscle, the same book week with no date) and the race block takes over 26 weeks out (p151: the programme
+  evolves toward the race). Offered on the race-date screen, e.g. "Your race is 34 weeks away. You start on Long Run +
+  Strength now, and the race plan begins on [date]." — words for Michael's yes.
 - ✅ Running weekly volume (Michael, 2026-09-30: "whatever the book says"): p151 raises the **mileage**, not only the long
   run, so the easy runs grow too, every bucket under p148's 10% a week (5% the usual step). Stage 2 covers both.
 
