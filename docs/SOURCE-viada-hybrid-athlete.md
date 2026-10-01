@@ -327,12 +327,12 @@ Track weekly, across **all** modalities:
 4. high-intensity work sets
 5. effective hypertrophy reps per muscle group
 
-⛔ **Change any bucket by less than 10% per week — ideally ≤5%.** When overreaching, back off **all**
-buckets equally. Intensity may rise inside a flat split.
+⛔ **Change any bucket by less than 10% per week — ideally ≤5%** (p148, read off the page 2026-09-30). When overreaching,
+back off **all** buckets equally (p149). Intensity may rise inside a flat split.
 
 ## B6. Maintenance
 
-- **~1/3 of productive volume, at least 1×/week, holds an adaptation.**
+- **~1/3 of productive volume, at least 1×/week, holds an adaptation** (p151, read off the page 2026-09-30).
 - As event volume climbs, taper the non-event buckets — but **keep the low-percentage high-velocity
   skill work**.
 
@@ -449,6 +449,15 @@ inadvisable (and performing multiple sets that each represent one's daily maximu
 impossible)"* — the example leaves *"about 2 reps in reserve."*
 
 ### ⚠️ NOT YET FOUND ON A PAGE
+
+> **FOUND 2026-09-30, read off the photographs (race-builds workorder, Stage 0).** The five buckets: **p146–147**
+> (defined, with the marathon-runner example split). The 10%-per-week rule: **p148** — *"aiming to change each of these by
+> less than 10 percent per week, though ideally 5 percent is as high as I will usually go"*; p150 repeats it ("10 percent
+> per bucket per week"). Back off all buckets equally: **p149** — *"reduce a program by equal amounts in all these buckets
+> if you're feeling taxed"*. The weekly floor (one speed / one subthreshold / the rest at VT1 or below): **p109**. The 2h
+> VT1 ceiling and the 6–8h back-to-back spacing: **p108**. The ~1/3 maintenance figure: **p151**. Still not checked on a
+> page: the 4–6h post-VT1 spacing. Everything below is history.
+
 
 The five accounting buckets, the 10%-per-week change rule, the "back off all buckets equally"
 instruction, the weekly floor (one speed / one subthreshold / remainder VT1), the 6–8h two-a-day
@@ -1671,6 +1680,60 @@ Test": simple option — start ~50% of FTP, +25 W (recreational male) / +20 W (h
 0.78**; complex option — +6/+5/+4 W every 15 s, **FTP = average of the four final power numbers ×
 0.74**. p214 = the 1RM (Part H).
 
+## E3c. Reading note — the taper before a race (p251 re-read off `p251.jpg`, 2026-09-24, Stage 2 of the run-programs workorder)
+
+- **The one deload sentence on p251 is about a MEET.** Strength Notes, third bullet, whole: *"Consider switching the ME
+  upper and lower days on occasion if the lower day is suffering heavily from the fast run the day before. Some fatigue is
+  inevitable after the weekend, however, and 4 to 5 weeks out from a meet, consider running the deload running portion
+  (unless a race is within 6 weeks)."* Read: a lifter with a powerlifting meet 4–5 weeks away swaps the running to the
+  taper column's running; the parenthesis turns that off when a race is within 6 weeks, so the running keeps training
+  toward the race. **It gives no timing for a race taper.**
+- **p250's table prints the column** — "TAPER/DELOAD", strength and endurance — but neither page says when a race puts
+  the athlete in it, or for how many weeks.
+- **p251 prints nothing about race day or race week**: no race-week session, no race pace, no DE cut. The NT line
+  (*"Half-marathoners may choose NT workouts that focus on the 92 to 97 percent intensity"*) is a choice of NT band for the
+  standard week, not a taper rule.
+- **The nearest printed rule is the sister program's**, p247 (Strength + 5K, whose structure p251 says this strength
+  portion is *"similar in structure to"*): *"If a powerlifting meet or 5K approaches, I recommend that, 2 weeks out, you
+  switch the program to the deload version."* p269 (another program) says the same number for a cycle under 8 weeks: *"only
+  a single week of deload 2 weeks out"*.
+- **Not carried over from p247**, because p251 does not print them for this program: the NT at race pace with 25 percent
+  longer recoveries *"if within six weeks of a race"* (p247 Running Notes), and *"eliminate the DE lifting sessions on race
+  week"* (p247, for a 5K).
+- **What the build does (OURS, ledger rows in `STATE-SOURCES.md`):** the last two weeks (the week before race week, and
+  race week) are p250's TAPER/DELOAD column, whole; race day carries the race and nothing else; nothing is built after
+  race day.
+
+## H0.1 "Establishing your VO2 max pace and threshold pace" (p210)
+1. Easy 6–8 min jog. 2. 2 × 100 m strides (slow → near full tilt). 3. 3 rounds of 30 s at a "fast run"
+(mile PR) pace, 1 min easy walk/jog between. 4. 1 min additional rest. 5. **Time trial: 9.5/10 to
+begin, ending at 10/10** — record distance after **12 minutes (beginner, <2 years), 10 minutes
+(intermediate, 2–4 years), 8 minutes (advanced, 4+ years)**. 6. **vVO2 speed (mph) = miles × 5
+(beginner) / × 6 (intermediate) / × 7.5 (advanced).** **Threshold speed = 88% of vVO2 speed.**
+7. Pace = 60 / speed (min/mile; decimal × 0.6 → seconds). Note on the page: build your own chart from
+75% up to 125% of threshold, converted back to pace.
+⛔ **THE 12-MINUTE TEST IS HIS, FOR BEGINNERS — and the threshold is NOT the trial's pace. It is 88%
+of the trial's SPEED.** The app's test read the 12-minute lap's pace as threshold directly; corrected
+2026-09-02 (`compute-workout-analysis` run_test): threshold pace = lap pace ÷ 0.88; the lap pace is
+stored as vVO2 pace.
+
+## H0.2 "VT1 heart rate zone and pace (any modality)" (p211) — the talk test, as a protocol
+Pick a 20-word sentence (~9 s at normal cadence). 5–10 min easy walk/jog; 1 min rest; begin at an
+extremely easy pace; recite the sentence aloud; **increase speed by 0.2 mph / 0:15 min/mile / 15 W,
+hold 30 s, recite again; repeat**; when it becomes difficult to recite it without taking a breath,
+stop. **Record the VT1 pace/speed/wattage at the last level you could complete, and the heart rate
+you noted there.** ⚠️ This is the book's OWN easy-zone anchor — VT1 heart rate from a talk-test ramp,
+not a percentage of threshold HR. Not built (2026-09-02); the app's easy zone is Friel's % of LTHR
+(OURS by choice, D-462). A VT1 test that writes `learned_fitness.run_vt1_hr` would be the book's way.
+
+## H0.3 FTP test protocols (pp.212–213) — cycling
+"The 20-Minute Test": 5–10 min easy; 3 × 1 min high turnover / 1 min rest; 3 min easy; 3 min at 9/10;
+6–8 min easy; **20 min best effort; FTP = 20-min average watts × 0.95** (calories: × 0.79). "The Ramp
+Test": simple option — start ~50% of FTP, +25 W (recreational male) / +20 W (high-level male) / +15 W
+(female) every minute until a full minute cannot be completed, **FTP = highest completed level ×
+0.78**; complex option — +6/+5/+4 W every 15 s, **FTP = average of the four final power numbers ×
+0.74**. p214 = the 1RM (Part H).
+
 # PART E4 — HYPERTROPHY + 5K (Chapter 10, pp.244–245) — "Strength Lead + Muscle" (proposed) in the app
 
 **Transcribed 2026-09-23 from `p244.jpg` and `p245.jpg`, both read directly.** Built as frame `hyp_5k`.
@@ -1778,6 +1841,70 @@ the standard lifting row for row; only the day headers add "primary". (4) Day 5'
 ⚠️ **No rate.** p253 gives no 1RM rate and no sentence on when to deload (both pages read off the photos for one; the only
 numbers on p253 are the NT percentages and the 3-hour LSD). The frame uses the All Rounder's ruling (no
 scheduled rise, OURS).
+
+# PART K — RACE BUILDS: HALF AND MARATHON (pages read off the photographs 2026-09-30)
+
+For `WORKORDER-race-builds-2026-09-30.md`. Every line below was read off the page image named.
+
+## K1. How fast a programme may change
+- **p148:** change each bucket *"by less than 10 percent per week, though ideally 5 percent is as high as I will usually
+  go"*. Said of an athlete moving onto a hybrid programme; the buckets are defined on p146–147.
+- **p149:** *"Too rapid increases in any category is the greatest source of program failure that I observe in hybrid
+  programs."* If taxed, reduce all buckets by equal amounts, then progress one or two buckets at a time. A rise in
+  intensity can be the overload with no change in the numbers. *"You do not just 'start' a hybrid program; you 'evolve'
+  the program into a hybrid one."*
+- **p150:** the same 10% per bucket per week; for a sport-switcher it *"can be well tolerated"*.
+- **p119:** hybrid periodization is *"steady, slow progression of primary sport parameters"*; what is not prioritised is
+  maintained through a variety of sessions, volume can drop but *"no quality should be allowed to deteriorate
+  completely."*
+
+## K2. Progressing to a longer event (p151, whole page)
+- The question it answers: a marathon programme *"that steadily increases mileage to acclimate you to longer distances,
+  peaking at high mileage"* — if mileage doubles over 8 to 12 weeks, how much lifting comes out?
+- Maintenance is about one-third of productive volume, at least once a week. Peaking for a longer race: *"steadily
+  decrease your nonevent training as you increase your event training."*
+- Worked example: running 30 → 60 miles a week; productive hypertrophy reps 50 upper / 60 lower → at 60-mile weeks
+  roughly 15–16 upper and 20 lower.
+- Keep the skill work: dynamic effort / speed in compound lifts, low percentages, high velocity, full rest.
+- *"evolve this training with a gradual reduction in strength training and a gradual increase in mileage"*; dropping all
+  the way to the one-third level *"is unnecessary"* because the running rises gradually.
+- **Not printed:** the shape of the reduction between the two endpoints, or a mileage target per race.
+
+## K3. Session length (p107–108)
+- p107: easy sessions much shorter than 10–15 minutes are unlikely to be worthwhile; an easy session ends when cardiac
+  drift reaches 10% (5% for hybrid athletes with many weekly sessions, or a key session within 24 hours).
+- p108: *"even for elite athletes, I rarely prescribe more than two hours of VT1 work in a single session"*; high-volume
+  athletes split into back-to-back sessions at least six to eight hours apart. Longer sessions have valid reasons —
+  practising fuelling, experience — *"Plus, longer sessions are good for the mind and soul."*
+- p109: most athletes aim for at least one speed session, at least one subthreshold session, the rest at VT1 or below;
+  *"There's no harm in adding a 'fast finish' or … strides to a long, slow run"* unless it wrecks the next session.
+
+## K4. The long run and race pace
+- **p251 Running Notes:** *"While progressive increases in the duration of the longer weekend run is an important
+  variable, increases in run quality are just as vital as in run duration. More runners will benefit from more intense
+  intervals and race pace portions of the LSD over simple 'over distance' runs."* Marathoners extend the weekend LSD up
+  to 3 hours as blended "strategy sessions" (fast finishes, food/drink tolerance). Advanced marathoners may extend Monday
+  and Wednesday to 80–90 minutes with longer VT1 warm-ups or cooldowns. NT: half 92–97%, marathon 89–94%.
+- **p253:** the same 3-hour line; advanced marathoners change Monday's VT1 L2 to L3 and add an extended VT1 cooldown to
+  Wednesday; the same NT bands.
+- **p235 (LSD), the race-pace finish by level:** L1 30 min @ VT1 + 5 min race pace · L2 60 min @ VT1, one 5 min @ 95%
+  mid, 10 min race pace · L3 90–120 min @ VT1, one 10 min @ 95% mid, 15 min race pace (Part D).
+- **p233–234 race-specific NT** (Part D): half L1 2×12′, L2 3×10′, L3 3×12′ @ 95% · marathon L1 2×15′, L2 2×20′,
+  L3 3×15′ @ 92% · 3–5 min walk/jog between.
+
+## K5. The taper
+- **p120:** *"running tapers may allow for delayed performance gain from elements such as an increase in red blood cell
+  count, but the timeline here is much more than a week!"* — said while rejecting overreach-to-deload for hybrid athletes.
+- **No page read gives a taper length for a half or a marathon.** p247 (Strength + 5K) and p269 give 2 weeks out for a 5K
+  / a short cycle; p251's "4 to 5 weeks out" is a powerlifting meet (E3c). Checked 2026-09-30: p118–121, p145–151,
+  p251, p253, p271–272.
+- **Michael's call (2026-09-30), FIELD:** marathon 3 weeks, half 2 weeks of the TAPER/DELOAD column — Pfitzinger, Higdon;
+  Smyth & Lawlor 2021 (Front. Sports Act. Living, ~158k recreational marathoners); Bosquet et al. 2007 (Med Sci Sports
+  Exerc meta-analysis).
+- ⚠️ **p250's TAPER/DELOAD column prints no LSD at all** (E3a); p252's keeps an LSD L1. Open for Michael (workorder
+  Stage 1).
+
+---
 
 # PART H — THE WORKING NUMBER AND THE PRETEST (p215)
 
