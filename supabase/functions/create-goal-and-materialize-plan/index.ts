@@ -3150,6 +3150,10 @@ Deno.serve(async (req: Request) => {
               // Strength, the p279 program.
               ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' || gsTp.focus === 'ride_long'
                 || gsTp.focus === 'run_half' || gsTp.focus === 'run_hyp' || gsTp.focus === 'run_half_hyp' ? { focus: gsTp.focus } : {}),
+              // ⛔ THE RACE BUILDS (2026-09-30, WORKORDER-race-builds): race day and distance travel to `generate-strength-plan`,
+              // which builds the book block back from them (`race-week.ts`). The builder checks both.
+              ...(typeof gsTp.race_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(gsTp.race_date) ? { race_date: gsTp.race_date } : {}),
+              ...(gsTp.race_distance === 'half' || gsTp.race_distance === 'marathon' ? { race_distance: gsTp.race_distance } : {}),
               /**
                * ⛔ THE OPTIONAL SESSIONS SWITCHED OFF (Ride + Strength's Day 2 easy ride, 2026-09-27). Same allowlist, same
                * failure: `generate-strength-plan` reads `endurance_slots_off` off its own body, so a hop that drops it builds

@@ -29,6 +29,8 @@ export type StepRouterState = {
    * wizard directly. Absent or null = not reached through a Train card.
    */
   trainCard?: string | null;
+  /** ⛔ Which programme card was tapped: `race_half` / `race_marathon` put the race screens in the flow (WORKORDER-race-builds). */
+  program?: string | null;
   posture: Partial<Record<string, string | null | undefined>>;
 };
 
@@ -103,6 +105,9 @@ export type StepKey =
   // the engine (`StrengthPrimaryArgs` has no `liftingDays`), so a card offering it would be a screen
   // asking a question nothing downstream can answer.
   | 'numbers'
+  // ⛔ THE RACE BUILDS (WORKORDER-race-builds, 2026-09-30) — which book week, then race day; the date sets the block's length.
+  | 'race_program'
+  | 'race_date'
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -335,7 +340,9 @@ export function getSteps(state: StepRouterState): StepKey[] {
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
-  const door: StepKey[] = state.entry === 'train' ? ['goal', 'train'] : ['goal'];
+  // ⛔ THE FOCUS SCREEN IS THE DOOR (Michael, 2026-09-30): Multisport / Run / Ride Focus sit on the Goals screen under the
+  // current plan, so a Train build opens on its program list — no entry screen and no Train screen inside the builder.
+  const door: StepKey[] = state.entry === 'train' ? [] : ['goal'];
   /**
    * ⛔ THE PROGRAM LIST FOLLOWS THE TRAIN CARD FOR A GROUPING (2026-09-07). Run Focus and Ride Focus
    * open it; Standard Focus does not. It is in the array BEFORE any goal exists, because the
@@ -367,8 +374,11 @@ export function getSteps(state: StepRouterState): StepKey[] {
    * on the frame rather than on the step. A value nobody was asked for still has to reach the
    * payload, and dropping the screen must not drop the write.
    */
+  // ⛔ THE RACE CARDS ASK WHICH BOOK WEEK, THEN RACE DAY (WORKORDER-race-builds, 2026-09-30): the block is built back from it.
+  const raceDate: StepKey[] = isStrengthFocus && (state.program === 'race_half' || state.program === 'race_marathon')
+    ? ['race_program', 'race_date'] : [];
   const head: StepKey[] = isStrengthFocus
-    ? [...door, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
+    ? [...door, ...raceDate, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
   const sched = scheduleSteps(state, isStrengthFocus, isRaceGoal);
   /**

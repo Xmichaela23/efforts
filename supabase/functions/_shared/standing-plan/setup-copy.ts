@@ -99,6 +99,21 @@ export const PROGRAM_COPY = {
     // ⛔ No lifting line: the page says nothing about lifting experience (2026-09-29).
     lifting: null as string | null,
   },
+  // ⛔ THE RACE BUILDS (2026-09-30, WORKORDER-race-builds) — WORDS NOT YET APPROVED. The book's half-marathon week (Long
+  // Run + Strength p250 or Long Run + Muscle p252, picked on the next screen) built back from a race date. Four lifting
+  // days: p250, p252. Two threshold sessions: MLSS+ and NT on days 1 and 3 of both weeks (p250, p252; p251 "increases
+  // in run quality are just as vital"). Half: strength keeps climbing, 1% every four weeks (p251). Marathon: the lifting decreases as the
+  // miles increase and strength is maintained (p151; Stage 4 builds the decrease).
+  race_half: {
+    label: 'Half marathon',  // not-instruction: a card name
+    blurb: 'Race a half marathon and keep lifting four days a week. Two threshold sessions a week build your speed. The running builds toward race day. The lifting holds your strength and keeps it climbing slowly.',  // Viada p250 p252 p251
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
+  race_marathon: {
+    label: 'Marathon',  // not-instruction: a card name
+    blurb: 'Race a marathon and keep lifting four days a week. Two threshold sessions a week build your speed. The running builds toward race day. The lifting decreases as the miles increase and holds your strength.',  // Viada p250 p252 p151
+    requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in week one.',
+  },
   // Viada p278: three lifting days; the Standard column's seven workouts are five rides — Days 3 and 5 each print two
   // workouts in one box, which the book's convention makes one ride (p269; Michael, 2026-09-27).
   // Viada p280, reworded (Michael approved the words 2026-09-19); the page: "These programs are included as training options for intermediate to
@@ -141,7 +156,7 @@ export const PROGRAM_COPY = {
 export const RUN_SECTIONS: ReadonlyArray<{ id: string; title: string; programs: ReadonlyArray<keyof typeof PROGRAM_COPY> }> = [
   { id: 'stronger', title: 'Get stronger', programs: ['run_strength', 'run_half_strength'] },  // not-instruction: section titles
   { id: 'muscle', title: 'Build muscle', programs: ['run_muscle', 'run_half_muscle'] },  // Viada pp244, 252
-  { id: 'race', title: 'Race', programs: ['marathon'] },
+  { id: 'race', title: 'Race', programs: [] },  // closed until the race builds are live (RUN_GROUPS, below)
   { id: 'offroad', title: 'Trails', programs: [] },       // Viada p254 — not built
   { id: 'faster', title: 'Get faster', programs: [] },         // Viada pp258, 276 — not built
 ];
@@ -158,7 +173,10 @@ export const RUN_GROUPS: ReadonlyArray<{ id: string; title: string | null; progr
   { id: 'new_short', title: 'New to lifting · up to 4 hours of running a week', programs: ['run_muscle', 'run_strength'] },  // p245 p247
   { id: 'new_long', title: 'New to lifting · 5 hours or more', programs: ['run_half_strength'] },  // p251
   { id: 'solid', title: 'Solid lifting background', programs: ['run_half_muscle'] },  // p253
-  { id: 'race', title: 'Race', programs: ['marathon'] },  // not-instruction: a group title
+  // ⛔ NO RACE GROUP UNTIL THE RACE BUILDS ARE LIVE (Michael, 2026-09-30). The old marathon card is off every door
+  // (WORKORDER-race-builds Stage 5b), and the new cards promise running that builds and lifting that decreases as the
+  // miles increase (Stages 2–4). When those ship, add back: { id: 'race', title: 'Race', programs: ['race_half',
+  // 'race_marathon'] } — and flip `RACE_PLANS_OFFERED` in `src/lib/race-weeks.ts`.
 ];
 /** Under a closed section. */
 export const SECTION_CLOSED_LINE = 'Not yet.';  // not-instruction
@@ -172,6 +190,22 @@ export const RIDE_GROUPS: ReadonlyArray<{ id: string; title: string | null; prog
   { id: 'base', title: 'Start here', programs: ['ride_strength'] },  // p280: Base first, "at least 4 weeks"; approved 2026-09-29
   { id: 'longer', title: 'Go longer', programs: ['ride_long_strength'] },  // Michael approved the words 2026-09-27
 ];
+
+/**
+ * ⛔ THE RACE DATE SCREEN (WORKORDER-race-builds, 2026-09-30) — WORDS NOT YET APPROVED. {weeks} is the count from the start
+ * week to race week, inclusive.
+ */
+export const RACE_DATE_COPY = {
+  program_title: 'Which week?',  // not-instruction: a screen title
+  program_subtitle: 'Both are the book\'s half-marathon weeks. The plan builds toward your race day.',
+  title: 'Race day',  // not-instruction: a screen title
+  subtitle: 'The plan runs from the week you start to race day.',
+  race_day_label: 'Race day',  // not-instruction: a field label
+  start_label: 'Start the week of',  // not-instruction: a field label
+  weeks_line: '{weeks} weeks of training.',  // not-instruction: the plan's length
+  // OURS — 4 to 52: the goal row's own range (create-goal `target_weeks`), not a book number. Stage 5 replaces it.
+  out_of_range_line: 'This plan needs 4 to 52 weeks between the start and race day.',
+} as const;
 
 // ── Adjust › Deload ───────────────────────────────────────────────────────────────────────────
 

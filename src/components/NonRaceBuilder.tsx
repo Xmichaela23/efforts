@@ -292,10 +292,10 @@ const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, buil
  * ⚠️ NEVER RENDER ONE OF THESE WITHOUT ITS BLURB — the card name alone does not say what the block
  * holds around the lifting.
  */
-type TrainCardId = 'standard' | 'run' | 'ride';
+export type TrainCardId = 'standard' | 'run' | 'ride';
 // ⛔ STANDARD FOCUS LEADS (Michael, 2026-08-30). It is the year-round programme — the one an athlete
 // SITS in — so it goes above the singular sports rather than beside them (DESIGN §1).
-const TRAIN_ORDER: TrainCardId[] = ['standard', 'run', 'ride'];
+export const TRAIN_ORDER: TrainCardId[] = ['standard', 'run', 'ride'];
 type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 /**
  * ⛔ THEY ARE "<DISCIPLINE> FOCUS", NOT THE BARE DISCIPLINE (Michael, 2026-08-05). "Run" is a thing
@@ -307,7 +307,7 @@ type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSPrope
  * rather than borrowing one of the four and implying a default.
  */
 // ⛔ THE SECTIONS' WORDS ARE THE SERVER'S (2026-09-13) — `builder.setup.sections`; only the icon and colour live here.
-const TRAIN_COPY: Record<TrainCardId, { Icon: CardIcon; color: string }> = {
+export const TRAIN_COPY: Record<TrainCardId, { Icon: CardIcon; color: string }> = {
   standard: {
     // ⛔ HIS CLAIMS, ALL OF THEM ON p274-275: an "all-year" programme, for an athlete interested in
     // multiple sports, that pivots to a race programme about a month out. Nothing here is ours.
@@ -374,7 +374,7 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
 type ProgramId = 'run_ride_strength' | 'run_strength' | 'run_half_strength' | 'run_muscle' | 'run_half_muscle' | 'ride_strength'
-  | 'ride_long_strength' | 'marathon';
+  | 'ride_long_strength' | 'marathon' | 'race_half' | 'race_marathon';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   // ⛔ 5HR + Strength (p250) sits under Run beside 4HR, 2026-09-22.
   // ⛔ Long Ride + Strength (p279) sits under Ride, 2026-09-28 — drawn in the server's `ride_groups` when they arrive.
@@ -422,6 +422,16 @@ const PROGRAM_COPY: Record<ProgramId, {
   marathon: {
     Icon: Flag, color: FOCUS_RACE_COLOR,
     goal: 'marathon', focus: 'run',
+  },
+  // ⛔ THE RACE BUILDS (WORKORDER-race-builds, 2026-09-30): the book's half-marathon week (p250 or p252, picked on the
+  // `race_program` screen) built back from a race date — `get_stronger` on a standing-plan frame. Not the marathon generator.
+  race_half: {
+    Icon: Flag, color: FOCUS_RACE_COLOR,
+    goal: 'get_stronger', focus: 'run_half',
+  },
+  race_marathon: {
+    Icon: Flag, color: FOCUS_RACE_COLOR,
+    goal: 'get_stronger', focus: 'run_half',
   },
   ride_strength: {
     Icon: Bike, color: getDisciplineColor('ride'),
@@ -1150,6 +1160,12 @@ export type NonRaceState = {
   /** Race day (YYYY-MM-DD). Empty on every non-race goal — its presence IS "this is a race goal",
    *  and it is what flips `assemblePayload` from a capacity goal to an `event` one. */
   raceDate: string;
+  /** ⛔ THE RACE BUILDS' RACE DAY (YYYY-MM-DD, WORKORDER-race-builds 2026-09-30). Separate from `raceDate` on purpose:
+   *  that field turns the goal into an `event` for the marathon generator; this one travels as `training_prefs.race_date`
+   *  to the book block's build. Empty = not a race card. */
+  raceBlockDate?: string;
+  /** The race card tapped: `half` or `marathon`. Null = not a race card. */
+  raceBlockDistance?: 'half' | 'marathon' | null;
   /** Race distance as the SERVER's label vocabulary expects it (`DISTANCE_TO_API`, `create-goal…:195`
    *  — 'Marathon' → 'marathon'). Sending the lowercase api key here would not resolve. */
   raceDistance: string;
@@ -1199,6 +1215,7 @@ export type NonRaceState = {
 // test on the path passed. ⚠️ Re-exported so every `StepKey` reference here is unchanged.
 export type { StepKey } from '@/lib/wizard-steps';
 import { getSteps, skipsSportScope, fixedSportScope, type StepKey } from '@/lib/wizard-steps';
+import { raceBlockWeeks, RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS } from '@/lib/race-weeks';
 
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -1270,6 +1287,9 @@ function assemblePayload(
    * already does. This slice deliberately does not change that routing.
    */
   const isRace = !!state.raceDate;
+  // ⛔ HALF MARATHON (2026-09-24): the block's length is the race's week, counted the way the server counts it.
+  const raceBlockWeeksNow = state.goal === 'get_stronger' && state.raceBlockDistance
+    ? raceBlockWeeks(state.startDate, state.raceBlockDate) : null;
   /**
    * ⛔ THE COUNTS, DERIVED FROM THE SLOTS ON THE STRENGTH PATH (2026-08-24). The program owns the
    * count (8-21 §3c), so "how many runs" is "how many of the four endurance slots are runs" — one
@@ -1310,7 +1330,7 @@ function assemblePayload(
         name: isRace && state.raceName.trim() ? state.raceName.trim() : (planName ?? GOAL_LABELS[goal]),
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
-        ...(isRace ? {} : { target_weeks: state.targetWeeks }),
+        ...(isRace ? {} : { target_weeks: raceBlockWeeksNow ?? state.targetWeeks }),
         sport: shape.sport,
         distance: isRace ? state.raceDistance : null,
         /**
@@ -1687,6 +1707,9 @@ function assemblePayload(
             }
             return Object.keys(out).length > 0 ? { endurance_slot_levels: out } : {};
           })(),
+          // ⛔ THE RACE BUILDS (WORKORDER-race-builds, 2026-09-30): race day and distance travel to the book block's build.
+          ...(raceBlockWeeksNow != null && state.raceBlockDate && state.raceBlockDistance
+            ? { race_date: state.raceBlockDate, race_distance: state.raceBlockDistance } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
           // test week. The endurance answers travel as data; create-goal inserts the week-one tests with the plan.
@@ -1934,7 +1957,7 @@ type PreviewPlan = {
  * with no props, and Back from step 1 needs somewhere to land that isn't a closed builder. Passing
  * no `entry` gives you the full flow, door included.
  */
-export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSeason }: { onClose?: () => void; entry?: EntryCardId; onPlanSeason?: () => void } = {}) {
+export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard: initialTrainCard, onPlanSeason }: { onClose?: () => void; entry?: EntryCardId; trainCard?: TrainCardId; onPlanSeason?: () => void } = {}) {
   const navigate = useNavigate();
   // ⛔ `error` WAS NOT READ, AND THE BUILD BUTTON FAILED SILENTLY (2026-08-04).
   //
@@ -2092,9 +2115,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // effect below swaps in the race flow. The POSTURE still comes from `reseed` a tick later —
     // `equipmentTier` reads the arc, which may not have loaded on the first render, and the race
     // screen reads no posture.
-    entry: initialEntry ?? null,
-    goal: initialEntry === 'race' ? 'marathon' : null,
-    trainCard: null, program: null,
+    // ⛔ THE FOCUS SCREEN'S CARDS OPEN THEIR PROGRAM LIST (Michael, 2026-09-30): Multisport / Run / Ride Focus sit on the
+    // Goals screen, so the builder opens on that card's list. A race opens the Run list, where its group sits; the old
+    // marathon flow is no longer offered from any door (WORKORDER-race-builds Stage 5b).
+    entry: initialEntry === 'race' || initialTrainCard ? 'train' : initialEntry ?? null,
+    goal: null,
+    trainCard: initialTrainCard ?? (initialEntry === 'race' ? 'run' : null), program: null,
     discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
     // arrival instead of an empty box. Michael: *"no prefill let them chose."* A long run is
@@ -2139,7 +2165,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // Step 0 is the door. When Goals already asked (deep link), start on the screen AFTER it — the
   // Train drill-down, or the race card. Back from there still closes the builder, which returns the
   // athlete to the Goals screen the door now lives on.
-  const [stepIdx, setStepIdx] = useState(initialEntry ? 1 : 0);
+  // A Focus card or the race door lands on its program list, the first screen of a Train build; any other entry on its first screen past the door.
+  const [stepIdx, setStepIdx] = useState(initialEntry === 'race' || initialTrainCard || initialEntry === 'train' ? 0 : initialEntry ? 1 : 0);
 
   // ⚠️ The schedule screens are built from the POSTURE, which is only seeded when the goal is tapped
   // — so on step 1 the flow would count itself with no disciplines kept ("1 of 3") and then jump.
@@ -2182,13 +2209,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       targetWeeks: goal === 'get_stronger' ? STRENGTH_FOCUS_WEEKS : Math.max(s.targetWeeks, floor),
     }));
   };
-  // Deep-linked into the race flow: the goal was seeded in the initial state so the right screen
-  // renders immediately; this fills in the posture / protocol / length the tap handler would have.
-  // Once, on mount — `reseed` overwrites posture, so re-running it would wipe the athlete's edits.
+
+  // ⛔ HALF MARATHON (2026-09-24): the block is as long as the weeks to race day, so the confirm screen's week count
+  // follows the race date and the start week (both can change after the date screen).
+  const raceBlockWeeksNow = state.goal === 'get_stronger' && state.raceBlockDistance
+    ? raceBlockWeeks(state.startDate, state.raceBlockDate) : null;
+  const raceBlockWeeksOk = raceBlockWeeksNow != null && raceBlockWeeksNow >= RACE_BLOCK_MIN_WEEKS && raceBlockWeeksNow <= RACE_BLOCK_MAX_WEEKS;
   React.useEffect(() => {
-    if (initialEntry === 'race') reseed('marathon', undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (raceBlockWeeksNow != null && raceBlockWeeksNow !== state.targetWeeks) setState((s) => ({ ...s, targetWeeks: raceBlockWeeksNow }));
+  }, [raceBlockWeeksNow, state.targetWeeks]);
 
   // Modal-lock: hide the app tab bar while the builder is open (see index.css `body.wizard-active`).
   React.useEffect(() => {
@@ -4199,80 +4228,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
-      {/* ── THE TRAIN DRILL-DOWN ─────────────────────────────────────────────────────────────────
-          Run / Ride / Strength / Athletic. Only Strength opens anything today; the other three are
-          dimmed and inert. This is the screen the July placeholder rule was rewritten for — see the
-          comment above `GOAL_ORDER`. */}
-      {currentStep === 'train' && (
-        <StepLayout
-          step={stepNo('train')} totalSteps={steps.length} title={eyeTitle('Train')}
-          subtitle="Pick an area of focus."
-          onBack={back} onContinue={next} canContinue={state.goal != null}
-          hideContinue hideProgress
-        >
-          <div className="space-y-2">
-            {TRAIN_ORDER.map((t) => {
-              const goal = TRAIN_GOAL[t];
-              const { Icon, color } = TRAIN_COPY[t];
-              // ⛔ A CARD IS LIVE IF IT OPENS SOMETHING — the wizard, or a program list (`TRAIN_OPENS`).
-              const live = TRAIN_OPENS[t] === 'programs' || goal != null;
-              /**
-               * ⛔ THE CARD IS THE SELECTION, NOT THE GOAL (2026-08-30). Standard Focus and Run
-               * Focus seed the same goal, so highlighting on the goal would light BOTH cards the
-               * moment either was tapped. `state.trainCard` is what tells them apart (2026-09-07);
-               * a draft from before that field existed falls back to the focus.
-               */
-              const chosen = state.trainCard != null
-                ? state.trainCard === t
-                : (t === 'standard' && state.goal === 'get_stronger' && state.focus === 'standard');
-              return (
-                <button
-                  key={t} type="button"
-                  className={optBtn(chosen, !live)}
-                  disabled={!live}
-                  onClick={() => {
-                    if (!live) return;
-                    if (TRAIN_OPENS[t] === 'programs') {
-                      // ⛔ NO GOAL YET. The programme card on the next screen seeds it; a goal left
-                      // over from an earlier tap is cleared so the list opens clean.
-                      setState((st) => ({ ...st, trainCard: t, program: null, goal: null }));
-                      next();
-                      return;
-                    }
-                    if (!goal) return;
-                    reseed(goal, undefined);
-                    // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`) and it is
-                    // what the payload carries. Set AFTER `reseed`, which does not touch it.
-                    setState((st) => ({ ...st, focus: 'standard', trainCard: t, program: null }));
-                    next();
-                  }}
-                >
-                  <span className="flex items-start gap-3.5">
-                    {/* Discipline colour survives the dimming, at lower opacity — a not-yet card
-                        should still say which discipline it is. */}
-                    <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color, opacity: live ? 1 : 0.4 }} />
-                    <span className="min-w-0 block">
-                      <span className="block text-base">{setupCopy?.sections[t].label}</span>
-                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
-                        {setupCopy?.sections[t].blurb}
-                      </span>
-                      {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
-                          line, under each card whose block refuses at the gate without it. */}
-                      {/* ⛔ THE REQUIREMENTS LINE MOVED TO THE PROGRAM CARD (2026-09-13), where Run + Strength and
-                          Ride + Strength already carry theirs. No section card carries one. */}
-                      {/* ⛔ THE PRECONDITION PARAGRAPH IS GONE (Michael, 2026-08-05: *"lose this"*).
-                          It listed what the block needs — barbell, rack, bench, four maxes on file —
-                          and it made one card three times the height of its three neighbours, which
-                          is what a picker screen cannot afford. The one-line requirement above is
-                          what replaced it (2026-08-30), and it sits under both live cards. */}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </StepLayout>
-      )}
+      {/* The Train screen (Multisport / Run / Ride Focus) moved onto the Goals screen, 2026-09-30 (`TRAIN_ORDER`, `TRAIN_COPY`). */}
 
       {/* ── THE PROGRAM LIST ─────────────────────────────────────────────────────────────────────
           Under Run Focus / Ride Focus (Michael, 2026-09-07): one card per programme, the live one
@@ -4367,8 +4323,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     }
                     reseed(goal, undefined);
                     // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`). Set AFTER
-                    // `reseed`, which does not touch it.
-                    setState((st) => ({ ...st, focus, program: p }));
+                    // `reseed`, which does not touch it. A race card also records its distance (WORKORDER-race-builds).
+                    const raceBlockDistance = p === 'race_half' ? 'half' as const : p === 'race_marathon' ? 'marathon' as const : null;
+                    setState((st) => ({ ...st, focus, program: p, raceBlockDistance }));
                     next();
                   }}
                 >
@@ -4398,6 +4355,93 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </div>
             ))}
           </div>
+          {/* ⛔ RACING MORE THAN ONCE (moved here 2026-09-30, Michael: "races sit in their sport"): under Run's Race group,
+              shown only while that group is on the list; it opens the season planner, as it did from the old race screen. */}
+          {state.trainCard === 'run' && onPlanSeason && setupCopy?.run_groups?.some((g) => g.id === 'race') && (
+            <button
+              type="button"
+              onClick={onPlanSeason}
+              className="w-full text-left rounded-xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 mt-3 transition-colors"
+            >
+              <span className="block text-white/85 text-sm">Racing more than once this year?</span>
+            </button>
+          )}
+        </StepLayout>
+      )}
+
+      {/* ── THE RACE BUILDS' PROGRAM (WORKORDER-race-builds, 2026-09-30) ─────────────────────────────────
+          Which book week the race plan is built on: Long Run + Strength (p250) or Long Run + Muscle (p252). The two cards
+          are the Run list's own cards, words and all; the screen's title is the server's (`RACE_DATE_COPY`). */}
+      {currentStep === 'race_program' && (
+        <StepLayout
+          step={stepNo('race_program')} totalSteps={steps.length} title={setupCopy?.race_date?.program_title ?? ''}
+          subtitle={setupCopy?.race_date?.program_subtitle ?? ''}
+          onBack={back} onContinue={next} canContinue={state.focus === 'run_half' || state.focus === 'run_half_hyp'}
+        >
+          <div className="space-y-2">
+            {(['run_half_strength', 'run_half_muscle'] as const).map((p) => {
+              const { Icon, color, focus } = PROGRAM_COPY[p];
+              const words = setupCopy?.programs[p];
+              return (
+                <button
+                  key={p} type="button"
+                  className={optBtn(state.focus === focus, false)}
+                  onClick={() => setState((st) => ({ ...st, focus }))}
+                >
+                  <span className="flex items-start gap-3.5">
+                    <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color }} />
+                    <span className="min-w-0 block">
+                      <span className="block text-base">{words?.label}</span>
+                      <span className="block text-sm mt-1 leading-relaxed text-white/70">{words?.blurb}</span>
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ── THE RACE BUILDS' RACE DAY (WORKORDER-race-builds, 2026-09-30) ──────────────────────────────
+          The Half marathon and Marathon cards on Run › Race: the book block built back from this date. The words are the
+          server's (`RACE_DATE_COPY`). */}
+      {currentStep === 'race_date' && (
+        <StepLayout
+          step={stepNo('race_date')} totalSteps={steps.length} title={setupCopy?.race_date?.title ?? ''}
+          subtitle={setupCopy?.race_date?.subtitle ?? ''}
+          onBack={back} onContinue={next} canContinue={raceBlockWeeksOk}
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-white/85 text-sm mb-2">{setupCopy?.race_date?.race_day_label ?? ''}</p>
+              <input
+                type="date"
+                value={state.raceBlockDate ?? ''}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setState((s) => ({ ...s, raceBlockDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-[rgba(var(--wiz-accent-rgb,236,233,227),0.50)]"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+            <div>
+              <p className="text-white/85 text-sm mb-2">{setupCopy?.race_date?.start_label ?? ''}</p>
+              <input
+                type="date"
+                value={state.startDate}
+                onChange={(e) => setState((s) => ({ ...s, startDate: e.target.value }))}
+                className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white text-[15px] px-3.5 py-3 focus:outline-none focus:border-[rgba(var(--wiz-accent-rgb,236,233,227),0.50)]"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+          </div>
+          {raceBlockWeeksOk && (
+            <p className="text-white/70 text-sm mt-1.5">
+              {(setupCopy?.race_date?.weeks_line ?? '').replace('{weeks}', String(raceBlockWeeksNow))}
+            </p>
+          )}
+          {state.raceBlockDate && !raceBlockWeeksOk && (
+            <p className="text-amber-400/70 text-sm mt-1.5">{setupCopy?.race_date?.out_of_range_line ?? ''}</p>
+          )}
         </StepLayout>
       )}
 

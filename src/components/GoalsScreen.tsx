@@ -1,3 +1,5 @@
+import { useArcSetupContext } from '@/hooks/useArcSetupContext';
+import { RACE_PLANS_OFFERED } from '@/lib/race-weeks';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { saveCalibration, previewCalibration } from '@/lib/run-pace-calibration';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -8,7 +10,7 @@ import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
-import NonRaceBuilder from '@/components/NonRaceBuilder';
+import NonRaceBuilder, { TRAIN_COPY, TRAIN_ORDER, type TrainCardId } from '@/components/NonRaceBuilder';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -377,6 +379,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   // here, and the card that was tapped is handed to the builder, which starts on the screen after
   // the door. `null` = the builder is closed; a card id = open, deep-linked to it.
   const [showBuilder, setShowBuilder] = useState<'train' | 'race' | 'build' | null>(null);
+  // The focus card tapped on this screen (Multisport / Run / Ride, 2026-09-30); the builder opens on its program list.
+  const [builderTrainCard, setBuilderTrainCard] = useState<TrainCardId | null>(null);
+  // The focus cards' words, from the server's setup copy (the same payload the builder reads; one shared fetch).
+  const { arc: setupArc } = useArcSetupContext();
+  const setupSections = (setupArc as { builder?: { setup?: { sections?: Record<TrainCardId, { label: string; blurb: string }> } } } | null)
+    ?.builder?.setup?.sections ?? null;
   // Default to past goals expanded so completed events are visible immediately.
   const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
@@ -1799,6 +1807,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       <div className="h-full">
         <NonRaceBuilder
           entry={showBuilder}
+          trainCard={showBuilder === 'train' ? builderTrainCard ?? undefined : undefined}
           onClose={() => setShowBuilder(null)}
           onPlanSeason={() => { onClose(); navigate('/arc-setup'); }}
         />
@@ -2245,10 +2254,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         <div className="pt-2 pb-4 space-y-2">
           {/* The other half of the "Current" label above — these three START something, they are not
               what is running. Without the pair, the door read as a second copy of the live block. */}
-          <div className="flex items-center gap-3 pb-1">
-            <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Plans</span>
-            <div className="h-px flex-1 bg-white/10" />
-          </div>
+
           {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
             Train · Race · Build. Train drills down to the discipline picker inside the builder;
             Race goes straight into the race flow. Build is a CREATE action, not a pick, so it gets
@@ -2266,33 +2272,30 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
-          {([
-          { id: 'train' as const, Icon: Gauge, label: 'Build a training plan', blurb: 'Run, ride, or both, with strength built in.', live: true, color: getDisciplineColor('mobility') },
-          { id: 'race' as const, Icon: Flag, label: 'Build a race plan', blurb: 'Train for any race — built to the date', live: true, color: FOCUS_RACE_COLOR },
-          ]).map(({ id, Icon, label, blurb, live, color }) => (
+          {/* ⛔ THE FOCUS CARDS ARE THE DOOR (Michael, 2026-09-30): Multisport / Run / Ride Focus, straight under the current
+              plan — the Train screen and the "Build a training plan" / "Build a race plan" cards are gone. Races sit inside
+              their sport's list (Run's Race group). Words are the server's (`SECTION_COPY`); icon and colour are the
+              builder's (`TRAIN_COPY`). */}
+          <p className="text-sm text-white/60 pb-1">Pick an area of focus.</p>
+          {TRAIN_ORDER.map((t) => {
+            const words = setupSections?.[t];
+            const { Icon, color } = TRAIN_COPY[t];
+            return (
           <button
-            key={id}
+            key={t}
             type="button"
-            disabled={!live}
-            onClick={() => { if (live) setShowBuilder(id); }}
+            onClick={() => { setBuilderTrainCard(t); setShowBuilder('train'); }}
             className="w-full flex items-start gap-3.5 rounded-xl p-5 text-left transition-all border border-white/12 bg-white/[0.03] hover:bg-white/[0.06]"
           >
-            {/* The colour stays on a dimmed card, at lower opacity — "not yet" without losing which
-                discipline it belongs to. No colour (Build) falls back to the neutral white. */}
-            <Icon
-              className="h-6 w-6 shrink-0 mt-0.5"
-              style={{
-                color: color ?? (live ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)'),
-                opacity: color && !live ? 0.4 : 1,
-              }}
-            />
+            <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color }} />
             <div className="min-w-0 flex-1">
-              <div className={`text-base font-medium ${live ? 'text-white/90' : 'text-white/40'}`}>{label}</div>
-              <div className={`mt-1 text-sm leading-relaxed ${live ? 'text-white/60' : 'text-white/30'}`}>{blurb}</div>
+              <div className="text-base font-medium text-white/90">{words?.label ?? ''}</div>
+              <div className="mt-1 text-sm leading-relaxed text-white/60">{words?.blurb ?? ''}</div>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 self-center text-white/40" aria-hidden="true" />
           </button>
-          ))}
+            );
+          })}
           {/* ⛔ "Build" IS NO LONGER A CARD (Michael, 2026-08-13: a new user kept tapping it instead
               of Train/Race). Two reasons, both about pull: the word "Build" claims the verb the
               other two cards actually perform, and the dashed border read as an add-tile — the
@@ -2424,7 +2427,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               it is one screen for five sports.
               ⚠️ THE OTHER SPORTS KEEP IT. Ride, swim and tri have no card yet, and a form that opens
               nothing is the failure the entry-card rule was written against. */}
-          <button
+          {RACE_PLANS_OFFERED && <button
             type="button"
             onClick={() => { resetForms(); setShowBuilder('race'); }}
             className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-left hover:bg-white/[0.08] transition-colors"
@@ -2434,7 +2437,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               The run builder asks for your week, your long run and the day it sits on, and says what
               the block will reach before you commit.
             </span>
-          </button>
+          </button>}
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Sport</span>
             <select value={eventSport} onChange={e => {
               const v = e.target.value;

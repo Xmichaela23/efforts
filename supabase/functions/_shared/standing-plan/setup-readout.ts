@@ -25,7 +25,7 @@ import {
 } from './accessory-picks.ts';
 import { FRAMES, type FrameId } from './frames.ts';
 import { DEADLIFT_FORM_LABEL, DEFAULT_DEADLIFT_FORM, TESTED_LIFT_NAME, type DeadliftForm } from './working-number.ts';
-import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RIDE_GROUPS, RUN_GROUPS, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
+import { BUILD_FOCUS_COPY, fill, NUMBERS_COPY, PLAN_COPY, PROGRAM_COPY, RACE_DATE_COPY, RIDE_GROUPS, RUN_GROUPS, RUN_SECTIONS, SECTION_CLOSED_LINE, SECTION_COPY } from './setup-copy.ts';
 
 export type BuildFocusOption = { name: string; label: string; display: string };
 export type BuildFocusRow = {
@@ -88,6 +88,8 @@ export type SetupBlock = {
   /** The Run list's tiers (2026-09-29): drawn flat, like `ride_groups`; `run_sections` stays for an older phone. */
   run_groups: typeof RUN_GROUPS;
   section_closed_line: string;
+  /** The Half marathon's date screen (2026-09-24). */
+  race_date: typeof RACE_DATE_COPY;
   plans: typeof PLAN_COPY;
   numbers: typeof NUMBERS_COPY;
   build_focus: Record<FrameId, BuildFocusBlock>;
@@ -167,6 +169,7 @@ export function setupBlock(equipment: string[] | null): SetupBlock {
     ride_groups: RIDE_GROUPS,
     run_groups: RUN_GROUPS,
     section_closed_line: SECTION_CLOSED_LINE,
+    race_date: RACE_DATE_COPY,
     plans: PLAN_COPY,
     numbers: NUMBERS_COPY,
     build_focus: {

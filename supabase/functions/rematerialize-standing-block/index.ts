@@ -29,6 +29,7 @@
 // (`_shared/plan-refresh.ts`); get-week queues `{ refresh: true }` on the job queue when a plan has an
 // upcoming session stamped older, and the endurance re-price after an accepted number queues the same job.
 // `run-jobs` calls it with the service key and the job's `user_id`.
+import { raceTaperWeeks } from '../_shared/standing-plan/race-week.ts';
 import { daySeqForType } from '../_shared/day-seq.ts';
 import { planDateOf } from '../_shared/moved-from.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -426,7 +427,11 @@ Deno.serve(async (req: Request) => {
     // it (weeks not yet started only); absent, the plan's stored choice stands. Week one (the test week) never.
     const requestedTaper = Array.isArray(p?.taper_weeks) ? (p.taper_weeks as unknown[]).map(Number) : null;
     const storedTaper = Array.isArray(sp.taper_weeks) ? (sp.taper_weeks as unknown[]).map(Number) : [];
-    const taperWeeks = (requestedTaper ?? storedTaper)
+    // ⛔ A RACE BLOCK'S TAPER IS THE RACE'S (WORKORDER-race-builds, 2026-09-30): the weeks the race set stay in, whatever
+    // the deload toggle sends, so a toggle can add a light week but never take the race's away.
+    const raceTaper = sp.race && typeof sp.race === 'object' && Number.isInteger(Number(sp.race.week))
+      ? raceTaperWeeks(Number(sp.race.week), sp.race.distance === 'marathon' ? 'marathon' : 'half') : [];
+    const taperWeeks = [...new Set([...(requestedTaper ?? storedTaper), ...raceTaper])]
       .filter((n) => Number.isInteger(n) && n > TEST_WEEK_INDEX && n <= weeks && n >= currentWeek)
       .sort((x, y) => x - y);
     /**
@@ -451,6 +456,8 @@ Deno.serve(async (req: Request) => {
       frame: sp.frame,
       weeks,
       taperWeeks,
+      // ⛔ The race the block was built to (WORKORDER-race-builds), read back so race week is rebuilt the same way.
+      ...(sp.race && typeof sp.race === 'object' ? { race: sp.race } : {}),
       competitionLifts,
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},

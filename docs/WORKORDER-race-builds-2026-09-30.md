@@ -66,6 +66,14 @@ plans already built on it keep working and its code stays.
 - Port the tabled branch's Part E3c.
 
 ### Stage 1 — The Race card builds a dated book block (half and marathon)
+**BUILT 2026-09-30 (branch `race-builds`, from `9b0c68716`).** Race cards `race_half` / `race_marathon` → "Which week?"
+(p250 / p252 cards) → "Race day" → the programme screens. `generate-strength-plan` takes `race_date` + `race_distance` on
+`strength_half` and `hyp_half`; taper 2 / 3 weeks (`race-week.ts`); a rebuild keeps the race's taper weeks. The Goals
+race door opens the Run list. **Words approved by Michael 2026-09-30** (cards: "Race a {half marathon|marathon} and keep
+lifting four days a week. Two threshold sessions a week build your speed. The running builds toward race day. …"; "Which
+week?"; "Race day"; "{weeks} weeks of training."). ⛔ **The race cards stay OFF the Run list until Stages 2–4 ship**
+(the cards promise running that builds and lifting that decreases) — `RUN_GROUPS` keeps the old marathon card until then.
+The goal row stays non-event (race in `training_prefs` + `config.standing_plan.race`); Stage 2 decides the goal row.
 - Cherry-pick the useful parts of `9b0c68716` onto main; move the race from the Run Lead card to the Race card:
   `RUN_GROUPS` race group → `['half_marathon', 'marathon']`, both opening a frame choice (Long Run + Strength / Long Run +
   Muscle — words for Michael) and the race-date screen.
@@ -115,6 +123,21 @@ plans already built on it keep working and its code stays.
   Strength now, and the race plan begins on [date]." — words for Michael's yes.
 - ✅ Running weekly volume (Michael, 2026-09-30: "whatever the book says"): p151 raises the **mileage**, not only the long
   run, so the easy runs grow too, every bucket under p148's 10% a week (5% the usual step). Stage 2 covers both.
+
+### Stage 5b — Remove the old marathon builder (Michael, 2026-09-30: "I don't want it haunting us down the road")
+A relic left reachable gets worked on, gets in the way, or gets its work done twice. So it goes, whole:
+- **At once (with Stage 1's push), DONE on branch `race-builds`:** off every door — the Run list has no Race group and the
+  Goals race card and "Running a race?" button are hidden (`RACE_PLANS_OFFERED = false`, `src/lib/race-weeks.ts`) until
+  the race cards go live. ⚠️ A one-marathon season in the season wizard still reaches it through `create-goal`; that door
+  closes with the deletion below.
+- **When the race builds are live:** delete `generate-run-plan` and everything only it uses (VDOT tables `effort-score.ts`,
+  `src/lib/run-volume-tables.ts`, the marathon branch of `create-goal-and-materialize-plan`, `race-readout.ts` /
+  `non-race-routing.ts` parts that serve it, the old `level`/`intent`/`days`/`strength` race screens, `PROGRAM_COPY.marathon`).
+  Grep every name before deleting; the deploy closure (`INVENTORY.md`) lists who imports what.
+- **Two readers outside it borrow its pace math and move first:** the race-time projection (`_shared/race-readiness`,
+  `recompute-goal-race-projections.ts`) and the intake readout — both to threshold-based paces.
+- Plans already built on it keep their calendar rows; nothing after the deletion can build or rebuild one.
+- Done = a grep for `generate-run-plan`, `SustainableGenerator`, `PerformanceBuildGenerator`, `VDOT` finds nothing live.
 
 ### Stage 6 — Seen on real builds
 - Throwaway accounts, through the real path, each read end to end: marathon 16 weeks on p250 and on p252; marathon 6

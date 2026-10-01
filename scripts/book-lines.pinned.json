@@ -183,6 +183,9 @@
    "{} (race tempo)"
   ],
   "supabase/functions/_shared/standing-plan/setup-copy.ts": [
+   "A first program. Muscle-building lifts with running near threshold. About 3 hours of running and four lifting days a week, with room for one or two more short easy runs. Not for very advanced runners.",
+   "Race a half marathon and keep lifting four days a week. Two threshold sessions a week build your speed. The running builds toward race day. The lifting holds your strength and keeps it climbing slowly.",
+   "Race a marathon and keep lifting four days a week. Two threshold sessions a week build your speed. The running builds toward race day. The lifting decreases as the miles increase and holds your strength.",
    "If a powerlifting meet or 5K is coming, the recommendation is to switch to the deload version 2 weeks before.",
    "If a powerlifting meet is 4 to 5 weeks away, the recommendation is to switch the running to the deload",
    "deload week.",
@@ -201,7 +204,6 @@
    "Pick how long the long ride and the midweek easy rides are.",
    "Optional. An easy ride between the hard days.",
    "Optional. An easy ride the day before the long ride.",
-   "A first program. Muscle-building lifts with running near threshold. About 3 hours of running and four lifting days a week, with room for one or two more short easy runs. Not for very advanced runners.",
    "Pick the Day 1 level, and how long the midweek easy rides and the long ride are.",
    "Easy session",
    "Easy session {n}",

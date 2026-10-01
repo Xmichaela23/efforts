@@ -28,11 +28,8 @@ const strengthPath = (focus?: 'standard' | 'run' | 'ride'): StepRouterState => (
   posture: { strength: 'develop', run: 'maintain', bike: 'maintain', swim: 'out' },
 });
 
-/** The screen a Train card's tap actually opens. */
-const landsOn = (state: StepRouterState) => {
-  const steps = getSteps(state);
-  return steps[steps.indexOf('train') + 1];
-};
+/** The screen a Focus card's tap actually opens (the cards sit on the Goals screen since 2026-09-30). */
+const landsOn = (state: StepRouterState) => getSteps(state)[0];
 
 Deno.test('⛔⛔ STANDARD FOCUS DOES NOT LAND ON THE 5K PATH\'S TIER SCREEN', () => {
   /**
@@ -118,7 +115,7 @@ Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE ENDURANCE SCREEN �
   const st = strengthPath('run');
   assertEquals(landsOn(st), 'program', 'the Run Focus card does not open the program list');
   assertEquals(getSteps(st), [
-    'goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
+    'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
   ]);
   assert(!(getSteps(st) as string[]).includes('posture'),
     'the posture card is back in the Run + Strength flow');
@@ -131,7 +128,7 @@ Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE ENDURANCE SCREEN �
 Deno.test('⛔ RIDE FOCUS OPENS ITS OWN LIST — one dimmed card, no goal, nothing beyond it yet', () => {
   const st: StepRouterState = { goal: null, entry: 'train', trainCard: 'ride', posture: {} };
   assertEquals(landsOn(st), 'program', 'the Ride Focus card does not open the program list');
-  assertEquals(getSteps(st).slice(0, 3), ['goal', 'train', 'program']);
+  assertEquals(getSteps(st).slice(0, 1), ['program']);
 });
 
 Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-strength-2026-09-13 §4, §5)', () => {
@@ -143,22 +140,22 @@ Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-streng
    */
   const st = strengthPath('ride');
   assertEquals(landsOn(st), 'program');
-  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
+  assertEquals(getSteps(st), ['program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
   assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
   assertEquals(RIDE_STRENGTH_POSTURE.run, 'out');
   assertEquals(RIDE_STRENGTH_POSTURE.bike, 'maintain');
   // ⚠️ The posture the effect writes: the list holds with run out as well as before it is written.
   assertEquals(getSteps({ ...st, posture: { ...st.posture, ...RIDE_STRENGTH_POSTURE } }), getSteps(st));
   // ⛔ One guard for the other two: their lists are unchanged.
-  assertEquals(getSteps(strengthPath('run')), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
+  assertEquals(getSteps(strengthPath('run')), ['program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
   // ⚠️ Multisport Focus gained its program list (2026-09-13); nothing else in its list moved.
-  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
+  assertEquals(getSteps(strengthPath('standard')), ['program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
 });
 
 Deno.test('⛔ LONG RIDE + STRENGTH (p279, 2026-09-28) — the same step list as Ride + Strength, rides held, runs out', () => {
   const st: StepRouterState = { ...strengthPath('ride'), focus: 'ride_long' };
   assertEquals(landsOn(st), 'program');
-  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
+  assertEquals(getSteps(st), ['program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
   assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
 });
 
@@ -173,7 +170,7 @@ Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCR
   const st = strengthPath(undefined);
   assert(!(getSteps(st) as string[]).includes('program'));
   assertEquals(getSteps(st), [
-    'goal', 'train', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
+    'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
   ]);
 });
 
@@ -231,8 +228,23 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
 
 Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN TAKES THE SAME ROUTE, MINUS THE DOOR', () => {
   // ⛔ A stored goal or a standalone route has no `train` screen and nothing else differs.
-  assertEquals(getSteps({ ...strengthPath('run'), entry: 'build' }),
-    getSteps(strengthPath('run')).filter((k) => k !== 'train' && k !== 'program'));
-  assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }),
-    getSteps(strengthPath('standard')).filter((k) => k !== 'train' && k !== 'program'));
+  assertEquals(getSteps({ ...strengthPath('run'), entry: 'build' }).filter((k) => k !== 'goal'),
+    getSteps(strengthPath('run')).filter((k) => k !== 'program'));
+  assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }).filter((k) => k !== 'goal'),
+    getSteps(strengthPath('standard')).filter((k) => k !== 'program'));
+});
+
+Deno.test('⛔ THE RACE CARDS (WORKORDER-race-builds 2026-09-30): which book week, then race day; no other card sees them', () => {
+  const base: StepRouterState = {
+    goal: 'get_stronger', entry: 'train', focus: 'run_half', trainCard: 'run',
+    posture: { strength: 'develop', run: 'maintain', bike: 'out', swim: 'out' },
+  };
+  const runLead = getSteps({ ...base, program: 'run_half_strength' });
+  assert(!runLead.includes('race_date') && !runLead.includes('race_program'), 'Long Run + Strength asks no race screens');
+  for (const program of ['race_half', 'race_marathon']) {
+    const race = getSteps({ ...base, program });
+    assertEquals(race.slice(race.indexOf('program') + 1, race.indexOf('program') + 3), ['race_program', 'race_date']);
+    assert(race.includes('schedule') && race.includes('confirm'), 'the programme screens follow race day');
+    assertEquals(race.filter((s) => s !== 'race_date' && s !== 'race_program'), runLead);
+  }
 });

@@ -112,6 +112,11 @@ import {
   RIDE_HOURS_DEFAULT,
   RUN_DAYS_DEFAULT,
 } from '../_shared/athlete-weekly-intent.ts';
+// ⛔ Half marathon (Stage 2, 2026-09-24): the race week, the plan week a date falls in, and the Monday a block opens on.
+import { RACE_MILES, raceTaperWeeks, weekdayOfIso, type RaceDistance, type StandingRace } from '../_shared/standing-plan/race-week.ts';
+import { planWeekContaining } from '../_shared/planning-context.ts';
+import { mondayOfCalendarYmd, mondayOfToday } from '../_shared/parse-local-date.ts';
+import { FALLBACK_EASY_MIN_PER_MILE } from '../_shared/athlete-weekly-intent.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -950,6 +955,47 @@ Deno.serve(async (req: Request) => {
         return out.length > 0 ? out : undefined;
       })();
 
+      /**
+       * ⛔ THE RACE BUILDS (WORKORDER-race-builds-2026-09-30) — a book half-marathon week (p250 or p252) built back from a
+       * race date, not a second generator. The block runs from the week it opens to race week; the last 2 (half) or 3
+       * (marathon) weeks are the page's TAPER/DELOAD column (FIELD, `race-week.ts`); race day carries the race and nothing
+       * after it is built. ⚠️ Those two frames only: `race_date` on any other frame is ignored and logged.
+       */
+      const RACE_FRAMES = new Set(['strength_half', 'hyp_half']);
+      const raceDateRaw = (body as Record<string, unknown>).race_date;
+      const raceDistance: RaceDistance = (body as Record<string, unknown>).race_distance === 'marathon' ? 'marathon' : 'half';
+      let race: StandingRace | null = null;
+      let raceStartMonday: string | null = null;
+      if (typeof raceDateRaw === 'string' && raceDateRaw.trim() !== '') {
+        const raceDate = raceDateRaw.trim().slice(0, 10);
+        if (!RACE_FRAMES.has(frameId)) {
+          console.log(`[standing-plan] race_date ${raceDate} ignored: frame ${frameId} has no race build.`);
+        } else {
+          const startMonday = typeof start_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(start_date)
+            ? mondayOfCalendarYmd(start_date.slice(0, 10))
+            : mondayOfToday();
+          const raceWeek = planWeekContaining(startMonday, raceDate);
+          const raceDay = /^\d{4}-\d{2}-\d{2}$/.test(raceDate) ? weekdayOfIso(raceDate) : null;
+          // The goal row's own range (create-goal: target_weeks 4 to 52), so the two cannot disagree.
+          if (raceWeek == null || raceDay == null || raceWeek < 4 || raceWeek > 52) {
+            return json({
+              success: false,
+              error: `The race date needs to be 4 to 52 weeks after the start (race week ${raceWeek ?? 'unknown'}).`,
+              reason: 'race_date_out_of_range',
+            }, 422);
+          }
+          raceStartMonday = startMonday;
+          race = {
+            date: raceDate,
+            week: raceWeek,
+            day: raceDay,
+            distance: raceDistance,
+            // OURS — the calendar's length only: the race distance at the athlete's easy pace (race-week.ts).
+            duration_min: Math.round(RACE_MILES[raceDistance] * (easyPaceMin ?? FALLBACK_EASY_MIN_PER_MILE)),
+          };
+        }
+      }
+
       const row = buildStandingPlanRow({
         compose: {
           frame: frameId,
@@ -1074,10 +1120,12 @@ Deno.serve(async (req: Request) => {
           roundTo: 5,
         },
         slotPicksChosen,
-        weeks: Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,
+        weeks: race ? race.week : Number(duration_weeks) > 0 ? Number(duration_weeks) : 12,
         // ⛔ NO SCHEDULED TAPER — p120. The deload column is a tool you deploy (a race two weeks
-        // out, p247), never a recovery week on a timer. This block has no race in it.
-        taperWeeks: [],
+        // out, p247), never a recovery week on a timer. A block with no race has none; a Half marathon block's
+        // race sets its last two weeks (`race-week.ts`).
+        taperWeeks: race ? raceTaperWeeks(race.week, race.distance) : [],
+        ...(race ? { race } : {}),
         goalName: typeof goal_name === 'string' ? goal_name : undefined,
         demonstratedMilesSource: demonstrated.source,
         dayMap,
@@ -1135,7 +1183,8 @@ Deno.serve(async (req: Request) => {
             standing_plan: row.config,
             one_rep_maxes_at_build: maxes,   // provenance: what aimed the test's warm-ups
             standing_plan_notes: row.notes,  // surfacing only — sources, gaps and what we could not honour
-            user_selected_start_date: start_date ?? null,
+            // ⛔ A race block counts its weeks from this Monday, so it is written even when no start was sent.
+            user_selected_start_date: start_date ?? raceStartMonday ?? null,
           },
           sessions_by_week: row.sessions_by_week,
           notes_by_week: {},

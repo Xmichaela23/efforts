@@ -27,3 +27,4 @@ export * from './accessory-picks.ts';
 export * from './equipment-rebuild-picks.ts';
 export * from './endurance-ledger.ts';
 export * from './week-ledger.ts';
+export * from './race-week.ts';
