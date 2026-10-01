@@ -132,7 +132,7 @@ a time as the running rises (the highest ratio so far, so never back up); ME/DE/
 - The p251 rate (1% every 4 weeks) is unchanged.
 
 ### Stage 5 — Length, late and early starts (words through Michael)
-**BUILT 2026-10-01 (branch `race-stage2`), words approved by Michael 2026-10-01.** Late start: the plan builds and the
+**DEPLOYED AND CHECKED LIVE 2026-10-01 (9e0c47e46 + 987db7689), words approved by Michael 2026-10-01.** Throwaway account: 34-week marathon = programme weeks 1-8, race plan from week 9, long run grows from week 10 to 180; 8-week marathon and 5-week half build. p252 blocks over ~30 weeks (race or not) hit the edge compute limit until the accessory options were cached (987db7689); 30/40/52-week p252, with and without a race, now build. Late start: the plan builds and the
 race day screen adds "Twelve weeks or more is the usual time to train for a marathon. This plan has {weeks}, so it builds
 from the running you do now." (half: eight / half marathon). Over 26 weeks: one block — the plain programme until
 26 weeks out (`race.from_week`, `racePlanFromWeek`), then the race plan; the screen says "Your race is {weeks} weeks away.
