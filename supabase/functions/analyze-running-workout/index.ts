@@ -2986,6 +2986,19 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         course_strategy_zones: courseStrategyZonesUsed ?? (
           (prevWa as Record<string, unknown> | null | undefined)?.course_strategy_zones ?? null
         ),
+        /**
+         * ⛔ THE STORED PERFORMANCE SUMMARY SURVIVES A RE-ANALYSIS (2026-10-01, Michael: Today's finished run showed only
+         * Distance and Moving Time). Today's Elevation, Pace and Execution tiles read it (get-week `doneTiles`); this full
+         * replacement erased it, so a run already opened dropped back to two tiles. It is kept as it was, and
+         * `recomputed_at` above marks it stale, so workout-detail rebuilds it — and recompute-workout's last step does
+         * that right away. The ride analyzer keeps it by spreading the old analysis.
+         */
+        ...((prevWa as Record<string, unknown> | null | undefined)?.session_detail_v1 != null
+          ? {
+            session_detail_v1: (prevWa as Record<string, unknown>).session_detail_v1,
+            session_detail_updated_at: (prevWa as Record<string, unknown>).session_detail_updated_at ?? null,
+          }
+          : {}),
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()

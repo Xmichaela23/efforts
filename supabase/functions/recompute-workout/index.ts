@@ -2,7 +2,7 @@
  * recompute-workout — THE canonical post-process orchestrator (fan-out ordering fix, 2026-07-17).
  *
  * Ordered, awaited chain — "await what you read":
- *   auto-attach → [summary] → analysis → workload ∥ adaptation → facts(skip_snapshot) → analyze → boom → snapshot(watermark)
+ *   auto-attach → [summary] → analysis → workload ∥ adaptation → facts(skip_snapshot) → analyze → boom → snapshot(watermark) → detail
  *
  * Every entry path fires this fire-and-forget so the webhook ack stays fast while correctness comes
  * from ordering INSIDE the chain (not from the webhook awaiting it). See docs/AUDIT-fanout-ordering-2026-07-17.md.
@@ -24,7 +24,7 @@ import {
 } from './orchestrator-lib.ts';
 
 type RecomputeStep =
-  | 'auto-attach' | 'summary' | 'analysis' | 'workload' | 'adaptation' | 'facts' | 'analyze' | 'boom' | 'snapshot';
+  | 'auto-attach' | 'summary' | 'analysis' | 'workload' | 'adaptation' | 'facts' | 'analyze' | 'boom' | 'snapshot' | 'detail';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -192,6 +192,18 @@ Deno.serve(withAlarm('recompute-workout', async (req) => {
   } catch (e) {
     fail('snapshot', e);
     console.warn('[recompute-workout] snapshot/cache refresh failed (non-fatal):', (e as Error)?.message ?? e);
+  }
+
+  // ── 7. the Performance summary (2026-10-01) — built and saved now, after the analyser and the snapshot it reads, so
+  //    Today's finished card has its Elevation / Pace / Execution tiles (get-week `doneTiles`) before the athlete opens
+  //    the session. Before this, only opening it on Performance saved one, and the card showed Distance and Moving Time.
+  //    Non-fatal: the screen builds it on open, as before.
+  if (analyzeFn) {
+    const r = await invokeWithRetry(serviceClient, 'workout-detail', {
+      id: workout_id, scope: 'session_detail', force_refresh: true, user_id: workout.user_id,
+    });
+    if (r?.error) console.warn('[recompute-workout] workout-detail summary failed (non-fatal):', r.error.message);
+    else steps.push('detail');
   }
 
   console.log('[recompute-workout] steps completed:', steps, failures.length ? `failed: ${failures.join(' | ')}` : '');

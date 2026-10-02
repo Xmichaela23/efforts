@@ -2,6 +2,7 @@
 // Function: workout-detail
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
+import { requireUserOrService } from '../_shared/require-user.ts';
 import { effortRowText, talkTestRowText } from '../_shared/effort-words.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
@@ -1721,10 +1722,15 @@ Deno.serve(async (req) => {
     let userId: string | null = null;
     try {
       if (token) {
-        const { data: userData } = await supabase.auth.getUser(token as any);
-        userId = userData?.user?.id || null;
+        /**
+         * ⛔ TWO DOORS (2026-10-01): the athlete's JWT, or the service-role key with an explicit `user_id` —
+         * recompute-workout's last step, which builds and saves the Performance summary right after a sync so Today's
+         * finished card has its tiles before the session is opened. `requireUserOrService` is the shared gate
+         * (constant-time key compare; a forged service claim is refused). Every query below is still scoped to userId.
+         */
+        ({ userId } = await requireUserOrService(req, typeof body?.user_id === 'string' ? body.user_id : null));
       }
-    } catch {}
+    } catch { userId = null; }
 
     /**
      * ⛔ THE ATHLETE'S UNIT, ONCE, FOR EVERY DETAILS ANSWER (2026-09-16, Stage 4 session 3). Every
