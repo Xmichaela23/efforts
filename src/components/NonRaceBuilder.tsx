@@ -3707,7 +3707,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
           <div className="space-y-2">
             {(['run_half_strength', 'run_half_muscle'] as const).map((p) => {
               const { Icon, color, focus } = PROGRAM_COPY[p];
-              const words = setupCopy?.programs[p];
+              // The race screen's own names and lines (`RACE_DATE_COPY.program_cards`, 2026-10-02); the Run list's otherwise.
+              const words = setupCopy?.race_date?.program_cards?.[p] ?? setupCopy?.programs[p];
               return (
                 <button
                   key={p} type="button"

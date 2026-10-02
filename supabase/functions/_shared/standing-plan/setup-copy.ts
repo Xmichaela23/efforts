@@ -197,8 +197,22 @@ export const RIDE_GROUPS: ReadonlyArray<{ id: string; title: string | null; prog
  */
 export const RACE_DATE_COPY = {
   program_title: 'Which week?',  // not-instruction: a screen title
-  // Approved 2026-10-01 (Michael). p251: "The running program here is not for novices."
-  program_subtitle: 'Both are half-marathon weeks for runners with intermediate running skills. The plan builds toward your race day.',  // not-instruction: who the race plans are for (p251)
+  // Approved 2026-10-02 (Michael): both plans build the running the same way; the lifting is the choice (p251, p253).
+  program_subtitle: 'Both build your running toward race day, with two threshold runs a week. The lifting focuses on either strength or hypertrophy.',  // not-instruction: the race plans' two lifting focuses (p250 p252)
+  /**
+   * ⛔ THE RACE SCREEN NAMES ITS OWN TWO CARDS (Michael, 2026-10-02: "Long run isn't necessary, it's a marathon build").
+   * The Run list keeps Long Run + Strength and Long Run + Muscle; here they are the lifting focus. Words approved 2026-10-02.
+   */
+  program_cards: {
+    run_half_strength: {
+      label: 'Strength',  // not-instruction: a card name
+      blurb: 'Heavy barbell work aimed at getting stronger. Four lifting days a week. Suits runners who are newer to lifting.',  // not-instruction: p250 four lifting days; p251 lifting like Strength + 5K
+    },
+    run_half_muscle: {
+      label: 'Hypertrophy',  // not-instruction: a card name
+      blurb: 'Lifting aimed at building muscle size, with speed lifts, jumps and sprints. Four lifting days a week. For lifters with a solid strength background.',  // not-instruction: p253 "build muscle size", "dynamic effort/speed movements, plyometrics, sprints", "a solid strength background"
+    },
+  } as Record<string, { label: string; blurb: string }>,
   title: 'Race day',  // not-instruction: a screen title
   subtitle: 'The plan runs from the week you start to race day.',
   race_day_label: 'Race day',  // not-instruction: a field label
