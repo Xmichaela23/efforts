@@ -9,7 +9,7 @@
  *
  * Pure: no database, no clock except where passed in, so `derive.test.ts` can pin every output.
  */
-import { calculateEffortScore, getPacesFromScore, type TrainingPaces } from '../generate-run-plan/effort-score.ts';
+import { calculateEffortScore, getPacesFromScore, type TrainingPaces } from '../_shared/effort-score.ts';
 import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { canonicalizeLiftKey } from '../_shared/state-trend/capacity-resolver.ts';
 import { KG_PER_LB } from '../_shared/strength/session-volume.ts';

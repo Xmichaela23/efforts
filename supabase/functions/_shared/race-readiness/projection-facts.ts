@@ -1,4 +1,4 @@
-import { formatPace } from '../../generate-run-plan/effort-score.ts';
+import { formatPace } from '../effort-score.ts';
 import type { EnduranceResponse } from '../response-model/types.ts';
 import type { RaceReadinessV1 } from './index.ts';
 

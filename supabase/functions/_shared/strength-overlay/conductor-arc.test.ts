@@ -3,7 +3,7 @@
 // build weeks — proving phase→protocol sequencing, not one flat protocol.
 // Run: ~/.deno/bin/deno test --no-check --allow-import --allow-read --allow-env conductor-arc.test.ts
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { buildStrengthSessionsForPlanWeek } from './strength-overlay.ts';
+import { buildStrengthSessionsForPlanWeek } from './index.ts';
 
 const enduranceWeek: any[] = [
   { type: 'run', day: 'Sunday', tags: ['long_run'], duration: 90 },

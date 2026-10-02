@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
       // earlier, statuses changed, target dates passed, etc.).
       const { data: remainingGoals } = await supabase
         .from('goals')
-        .select('id, priority, target_date, status, goal_type')
+        .select('id, priority, target_date, status, goal_type, sport')
         .eq('user_id', userId)
         .eq('goal_type', 'event')
         .eq('status', 'active')
@@ -301,6 +301,9 @@ Deno.serve(async (req) => {
 
       if (futureRemaining.length === 0) {
         toastMessage = `${goalName} removed. No active races remain — plan ended.`
+      } else if (futureRemaining.length === 1 && String(futureRemaining[0].sport ?? '').toLowerCase() === 'run') {
+        // ⛔ ONE RUN RACE LEFT IS NOT REBUILT (2026-10-01, Michael). The single-race run builder (generate-run-plan) is
+        // deleted; a half or marathon is built from Run → Race. The toast stays "{goal} removed."
       } else {
         // Pick the highest-priority (A > B > C), earliest target_date as the anchor.
         const priorityRank: Record<string, number> = { A: 0, B: 1, C: 2 }

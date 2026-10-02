@@ -1,5 +1,5 @@
 import { resolveCurrentRunThresholdPace } from '../../../../src/lib/resolve-current-run-pace.ts';
-import { estimateVdotFromPace, getTargetTime, getPacesFromScore, formatPace } from '../../generate-run-plan/effort-score.ts';
+import { estimateVdotFromPace, getTargetTime, getPacesFromScore, formatPace } from '../effort-score.ts';
 
 // =============================================================================
 // Types

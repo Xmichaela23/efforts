@@ -23,7 +23,7 @@ import { computeLongitudinalSignals, type LongitudinalSignals } from './longitud
 import {
   estimateVdotFromPace,
   getTargetTime,
-} from '../generate-run-plan/effort-score.ts';
+} from './effort-score.ts';
 import { RUN_PACE_DIVERGENCE_THRESHOLD } from '../generate-combined-plan/science.ts';
 import {
   describeThresholdBasis,

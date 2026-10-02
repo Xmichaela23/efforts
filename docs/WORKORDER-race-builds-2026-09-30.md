@@ -149,6 +149,14 @@ you start." / "Race day needs to be within a year."
   run, so the easy runs grow too, every bucket under p148's 10% a week (5% the usual step). Stage 2 covers both.
 
 ### Stage 5b — Remove the old marathon builder (Michael, 2026-09-30: "I don't want it haunting us down the road")
+**DONE 2026-10-01 (Michael: "Run > Race becomes the only way to build a half or marathon").** `generate-run-plan` deleted
+with everything only it used (`_shared/endurance/{index,pace-zones,volume,distribution}`, `shared/strength-system/frequency-policy`,
+create-goal's run event path and (b)-run path + `race-readout.ts`, the marathon-timeline helpers). Moved, unchanged: the VDOT pace
+math → `_shared/effort-score.ts` (coach, arc-context, race-readiness, save-baselines); the strength overlay → `_shared/strength-overlay/`
+(adapt-plan's relayout, which tri plans use). Doors: a single run race is refused by create-goal (`unsupported_sport`); delete-goal
+does not rebuild a lone run race; Build Plan is not offered on a run race goal; "Racing more than once this year?" is hidden
+(season planner on hold); the old marathon wizard screens are gone. The race projection and intake readout were NOT moved to
+threshold: neither depended on the deleted folder beyond the pace math, which moved.
 A relic left reachable gets worked on, gets in the way, or gets its work done twice. So it goes, whole:
 - **At once (with Stage 1's push), DONE on branch `race-builds`:** off every door — the Run list has no Race group and the
   Goals race card and "Running a race?" button are hidden (`RACE_PLANS_OFFERED = false`, `src/lib/race-weeks.ts`) until

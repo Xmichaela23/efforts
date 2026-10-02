@@ -72,7 +72,8 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
    * theme — "Strength work", "Your week", "Per-discipline focus" already uses the word without the
    * mark — and NONE of them is mine to rename. He ruled on exactly two.
    */
-  for (const untouched of ['Which race?', 'What can you sustain?', 'Your week', 'Strength work',
+  // ⚠️ "Which race?" and "Strength work" left with the old marathon flow (2026-10-01).
+  for (const untouched of ['What can you sustain?', 'Your week',
                            'Per-discipline focus', 'How long is this block?']) {
     assert(WIZARD.includes(`title="${untouched}"`), `"${untouched}" was renamed without a ruling`);
   }

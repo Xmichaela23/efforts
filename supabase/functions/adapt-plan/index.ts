@@ -22,12 +22,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
-import type { Phase, PhaseStructure } from '../generate-run-plan/types.ts';
+import type { Phase, PhaseStructure } from '../_shared/strength-overlay/types.ts';
 import {
   buildStrengthSessionsForPlanWeek,
   extractPrimaryScheduleForWeekSessions,
   primaryScheduleSignature,
-} from '../generate-run-plan/strength-overlay.ts';
+} from '../_shared/strength-overlay/index.ts';
 import {
   getLatestAthleteMemory,
   resolveMemoryContextForPlanning,

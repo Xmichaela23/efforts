@@ -4,7 +4,7 @@
 // HEAD (upper stripped) and PASSES after the filter removal.
 // Run: ~/.deno/bin/deno test --no-check supabase/functions/generate-run-plan/strength-overlay-q087.test.ts
 import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildStrengthSessionsForPlanWeek } from './strength-overlay.ts';
+import { buildStrengthSessionsForPlanWeek } from './index.ts';
 
 // A non-taper, non-recovery Base week so upper_aesthetics emits [LOWER_MAINTENANCE, UPPER_STRENGTH].
 const phaseStructure = {

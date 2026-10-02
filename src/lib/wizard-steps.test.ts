@@ -198,7 +198,6 @@ Deno.test('⛔⛔ RUN + STRENGTH HOLDS RUNNING ONLY — the scope cards are answ
   assertEquals(fixedSportScope(strengthPath('standard')), STANDARD_FOCUS_POSTURE);
   // ⛔ AND A NON-STRENGTH GOAL IS STILL ASKED.
   assertEquals(fixedSportScope({ ...strengthPath('run'), goal: 'build_endurance' }), null);
-  assertEquals(fixedSportScope({ ...strengthPath('run'), goal: 'marathon' }), null);
 });
 
 Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {

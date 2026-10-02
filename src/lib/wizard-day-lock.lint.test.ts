@@ -89,7 +89,8 @@ Deno.test('⛔ THE RUN AND SWIM PICKERS READ THEIR RANGES — no hardcoded liter
   assert(runVolumeCard.test(SRC), 'the volume card\'s run picker stopped reading RUN_DAYS_CHOICES');
 
   const swimWrites = [...SRC.matchAll(/swimDays: n \}/g)];
-  assert(swimWrites.length >= 2, `expected at least two swim pickers, found ${swimWrites.length}`);
+  // ⚠️ One picker since the old marathon flow's swim screen came out with that flow (2026-10-01).
+  assert(swimWrites.length >= 1, `expected a swim picker, found ${swimWrites.length}`);
   for (const m of swimWrites) {
     const before = SRC.slice(Math.max(0, m.index! - 700), m.index!);
     assert(

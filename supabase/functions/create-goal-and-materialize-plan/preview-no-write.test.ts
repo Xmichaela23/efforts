@@ -86,50 +86,7 @@ Deno.test('create-path goal inserts are guarded against a preview — the run-ev
   assertEquals(unguarded.length, 1, `unguarded create-path goal inserts: expected exactly the known tri one, got ${unguarded.length}`);
 });
 
-Deno.test('the run-event path returns its preview BEFORE anything persists or mutates', () => {
-  const genCall = SRC.indexOf("invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', generateBody)");
-  assert(genCall > 0, 'could not find the event-path generate-run-plan call — scan is stale');
-
-  const after = SRC.slice(genCall);
-
-  // ⚠️ MATCH THE CALL, NEVER THE MENTION. The first cut of this test looked for the bare name
-  // `retireCompetingActivePlans` and matched the sentence in the SOURCE COMMENT that explains why
-  // the return has to sit above it — 248 characters after the generate call, so the test failed on
-  // correct code. A scanner that reads prose is measuring the wrong thing.
-  const previewReturn = after.indexOf('if (bodyPreview) {');
-  const planIdGuard = after.indexOf("throw new AppError('plan_generation_failed'");
-  const linkWrite = after.indexOf("plan_mode: 'rolling'");
-  const activate = after.indexOf("invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan'");
-  const retire = after.indexOf('await retireCompetingActivePlans(');
-
-  for (const [name, idx] of [['plan_id guard', planIdGuard], ['link write', linkWrite],
-    ['activate-plan', activate], ['retireCompetingActivePlans', retire]] as const) {
-    assert(idx > 0, `could not find ${name} after the generate call — scan is stale`);
-  }
-
-  assert(previewReturn > 0, 'the event path has no bodyPreview early return after generating');
-
-  // ⚠️ ABOVE THE plan_id CHECK, not merely above the writes. In preview mode the generator returns
-  // `plan_id: null` on purpose (`generate-run-plan:406`), so a return placed below this guard would
-  // throw `plan_generation_failed` on a preview that had in fact worked.
-  assert(previewReturn < planIdGuard, 'preview return sits BELOW the plan_id guard — a working preview would throw');
-  assert(previewReturn < linkWrite, 'preview return sits below the plan→goal link write');
-  assert(previewReturn < activate, 'preview return sits below activate-plan');
-  // The destructive one: this ends the athlete's current plan.
-  assert(previewReturn < retire, 'preview return sits below retireCompetingActivePlans — a preview could end a live plan');
-});
-
-Deno.test('the run-event generator call carries the no-persist flag on a preview', () => {
-  // Without this the guarded goal insert just moves the damage: no goal row, but a real `plans` row
-  // still written by the generator and then orphaned.
-  const body = SRC.slice(SRC.indexOf('const generateBody: Record<string, any> = {'));
-  const end = body.indexOf('\n    };');
-  assert(end > 0, 'could not bound generateBody — scan is stale');
-  assert(
-    /\.\.\.\(bodyPreview \? \{ preview: true \} : \{\}\)/.test(body.slice(0, end)),
-    'generateBody does not forward `preview: true` — a preview would persist a plan row',
-  );
-});
+// The run-event path and its two preview tests are gone with generate-run-plan (2026-10-01).
 
 Deno.test('the non-race guard that this bug hid behind is still in place', () => {
   // The regression that started all of this was a fix documented in ONE branch and assumed to cover

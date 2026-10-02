@@ -54,18 +54,11 @@ export type StepKey =
   // programme; the live one seeds the goal and opens the wizard on its frame. It sits where the
   // tier screen sat, with program ids in place of tiers, and Standard Focus never sees it.
   | 'program'
-  // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
-  // every screen after it is shaped by the answers: the date owns the block length (so the `length`
-  // step drops out), and the level picks the volume table the plan is built from.
-  | 'race'
-  // ⛔ SPLIT OUT OF `race` (2026-08-04). One question per card: the race card asks WHICH RACE, the
-  // level card asks WHERE THEY ARE, the intent card asks WHAT IT IS FOR. They were stacked on one
-  // scrolling card and the level question — the one that seeds every number in the plan — sat
-  // below the fold.
-  | 'level' | 'intent'
+  // ⛔ The old marathon flow's screens (`race`, `level`, `intent`, `strength`, `swim`) are gone with it
+  // (generate-run-plan deleted 2026-10-01); halves and marathons are built from Run → Race (`race_program`, `race_date`).
   | 'posture' | 'commitment' | 'length'
   // The old single `schedule` step, split one card per screen (below).
-  | 'days' | 'accessory' | 'swim'
+  | 'days' | 'accessory'
   /**
    * ⛔ THE ENDURANCE WEEK — ONE SCREEN, REPLACING `volume` + `hardday` ON THE STRENGTH PATH
    * (Michael's flow, 2026-08-24). Those two asked one question in two places: how much, then how
@@ -77,9 +70,6 @@ export type StepKey =
    * them.
    */
   | 'endurance'
-  // ⛔ STRENGTH, ON ITS OWN CARD (2026-08-06) — one primary decision per screen. It was the fifth
-  // question on "Your week" and got missed on a device.
-  | 'strength'
   // ⛔ THE WEEK WAS BRIEFLY THREE STEPS AND IS ONE AGAIN (2026-08-06). Those step keys are gone.
   // Michael: *"i thought we were doing one week 3 questions."* Three cards each holding a single
   // seven-chip row is three taps to answer what is visibly one thing, with the phone empty beneath.
@@ -120,7 +110,7 @@ export type StepKey =
 // sees a bike screen. The unit is the DISCIPLINE, not the question: run holds its day and its volume
 // together, because deciding one without seeing the other is deciding half of it.
 // This is grouping, not new logic: every control here was already gated on posture.
-function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceGoal = false): StepKey[] {
+function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean): StepKey[] {
   const kept = (d: Discipline) => state.posture[d] != null && state.posture[d] !== 'out';
   const strengthDevelop = state.posture?.strength === 'develop';
   const out: StepKey[] = [];
@@ -170,21 +160,10 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
     out.push('schedule');
   }
   // ⛔ The `run` and `bike` screens for other goals are gone (2026-09-16, Stage 7 session 1): every live
-  // route is `get_stronger` or `marathon`, the race flow is declared whole in `getSteps`, so no route
-  // reached them.
-  // Swim sits last — booked, not coached. It is the slot we merely hold, so it follows the work.
-  // ⛔ UNGATED FOR A RACE GOAL (2026-08-04). The condition was `strengthDevelop && swim === 'maintain'`,
-  // so on a marathon block the athlete could opt the swim IN on the posture card and then never be
-  // asked how many — `swim_days` went out unset and the engine guessed. The swim hold card is the
-  // same mechanic whichever goal is leading; what gates it is whether the swim is KEPT, not which
-  // discipline develops. Strength-path behaviour is unchanged (`maintain` is the only non-out state
-  // that path seeds for swim).
+  // route is `get_stronger`, so no route reached them.
   // ⛔ THE STANDALONE SWIM CARD IS OFF THE STRENGTH PATH (2026-08-17). Michael: the swim belongs on
   // the same card as the miles and the hours — it is a VOLUME question in its own unit, not a screen
   // of its own. It renders as the third row of `volume`.
-  // ⚠️ THE RACE PATH KEEPS ITS CARD: that flow has no `volume` step to fold it into.
-  const swimKept = state.posture?.swim != null && state.posture?.swim !== 'out';
-  if (isRaceGoal && swimKept) out.push('swim');
   return out;
 }
 
@@ -293,50 +272,17 @@ export function getSteps(state: StepRouterState): StepKey[] {
   // passes a REAL goal id and must keep doing so.
   const effective = state.goal;
   const isStrengthFocus = effective === 'get_stronger';
-  const isRaceGoal = effective === 'marathon';
   // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — the previous program's ratios are
   // 2:1, 3:2 and 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor
   // as designed. The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10
   // silently became 8 and 14 became 12: the athlete picked a number the engine never built. 8 ships
   // later as the short, off-ratio option, labelled as such.
-  // ⛔ AND NO LENGTH SLIDER ON A RACE EITHER, FOR A DIFFERENT REASON (2026-08-04). Strength Focus
-  // skips it because 12 is the protocol; a race skips it because THE DATE ALREADY DECIDED. The
-  // server computes `durationWeeks = max(floor, min(weeksOut, 20))` from the race date
-  // (`create-goal…:3293`) and never reads `target_weeks` on the event path. Showing a slider that
-  // moves a number the engine discards is the exact failure this file has produced twice before —
-  // "Days Per Week: 5" and "Weekly Hours Available: 6" printed as constraints the athlete never set.
-  // The confirm screen states the derived length instead.
-  // ⛔ THE RACE FLOW IS DECLARED WHOLE, NOT ASSEMBLED (2026-08-04). Michael's five screens:
-  // race+date, days (with the long-run day), level, intent, preview. It does NOT go through
-  // `scheduleSteps` — that builds a per-discipline flow from posture, which is the strength path's
-  // shape and produced three cards a race build does not want.
-  //
-  // ⛔ WHAT CAME OUT, AND WHY:
-  //   • `commitment` (the hours tier) — CUT. Screen 3 now carries volume as miles and a long run,
-  //     and `days` carries frequency. Asking hours after that is a THIRD estimate of the same
-  //     quantity, and it is the one athletes are worst at. `weekly_hours_available` is derived
-  //     from the miles instead (see `assemblePayload`).
-  //   • `posture` (the hold cards) — MOVED, not cut. Bike/swim maintenance is a decision about
-  //     disciplines outside the plan's primary, and it belongs after the athlete has seen the
-  //     plan. It now lives on the confirm card, under the preview.
-  //   • `length` — already skipped on a race; the date owns it.
-  // ⛔ RACE SKIPS THE TRAIN PICKER. It is reached from the entry card directly — racing is an intent
-  // that spans disciplines, not one of the four ongoing focuses (SPEC §B).
-  // ⛔ STRENGTH IS ITS OWN CARD (2026-08-06). It sat at the bottom of "Your week" — three stacked
-  // options with two-line descriptions, below the day count, the long-run day, the club night and
-  // two conditional notices — and Michael's device pass found it missed entirely. §2.1 recorded the
-  // accretion that put it there and kept the OUTCOME on his review; this moves the question, not the
-  // decision. The week card gets the training-day picker in the same pass, so it is not re-loaded.
-  // Capacity (level + weekly miles + days-a-week) comes BEFORE the week anchors and strength — Runna
-  // and the hybrid apps ask availability up front, since everything downstream is placed inside it
-  // (2026-08-07). Order: goal → race → level(capacity) → days(anchors) → strength → intent → confirm.
   /**
    * 'numbers' — "Know your numbers?" (SPEC-baseline-entry-2026-09-04): the last screen before the
    * commit, on EVERY route, because the choice (use the number on file / retest in week one) changes
    * what the plan contains, so the confirm screen's week must already reflect it. Optional: the
    * screen renders with defaults and Continue is never gated.
    */
-  if (isRaceGoal) return ['goal', 'race', 'level', 'intent', 'days', 'strength', 'numbers', 'confirm'];
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
@@ -380,7 +326,7 @@ export function getSteps(state: StepRouterState): StepKey[] {
   const head: StepKey[] = isStrengthFocus
     ? [...door, ...raceDate, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
-  const sched = scheduleSteps(state, isStrengthFocus, isRaceGoal);
+  const sched = scheduleSteps(state, isStrengthFocus);
   /**
    * ⛔ ON THE STRENGTH PATH "KNOW YOUR NUMBERS?" COMES BEFORE "YOUR WEEK" (Michael, off his phone 2026-09-13).
    * "Your week" draws week 1, and whether week 1 is the lift test week is this screen's answer, so asked

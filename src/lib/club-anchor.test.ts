@@ -65,20 +65,8 @@ Deno.test('a dropped discipline contributes no day — posture gates both slots'
 
 const SRC = await Deno.readTextFile(new URL('../components/NonRaceBuilder.tsx', import.meta.url));
 
-Deno.test('the intake routes the pin by the athlete\'s answer, not by assumption', () => {
-  // ⚠️ THE LINE GREW A SECOND SOURCE (§1i, 2026-08-17) — `qualityDays` is now a spread of the club
-  // pin AND the strength path's hard days, because that bag is sport-keyed and both feed it. What
-  // this test is actually protecting is unchanged and still asserted: the club pin is routed by the
-  // athlete's INTENSITY answer, so a social club run is never filed as the quality day.
-  assert(
-    /\.\.\.\(state\.runClubIntensity === 'quality' \? state\.qualityDays : \{\}\)/.test(SRC),
-    'the club pin no longer routes on intensity — it is back to always-quality',
-  );
-  assert(
-    /easyDays: state\.runClubIntensity === 'easy' \? state\.qualityDays : \{\}/.test(SRC),
-    'the easy branch is gone — a social club run will be filed as the quality day',
-  );
-});
+// ⛔ The source-text pins on the old marathon flow's club-intensity, strength and intent cards left with that flow
+// (generate-run-plan deleted 2026-10-01). `buildPreferredDays` above still routes a club night by its intensity.
 
 Deno.test('⛔ the screen no longer promises hard running on a day it may not place there', () => {
   // The copy under the picker used to read "The plan puts its hard running there" unconditionally,
@@ -90,79 +78,14 @@ Deno.test('⛔ the screen no longer promises hard running on a day it may not pl
   );
 });
 
-Deno.test('the strength choice is offered rather than assumed, with three real answers', () => {
-  // `non-race-goal-seeds` seeds a marathon with strength: 'maintain', which put two lifting days in
-  // the preview with nothing having asked. Michael, 2026-08-05: "we need to add strength as an
-  // option" — then, seeing two options: "are we using a the previous program? should give more discretion."
-  assert(
-    /strength: k === 'none' \? 'out' : 'maintain'/.test(SRC),
-    'the strength control no longer writes posture.strength — the default is unaskable again',
-  );
-  // ⚠️ LABELS REWORDED 2026-08-25 to match the shipped card (a2d772ee reworded them and this pin was
-  // not updated): "Keep lifting heavy" → "Keep it heavy", "Keep me together" → "Keep it together".
-  // The pin is on the THREE ANSWERS EXISTING, not on the wording — matched loosely so the next copy
-  // pass does not fail a test about routing.
-  assert(/Keep it together/.test(SRC), 'the durability option is gone');
-  assert(/Keep it heavy/.test(SRC), 'the heavy option is gone — the card is back to two answers');
-  assert(/Running only/.test(SRC), 'the "None" option is gone; strength is mandatory again');
-});
-
-Deno.test('⛔ heavy sends neural_speed WITHOUT turning strength into a develop block', () => {
-  // `derivePlanShape` hardcodes maintain → durability, so the race path overrides it directly.
-  // The override must NOT reach for posture 'develop': that pulls strength_frequency to 4
-  // (`strength_frequency: state.posture?.strength === 'develop' ? 4 : 2`), putting a four-day
-  // strength block underneath a marathon. Two heavy sessions is the Rønnestad protocol; four is a
-  // different sport.
-  assert(
-    /strength_protocol: 'neural_speed', strength_intent: 'performance'/.test(SRC),
-    'the heavy pick no longer sends neural_speed — it will fall back to durability silently',
-  );
-  assert(
-    /state\.posture\?\.strength === 'maintain' && state\.strengthProtocol === 'neural_speed'/.test(SRC),
-    'the heavy override is no longer gated on maintain — check it has not become a develop block',
-  );
-  // ⚠️ THIS USED TO PIN THE LITERAL TERNARY `develop ? 4 : 2`, and that expression was DELETED on
-  // 2026-08-06 — it was the strength-none leak: 'out' is not 'develop', so declining strength sent 2
-  // lifting days and `arc-setup-persistence` rebuilt a protocol from them. The rule the assertion
-  // was protecting (heavy stays at 2, it does not become a develop block) is unchanged; it now
-  // lives in one named helper instead of two copies of a ternary, so pin the RULE.
+Deno.test('strength frequency goes through the one helper, and out asks for no lifting days', () => {
   assert(
     /strength_frequency: strengthFrequencyForPosture\(state\.posture\?\.strength\)/.test(SRC),
     'the payload no longer routes strength frequency through the one helper',
   );
-  assert(
-    /if \(p === 'maintain'\) return 2;/.test(SRC),
-    'strength_frequency changed shape — confirm the heavy pick (maintain) still sends 2, not 4',
-  );
+  assert(/if \(p === 'maintain'\) return 2;/.test(SRC), 'strength_frequency changed shape for maintain');
   assert(
     /if \(p === 'develop'\) return 4;/.test(SRC) && /return 0;/.test(SRC),
     'the develop→4 / out→0 rungs changed — an out posture must never ask for lifting days',
-  );
-});
-
-Deno.test('⛔ §0h — the silent equipment downgrade is stated', () => {
-  // generate-run-plan honours a protocol only at strength_tier 'strength_power' (barbell on file).
-  // Without it the heavy pick becomes durability and nothing says so.
-  assert(
-    /equipmentTier === 'bodyweight_bands'/.test(SRC),
-    'the equipment warning is gone — a bodyweight athlete picks heavy and silently gets durability',
-  );
-});
-
-// ── the intent card actually reaches the engine ──────────────────────────────────────────────────
-
-Deno.test('⛔ "A time" reaches the server as performance intent, not a hardcoded completion', () => {
-  // `training_prefs.training_intent` was the constant `'completion'` on every path. `create-goal`
-  // resolves the approach from `training_intent` FIRST and returns before it ever reads `goal_type`
-  // — so the intent card's answer was collected, sent, and shadowed. Every race built `sustainable`:
-  // no tempo, no intervals, for anyone. Michael, 2026-08-05: "no speed work showing up."
-  assert(
-    /training_intent: isRace && state\.raceIntent === 'speed' \? 'performance' : 'completion'/.test(SRC),
-    'training_intent is hardcoded again — the intent card is decorative and every race build is easy running',
-  );
-  // and the second field must still travel, in agreement rather than in competition
-  assert(
-    /goal_type: state\.raceIntent \|\| 'complete'/.test(SRC),
-    'the goal_type fallback is gone — the two intent fields must agree, not one replace the other',
   );
 });

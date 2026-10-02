@@ -99,7 +99,7 @@ import {
   type RaceFinishProjectionV1,
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { resolveGoalTargetTimeSeconds, targetSecondsFromPlanConfig } from '../_shared/resolve-goal-target-time.ts';
-import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
+import { getPacesFromScore } from '../_shared/effort-score.ts';
 import {
   buildDailyLedger,
   buildIdentity,

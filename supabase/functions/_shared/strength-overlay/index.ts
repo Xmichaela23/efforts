@@ -8,29 +8,29 @@ import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from '
 import {
   getProtocol,
   resolveStrengthProtocolForGoal,
-} from '../shared/strength-system/protocols/selector.ts';
+} from '../../shared/strength-system/protocols/selector.ts';
 // ⛔ THE LIFTS ARE PLACED BY THE ENGINE NOW, NOT BY A WEEKDAY GRID (2026-08-08).
 // `simplePlacementPolicy` held Higdon's and Daniels' EXAMPLE weeks as literal weekdays
 // (Mon=Upper, Wed=Lower, Fri=Optional …) and could not answer the only question that matters —
 // "is this day clear of the long run" — for any athlete who does not run long on Sunday.
 // `solverPlacementPolicy` asks `_shared/week-solver.ts`, which reads the same law the runs do.
 // See that file's header for what it deliberately does NOT decide.
-import { solverPlacementPolicy } from '../shared/strength-system/placement/solver.ts';
-import { isGetStrongArc, resolveStrengthArcProtocol } from '../shared/strength-system/strength-arc.ts';
-import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
+import { solverPlacementPolicy } from '../../shared/strength-system/placement/solver.ts';
+import { isGetStrongArc, resolveStrengthArcProtocol } from '../../shared/strength-system/strength-arc.ts';
+import { mapApproachToMethodology } from '../../shared/strength-system/placement/strategy.ts';
 import {
   ProtocolContext,
   StrengthPhase,
   PlacedSession,
   IntentSession,
-} from '../shared/strength-system/protocols/types.ts';
-import type { PlanningMemoryContext } from '../_shared/athlete-memory.ts';
-import { canonicalizePhaseName, isRestedTerminal, protocolPhaseName } from '../_shared/periodization/index.ts';
+} from '../../shared/strength-system/protocols/types.ts';
+import type { PlanningMemoryContext } from '../athlete-memory.ts';
+import { canonicalizePhaseName, isRestedTerminal, protocolPhaseName } from '../periodization/index.ts';
 
-/** Interference risk threshold above which we force noDoubles. Science: AMPK/mTOR conflict is highest within 6 hrs of concurrent sessions. */
+/** OURS — interference risk above which the overlay forces no doubles. The direction is the AMPK/mTOR conflict within ~6 h of concurrent sessions; the 0.65 cut is ours. */
 const INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD = 0.65;
 
-/** Minimum confidence required to display computed weight instead of "X% 1RM" text. */
+/** OURS — the confidence a computed weight needs before it is printed instead of "X% 1RM". */
 const WEIGHT_RESOLUTION_CONFIDENCE_THRESHOLD = 0.7;
 
 // ============================================================================

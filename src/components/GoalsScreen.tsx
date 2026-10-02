@@ -1543,6 +1543,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             )
           ) : (() => {
             const conflictPlan = goal.goal_type === 'event' ? findConflictPlan(goal) : null;
+            // ⛔ NO "Build Plan" FOR A RUN RACE: the old marathon builder is gone (generate-run-plan deleted 2026-10-01);
+            // halves and marathons are built from Run → Race. "Build season plan" (two or more races) stays.
+            const offersBuild = !(goal.goal_type === 'event' && goalSportLower(goal.sport) === 'run' && activeEventGoals.length < 2);
 
             if (goal.goal_type === 'event' && conflictPlan) {
               return (
@@ -1559,7 +1562,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     >
                       Link existing plan
                     </button>
-                    <button
+                    {offersBuild && <button
                       type="button"
                       className="w-full flex items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       disabled={buildingGoalId === goal.id || seasonBuilding}
@@ -1576,12 +1579,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                           {activeEventGoals.length >= 2 ? 'Build season plan' : 'Build Plan'}
                         </>
                       )}
-                    </button>
+                    </button>}
                   </div>
                 </div>
               );
             }
-            if (goal.goal_type === 'event') {
+            if (goal.goal_type === 'event' && (multipleEventGoals || offersBuild)) {
               if (multipleEventGoals) {
                 return (
                   <p className="text-xs text-white/40 leading-relaxed">
@@ -1778,7 +1781,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     setShowArcSetupNextStep(false);
                   },
                 }
-              : {
+              // ⛔ No "Build training plan" for a run race: the old marathon builder is gone (generate-run-plan deleted
+              // 2026-10-01); halves and marathons are built from Run → Race.
+              : goalSportLower(primaryActiveEventGoal.sport) === 'run'
+                ? null
+                : {
                   subtitle: `Create your schedule for ${primaryActiveEventGoal.name}.`,
                   label: buildingGoalId === primaryActiveEventGoal.id ? 'Building…' : 'Build training plan',
                   disabled: Boolean(buildingGoalId === primaryActiveEventGoal.id || seasonBuilding),
@@ -1798,10 +1805,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               }
       : null;
 
-  // `onPlanSeason` is the exact handler the old top-level "Plan a season" button carried — it closes
-  // the Goals screen and routes to the season builder. It is passed DOWN rather than reimplemented
-  // in the builder, because closing Goals is this screen's job, not the builder's (the builder's own
-  // `onClose` only unmounts the embedded view and would leave Goals sitting on top of the route).
   if (showBuilder) {
     return (
       <div className="h-full">
@@ -1809,7 +1812,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           entry={showBuilder}
           trainCard={showBuilder === 'train' ? builderTrainCard ?? undefined : undefined}
           onClose={() => setShowBuilder(null)}
-          onPlanSeason={() => { onClose(); navigate('/arc-setup'); }}
         />
       </div>
     );
@@ -2096,7 +2098,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             ) : null}
           </div>
         )}
-        {showArcSetupNextStep && (
+        {showArcSetupNextStep && (loading || arcSetupFollowUp) && (
           <div className="rounded-2xl border border-teal-500/40 bg-teal-950/45 p-4 mb-4 shrink-0">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold text-teal-100/95 leading-snug">What’s next</p>
@@ -2304,11 +2306,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               row is inert; wire it to `setShowBuilder('build')` the day the flow lands. */}
           {/* The inert "Build your own" row is gone (Michael, 2026-09-08). Restore it the day the
               build-your-own flow lands. */}
-          {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
-            season should be in race"*). It now lives inside the Race flow, under the race fields,
-            as the way out for an athlete racing more than once — see the `race` step in
-            `NonRaceBuilder`. The handler moved with it (`onPlanSeason`, passed down at the builder
-            mount above); the route it opens (`/arc-setup`) is unchanged. */}
+          {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON (Michael, 2026-08-05), and the builder's "Racing more than once
+              this year?" door is gone too: the season planner is on hold (2026-10-01). */}
           {inactiveGoals.length > 0 && (
           <button
             className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-xs text-white/55 hover:text-white/80 transition-colors"
