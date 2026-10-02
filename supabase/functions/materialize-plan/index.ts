@@ -55,6 +55,7 @@ import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { barLbForExercise, calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 // Round 4 (2026-09-18): the warm-up sets in front of a standing-plan barbell lift — FIELD, StrongLifts (see the file).
 import { warmUpLineFor, warmupSetsFor } from '../_shared/standing-plan/warmup.ts';
+import { RACE_PACE_OF_THRESHOLD } from '../_shared/standing-plan/race-week.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
@@ -4342,7 +4343,7 @@ Deno.serve(async (req) => {
        * newcomer gets one from week one's time trial (p210). FIELD: Runna sets race pace from current ability.
        */
       if (standingRaceDistance && thrResolved.sec_per_mi != null) {
-        const pct = standingRaceDistance === 'marathon' ? 0.92 : 0.95;
+        const pct = RACE_PACE_OF_THRESHOLD[standingRaceDistance === 'marathon' ? 'marathon' : 'half'];
         goalRacePaceSecPerMi = Math.round(thrResolved.sec_per_mi / pct);
         console.log(`[Paces] Race block (${standingRaceDistance}) race pace: ${goalRacePaceSecPerMi}s/mi = threshold ${thrResolved.sec_per_mi} / ${pct}`);
       }

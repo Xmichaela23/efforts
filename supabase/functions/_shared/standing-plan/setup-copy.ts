@@ -213,6 +213,22 @@ export const RACE_DATE_COPY = {
       blurb: 'Lifting aimed at building muscle size, with speed lifts, jumps and sprints. Four lifting days a week. For lifters with a solid strength background.',  // not-instruction: p253 "build muscle size", "dynamic effort/speed movements, plyometrics, sprints", "a solid strength background"
     },
   } as Record<string, { label: string; blurb: string }>,
+  /**
+   * ⛔ A RACE PLAN IS NAMED FOR ITS RACE (Michael, 2026-10-02: a marathon "saves as long run, not marathon"). Keyed by
+   * distance, then by the focus the race screen picked (`run_half` = Strength, `run_half_hyp` = Hypertrophy). The goal and
+   * the plan both carry it. Approved 2026-10-02.
+   */
+  plan_names: {
+    half: { run_half: 'Half marathon · Strength', run_half_hyp: 'Half marathon · Hypertrophy' },  // not-instruction: plan names
+    marathon: { run_half: 'Marathon · Strength', run_half_hyp: 'Marathon · Hypertrophy' },  // not-instruction: plan names
+  } as Record<string, Record<string, string>>,
+  /**
+   * ⛔ THE RUN FOCUS SCREEN ON A RACE PLAN (Michael, 2026-10-02: "we need to be clear"). The chips set week one; the race
+   * plan grows the runs from there. `long_grows` prints the long run's own peak for the chip picked (`raceLongRunPeaks`).
+   * Approved 2026-10-02.
+   */
+  lengths_sub: 'These are the lengths for week one. The plan makes your runs longer each week, toward race day.',  // not-instruction: what the chips set
+  long_grows: 'Grows to {length} by week {week}.',  // not-instruction: the long run's peak in this plan
   title: 'Race day',  // not-instruction: a screen title
   subtitle: 'The plan runs from the week you start to race day.',
   race_day_label: 'Race day',  // not-instruction: a field label

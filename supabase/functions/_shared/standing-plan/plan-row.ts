@@ -18,6 +18,7 @@ import {
   type ComposeArgs,
   type ComposedWeek,
   type PlanSession,
+  raceLongRunPeak,
 } from './compose.ts';
 import { FRAMES, JOINED_PART_TAG, type EnduranceExperience, type FrameId } from './frames.ts';
 import type { ConflictRule, WeekConflict } from './week-conflicts.ts';
@@ -286,6 +287,33 @@ const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satu
  * ⚠️ `weeks` IS THE ATHLETE'S ASK, UNROUNDED. Get Stronger rounds down to whole four-week the previous program
  * cycles because its wave is four weeks long; this block has no wave, so ten weeks means ten weeks.
  */
+/**
+ * ⛔ THE LONG RUN'S PEAK FOR EACH LENGTH THE RUN FOCUS SCREEN OFFERS (2026-10-02) — the block `buildStandingPlanRow` would
+ * build from these same arguments, with the long run starting at each option. Keyed by the option's minutes.
+ */
+export function raceLongRunPeaks(
+  args: Parameters<typeof buildStandingPlanRow>[0],
+  options: number[],
+): Record<string, { minutes: number; week: number }> {
+  if (!args.race) return {};
+  const base = {
+    ...args.compose,
+    ...(args.dayMap ? { dayOffset: args.dayMap.order } : {}),
+    weeks: Math.max(1, Math.round(args.weeks)),
+    taperWeeks: args.taperWeeks ?? [],
+    race: args.race,
+  };
+  const first = raceLongRunPeak(base);
+  if (!first) return {};
+  const out: Record<string, { minutes: number; week: number }> = {};
+  for (const m of options) {
+    const mix = base.sportMix ?? {};
+    const peak = raceLongRunPeak({ ...base, sportMix: { ...mix, minutes: { ...(mix.minutes ?? {}), [first.key]: m } } });
+    if (peak) out[String(m)] = { minutes: peak.minutes, week: peak.week };
+  }
+  return out;
+}
+
 export function buildStandingPlanRow(args: {
   compose: Omit<ComposeArgs, 'week' | 'column'>;
   /** The pick keys the athlete set by hand (`slot_picks_chosen`, 2026-09-25); absent = not recorded. */

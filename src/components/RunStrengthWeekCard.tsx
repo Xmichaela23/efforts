@@ -115,6 +115,10 @@ export default function RunStrengthWeekCard(props: Props) {
                       </GalaxyButton>
                     ))}
                   </div>
+                  {/* ⛔ ON A RACE PLAN, WHERE THIS LONG RUN GOES (2026-10-02): the server's line for the chip picked. */}
+                  {pickedLong != null && week.long_grows_lines?.[String(pickedLong)] ? (
+                    <p className="text-white/70 text-xs mt-2 leading-relaxed">{week.long_grows_lines[String(pickedLong)]}</p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

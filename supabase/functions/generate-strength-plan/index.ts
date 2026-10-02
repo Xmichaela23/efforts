@@ -42,6 +42,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
  */
 import {
   buildStandingPlanRow,
+  raceLongRunPeaks,
   chooseDayMap,
   isWeekday,
   titleCaseDay,
@@ -112,8 +113,9 @@ import {
   RIDE_HOURS_DEFAULT,
   RUN_DAYS_DEFAULT,
 } from '../_shared/athlete-weekly-intent.ts';
+import { fill, lengthWords, RACE_DATE_COPY } from '../_shared/standing-plan/setup-copy.ts';
 // ⛔ Half marathon (Stage 2, 2026-09-24): the race week, the plan week a date falls in, and the Monday a block opens on.
-import { RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_MILES, racePlanFromWeek, raceTaperWeeks, weekdayOfIso, type RaceDistance, type StandingRace } from '../_shared/standing-plan/race-week.ts';
+import { RACE_BLOCK_MAX_WEEKS, RACE_BLOCK_MIN_WEEKS, RACE_MILES, RACE_PACE_OF_THRESHOLD, racePlanFromWeek, raceTaperWeeks, weekdayOfIso, type RaceDistance, type StandingRace } from '../_shared/standing-plan/race-week.ts';
 import { planWeekContaining } from '../_shared/planning-context.ts';
 import { mondayOfCalendarYmd, mondayOfToday } from '../_shared/parse-local-date.ts';
 import { FALLBACK_EASY_MIN_PER_MILE } from '../_shared/athlete-weekly-intent.ts';
@@ -674,7 +676,11 @@ Deno.serve(async (req: Request) => {
         easyPaceSecPerMi: easyPaceMin != null ? easyPaceMin * 60 : null,
         demonstrated,
       });
-      if (preview === true && (body as Record<string, unknown>).preview_scope === 'intake') {
+      const intakeOnly = preview === true && (body as Record<string, unknown>).preview_scope === 'intake';
+      // ⛔ A RACE PLAN'S INTAKE GOES ON TO THE BLOCK'S ARGUMENTS (2026-10-02): the Run focus screen prints the long run's
+      // peak for each chip (`raceLongRunPeaks`), read off the same arguments the build uses, without composing the block.
+      const raceIntake = intakeOnly && typeof (body as Record<string, unknown>).race_date === 'string';
+      if (intakeOnly && !raceIntake) {
         return json({ success: true, plan_id: null, plan: null, intake }, 200);
       }
 
@@ -992,13 +998,17 @@ Deno.serve(async (req: Request) => {
             distance: raceDistance,
             // A race more than 26 weeks out starts on the plain programme; the race plan takes over 26 weeks out.
             ...(racePlanFromWeek(raceWeek) > 1 ? { from_week: racePlanFromWeek(raceWeek) } : {}),
-            // OURS — the calendar's length only: the race distance at the athlete's easy pace (race-week.ts).
-            duration_min: Math.round(RACE_MILES[raceDistance] * (easyPaceMin ?? FALLBACK_EASY_MIN_PER_MILE)),
+            // The race at race pace — threshold at the race's percentage (`RACE_PACE_OF_THRESHOLD`, pp233–234), the pace the
+            // race-pace steps carry (Michael, 2026-10-02: 4h56 at easy pace read wrong). OURS — with no threshold on file, the
+            // calendar's length falls back to the easy pace, as before.
+            duration_min: Math.round(RACE_MILES[raceDistance] * (thrResolved.sec_per_mi != null
+              ? thrResolved.sec_per_mi / RACE_PACE_OF_THRESHOLD[raceDistance] / 60
+              : (easyPaceMin ?? FALLBACK_EASY_MIN_PER_MILE))),
           };
         }
       }
 
-      const row = buildStandingPlanRow({
+      const rowArgs: Parameters<typeof buildStandingPlanRow>[0] = {
         compose: {
           frame: frameId,
           /**
@@ -1134,7 +1144,19 @@ Deno.serve(async (req: Request) => {
         // ⛔ ALWAYS NULL SINCE 2026-08-30 — nothing is skipped, so there is no evidence to record.
         skipEvidence: null,
         extraNotes: wiringNotes,
-      });
+      };
+      if (raceIntake) {
+        const rsw = intake?.run_strength_week;
+        if (rsw && race) {
+          const peaks = raceLongRunPeaks(rowArgs, rsw.long_run_options);
+          rsw.sub_line = RACE_DATE_COPY.lengths_sub;
+          rsw.long_grows_lines = Object.fromEntries(Object.entries(peaks).map(([m, p]) => [
+            m, fill(RACE_DATE_COPY.long_grows, { length: lengthWords(p.minutes), week: p.week }),
+          ]));
+        }
+        return json({ success: true, plan_id: null, plan: null, intake }, 200);
+      }
+      const row = buildStandingPlanRow(rowArgs);
 
       console.log(
         `[standing-plan] composed: ${row.name} (${row.duration_weeks}wk, frame ${frameId}) — `

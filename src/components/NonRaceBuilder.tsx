@@ -1820,7 +1820,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, trainCard
   // ⛔ THE FRAME EVERY SLOT QUESTION ON THIS SCREEN READS — see `frameOf`.
   const wizardFrame: FrameId = frameOf(state);
   /** ⛔ THIS PLAN'S NAME, BUILD THIS PLAN? LINES AND FTP LINE — the server's (`builder.setup.plans`, 2026-09-13). */
-  const planCopy = state.goal === 'get_stronger' ? setupCopy?.plans[wizardFrame] ?? null : null;
+  const planCopyFrame = state.goal === 'get_stronger' ? setupCopy?.plans[wizardFrame] ?? null : null;
+  // ⛔ A RACE PLAN IS NAMED FOR ITS RACE (`RACE_DATE_COPY.plan_names`, 2026-10-02): "Marathon · Strength", not the week's name.
+  const raceBlockName = state.raceBlockDistance && state.focus
+    ? setupCopy?.race_date?.plan_names?.[state.raceBlockDistance]?.[state.focus] ?? null
+    : null;
+  const planCopy = planCopyFrame && raceBlockName ? { ...planCopyFrame, name: raceBlockName } : planCopyFrame;
   /**
    * ⛔⛔⛔ THE POSTURE THE SKIPPED SCREEN WOULD HAVE WRITTEN — and this is a BLOCKER FIX, not tidiness
    * (Michael, 2026-08-30). See `skipsSportScope` for the ruling and `STANDARD_FOCUS_POSTURE` for the

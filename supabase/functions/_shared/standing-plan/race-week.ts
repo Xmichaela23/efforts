@@ -40,8 +40,16 @@ export function racePlanFromWeek(raceWeek: number): number {
 /** FIELD — see the header; ledger row in docs/STATE-SOURCES.md. */
 export const RACE_TAPER_WEEKS: Record<RaceDistance, number> = { half: 2, marathon: 3 };
 
-/** The race distances in miles (21.0975 / 42.195 km), the numbers `generate-run-plan` uses. */
+/** The race distances in miles (21.0975 / 42.195 km). */
 export const RACE_MILES: Record<RaceDistance, number> = { half: 13.1, marathon: 26.2 };
+
+/**
+ * ⛔ RACE PACE IS THE ATHLETE'S THRESHOLD AT THE RACE'S PERCENTAGE (Michael, 2026-09-30). Viada pp233–234 print the
+ * race-specific NT work at 95% of threshold for a half marathon and 92% for a marathon; percentages are of threshold
+ * SPEED, so the pace divides (`threshold / pct`). Read by materialize-plan (the race-pace steps) and generate-strength-plan
+ * (the race day's length on the calendar).
+ */
+export const RACE_PACE_OF_THRESHOLD: Record<RaceDistance, number> = { half: 0.95, marathon: 0.92 };  // Viada pp233-234
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 

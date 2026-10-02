@@ -121,6 +121,8 @@ export type EnduranceIntakeReadout = {
       rows: { title: string; session: string; length: string; card: string }[];
     };
     long_option_labels: Record<string, string>;
+    /** On a race plan only (2026-10-02): the line under the long run's chips, keyed by each chip's minutes. */
+    long_grows_lines?: Record<string, string>;
     rows: Array<{
       key: SlotKey; title: string; session: string; length: string | null; is_long: boolean;
       /** An easy row with chips (2026-09-23): the frame's tiers, the first selected. */

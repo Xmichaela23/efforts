@@ -18,6 +18,7 @@ import {
   FRAMES,
   assignSports,
   buildStandingPlanRow,
+  raceLongRunPeaks,
   chooseDayMap,
   defaultCompetitionLifts,
   fenceMixToFrame,
@@ -437,4 +438,31 @@ Deno.test('⛔ A RACE MORE THAN 26 WEEKS OUT — the plain programme first, the 
   }
   assert(Number(longOf(row, 20)) > Number(longOf(row, 9)), 'the long run grows once the race plan begins');
   assertEquals(Object.keys(row.sessions_by_week).length, 34);
+});
+
+Deno.test('⛔ THE RUN FOCUS SCREEN\'S PEAK IS THE BUILT PLAN\'S — "Grows to {length} by week {week}" matches the block', () => {
+  for (const [distance, weeks, frame] of [['marathon', 12, 'strength_half'], ['marathon', 16, 'hyp_half'], ['half', 10, 'strength_half'], ['marathon', 34, 'strength_half']] as const) {
+    const raceDate = addDays(START, (weeks - 1) * 7 + 6);
+    const race = { ...raceFor(raceDate, distance), ...(racePlanFromWeek(weeks) > 1 ? { from_week: racePlanFromWeek(weeks) } : {}) };
+    const sports: Record<string, 'run'> = {};
+    for (const d of FRAMES[frame].columns.standard) d.endurance.forEach((_, i) => { sports[`${d.day}:${i}`] = 'run'; });
+    for (const start of [105, 120, 134]) {
+      const mix = fenceMixToFrame(frame, { runs: Object.keys(sports).length, rides: 0, swimDays: 0, rideCount: null, slots: sports, archetypes: null, minutes: { '6:0': 105 } });
+      assignSports(FRAMES[frame].columns.standard, mix);
+      const dayMap = chooseDayMap(frame, { longRunDay: 'Saturday', longRideDay: null, longSlotSport: 'run', hardDays: [], unavailableDays: [] });
+      const rowArgs = { compose: { frame, competitionLifts: defaultCompetitionLifts(), seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+        workingNumbers: WORKING, baselines: BASELINES, equipment: ['Commercial gym'], roundTo: 5, sportMix: mix } as never,
+        weeks, taperWeeks: raceTaperWeeks(weeks, distance), race, dayMap };
+      const peak = raceLongRunPeaks(rowArgs, [start])[String(start)];
+      assert(peak, `${distance} ${weeks}wk ${frame} from ${start}: a peak`);
+      const pinned = { ...rowArgs, compose: { ...(rowArgs.compose as object), sportMix: { ...mix, minutes: { ...(mix.minutes ?? {}), '6:0': start } } } as never };
+      const row = buildStandingPlanRow(pinned);
+      const longs = Object.entries(row.sessions_by_week)
+        .filter(([w]) => !raceTaperWeeks(weeks, distance).includes(Number(w)))
+        .map(([w, ss]) => [Number(w), Number(ss.find((s) => slotOf(s) === '6:0' && s.type === 'run')?.duration ?? 0)] as const);
+      const max = Math.max(...longs.map(([, m]) => m));
+      const first = longs.filter(([, m]) => m === max).map(([w]) => w).sort((a, b) => a - b)[0];
+      assertEquals([peak.minutes, peak.week], [max, first], `${distance} ${weeks}wk ${frame} from ${start}`);
+    }
+  }
 });

@@ -5071,6 +5071,29 @@ function raceStandardWeeks(
   return out;
 }
 
+/**
+ * ⛔ WHERE A RACE BLOCK'S LONG RUN PEAKS (Michael, 2026-10-02: "we need to be clear"). The race growth schedule's own
+ * answer (`raceStandardWeeks`, the weeks `composeBlock` builds), read without composing the block: the longest the long
+ * run gets in a standard week and the first week it gets there. The Run focus screen prints it under the long run's
+ * chips ("Grows to 2h48 by week 9."). Null on a block with no race or no long run.
+ */
+export function raceLongRunPeak(
+  args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[] },
+): { key: string; minutes: number; week: number } | null {
+  if (!args.race) return null;
+  const weeks = raceStandardWeeks(args);
+  if (!weeks) return null;
+  const longKey = Object.entries(weeks[Number(Object.keys(weeks)[0])]?.archetypes ?? {})
+    .find(([, a]) => a === 'race_pace_finish')?.[0];
+  if (!longKey) return null;
+  let best: { key: string; minutes: number; week: number } | null = null;
+  for (const w of Object.keys(weeks).map(Number).sort((a, b) => a - b)) {
+    const m = Number(weeks[w]?.minutes?.[longKey]);
+    if (Number.isFinite(m) && (!best || m > best.minutes)) best = { key: longKey, minutes: m, week: w };
+  }
+  return best;
+}
+
 export function composeBlock(
   args: Omit<ComposeArgs, 'week' | 'column'> & { weeks: number; taperWeeks?: number[] },
 ): ComposedWeek[] {
