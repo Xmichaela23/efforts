@@ -633,3 +633,40 @@ Commits `3ff9f9331`, `958847aa7`, `b90c90826`. The trap bar swap sheet is VERIFI
    still line up with its steps (D-496; `plannedWhole` gives the analysis the same steps). The drills are the plan's:
    one per p227 family, walking p89's order weekly, ladder drills only with a ladder.
 Commit `1533208a6`. DEPLOYED, installed; NOT yet seen on a plyo day or on the watch.
+
+## D-511 — Half marathon and marathon plans are built back from race day on the book's p250 / p252 weeks (2026-09-30 → 10-02, Michael)
+
+Run → Race → Half marathon / Marathon. "Which week?" picks Strength (p250, frame `strength_half`) or Hypertrophy (p252,
+`hyp_half`); race day sets the block's length. `generate-strength-plan` builds it (`race` on `config.standing_plan`);
+rules in `_shared/standing-plan/race-week.ts`, growth in `compose.ts raceStandardWeeks`.
+- **Running grows** 5% of the sub-VT1 bucket a week (p148), easy runs first, each to its level's printed top (p235); the
+  long run is p235's race-pace finish, up to 3 hours for a marathon (p251, p253). Taper: half 2 weeks, marathon 3, the
+  page's taper column. The hard cycle is solved once on the starting lengths (`holdMinutes`).
+- **Threshold work** moves into the race band (p251/p253: half 92–97%, marathon 89–94%) with race-specific repeats
+  (pp233–234). **Race pace = threshold ÷ 0.95 (half) / 0.92 (marathon)** (`RACE_PACE_OF_THRESHOLD`), used by the
+  race-pace steps and race day's calendar length.
+- **Lifting:** hypertrophy sets drop one at a time as running grows (p151), never below one a row.
+- **Length:** 2–52 weeks (OURS). Under 12 (marathon) / 8 (half) builds with a note (FIELD: Nike Run Club, Runna). Over
+  26 weeks: the plain programme until 26 weeks out (`race.from_week`, FIELD: Runna/Garmin 26-week cap).
+- **Words** (all approved): Strength / Hypertrophy cards and subtitle; plan names "Marathon · Strength" etc.
+  (`RACE_DATE_COPY.plan_names`); Run focus "These are the lengths for week one…" and "Grows to {length} by week
+  {week}." per chip (`raceLongRunPeaks`, pinned to the built block by test).
+- Rejected: a goal-time input (the race pace follows the threshold the athlete accepts, as Runna does).
+
+## D-512 — The old marathon builder is deleted; Run → Race is the only way to build a half or marathon (2026-10-01, Michael: "I don't want it haunting us down the road")
+
+`generate-run-plan` deleted (code + deployed function) with everything only it used: create-goal's single run race path
+and run non-race path (now `unsupported_sport`), `race-readout.ts`, the marathon-timeline helpers, `_shared/endurance/
+{index,pace-zones,volume,distribution}`, `frequency-policy.ts`, `src/lib/run-volume-tables.ts`, the old marathon wizard
+screens. delete-goal does not rebuild a lone run race; Goals offers no "Build Plan" on a single run race goal;
+"Racing more than once this year?" is hidden (season planner on hold). Moved unchanged: VDOT pace math →
+`_shared/effort-score.ts`; the strength overlay (adapt-plan's relayout, tri plans) → `_shared/strength-overlay/`.
+Rejected: routing single races to the season builder — `buildCombinedPlan` refuses one event goal (tested live).
+
+## D-513 — The Performance summary is built after every sync, so Today's finished card has all its tiles (2026-10-01, Michael)
+
+Today's ride/run tiles (Elevation, Pace, Execution) read the stored `session_detail_v1`, which only `workout-detail`
+saved, on open. `recompute-workout` step 7 now calls `workout-detail` (service door: service key + `user_id`) after the
+snapshot; `analyze-running-workout` keeps the stored summary on a re-analysis (it was a full replacement). Older
+sessions fill in when opened.
+

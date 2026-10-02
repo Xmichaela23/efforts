@@ -1,33 +1,45 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-30, PM chat — main = `1533208a6` + this docs commit; every server importer DEPLOYED; the phone has the latest build)
+## 🧭 NEXT SESSION — START HERE (written 2026-10-02, PM chat — main = `c73d979af` + this docs commit; every server importer DEPLOYED; the phone has the latest build)
 
 > **How to talk to Michael (read first):** `~/.claude/CLAUDE.md` and the memory index. Plain spoken sentences, no
 > jargon, no idioms. Where a page decides it, build it; bring him book silences, athlete-facing words and pure design
 > calls. A "go" is the word go. Every athlete-facing line gets his yes. Don't tune anything to his own numbers.
 >
+> **State: WORK IN PROGRESS on the race plans.** Michael is building and deleting marathon / half plans on his phone
+> until they read right. His next ask is the **logger** (new chat).
+>
 > **Your job, in order:**
-> 1. **Have him look at what is live and unseen:** a plyo day (Today: one card "Plyo - {run}", drills first; the watch
->    opens on one "Plyo warm-up: …" step, lap once); a back extension set with a plate (Lb box, empty still checks);
->    a Deadlift → Trap Bar Deadlift swap keeps 165-style weights set by set; "Rest of plan" to the trap bar renames the
->    later rows and gives them a weight; State's trap bar card and best-sets "first → best" lines appear after his next
->    logged workout (the snapshot rebuilds on ingest).
-> 2. **After his next run on a plyo day:** check the recorded file's first lap is read as the warm-up and the run's laps
->    still line up (D-496 `oneForOne`; the warm-up step is in `plannedWhole`'s steps).
-> 3. **Still open from 2026-09-29:** p251/p253's 3-hour marathon strategy session and p253's two advanced options (D-506);
->    Strength + Half's `no_rest_day` deload line words; a pick losing to a frame's own rotation list (p148 agent).
+> 1. **If he brings a race-plan screenshot:** the race plans are Run → Race → Half marathon / Marathon → "Which week?"
+>    (Strength = p250 frame `strength_half`, Hypertrophy = p252 frame `hyp_half`) → race date → … → Run focus lengths.
+>    Rules and stages: `docs/WORKORDER-race-builds-2026-09-30.md` (Stages 0–5b DONE). Code: `_shared/standing-plan/
+>    race-week.ts`, `compose.ts` (`raceStandardWeeks`, `raceLongRunPeak`), `plan-row.ts` (`raceLongRunPeaks`),
+>    `generate-strength-plan` (race validation, `RACE_PACE_OF_THRESHOLD`), words in `setup-copy.ts RACE_DATE_COPY`.
+> 2. **Unseen on a device (POLISH-PUNCH-LIST AWAITING 2026-10-02):** plan names, race day at race pace, the Run focus
+>    "Grows to {length} by week {week}." line, the Strength / Hypertrophy cards, Today's tiles filling in after a sync.
+> 3. **Season planner is ON HOLD** (Michael's overhaul pending). It is still reachable from State's "review with Arc";
+>    a single run race entered there is refused by create-goal (`unsupported_sport`, words never approved for a screen).
 >
-> **What shipped 2026-09-29/30 — do not redo.** D-507 … D-510 in `DECISIONS-LOG-4.md`:
-> - Back extension takes a plate, priced body weight + plate (D-507).
-> - Trap bar: on every Deadlift swap sheet (VERIFIED); a swapped heavy day moves no deadlift set; "Rest of plan" runs
->   Adjust's form switch; the swap keeps the row's weight, unconverted (+8% / +15% in the research, no app converts) (D-508).
-> - State follows the plan's lifts (VERIFIED: the overhead press card left); trap bar its own card; best sets upper /
->   lower, first → best, tap for history, straight columns, always open (VERIFIED); "This week's lifting" deleted (D-509).
-> - The plyo warm-up is part of its run or ride everywhere: dated with it, moves with it, one card, one Garmin step (D-510).
+> **What shipped 2026-09-30 → 10-02 — do not redo.** D-511 … D-513 in `DECISIONS-LOG-4.md`:
+> - Race plans live on Run → Race (D-511): built back from race day on p250/p252, running grows 5%/week to the book's
+>   3-hour marathon long run, race-specific threshold work, lifting sets drop as the miles grow, taper 2/3 weeks, a race
+>   over 26 weeks out runs the plain programme first, late starts build with a note, race pace = threshold ÷ 0.95/0.92.
+> - The old marathon builder `generate-run-plan` is DELETED, code and deployed function (D-512). Run → Race is the only
+>   way to build a half or marathon. Moved unchanged: `_shared/effort-score.ts`, `_shared/strength-overlay/`.
+> - Today's finished ride/run shows all its tiles without opening Performance: `recompute-workout` step 7 builds and
+>   saves the Performance summary; a run re-analysis keeps it (D-513).
+> - Speed: screen caching (react-query persistence), the held hard cycle solved once per block, ladder and accessory-
+>   options caches (a 52-week p252 block ran out of edge compute before).
 >
-> **Known failing tests on main, not from this work:** `cycling-long-frame.test.ts` (the words check),
-> `inventory.test.ts` (INVENTORY.md stale at line 36), `workload-bar-lb.test.ts` (Drag Curl priced with a bar),
-> `enforcement.test.ts` (a discipline ladder in `SessionZoneCards.tsx:32`), `logger-prints.test.ts` (the plyo list).
+> **Known failing tests on main, not from this work:** `cycling-long-frame.test.ts` (ride card words),
+> `shared/strength-system/assistance-collision` + `assistance-equipment-gate` (10, kit ranking), `src/lib` club-control-
+> hidden, exercise-role.type, experience-chip(-line), focus-frame-travel, wizard-day-lock, wizard-focus-theme,
+> run-pace-calibration (import map), plus the 2026-09-30 list (`workload-bar-lb`, `enforcement`, `logger-prints`).
+
+## (older banner) NEXT SESSION — START HERE (written 2026-09-30) — superseded by the 2026-10-02 banner above
+
+> Jobs were his look at the plyo day, back extension plate, trap bar swap and State's best sets (still in POLISH-PUNCH-LIST's
+> 2026-09-30 AWAITING block), and p251/p253's 3-hour strategy session (built as D-511's 3-hour marathon long run).
 
 ## (older banner) NEXT SESSION — START HERE (written 2026-09-29) — superseded by the 2026-09-30 banner above
 

@@ -340,11 +340,11 @@ Within the race path, and unchanged: `_shared/week-optimizer.ts` owns every "wha
 
 The same-day matrix is in `_shared/schedule-session-constraints.ts` (`ROWS` table at line 337; the separate `ADJACENCY_HOURS_ROWS` table at line 131) ⟨A31⟩; sequential rules + placement live in `week-optimizer.ts` (`sequentialOk`, `canPlaceWithModifier`, `deriveOptimalWeek`). Spec: `docs/SCHEDULING-RULES.md`. ⚠️ **`docs/SCHEDULING-RULES-EXTRACTED.md` is NOT a snapshot of current code** — its own banner reads *"SNAPSHOT OUTDATED — 2026-05-09 … Kept for historical reference only"*, because the consolidation pass removed the builder guards it describes. **Read the code, not that file.** ⟨A31⟩
 
-Other plan generators (`generate-run-plan`, `generate-triathlon-plan`, `generate-plan`) **do not yet route through the optimizer** — they are separate edge functions with their own pipelines. Wiring them is explicitly scoped out of the consolidation pass and is a follow-up.
+Other plan generators (`generate-triathlon-plan`, `generate-plan`) **do not yet route through the optimizer** (`generate-run-plan` was DELETED 2026-10-02, D-512 — halves and marathons are built from Run → Race by `generate-strength-plan`, D-511) — they are separate edge functions with their own pipelines. Wiring them is explicitly scoped out of the consolidation pass and is a follow-up.
 
 ### Plan generation is fragmented
 
-Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, the most active surface — has its own `phase-structure`, `week-builder`, `validator`, `validate-training-floors`, `science`, `swim-protocol-v21`), `generate-triathlon-plan`, `generate-run-plan`, `generate-plan`. Wrapper: `create-goal-and-materialize-plan`. They share `PlanContractV1` (defined in `generate-run-plan/types.ts:233` ⟨A31⟩ despite the name).
+Four generators with overlapping logic: `generate-combined-plan/` (multi-sport, the most active surface — has its own `phase-structure`, `week-builder`, `validator`, `validate-training-floors`, `science`, `swim-protocol-v21`), `generate-triathlon-plan`, `generate-plan`, and the Standing Plan builder `generate-strength-plan` (which also builds the half / marathon race plans, D-511). Wrapper: `create-goal-and-materialize-plan`. ⛔ `generate-run-plan` and its `PlanContractV1` type are DELETED (2026-10-02, D-512); the stored `config.plan_contract_v1` shape lives on in combined and tri.
 
 ### "Smart server, dumb client" is a calendar invariant, not a universal rule
 
@@ -380,7 +380,7 @@ Read these before touching the corresponding subsystem:
 - Schedule placement → ⛔ **TWO ENGINES — read the Scheduling section above before opening either.** Race path: `_shared/schedule-session-constraints.ts` (matrix), `_shared/week-optimizer.ts`, `generate-combined-plan/reconcile-athlete-state-week-optimizer.ts` (plumbing). Strength-primary path: `_shared/week-model/model.ts` (law) + `resolve.ts` (score) + `shared/strength-system/place-week.ts` (anchors, fallback)
 - Arc / athlete state → `supabase/functions/_shared/arc-context.ts`, `_shared/athlete-snapshot/`, `compute-snapshot/`, `compute-facts/`
 - Coach (deterministic week-context engine, LLM on top) → `supabase/functions/coach/`, `coach/methodologies/`
-- Plan generation → `generate-combined-plan/`, `generate-run-plan/types.ts` (`PlanContractV1`)
+- Plan generation → `generate-combined-plan/`; Standing Plan + race plans → `generate-strength-plan/`, `_shared/standing-plan/` (`race-week.ts`, `compose.ts`)
 - Plan token expansion → **`materialize-plan/index.ts:1840` `expandTokensForRow` (its OWN inline expander; `expandRunToken`:1279, `expandBikeToken`:1676)** ⟨A31⟩. ⚠️ `_shared/token-parser.ts` is a *different* thing — it serves the **analysis** path (`compute-workout-analysis`, `analyze-running-workout`), and `materialize-plan` does not import it. This file used to point at the wrong one.
 - Workload → `_shared/workload.ts`, `calculate-workload/`
 - Ingest fan-out → `ingest-activity/index.ts:~1430-1580`

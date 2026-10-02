@@ -52,6 +52,16 @@ exemption only. Removing the skip alone would turn the silent drop into an inser
 **How to check a fix:** re-run the script above; every case's "every composed run/ride is saved to the calendar"
 line must read ok. The local sweep (`builder-answers-sweep.test.ts`) cannot see this: it stops at the composed row.
 
+## AWAITING MICHAEL (2026-10-02 — D-511…D-513, all PUSHED, DEPLOYED and on his phone; WORK IN PROGRESS)
+
+- [ ] **Race plan build:** Run → Race → Marathon → "Which week?" shows Strength / Hypertrophy and the new subtitle; the
+      plan saves as "Marathon · Strength" (or Hypertrophy / Half marathon); race day reads about 3h30 at race pace.
+- [ ] **Run focus on a race plan:** the top line "These are the lengths for week one…"; under the long run's chips
+      "Grows to 3h by week N." changes with the chip.
+- [ ] **Today after the next synced run or ride:** all its tiles without opening Performance.
+- [ ] **Gone:** no "Racing more than once this year?"; no "Build Plan" on a single run race goal.
+- [x] Run list group headings larger, kit line once at the top — on his phone 2026-10-01.
+
 ## AWAITING MICHAEL (2026-09-30 — D-507…D-510, all PUSHED, DEPLOYED and on his phone)
 
 - [ ] **Plyo day:** Today shows one card "Plyo - {run}" with the drills first; no separate plyo card; moving the run
