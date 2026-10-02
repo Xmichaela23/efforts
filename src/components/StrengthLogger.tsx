@@ -5767,7 +5767,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       {intentLine && (
                         <button type="button" data-first-run="set-word" onClick={() => bookWord && setSetTypeFor(bookWord)}
                           className={`block w-full text-left px-1.5 pt-0.5 ${bookWord === 'ME' ? 'pb-2' : 'pb-1'} text-caption font-medium text-label-secondary leading-snug`}>
-                          {intentLine}
+                          {/* The kind of set leads in bold (2026-10-02): the server's line is "Maximum Effort · …"; the
+                              head before the first " · " is the book's word and reads bolder, the rest stays as it was. */}
+                          {(() => {
+                            const sep = intentLine.indexOf(' · ');
+                            if (sep < 0) return intentLine;
+                            return (
+                              <>
+                                <span className="font-semibold text-label">{intentLine.slice(0, sep)}</span>
+                                {intentLine.slice(sep)}
+                              </>
+                            );
+                          })()}
                         </button>
                       )}
                       {/* The detected advance trigger — a fact about last session, dimmer than the
@@ -6824,12 +6835,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </>
                     )}
                     {isSaved && (
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
-                          <span>Saved!</span>
-                        </div>
-                        <span className="text-caption text-label-secondary">View Adherence to adjust weights for next time</span>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className={`h-4 w-4 ${themeColors.text}`} />
+                        <span>Saved!</span>
                       </div>
                     )}
                   </div>
@@ -7172,7 +7180,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <div className="flex flex-col items-center justify-center py-8">
                 <CheckCircle className={`h-12 w-12 ${themeColors.text} mb-4`} />
                 <p className="text-body font-medium text-label">Saved!</p>
-                <p className="text-subhead text-label-secondary mt-2">View Details to adjust weights for next time</p>
               </div>
             ) : (
               <>
