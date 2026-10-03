@@ -85,7 +85,9 @@ Deno.serve(async (req) => {
           .filter((r) => Number(r?.week_number) === sheetWeek)
           .map((r) => ({ ...r, day_order: r?.id ? day_order[String(r.id)] ?? null : null })),
       });
-      return json({ success: true, sheet });
+      // ⛔ THE THREE EMPTY LISTS ARE FOR APP BUILDS FROM BEFORE THE BY-DAY SHEET (2026-10-02): they read `lift_days`,
+      // `plyo` and `endurance` and crashed when those were gone. Empty, they draw the week and its changes and stop.
+      return json({ success: true, sheet: { lift_days: [], plyo: [], endurance: [], ...sheet } });
     }
     /**
      * ⛔ THE PROGRAM OUTLINE (2026-09-25, `_shared/standing-plan/program-outline.ts`) — the sheet Info opens on a

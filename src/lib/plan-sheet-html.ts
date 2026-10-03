@@ -98,7 +98,51 @@ tr.pair td:first-child{box-shadow:inset 3px 0 0 var(--strength)}
 @media print{.page{padding:0;max-width:none}}
 `;
 
-export function planSheetHtml(sheet: PlanSheetV1): string {
+const arr = <T,>(v: T[] | null | undefined): T[] => (Array.isArray(v) ? v : []);
+
+/**
+ * ⛔ A SHEET MISSING A SECTION STILL DRAWS (2026-10-02). An older app build met the by-day sheet and crashed reading a
+ * section that was no longer sent. Every list defaults to empty and every heading and column word to the approved one,
+ * so the page draws what is there and never throws.
+ */
+function normalized(raw: Partial<PlanSheetV1> | null | undefined): PlanSheetV1 {
+  const r = (raw ?? {}) as Partial<PlanSheetV1>;
+  const words = (r.words ?? {}) as Partial<PlanSheetV1['words']>;
+  return {
+    ...(r as PlanSheetV1),
+    title: r.title ?? 'Training plan',
+    meta: r.meta ?? '',
+    week: {
+      days: arr(r.week?.days).map((d) => ({ ...d, sessions: arr(d?.sessions) })),
+      total: r.week?.total ?? null,
+    },
+    changes: arr(r.changes),
+    training_days: arr(r.training_days).map((d) => ({
+      ...d,
+      blocks: arr(d?.blocks).filter((b) => b && typeof b === 'object').map((b) => ({
+        ...b,
+        rows: arr((b as { rows?: never[] }).rows),
+        steps: arr((b as { steps?: never[] }).steps),
+      })) as PlanSheetV1['training_days'][number]['blocks'],
+    })),
+    weight_note: r.weight_note ?? null,
+    footer: arr(r.footer),
+    headings: { week: 'The week', changes: 'How it changes', ...(r.headings ?? {}) },
+    words: {
+      rest: words.rest ?? 'Rest',
+      weekTotal: words.weekTotal ?? 'Week total',
+      pair: words.pair ?? 'pair',
+      noWeight: words.noWeight ?? '—',
+      columns: {
+        day: 'Day', sessions: 'Sessions', time: 'Time', lift: 'Lift', setsReps: 'Sets × reps', weight: 'Weight',
+        effort: 'Effort', drill: 'Drill', for: 'For', ...(words.columns ?? {}),
+      },
+    },
+  } as PlanSheetV1;
+}
+
+export function planSheetHtml(raw: PlanSheetV1): string {
+  const sheet = normalized(raw);
   const w = sheet.words;
   const c = w.columns;
   const out: string[] = [];
@@ -161,6 +205,6 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
 
 /** "run-ride-strength-week-5.pdf" */
 export function planSheetFilename(sheet: PlanSheetV1): string {
-  const base = sheet.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'plan';
-  return `${base}-week-${sheet.week_number}.pdf`;
+  const base = String(sheet?.title ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'plan';
+  return `${base}-week-${sheet?.week_number ?? 1}.pdf`;
 }

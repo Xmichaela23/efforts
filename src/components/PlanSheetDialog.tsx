@@ -55,7 +55,11 @@ export default function PlanSheetDialog({
     return () => { live = false; };
   }, [open, planId, week]);
 
-  const html = useMemo(() => (sheet ? planSheetHtml(sheet) : ''), [sheet]);
+  // A sheet the page cannot draw shows the load error instead of taking the screen down.
+  const html = useMemo(() => {
+    if (!sheet) return '';
+    try { return planSheetHtml(sheet); } catch { return ''; }
+  }, [sheet]);
   const weeks = useMemo(() => Array.from({ length: Math.max(1, totalWeeks ?? 1) }, (_, i) => i + 1), [totalWeeks]);
   const native = isNativeSheet();
 
@@ -91,15 +95,15 @@ export default function PlanSheetDialog({
         <div className="ml-auto flex gap-2">
           {native ? (
             <>
-              <button type="button" className={pill} disabled={!sheet || busy} onClick={() => run(() => savePlanSheetToFiles(html, planSheetFilename(sheet!)))}>
+              <button type="button" className={pill} disabled={!html || busy} onClick={() => run(() => savePlanSheetToFiles(html, planSheetFilename(sheet!)))}>
                 Save to Files
               </button>
-              <button type="button" className={pill} disabled={!sheet || busy} onClick={() => run(() => sharePlanSheet(html, planSheetFilename(sheet!)))}>
+              <button type="button" className={pill} disabled={!html || busy} onClick={() => run(() => sharePlanSheet(html, planSheetFilename(sheet!)))}>
                 Share
               </button>
             </>
           ) : (
-            <button type="button" className={pill} disabled={!sheet || busy} onClick={() => run(() => printPlanSheet(html))}>
+            <button type="button" className={pill} disabled={!html || busy} onClick={() => run(() => printPlanSheet(html))}>
               Save as PDF
             </button>
           )}
@@ -108,7 +112,8 @@ export default function PlanSheetDialog({
       {error ? <p className="px-4 py-2 text-sm text-white/70">{error}</p> : null}
       <div className="min-h-0 flex-1 bg-[#E9E7E1]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {loading && !sheet ? <p className="p-4 text-sm text-black/60">Loading…</p> : null}
-        {sheet ? <iframe title="Plan sheet" srcDoc={html} className="w-full h-full border-0 bg-white" /> : null}
+        {sheet && !html ? <p className="p-4 text-sm text-black/60">The sheet did not load.</p> : null}
+        {sheet && html ? <iframe title="Plan sheet" srcDoc={html} className="w-full h-full border-0 bg-white" /> : null}
       </div>
     </div>,
     document.body,

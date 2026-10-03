@@ -1290,7 +1290,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               aria-haspopup="dialog"
               className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm"
             >
-              Plan sheet
+              Share
             </button>
             {/* ⛔ ON A STANDING PLAN, INFO OPENS THE PROGRAM OUTLINE (2026-09-25) — the sheet Today's plan name opens,
                 sent by `plan-overview`. Any other plan keeps the description toggle. */}
@@ -1300,10 +1300,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm sm:hidden"
             >
               Info
-            </button>
-            
-            <button className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
-              Modify
             </button>
             
             {(planStatus === 'active' || planStatus === 'paused') && (
