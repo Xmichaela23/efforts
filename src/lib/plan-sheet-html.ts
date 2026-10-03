@@ -72,6 +72,20 @@ tr.pair td:first-child{box-shadow:inset 3px 0 0 var(--strength)}
 .steps li span:first-child{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding-top:1px}
 .how{font-size:12.5px;color:var(--muted);margin-top:6px}
 .foot{margin-top:22px;border-top:1px solid var(--rule);padding-top:8px;font-size:12px;color:var(--muted);display:grid;gap:3px}
+/* A phone screen: each lift is a stacked block (intent · name and pair · sets × reps · weight · effort). Screen only,
+   so the PDF (print) keeps the full-width table at page width. */
+@media screen and (max-width:600px){
+  .page{padding:20px 16px 28px}
+  .lifts,.lifts tbody,.lifts tr{display:block;width:100%}
+  .lifts thead,.lifts colgroup{display:none}
+  .lifts tr{padding:8px 8px;border-bottom:1px solid var(--rule-2)}
+  .lifts td{display:block;padding:0;border:0;background:none!important;box-shadow:none!important}
+  .lifts td.r,.lifts td.w{display:inline;font-size:13px}
+  .lifts td.w::before{content:" · ";font-family:var(--sans);color:var(--faint)}
+  .lifts td.e{margin-top:2px}
+  tr.pair{background:var(--band);box-shadow:inset 3px 0 0 var(--strength)}
+  .week td:first-child{width:76px}
+}
 @page{size:letter;margin:12mm}
 @media print{.page{padding:0;max-width:none}}
 `;
