@@ -91,7 +91,7 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
     }
     const sess = d.sessions.map((s) => `<div class="sess">${dot(s.sport)}${esc(s.title)}</div>`).join('');
     // One time per session, beside its row, as the week view prints them.
-    const times = d.sessions.map((s) => `<div class="sess t">${esc(s.time ?? hm(s.minutes))}</div>`).join('');
+    const times = d.sessions.map((s) => `<div class="sess t">${esc(s.time ?? hm(s.minutes)) || '&nbsp;'}</div>`).join('');
     out.push(`<tr><td>${esc(d.day)}</td><td>${sess}</td><td>${times}</td></tr>`);
   }
   out.push(`<tr class="total"><td></td><td>${esc(w.weekTotal)}</td><td>${esc(hm(sheet.week.total_minutes))}</td></tr></tbody></table>`);

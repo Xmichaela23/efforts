@@ -7,6 +7,7 @@
  * Save to Files and Share on the phone. Decides nothing.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,8 +70,9 @@ export default function PlanSheetDialog({
   };
 
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label="Plan sheet">
+  // On the body, above the app's own header and tab bar.
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Plan sheet">
       <div
         className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-white/10"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
@@ -82,7 +84,7 @@ export default function PlanSheetDialog({
           <SelectTrigger className="w-[120px] h-8 rounded-full bg-white/[0.08] border-white/20 text-white/90 text-sm">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[60]">
+          <SelectContent className="z-[1001]">
             {weeks.map((n) => <SelectItem key={n} value={String(n)}>Week {n}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -108,6 +110,7 @@ export default function PlanSheetDialog({
         {loading && !sheet ? <p className="p-4 text-sm text-black/60">Loading…</p> : null}
         {sheet ? <iframe title="Plan sheet" srcDoc={html} className="w-full h-full border-0 bg-white" /> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
