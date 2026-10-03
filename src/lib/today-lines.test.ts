@@ -16,7 +16,11 @@ import {
   familyOf,
 } from './today-lines.ts';
 
+import { familyLineFor } from '../../supabase/functions/_shared/standing-plan/family-lines.ts';
+
 const PLAN = 'plan-1';
+/** The family's purpose line — printed in the tapped view only since 2026-10-03, no longer on Today's card. */
+const purpose = (s: { tags?: string[] }) => { const f = (s.tags ?? []).find((t) => t.startsWith('family:'))?.slice(7) ?? null; const a = (s.tags ?? []).find((t) => t.startsWith('archetype:'))?.slice(10) ?? null; const l = familyLineFor(f, a, null); return l ? [l] : []; };
 const lift = (rows: unknown[], tags: string[] = ['standing_plan']) => ({
   id: 'lift', type: 'strength', training_plan_id: PLAN, tags, strength_exercises: rows,
 });
@@ -157,40 +161,38 @@ Deno.test('⛔ ONLY ADJACENT ROWS PAIR — a mark with something between is two 
 // ── the endurance session ───────────────────────────────────────────────────────────────────────
 
 Deno.test('each named family gets its line, and only that line — the page\'s own words (2026-09-18)', () => {
-  assertEquals(enduranceLinesFor(ride('ride_anaerobic', 'above')), [
+  assertEquals(purpose(ride('ride_anaerobic', 'above')), [
     'These sessions build anaerobic repeatability and are best ridden by feel, with a power floor instead of a set power target; treat the numbers below as guidelines.',
   ]);
-  assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.');
-  assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'If you\'re unsure, the "talk test" is worth doing at least twice per run: once after 5 minutes of running and once after 20.');
+  assertEquals(purpose(ride('ride_sweet_spot', 'below'))[0], 'These sessions take you as close to threshold as possible without going over it, which gives plenty of time in the zone with much less fatigue than riding at or above it.');
+  assertEquals(purpose(run('run_vt1', 'vt1_or_easier'))[0], 'If you\'re unsure, the "talk test" is worth doing at least twice per run: once after 5 minutes of running and once after 20.');
   assertEquals(
-    enduranceLinesFor(run('run_lsd', 'vt1_or_easier'))[0],
+    purpose(run('run_lsd', 'vt1_or_easier'))[0],
     'A session meant to maximize training time can mix zones. Hike/jog sessions can include rests or pauses with little negative effect.',
   );
 });
 
 Deno.test('⛔ THE TWO HARD RUNS EACH PRINT THEIR OWN PAGE — p231 for MLSS, p233 for near-threshold (2026-09-18)', () => {
-  assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
-  assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.');
+  assertEquals(purpose(run('run_mlss', 'above'))[0], 'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.');
+  assertEquals(purpose(run('run_near_threshold', 'near'))[0], 'Sessions that maximize time near threshold (NT), using shorter above-threshold or longer below-threshold intervals. They aim for the most total time at this intensity while controlling fatigue.');
 });
 
 Deno.test('⛔ A HARD RUN OR RIDE READS THE SERVER\'S NARRATIVE FIRST, THEN ITS PAGE\'S LINE (2026-09-20)', () => {
   const narrative = '2 sets. Set 1: 3:00, 2:00, 1:00, 45 seconds and 30 seconds at 7:11–8:47/mi. After each one: 2:00, 1:20, 40 seconds, 30 seconds and 20 seconds at 14:22–17:34/mi. Then 2:00 at 10:56–12:22/mi. Set 2 repeats set 1 from the 2:00 effort.';
-  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative } }), [
-    narrative,
-    'The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.',
-  ]);
+  // ⛔ The card prints the written workout only (Michael, 2026-10-03); the purpose line is the tapped view's.
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative } }), [narrative]);
   // p236's sprints have no purpose line; the narrative prints alone.
   const surges = '8 flying 30-second surges to max effort, with 2:30 of recovery between them.';
   assertEquals(enduranceLinesFor({ ...ride('ride_sprints', 'above'), computed: { narrative: surges } }), [surges]);
-  // A row the server sent no narrative for reads as it did before.
-  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative: null } }).length, 1);
-  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: null }).length, 1);
+  // A row the server sent no narrative for prints no line on the card.
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: { steps: [], narrative: null } }).length, 0);
+  assertEquals(enduranceLinesFor({ ...run('run_mlss', 'above'), computed: null }).length, 0);
 });
 
 Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {
   // ⚠️ The VO2 ride has p238's line since 2026-09-18 (book-language pass 5); p236's sprints print no intent sentence.
-  assertEquals(enduranceLinesFor(ride('ride_sprints', 'above')), []);
-  assertEquals(enduranceLinesFor(run('run_sprint_power', 'above')), []);
+  assertEquals(purpose(ride('ride_sprints', 'above')), []);
+  assertEquals(purpose(run('run_sprint_power', 'above')), []);
 });
 
 /**
@@ -200,13 +202,13 @@ Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS IN
  */
 Deno.test('⛔ NO STOP RULE ON ANY ENDURANCE SESSION', () => {
   const everyLine = [
-    ...enduranceLinesFor(ride('ride_anaerobic', 'above')),
-    ...enduranceLinesFor(ride('ride_endurance', 'vt1_or_easier')),
-    ...enduranceLinesFor(ride('ride_sweet_spot', 'below')),
-    ...enduranceLinesFor(run('run_mlss', 'above')),
-    ...enduranceLinesFor(run('run_near_threshold', 'near')),
-    ...enduranceLinesFor(run('run_lsd', 'vt1_or_easier')),
-    ...enduranceLinesFor(run('run_vt1', 'vt1_or_easier')),
+    ...purpose(ride('ride_anaerobic', 'above')),
+    ...purpose(ride('ride_endurance', 'vt1_or_easier')),
+    ...purpose(ride('ride_sweet_spot', 'below')),
+    ...purpose(run('run_mlss', 'above')),
+    ...purpose(run('run_near_threshold', 'near')),
+    ...purpose(run('run_lsd', 'vt1_or_easier')),
+    ...purpose(run('run_vt1', 'vt1_or_easier')),
   ].join(' ');
   /* ⚠️ PIN THE SENTENCE, NOT A FRAGMENT OF IT. `/5 percent/` also matches the easy ride's
      "below 75%". */
@@ -216,9 +218,9 @@ Deno.test('⛔ NO STOP RULE ON ANY ENDURANCE SESSION', () => {
 
 Deno.test('⛔ NEVER THE WORD VT1 ON SCREEN', () => {
   const everyLine = [
-    ...enduranceLinesFor(run('run_vt1', 'vt1_or_easier')),
-    ...enduranceLinesFor(run('run_lsd', 'vt1_or_easier')),
-    ...enduranceLinesFor(ride('ride_endurance', 'vt1_or_easier')),
+    ...purpose(run('run_vt1', 'vt1_or_easier')),
+    ...purpose(run('run_lsd', 'vt1_or_easier')),
+    ...purpose(ride('ride_endurance', 'vt1_or_easier')),
   ].join(' ');
   assert(!/vt1/i.test(everyLine), everyLine);
 });

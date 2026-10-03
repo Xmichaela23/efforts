@@ -458,7 +458,7 @@ export const SessionCard: React.FC<{
   emphasis?: CardEmphasis;
   onOpen?: () => void;
   venueLabel?: string | null;
-  /** The type under the title ("Maximal Lactate Steady State"); the time joins it there instead of the name line. */
+  /** The type and level under the title ("Threshold surges · Level 2"); the time stays on the name line. */
   typeLine?: string | null;
   /** The plyo warm-up folded into this run or ride (get-week `plyo-fold.ts`, 2026-09-29), drawn before its steps. */
   plyo?: PlyoWarmUp | null;
@@ -506,8 +506,9 @@ export const SessionCard: React.FC<{
           {typeLine}
         </div>
       ) : null}
-      {/* ⛔ THE WORKOUT SHAPE, THIN, WARM-UP TO COOL-DOWN (2026-10-03) — the server's `shape`, drawn as sent. */}
-      <WorkoutShape shape={shape} color={colour} variant="thin" style={{ marginTop: 8 }} />
+      {/* ⛔ THE WORKOUT SHAPE, WARM-UP TO COOL-DOWN, THE SAME HEIGHT AS THE TAPPED VIEW'S (Michael, 2026-10-03) — the
+          server's `shape`, drawn as sent. */}
+      <WorkoutShape shape={shape} color={colour} variant="tall" style={{ marginTop: 8 }} />
       {/* ⛔ THE PLYO WARM-UP, FIRST, INSIDE THE RUN OR RIDE (Michael, 2026-09-29: one session, one log). Server words only:
           "Plyo warm-up" (the page's name, p246 / p274 / p278), get-week's note (p275 / p227), each drill's how-to and, behind
           its (i), p227's benefit. The (i) is a span: this whole card is one button. */}

@@ -15,7 +15,7 @@
  * and the row's own `slot_intent` are data; a session's NAME is a label that changes.
  */
 
-import { familyLineFor, sprintEveryMinutesFromTokens } from '@shared/standing-plan/family-lines';
+import { rideWithWorkLine, sprintEveryMinutesFromTokens } from '@shared/standing-plan/family-lines';
 import { intentLine } from '@shared/strength-grid/intents';
 
 /** The rows a session carries. Only the fields this file reads. */
@@ -286,19 +286,21 @@ export function liftCardLinesFor(
  * week view keep the step list and do not print it. A row without one reads as it did before.
  */
 export function enduranceLinesFor(session: TodayRow): string[] {
-  const family = familyOf(session);
-  // ⚠️ THE ARCHETYPE PICKS THE ENDURANCE RIDE'S LINE (plain / with work). A row without the tag — any row
-  // written before 2026-09-10 — gets the plain line, which is what every such row actually is.
-  // ⛔ THE WITH-WORK LINE'S SPRINT INTERVAL IS READ OFF THE ROW'S OWN TOKENS, the ride the server built.
-  const line = familyLineFor(
-    family,
-    tagValue(session, 'archetype'),
-    sprintEveryMinutesFromTokens((session as { steps_preset?: unknown } | null)?.steps_preset),
-  );
+  /**
+   * ⛔ THE PURPOSE LINE IS OFF TODAY'S CARD (Michael, 2026-10-03, from his phone): the card is the name, type · level,
+   * time, the shape and the written workout. The family's purpose line prints only in the tapped view, where the
+   * server's description carries it (`session-vocabulary.ts` builds it from `familyLineFor`).
+   */
   const computed = (session as { computed?: unknown } | null)?.computed;
   const sent = computed && typeof computed === 'object' ? (computed as { narrative?: unknown }).narrative : null;
   const narrative = typeof sent === 'string' && sent.trim() ? sent.trim() : null;
-  return [narrative, line].filter((x): x is string => !!x);
+  // ⚠️ THE RIDE WITH WORK'S LINE IS ITS WORKOUT, NOT A PURPOSE (p239 "10-second all-out sprint every 9 minutes"), so it
+  // stays on the card. The interval is read off the row's own tokens, the ride the server built.
+  const every = familyOf(session) === 'ride_endurance' && tagValue(session, 'archetype') === 'mixed'
+    ? sprintEveryMinutesFromTokens((session as { steps_preset?: unknown } | null)?.steps_preset)
+    : null;
+  const workLine = every != null && every > 0 ? rideWithWorkLine(every) : null;
+  return [narrative, workLine].filter((x): x is string => !!x);
 }
 
 /**

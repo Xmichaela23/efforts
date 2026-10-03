@@ -39,27 +39,33 @@ export function sessionTypeForFamily(family: string | null | undefined): string 
 }
 
 /**
- * ⛔ THE OTHER FIVE TYPES' NAMES ON THE CARD (Michael approved 2026-10-03, docs/WORKORDER-workout-shape-2026-10-03.md
- * Copy) — the Build Focus picker's type names (docs/MOCKUP-week-builder-2026-10-02.html). The five types above keep
- * their own line.
+ * ⛔ THE TYPE NAMES ON TODAY'S CARD AND THE TAPPED VIEW — the Build Focus picker's names, every run and ride type
+ * (Michael approved 2026-10-03: docs/WORKORDER-workout-shape-2026-10-03.md Copy, and the week-builder work order's
+ * approved words — "Threshold surges" was MLSS, "Easy run" was VT1). One list, so no type prints the book's heading
+ * on one screen and the picker's name on another.
  */
 export const CARD_TYPE_NAMES: Readonly<Record<string, string>> = {
+  run_sprint_power: 'Sprint / power',  // pp229–231
+  run_mlss: 'Threshold surges',  // pp231–232 (MLSS)
+  run_near_threshold: 'Near-threshold',  // pp233–234
   run_vt1: 'Easy run',  // p235 (VT1)
   run_lsd: 'Long slow distance',  // p235
-  ride_endurance: 'Endurance',  // p239
-  run_sprint_power: 'Sprint / power',  // pp229–231
   ride_sprints: 'Sprints',  // p236
+  ride_anaerobic: 'Anaerobic',  // p237
+  ride_vo2: 'VO2',  // p238
+  ride_sweet_spot: 'Sweet spot',  // p238
+  ride_endurance: 'Endurance',  // p239
 };
 
 /**
- * "Anaerobic · Level 1" — the small line under a run or ride's name on Today's card and in the drawer (approved
- * 2026-10-03). The type is the row's `family:` tag (`sessionTypeFor`, else `CARD_TYPE_NAMES`); the level is its
- * `level:` tag. A row with no type gets no line; a row with no level prints the type alone.
+ * "Threshold surges · Level 2" — the small line under a run or ride's name on Today's card and in the tapped view
+ * (approved 2026-10-03). The type is the row's `family:` tag through `CARD_TYPE_NAMES`; the level is its `level:` tag.
+ * A row with no type gets no line; a row with no level prints the type alone.
  */
 export function sessionTypeLevelFor(row: { tags?: unknown } | null | undefined): string | null {
   const tags = Array.isArray(row?.tags) ? (row!.tags as unknown[]).map(String) : [];
   const fam = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null;
-  const type = sessionTypeForFamily(fam) ?? (fam ? CARD_TYPE_NAMES[fam] ?? null : null);
+  const type = fam ? CARD_TYPE_NAMES[fam] ?? null : null;
   if (!type) return null;
   const level = Number(tags.find((t) => t.startsWith('level:'))?.slice('level:'.length));
   // The level is the page's own (each type's levels 1–3, pp229–239), read off the row's tag.

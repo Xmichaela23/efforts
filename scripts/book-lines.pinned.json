@@ -166,8 +166,9 @@
    "{} between sets"
   ],
   "supabase/functions/_shared/standing-plan/family-lines.ts": [
-   "Easy run",
    "Sprint / power",
+   "Threshold surges",
+   "Easy run",
    "These sessions build anaerobic repeatability and are best ridden by feel, with a power floor instead of a set power target; treat the numbers below as guidelines.",
    "Easy ride below 75%.",
    "The goal is to accumulate as much time at the target intensity as possible while keeping fatigue even. The work intervals can be run on hills, adjusting pace to hold the target intensity.",
