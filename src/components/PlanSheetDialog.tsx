@@ -69,7 +69,10 @@ export default function PlanSheetDialog({
     setError(null);
     try { await fn(); } catch (e: unknown) {
       // Closing the share sheet or the Files picker without choosing is not an error.
-      if (!/cancel/i.test(String((e as { message?: string })?.message ?? e))) setError('The PDF was not made.');
+      const why = String((e as { message?: string })?.message ?? e);
+      // The real reason goes to the console always (the device console reads it), and onto the screen in a dev build.
+      console.error('[PlanSheet] PDF failed:', why);
+      if (!/cancel/i.test(why)) setError(import.meta.env.DEV ? `The PDF was not made. (${why})` : 'The PDF was not made.');
     } finally { setBusy(false); }
   };
 

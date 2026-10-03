@@ -51,7 +51,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bridge.registerPluginInstance(HealthKitPlugin())
         bridge.registerPluginInstance(WatchConnectivityPlugin())
         bridge.registerPluginInstance(BluetoothHRPlugin())
-        bridge.registerPluginInstance(PlanSheetPdfPlugin())
+        // PlanSheetPdfPlugin registers in MainViewController.capacitorDidLoad, before the page loads.
         // WorkoutKitPlugin is gated behind @available (WorkoutKit scheduling).
         // COMPILE-RISK (availability): keep this guard's version in sync with the
         // @available annotation on WorkoutKitPlugin. On older OS the plugin simply
