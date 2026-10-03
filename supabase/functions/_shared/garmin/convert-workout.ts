@@ -830,7 +830,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
    * ⛔ AND WITH A RUN, THE SAME WAY (2026-09-18, book-language pass 4, audit §4): the talk test (p235), the MLSS hills
    * line (p231), the race-tempo sentence (p247) and the run test's protocol (p210) stayed in the app. Swims unchanged.
    */
-  // ⛔ THE TYPE LINE LEADS IT (2026-09-19) — "Maximal Lactate Steady State", then the description (`sendDescription`).
+  // ⛔ THE TYPE LINE LEADS IT (2026-09-19; the card's names since 2026-10-03) — "Threshold surges · Level 2", then the description (`sendDescription`).
   const sessionNote = sport === 'CYCLING' || sport === 'RUNNING' ? sendDescription(workout as any).trim() : ''
   return {
     workoutName: workout.name,

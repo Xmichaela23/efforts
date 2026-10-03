@@ -151,7 +151,7 @@ export function serializeRide(row: PlannedRideRow): IntervalsEvent {
   }
 
   const lines = steps.map((s, i) => stepLine(s, i, ftp));
-  // ⛔ THE TYPE LINE LEADS THE NOTE (2026-09-19) — the order Today and the session sheet print them (`sendDescription`).
+  // ⛔ THE TYPE LINE LEADS THE NOTE (2026-09-19) — the card's own line and order since 2026-10-03 (`sendDescription`).
   const note = sendDescription(row).trim();
   // A line that does not start with "-" is a heading; a heading ending in "Nx" starts a repeat.
   if (note && note.split('\n').some((l) => /\b\d+x\s*$/i.test(l.trim()))) {

@@ -205,6 +205,18 @@ Deno.test('a run\'s session note reaches the watch, as a ride\'s does', () => {
   assert(/talk test/.test(String((g as any).description)), JSON.stringify((g as any).description));
 });
 
+Deno.test('⛔ the note sent to Garmin and Intervals.icu leads with the card\'s type line, not the book\'s heading (2026-10-03)', () => {
+  const mlss = built('run_mlss', 2, 'surge_float');
+  const g = convertWorkoutToGarmin({ ...mlss.row, computed: { steps: mlss.v3 } } as any);
+  const note = String((g as any).description);
+  assertEquals(note.split('\n')[0], 'Threshold surges · Level 2');
+  assert(!note.includes('Maximal Lactate Steady State'), note);
+  // Intervals.icu takes rides only; a ride's note leads with the same line.
+  const ana = built('ride_anaerobic', 1, 'one_to_one');
+  const ev = serializeRide({ ...ana.row, computed: { steps: ana.v3, anchors: { ftp_w: 250 } } } as any);
+  assertEquals(ev.description.split('\n')[0], 'Anaerobic · Level 1');
+});
+
 // ── Pass 5: what the page gives that the app did not show ────────────────────────────────────────
 
 Deno.test('p235\'s long run with inserted sets builds the page\'s sets: level 2 is 2 sets of 2 rounds of 1:30 @ 115% / 30 s', () => {

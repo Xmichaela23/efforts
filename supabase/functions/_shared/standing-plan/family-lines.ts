@@ -85,7 +85,9 @@ export function sessionTypeFor(row: { tags?: unknown } | null | undefined): stri
  */
 export function sendDescription(row: { tags?: unknown; description?: unknown } | null | undefined): string {
   const desc = typeof row?.description === 'string' ? row.description : '';
-  const type = sessionTypeFor(row);
+  // ⛔ THE CARD'S TYPE LINE, NOT THE BOOK'S HEADING (Michael, 2026-10-03): "Threshold surges · Level 2", the line Today
+  // and the tapped view print (`sessionTypeLevelFor`), so Garmin and Intervals.icu name the session the way the app does.
+  const type = sessionTypeLevelFor(row);
   return [type, desc].filter((x) => x && String(x).trim()).join('\n');
 }
 
