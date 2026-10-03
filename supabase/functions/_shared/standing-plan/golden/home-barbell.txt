@@ -64,7 +64,7 @@ WEEK 02  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Descending Ladder — 39 min
+  [Monday] run      Forty-Twenty Repeats — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 190x
@@ -77,7 +77,7 @@ WEEK 02  column=standard
       tags: standing_plan, plyo, warms_up:3:0
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Short Threshold Repeats — 54 min
+  [Wednesday] run      Sub-Threshold Repeats — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
@@ -112,7 +112,7 @@ WEEK 03  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Forty-Twenty Repeats — 46 min
+  [Monday] run      Long Surge and Float — 48 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · how-to · plan 190x
@@ -142,7 +142,7 @@ WEEK 03  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 80 min
+  [Saturday] run      Long Run — 78 min
   NOTES
       [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
@@ -151,6 +151,198 @@ WEEK 03  column=standard
       [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
 WEEK 04  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+  [Monday] run      Descending Ladder — 39 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+  [Tuesday] ride     Progressive Repeats — 65 min
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
+      tags: standing_plan, plyo, warms_up:3:0
+      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+  [Wednesday] run      Short Threshold Repeats — 54 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+  [Thursday] ride     Ride — 80 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
+  [Saturday] run      Long Run — 87 min
+  NOTES
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
+
+WEEK 05  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+  [Monday] run      Forty-Twenty Repeats — 46 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
+      tags: standing_plan, plyo, warms_up:3:0
+      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+  [Wednesday] run      Surge into Steady — 54 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+  [Thursday] ride     Ride — 80 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
+  [Saturday] run      Long Run — 80 min
+  NOTES
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
+
+WEEK 06  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+  [Monday] run      Long Surge and Float — 48 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+  [Tuesday] ride     One-to-One Repeats — 33 min
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
+      tags: standing_plan, plyo, warms_up:3:0
+      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+  [Wednesday] run      Short Threshold Repeats — 54 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+  [Thursday] ride     Ride — 80 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
+  [Saturday] run      Long Run — 78 min
+  NOTES
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
+
+WEEK 07  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
+      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
+      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
+  [Monday] run      Forty-Twenty Repeats — 46 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
+      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
+  [Tuesday] ride     Fade at 130% — 36 min
+  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
+      tags: standing_plan, plyo, warms_up:3:0
+      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+  [Wednesday] run      Surge into Steady — 54 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
+      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
+      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
+  [Thursday] ride     Ride — 80 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
+      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
+      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
+      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
+  [Saturday] run      Long Run — 80 min
+  NOTES
+      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
+      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
+
+WEEK 08  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -172,7 +364,7 @@ WEEK 04  column=standard
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo, warms_up:3:0
       -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
+      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
   [Wednesday] run      Long Sub-Threshold Repeats — 52 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -198,198 +390,6 @@ WEEK 04  column=standard
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
 
-WEEK 05  column=standard
-----------------------------------------------------------------------------------------------------
-  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
-      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
-      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Descending Ladder — 39 min
-  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Fade at 130% — 36 min
-  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
-      tags: standing_plan, plyo, warms_up:3:0
-      -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Surge into Steady — 54 min
-  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 80 min
-  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 87 min
-  NOTES
-      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
-      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
-
-WEEK 06  column=standard
-----------------------------------------------------------------------------------------------------
-  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
-      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
-      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Forty-Twenty Repeats — 46 min
-  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Surge, Sustain, Surge — 46 min
-  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
-      tags: standing_plan, plyo, warms_up:3:0
-      -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Pogo Hops                      1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Race-Specific Repeats — 43 min
-  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 80 min
-  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 91 min
-  NOTES
-      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
-      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
-
-WEEK 07  column=standard
-----------------------------------------------------------------------------------------------------
-  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
-      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
-      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Long Surge and Float — 48 min
-  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Fade at 130% — 36 min
-  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
-      tags: standing_plan, plyo, warms_up:3:0
-      -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Rebound Jumps                  1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Sub-Threshold Repeats — 47 min
-  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 80 min
-  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 85 min
-  NOTES
-      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
-      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
-
-WEEK 08  column=standard
-----------------------------------------------------------------------------------------------------
-  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Bench Press                    1x1-5        @ 135           | 90% · how-to · plan 135x
-      DE     Seated DB Press                4x2-4        @               | RIR 3.5 · per_side · how-to
-      HYP    DB Bench Press                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Descending Ladder — 39 min
-  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Deadlift                       1x1-5        @ 195           | 90% · how-to · plan 195x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
-      DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Surge, Sustain, Surge — 46 min
-  [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
-      tags: standing_plan, plyo, warms_up:3:0
-      -      Bounding                       1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-      -      Lunge Hops                     1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Surge into Steady — 54 min
-  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard
-      ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
-      DE     Barbell Row                    4x2-4        @               | RIR 3.5 · no_tested_lift · how-to
-      HYP    Band Pull Down                 3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Rear Delt Fly                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Bent-Over Dumbbell Rear Delt Fly" · how-to
-  [Thursday] ride     Ride — 80 min
-  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
-      tags: standing_plan, frame:all_rounder, column:standard, lower:me
-      ME     Back Squat                     1x1-5        @ 165           | 90% · how-to · plan 165x
-      HYP    Weighted Reverse Hyper         3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
-      HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
-      SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 87 min
-  NOTES
-      [source  ] Assume a 3 to 4 percent drop in working 1RM here. The drop can be taken away gradually over eight to ten weeks.  (Viada p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
-      [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
-      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Friday heavy legs, Saturday long run. A very hard session of 14+ work sets may cut performance in other training a lot for twenty-four hours, and noticeably for up to seventy-two hours. An easier session of 6 to 8 work sets may cause only small performance drops for twenty-four hours, with few problems forty-eight hours later.  (Viada p86)
-
 WEEK 09  column=standard
 ----------------------------------------------------------------------------------------------------
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
@@ -408,12 +408,12 @@ WEEK 09  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Fade at 130% — 36 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo, warms_up:3:0
       -      Stiff-Legged Run               1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Single-Leg Hops                1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Short Threshold Repeats — 54 min
+  [Wednesday] run      Surge into Steady — 54 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
@@ -456,12 +456,12 @@ WEEK 10  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Surge, Sustain, Surge — 46 min
+  [Tuesday] ride     Progressive Repeats — 65 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo, warms_up:3:0
       -      A-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
       -      Skater Hops                    1x           @ Bodyweight    | how-to · note: Benefit: general speed and explosiveness. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
-  [Wednesday] run      Surge into Steady — 54 min
+  [Wednesday] run      Race-Specific Repeats — 43 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @               | no_tested_lift · how-to
@@ -478,7 +478,7 @@ WEEK 10  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 78 min
+  [Saturday] run      Long Run — 89 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)
@@ -495,7 +495,7 @@ WEEK 11  column=standard
       HYP    Tate Press                     3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Dumbbell Curl                  3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Lateral Raise                  3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Lateral Raise" · how-to
-  [Monday] run      Descending Ladder — 39 min
+  [Monday] run      Forty-Twenty Repeats — 46 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · how-to · plan 200x
@@ -503,7 +503,7 @@ WEEK 11  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Leg Curl                       3x6-12       @               | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @               | RIR 3.5 · per_side · how-to
-  [Tuesday] ride     Progressive Repeats — 65 min
+  [Tuesday] ride     Surge, Sustain, Surge — 46 min
   [Wednesday] STRENGTH Plyo warm-up   (Viada p227)
       tags: standing_plan, plyo, warms_up:3:0
       -      B-Skip                         1x           @ Bodyweight    | how-to · note: Benefit: running gait and speed. Repeat each drill until the movement is at its best for the day and you feel confident in it, then move on. Fatigue, poor form and imprecise movement all need to be avoided.
@@ -525,7 +525,7 @@ WEEK 11  column=standard
       HYP    Goblet Squat                   3x6-12       @               | RIR 1 · auto_regulated · how-to
       HYP    Banded Leg Extension           3x6-12       @               | RIR 1 · auto_regulated · how-to
       SKILL  Bulgarian Split Squat          3x3-5        @               | RIR 3.5 · per_side · how-to
-  [Saturday] run      Long Run — 87 min
+  [Saturday] run      Long Run — 80 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number, so a drill row carries none; the efforts are recorded after.
       [source  ] Repeat each drill until the movement is at its best for the day and the athlete is confident in it, then move on. Fatigue, poor form and imprecise movement must all be avoided.  (Viada p227)

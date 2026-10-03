@@ -3467,16 +3467,37 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     };
     let plan = holdRotation(rotating, base, held, perSport);
     const baseCount = plan.breaks < 0 ? null : windowBreaks(plan, rotating);
-    for (const o of optional) {
-      if (!baseCount) break; // the page-order fallback: no cycle to hold, so nothing joins
-      const tryRot = rotating.map((sl) => (sl.key === o.slot ? { ...sl, candidates: [...sl.candidates, { id: o.id, ...o.v }] } : sl));
-      const next = holdRotation(tryRot, base, held, perSport);
-      if (next.breaks < 0) continue;
-      const got = windowBreaks(next, tryRot);
-      if (got.every((n, i) => n <= baseCount[i])) {
-        rotating.splice(0, rotating.length, ...tryRot);
-        plan = next;
+    /**
+     * ⛔ HOW AN OPTION JOINS, WITHOUT A SECOND SOLVE (2026-10-03). Re-solving the cycle per option cost the edge function
+     * its CPU budget (Standard Focus failed to build on the server). So the cycle solved above stands, and an option
+     * takes the place of a week where the slot builds a shape that comes round more than once in the cycle — the
+     * rotation stays whole and still changes shape every week, and no family builds one shape twice in a week. It is
+     * kept at the first such week where no number breaks the 10% line more often over the block than before; otherwise
+     * the option is not rotated (it is still the athlete's to pick).
+     * ⚠️ OURS — the substitution search; the rules it keeps are p112's, p148's and the no-twin rule above.
+     */
+    if (baseCount) {
+      let cycle = plan.cycle.map((r) => r.slice());
+      for (const o of optional) {
+        const si = plan.keys.indexOf(o.slot);
+        if (si < 0) continue;
+        const slotRot = rotating.find((sl) => sl.key === o.slot)!;
+        if (!slotRot.candidates.some((c) => c.id === o.id)) slotRot.candidates.push({ id: o.id, ...o.v });
+        const fam = slotRot.family;
+        const L = cycle.length;
+        if (L < 2 || cycle.some((r) => r[si] === o.id)) continue;
+        for (let w = 0; w < L; w++) {
+          const was = cycle[w][si];
+          if (cycle.filter((r) => r[si] === was).length < 2) continue;
+          if (cycle[(w + L - 1) % L][si] === o.id || cycle[(w + 1) % L][si] === o.id) continue;
+          if (plan.keys.some((k, j) => j !== si && rotating.find((sl) => sl.key === k)?.family === fam && cycle[w][j] === o.id)) continue;
+          const trial = cycle.map((r) => r.slice());
+          trial[w][si] = o.id;
+          const got = windowBreaks({ ...plan, cycle: trial }, rotating);
+          if (got.every((n, i) => n <= baseCount[i])) { cycle = trial; break; }
+        }
       }
+      plan = { ...plan, cycle };
     }
     return heldRowFor(plan, args.week);
   })();
