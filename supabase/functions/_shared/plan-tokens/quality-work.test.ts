@@ -175,7 +175,10 @@ function everyQualityToken(): Array<{ token: string; sport: 'run' | 'ride'; rule
 const noPlace = (steps: unknown[]) => JSON.parse(JSON.stringify(steps, (k, v) => (k === 'place' ? undefined : v)));
 
 Deno.test('every quality token the four hard families emit expands exactly as the branches did', () => {
-  const tokens = everyQualityToken();
+  // ⚠️ THE BRANCHES' GRAMMAR ONLY (2026-10-02): the reference above is the old branches, which read no all-out, distance
+  // or open segment. Tokens carrying those (week builder Stage 2) are pinned in `printed-options.test.ts` instead.
+  const OLD_GRAMMAR = /^(?:round_\d+x_(?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*(?:_r\d+s)?|interval_.*|bike_.*)$/i;
+  const tokens = everyQualityToken().filter((t) => OLD_GRAMMAR.test(t.token));
   // The sweep is worthless if the families stopped emitting these shapes.
   assertEquals(tokens.length > 30, true, `only ${tokens.length} quality tokens found`);
   for (const { token, sport, rule, where } of tokens) {
@@ -270,7 +273,9 @@ Deno.test('a metric athlete reads the same work per kilometre', () => {
 
 Deno.test('the line says nothing beyond the page\'s structure, the numbers and the units', () => {
   // ⛔ "spin" joined 2026-09-18 (book-language pass 2): a ride's untargeted recovery reads the page's "easy spin".
-  const ALLOWED = /^[0-9\s:×–%,;./]*(?:(?:rounds|sets|of|at|easy|spin|between|min|s|W|mi|km)[0-9\s:×–%,;./]*)*$/;
+  // ⚠️ "all out", "or more", "full recovery", "until it cannot be held", "faster than vVO2" and "run out" joined
+  // 2026-10-02 (week builder Stage 2), approved by Michael that day (`OPEN_AND_DISTANCE_WORDS`, `ALL_OUT_WORD`).
+  const ALLOWED = /^[0-9\s:×–%,;./]*(?:(?:rounds|sets|of|at|easy|spin|between|min|s|W|mi|km|m|all out|or more|full recovery|until it cannot be held|faster than vVO2|run out)[0-9\s:×–%,;./]*)*$/;
   for (const { token, sport } of everyQualityToken()) {
     const line = qualityWorkLine(parseQualityWork(token), sport, { thresholdSecPerMi: THRESHOLD, ftp: FTP, units: 'imperial' });
     assertEquals(ALLOWED.test(line), true, `unexpected word in: ${line}`);

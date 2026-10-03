@@ -133,6 +133,26 @@ export type Step = {
    * states anywhere (140%, p230-231) so the number can only be too small.
    */
   secondsIsLowerBound?: boolean;
+  /**
+   * ⛔ AN OPEN END (week builder Stage 2, 2026-10-02). `at_least`: p237's "1 minute-plus to fade at 130%" — `seconds`
+   * is the printed minimum and the step runs on until the effort fades; the watch ends it on the lap button. `lap`: no
+   * clock at all — p237's "repeat until unable to hold 120%", p229's "full recovery" between distance reps.
+   */
+  open?: 'at_least' | 'lap';
+};
+
+/**
+ * ⛔ A RANGE THE PAGE PRINTS FOR THIS SESSION (week builder decision 5, 2026-10-02): "6 to 10 ×", "4 to 6 min",
+ * "60 to 100 min". A workout's numbers move only inside one of these; an exact printed number has none. `built` is the
+ * value this session was built at, so a picker can show it and offer the rest of the range.
+ */
+export type PrintedRange = {
+  /** What the range sizes, in the page's terms. */
+  what: 'reps' | 'rep_seconds' | 'rest_seconds' | 'session_seconds' | 'distance_m';
+  lo: number;
+  hi: number;
+  built: number;
+  cite: string;
 };
 
 export type Block = {
@@ -228,4 +248,6 @@ export type EnduranceSession = {
   workToRest: { workSeconds: number; restSeconds: number; ratio: number | null };
   anchor: AnchorReport;
   notes: SessionNote[];
+  /** Every range the page prints for this option at this level (decision 5). Empty where every number is exact. */
+  ranges: PrintedRange[];
 };

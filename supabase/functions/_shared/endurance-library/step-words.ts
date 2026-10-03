@@ -24,6 +24,12 @@ export type StepWords = {
   allOut?: string;
   /** A work step at race pace. */
   racePace?: string;
+  /** The page's "full recovery" inside a round (week builder Stage 2, 2026-10-02). */
+  fullRecovery?: string;
+  /** An untimed rest between rounds — p230's "full recovery and stretch/mobility between rounds". */
+  betweenOpen?: string;
+  /** An open-ended effort — p237's "1 minute-plus to fade at 130%", "until unable to hold 120%". */
+  openEnd?: string;
 };
 
 export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = {
@@ -49,6 +55,28 @@ export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = 
     // p247, the race-tempo row (any shape): "increase the pace here to race pace".
     '*': { racePace: 'race pace' },
   },
+  // ⛔ WEEK BUILDER STAGE 2 (2026-10-02): p230–231's printed sprint lines, their walks and rests as the page names them.
+  run_sprint_power: {
+    // p230 L1/L2, p231 L3: "1-minute walk between sets, 1-minute rest between rounds".
+    flying_short: { inRound: 'walk', between: 'rest' },
+    // p230 L2: "2-minute walk between sets, 1-minute rest between rounds".
+    flying_75: { inRound: 'walk', between: 'rest' },
+    // p231 L3: "2-minute walk between sets".
+    repeat_100: { inRound: 'walk' },
+    // p230 / p231: "2-minute recovery between sets, 3-minute rest between rounds".
+    flying_long: { inRound: 'recovery', between: 'rest' },
+    // p231 L3: "2-minute rest between rounds"; p230 L2 "full recovery".
+    max_pace_50: { between: 'rest', fullRecovery: 'full recovery' },
+    max_pace_200: { fullRecovery: 'full recovery' },
+    // p230 / p231: "full recovery between sets, full recovery and stretch/mobility between rounds".
+    speed_200: { fullRecovery: 'full recovery', betweenOpen: 'full recovery and stretch/mobility' },
+    speed_endurance: { fullRecovery: 'full recovery', betweenOpen: 'full recovery and stretch/mobility' },
+    mixed_150: { fullRecovery: 'full recovery', betweenOpen: 'full recovery and stretch/mobility' },
+    short_max: { fullRecovery: 'full recovery' },
+    short_max_crouch: { fullRecovery: 'full recovery' },
+    short_max_plank: { fullRecovery: 'full recovery', betweenOpen: 'full recovery' },
+    short_max_runout: { fullRecovery: 'full recovery' },
+  },
   run_lsd: {
     // p235: "5 minutes @ race pace finish", "10 minutes @ race pace finish", "15 minutes @ race pace finish".
     race_pace_finish: { racePace: 'race pace finish' },
@@ -61,6 +89,11 @@ export const STEP_WORDS: Partial<Record<FamilyId, Record<string, StepWords>>> = 
     sandwich: { inRound: 'easy spin', between: { 3: 'additional spin/recovery' } },
     // p237 L2 / L3: "5-minute spin between sets".
     one_to_one: { between: { 2: 'spin', 3: 'spin' } },
+    // p237: "1 minute-plus to fade at 130% (when power drops) / 5-minute spin recovery" (2026-10-02).
+    fade_130: { openEnd: '1 minute-plus to fade at 130% (when power drops)', between: 'spin recovery' },
+    // p237 L2 / L3: "30 seconds @ 120% / 30 seconds rest, repeat until unable to hold 120% for the duration; rest 5
+    // minutes" (2026-10-02).
+    until_fail_120: { openEnd: '30 seconds @ 120% / 30 seconds rest, repeat until unable to hold 120% for the duration', between: 'rest' },
   },
   ride_vo2: {
     // p238: "5-minute rest".

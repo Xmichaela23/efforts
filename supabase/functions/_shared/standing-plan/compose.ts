@@ -173,7 +173,11 @@ function slotRotation(
     if (first) return { fixed: first };
   }
   if (!(FAMILIES as Record<string, unknown>)[assigned.family]) return { fixed: undefined };
-  const offered = archetypesForVenue(assigned.family as never, level as never, venue);
+  // ⛔ A STAGE-2 OPTION IS LEFT OUT HERE (Michael, 2026-10-03): it joins only through the held cycle, and only where the
+  // week still holds p148's 10% (`heldShapes`). Everywhere else — an easy row, the taper column — the rotation is as it
+  // was, and the option is the athlete's to pick (Build Focus, the swap sheet).
+  const offered = archetypesForVenue(assigned.family as never, level as never, venue)
+    .filter((a) => !joinsRotationIfHeld(assigned.family, a.id, level));
   if (offered.length === 0) return { fixed: undefined };
   return { rotates: offered.map((a) => a.id) };
 }
@@ -202,6 +206,9 @@ function archetypeForSlot(
   const r = slotRotation(slot, assigned, level, lengthPicked, venue);
   if ('fixed' in r) return r.fixed;
   if (held && r.rotates.includes(held)) return held;
+  // The held cycle may have let a Stage-2 option in (`heldShapes`) — it is still one the level and venue offer.
+  if (held && joinsRotationIfHeld(assigned.family, held, level)
+    && archetypesForVenue(assigned.family as never, level as never, venue).some((a) => a.id === held)) return held;
   return r.rotates[(Math.max(1, week) - 1) % r.rotates.length];
 }
 
@@ -215,7 +222,8 @@ function slotVenue(args: Pick<ComposeArgs, 'trainerSlotsByWeek' | 'week'>, key: 
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
 import { heldRowFor, holdRotation, type HoldSlot, type HoldVector } from './hard-rotation.ts';
-import { archetypesFor, archetypesForVenue } from '../endurance-library/index.ts';
+import { WEEK_CHANGE_FLAG_PCT } from '../accessory-dosing/dose.ts';
+import { archetypesFor, archetypesForVenue, joinsRotationIfHeld } from '../endurance-library/index.ts';
 import { WORK_BANDS } from '../endurance-library/source-rules.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { conflictsOfTyped, easyRunOnHeavyLegDays, typedRowsOf, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
@@ -3350,6 +3358,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const heldShapes: Record<string, string> = (() => {
     if (args.column !== 'standard') return {};
     const rotating: HoldSlot[] = [];
+    const optional: Array<{ slot: string; id: string; v: HoldVector }> = [];
+    /** Each easy row's sub-VT1 minutes in week w, less its week-one value (which the base already holds). */
+    const easyRows: Array<(w: number) => number> = [];
     const base: HoldVector = { minutes: 0, sub: 0, near: 0, over: 0 };
     const held: Record<string, string[]> = {};
     const fixedHardBySport: Record<string, number> = {};
@@ -3386,9 +3397,11 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             // ⛔ A race block's grown lengths do not move the held cycle: it is solved once, on the block's starting
             // lengths (`holdMinutes`, WORKORDER-race-builds 2026-09-30) — held means one cycle for the block.
             const picked = Number((args.holdMinutes ?? args.sportMix?.minutes)?.[key]);
-            base.sub += Number.isFinite(picked) && picked > 0
-              ? picked
-              : measure(a.family, level, archetypeForSlot(slot, a, level, 1, false, 'road'), omit).sub;
+            const pickedOk = Number.isFinite(picked) && picked > 0;
+            const week1 = pickedOk ? picked : measure(a.family, level, archetypeForSlot(slot, a, level, 1, false, 'road'), omit).sub;
+            base.sub += week1;
+            // The easy row's own shape week by week (its walk by week number), for the Stage-2 count below.
+            if (!pickedOk) easyRows.push((w) => measure(a.family, level, archetypeForSlot(slot, a, level, w, false, 'road'), omit).sub - week1);
             return;
           }
           const r = slotRotation(slot, a, level, lengthPickedFor(key), 'road');
@@ -3403,6 +3416,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             key, family: a.family, sport: a.sport,
             candidates: r.rotates.map((id) => ({ id, ...measure(a.family, level, id, omit) })),
           });
+          // The Stage-2 options this slot could take — tried below, one at a time, against the week's 10% line.
+          if (!(Array.isArray(slot.archetypes) && slot.archetypes.length > 0) && !a.substituted) {
+            for (const o of archetypesForVenue(a.family as never, level as never, 'road', slot.raceDistance)) {
+              if (joinsRotationIfHeld(a.family, o.id, level)) optional.push({ slot: key, id: o.id, v: measure(a.family, level, o.id, omit) });
+            }
+          }
         });
       }
     } catch {
@@ -3414,7 +3433,52 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const perSport: Record<string, number> = {};
     if (Number(args.targetRunHours) > 0) perSport.run = fixedHardBySport.run ?? 0;
     if (Number(args.targetRideHours ?? args.targetWeeklyRideHours) > 0) perSport.ride = fixedHardBySport.ride ?? 0;
-    return heldRowFor(holdRotation(rotating, base, held, perSport), args.week);
+    /**
+     * ⛔⛔ p148 FIRST, THEN THE NEW OPTIONS (Michael, 2026-10-03). The cycle is solved on the shapes the plan has always
+     * rotated; then each Stage-2 option is tried in the page's order and kept only if the cycle it makes breaks the 10%
+     * line no more often per week than the cycle without it. One that would is still offered to pick (Build Focus, the
+     * swap sheet) — it just does not rotate into this plan.
+     * ⚠️ Deterministic: the same slots, the same options in the same order, the same answer every week of the block.
+     */
+    // ⚠️ "NO MORE OFTEN" IS COUNTED THE WAY THE BLOCK IS BUILT: each of the four numbers on its own (hard minutes and
+    // p146's three buckets), week to week over this block's own standard weeks after the first (week 1 is the test
+    // week). The option joins only if no number breaks the line more often than it did without it.
+    const N = Math.max(3, Number((args as { weeks?: number }).weeks) || 12);
+    const windowBreaks = (pl: ReturnType<typeof holdRotation>, rot: HoldSlot[]): number[] => {
+      const vecs: HoldVector[] = [];
+      for (let w = 2; w <= N; w++) {
+        const row = heldRowFor(pl, w);
+        const v = { ...base };
+        for (const f of easyRows) v.sub += f(w);
+        for (const sl of rot) {
+          const c = sl.candidates.find((x) => x.id === row[sl.key]);
+          if (c) { v.minutes += c.minutes; v.sub += c.sub; v.near += c.near; v.over += c.over; }
+        }
+        vecs.push(v);
+      }
+      return (['minutes', 'sub', 'near', 'over'] as const).map((q) => {
+        let n = 0;
+        for (let i = 1; i < vecs.length; i++) {
+          const a = vecs[i - 1][q], b = vecs[i][q];
+          if (a > 0 ? Math.abs(b - a) / a > WEEK_CHANGE_FLAG_PCT / 100 : b > 0) n += 1;
+        }
+        return n;
+      });
+    };
+    let plan = holdRotation(rotating, base, held, perSport);
+    const baseCount = plan.breaks < 0 ? null : windowBreaks(plan, rotating);
+    for (const o of optional) {
+      if (!baseCount) break; // the page-order fallback: no cycle to hold, so nothing joins
+      const tryRot = rotating.map((sl) => (sl.key === o.slot ? { ...sl, candidates: [...sl.candidates, { id: o.id, ...o.v }] } : sl));
+      const next = holdRotation(tryRot, base, held, perSport);
+      if (next.breaks < 0) continue;
+      const got = windowBreaks(next, tryRot);
+      if (got.every((n, i) => n <= baseCount[i])) {
+        rotating.splice(0, rotating.length, ...tryRot);
+        plan = next;
+      }
+    }
+    return heldRowFor(plan, args.week);
   })();
   /**
    * ⛔ THE CYCLE IS THE ROAD'S (SPEC-outdoor-rides §3A: the road unless the athlete put that slot on the trainer).

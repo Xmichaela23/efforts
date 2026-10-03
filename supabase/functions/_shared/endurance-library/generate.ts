@@ -41,7 +41,7 @@ import {
   WRAPPERS,
   type Archetype,
 } from './source-rules.ts';
-import type { PrintedDistance, PrintedIntervals, PrintedLongRun, PrintedRide, RideVenueMark } from './source-rules.ts';
+import type { PrintedDistancePart, PrintedIntervals, PrintedLongRun, PrintedRest, PrintedRide, RideVenueMark } from './source-rules.ts';
 import { anchorFor, resolveEnduranceAnchors, UNKNOWN_ANCHORS, type EnduranceAnchors, type EnduranceBaselines } from './anchors.ts';
 import type {
   AnchorReport,
@@ -50,6 +50,7 @@ import type {
   FamilyId,
   Intensity,
   Level,
+  PrintedRange,
   Range,
   ResolvedTarget,
   SessionNote,
@@ -396,7 +397,9 @@ function buildPrintedIntervals(ctx: BuildContext, p: PrintedIntervals): Block[] 
   const { archetype: a, sport, anchor } = ctx;
   const labelFor = (s: PrintedIntervals['round'][number]): string =>
     s.label ?? (s.role === 'work' ? 'Work' : s.role === 'float' ? 'Float' : 'Recovery');
-  const roundSteps = (): Step[] => p.round.map((s) => step(s.role, labelFor(s), s.seconds, s.intensity, sport, anchor));
+  // ⛔ AN OPEN SEGMENT (2026-10-02): `at_least` keeps its printed minimum as its clock; `lap` has none.
+  const roundSteps = (): Step[] => p.round.map((s) => step(s.role, labelFor(s), s.open === 'lap' ? null : s.seconds, s.intensity, sport, anchor,
+    s.open ? { open: s.open } : undefined));
   // ⛔ Ch.4's reclassification, same note `buildIntervals` gives: a sub-threshold block past fifteen
   // minutes is a tempo effort, ridden as one block (p239's 20 min @ 80%).
   if (p.round.some((s) => s.role === 'work' && s.seconds > TEMPO_CROSSOVER_SECONDS
@@ -423,6 +426,26 @@ function buildPrintedIntervals(ctx: BuildContext, p: PrintedIntervals): Block[] 
   for (let i = 0; i < p.rounds; i++) {
     inner.push(...roundSteps());
     if (betweenRounds && i < p.rounds - 1) inner.push({ ...betweenRounds });
+  }
+  const betweenSets = p.betweenSetsSeconds && p.betweenSetsSeconds > 0
+    ? step('recovery', 'Between sets', p.betweenSetsSeconds, p.betweenSetsIntensity ?? { kind: 'easy' }, sport, anchor)
+    : null;
+  /**
+   * ⛔ A SET OF SETS (p232 MLSS L3, 2026-10-02) — see `PrintedIntervals.outer`. One block repeated `outer.sets` times; its
+   * steps are the small sets written out with the small-set rest between them, and the larger rest is `restBetween`.
+   */
+  if (p.outer) {
+    const small: Step[] = [];
+    for (let k = 0; k < p.sets; k++) {
+      small.push(...inner.map((st) => ({ ...st })));
+      if (betweenSets && k < p.sets - 1) small.push({ ...betweenSets });
+    }
+    return [{
+      repeat: p.outer.sets,
+      label: `${p.outer.sets} x ${p.sets} x ${p.rounds} ${a.label.toLowerCase()}`,
+      steps: small,
+      restBetween: step('recovery', 'Between larger sets', p.outer.betweenSeconds, p.outer.betweenIntensity ?? { kind: 'easy' }, sport, anchor),
+    }];
   }
   return [{
     repeat: p.sets,
@@ -485,8 +508,10 @@ function buildIntervals(ctx: BuildContext): Block[] {
   };
   const mkRepeat = (i = 0, n = 1): Step[] => {
     const steps: Step[] = [];
-    // A standing start has no stated duration; its step carries a null clock rather than a guess.
-    steps.push(step('work', workLabel, repSeconds > 0 ? repSeconds : null, workAt(i, n), sport, anchor));
+    // A standing start has no stated duration; its step carries a null clock rather than a guess — and the lap button
+    // (2026-10-02), so it reaches a plan row and the watch: "accelerate as fast as possible up to speed" ends on lap.
+    steps.push(step('work', workLabel, repSeconds > 0 ? repSeconds : null, workAt(i, n), sport, anchor,
+      repSeconds > 0 ? undefined : { open: 'lap' }));
     if (a.float && !floatInside) {
       steps.push(step(floatCountsAsWork ? 'work' : 'float', a.float.label, floatSeconds, a.float.intensity, sport, anchor));
     }
@@ -539,41 +564,63 @@ function buildIntervals(ctx: BuildContext): Block[] {
 }
 
 /**
- * ⛔ A DISTANCE SESSION AS PRINTED — see `Archetype.printedDistanceByLevel`. One block per the page: `rounds` repeats of
- * the round, each round `repsPerRound` reps written out segment by segment with the page's full recovery between reps,
- * and full recovery between rounds. The clock is the family's own lower bound, as `buildDistanceIntervals` gives it.
+ * ⛔ A DISTANCE SESSION AS PRINTED, PART BY PART (week builder Stage 2, 2026-10-02) — see `PrintedDistancePart`. One block
+ * per part: `rounds` repeats of the part's reps written out segment by segment (run straight through), the page's rest
+ * between reps inside it and between rounds as `restBetween`; a part's `after` rest is a block of its own. The clock of a
+ * step with no percentage is the family's lower bound (`SPRINT_CLOCK_BOUND_PCT`), as before.
  */
-function buildPrintedDistance(ctx: BuildContext, p: PrintedDistance): Block[] {
+function buildPrintedDistanceParts(ctx: BuildContext, parts: PrintedDistancePart[]): Block[] {
   const { archetype: a, sport, anchor } = ctx;
-  const segment = (sg: PrintedDistance['rep'][number]): Step => {
+  const segment = (sg: PrintedDistancePart['rep'][number]): Step => {
     const pctForClock = sg.intensity.kind === 'pct_threshold' ? sg.intensity.hi : sport === 'run' ? SPRINT_CLOCK_BOUND_PCT : null;
     const { seconds, fromDistance } = secondsForDistance(sg.meters, sport, anchor, pctForClock);
-    return step('work', sg.label ?? `${sg.meters} m`, seconds, sg.intensity, sport, anchor, {
+    return step(sg.role ?? 'work', sg.label ?? `${sg.meters} m`, seconds, sg.intensity, sport, anchor, {
       meters: sg.meters,
       secondsFromDistance: fromDistance || undefined,
       secondsIsLowerBound: (fromDistance && sg.intensity.kind !== 'pct_threshold') || undefined,
     });
   };
-  const full = recoveryStep(a, 0, sport, anchor);
-  const inner: Step[] = [];
-  for (let i = 0; i < p.repsPerRound; i++) {
-    inner.push(...p.rep.map(segment));
-    if (full && i < p.repsPerRound - 1) inner.push({ ...full });
+  /** The page's rest as a step: a clock, the lap button ("full recovery"), a share of the rep's own clock, or none. */
+  const restStep = (r: PrintedRest, repSeconds: number | null, label: string): Step | null => {
+    if (r == null) return null;
+    if (r === 'open') return step('rest', 'Full recovery', null, { kind: 'easy' }, sport, anchor, { open: 'lap' });
+    if ('fractionOfRep' in r) {
+      // p233 "rest equal to 50% of the run": the rep's own clock at this athlete's pace; the lap button without one.
+      return repSeconds != null
+        ? step('recovery', label, Math.round(repSeconds * r.fractionOfRep), { kind: 'vt1' }, sport, anchor)
+        : step('recovery', label, null, { kind: 'vt1' }, sport, anchor, { open: 'lap' });
+    }
+    return step('recovery', label, r.seconds, r.intensity, sport, anchor);
+  };
+  const blocks: Block[] = [];
+  for (const part of parts) {
+    const rep = part.rep.map(segment);
+    const repSeconds = rep.every((st) => st.seconds != null) ? rep.reduce((t, st) => t + (st.seconds as number), 0) : null;
+    const inner: Step[] = [];
+    for (let i = 0; i < part.reps; i++) {
+      inner.push(...rep.map((st) => ({ ...st })));
+      const between = i < part.reps - 1 ? restStep(part.betweenReps, repSeconds, 'Recovery') : null;
+      if (between) inner.push(between);
+    }
+    const repMeters = part.rep.reduce((t, sg) => t + sg.meters, 0);
+    blocks.push({
+      repeat: Math.max(1, part.rounds),
+      label: `${part.rounds} x ${part.reps} x ${repMeters} m`,
+      steps: inner,
+      restBetween: part.rounds > 1 ? restStep(part.betweenRounds, repSeconds, 'Between rounds') : null,
+    });
+    const after = part.after ? restStep(part.after, repSeconds, 'Recovery') : null;
+    if (after) blocks.push({ repeat: 1, label: 'Recovery', steps: [after], restBetween: null });
   }
-  const repMeters = p.rep.reduce((t, sg) => t + sg.meters, 0);
-  return [{
-    repeat: Math.max(1, p.rounds),
-    label: `${p.rounds} x ${p.repsPerRound} x ${repMeters} m`,
-    steps: inner,
-    restBetween: full ? { ...full } : null,
-  }];
+  void a;
+  return blocks;
 }
 
 function buildDistanceIntervals(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
-  // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE FOR THIS LEVEL — see `buildPrintedDistance`.
-  const printedDistance = a.printedDistanceByLevel?.[ctx.level];
-  if (printedDistance) return buildPrintedDistance(ctx, printedDistance);
+  // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE FOR THIS LEVEL — see `buildPrintedDistanceParts`.
+  const printedParts = a.printedDistancePartsByLevel?.[ctx.level];
+  if (printedParts) return buildPrintedDistanceParts(ctx, printedParts);
   // OURS — `buildDistanceIntervals` rounds a rep distance to whole 25 m lengths, 25 m at least; no page.
   const repMeters = Math.max(25, Math.round(lerp(a.repBand, levelT(ctx.level)) / 25) * 25);
   const reps = repCount(a, ctx, repMeters);
@@ -1195,7 +1242,25 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
     },
     anchor,
     notes,
+    ranges: printedRangesOf(archetype, req.level, blocks, totals),
   };
+}
+
+/**
+ * ⛔ THE RANGES THE PAGE PRINTS FOR THIS OPTION (week builder decision 5, 2026-10-02) — `Archetype.rangesByLevel`, with
+ * the value this session was built at. A count and a session length are read off the built session; anything else is
+ * the spec's own `built` (the value the builder uses), or the range's low end.
+ */
+function printedRangesOf(a: Archetype, level: Level, blocks: Block[], totals: SessionTotals): PrintedRange[] {
+  const specs = a.rangesByLevel?.[level] ?? [];
+  const workReps = blocks.reduce((t, b) => t + b.repeat * b.steps.filter((st) => st.role === 'work').length, 0);
+  return specs.map((r) => ({
+    what: r.what,
+    lo: r.lo,
+    hi: r.hi,
+    built: r.built ?? (r.what === 'session_seconds' ? totals.clockedSeconds : r.what === 'reps' ? workReps : r.lo),
+    cite: r.cite,
+  }));
 }
 
 // ── the size band, which is what the wizard reads ───────────────────────────────────────────────

@@ -49,6 +49,9 @@ type PlannedRideRow = {
 
 const CUE_BY_KIND: Record<string, string> = { warmup: 'Warmup', cooldown: 'Cooldown', recovery: 'Recovery' };
 
+/** The line over an open-ended step (p237 "until power drops"); Michael approved the words 2026-10-02. */
+export const OPEN_END_LINE = 'Keep going past this until the power drops';
+
 export function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -58,7 +61,22 @@ export function formatDuration(totalSeconds: number): string {
 
 function stepLine(step: any, index: number, ftp: number): string {
   const where = `step ${index}`;
-  const seconds = Number(step?.seconds);
+  /**
+   * ⛔ A LAP-BUTTON STEP (week builder Stage 2, 2026-10-02). Intervals.icu has no lap step and no "repeat until" (read off
+   * the Workout Builder Syntax Quick Guide, forum.intervals.icu/t/123701, 2026-10-02). p237's "1 minute-plus to fade at
+   * 130%" carries its printed minimum (`min_seconds`) and goes as that minimum, with the page's open end as a text line
+   * above it. A lap step with no minimum (p237's "until unable to hold 120%") has no length to write and refuses, by name.
+   */
+  // ⚠️ A LAP STEP THAT HAS A LENGTH (the p237 warm-up's 10–15 minutes, saved as its 12:30 with the lap button) goes as
+  // that length, as it always did. Only a lap step with no length reads its minimum, or refuses.
+  const ownSeconds = Number(step?.seconds);
+  const hasOwn = Number.isInteger(ownSeconds) && ownSeconds > 0;
+  const openEnd = step?.lap_button === true && !hasOwn;
+  const lapMin = openEnd ? Number(step?.min_seconds) : NaN;
+  if (openEnd && !(Number.isInteger(lapMin) && lapMin > 0)) {
+    throw new IntervalsSerializeError(`${where}: a lap-button step with no length (Intervals.icu has no lap step)`);
+  }
+  const seconds = openEnd ? lapMin : ownSeconds;
   if (!Number.isInteger(seconds) || seconds <= 0) {
     throw new IntervalsSerializeError(`${where}: no duration in seconds (${JSON.stringify(step?.seconds)})`);
   }
@@ -73,13 +91,13 @@ function stepLine(step: any, index: number, ftp: number): string {
    * step keeps its kind's cue. ⚠️ A line ending in "Nx" would start a repeat, so that one still refuses.
    * ⚠️ Read off the Quick Guide, not yet seen on a live Intervals.icu calendar.
    */
-  let heading = '';
+  let heading = openEnd ? OPEN_END_LINE : '';
   let cueLabel = label;
   if (label && /[\d%]/.test(label)) {
     if (/\b\d+x\s*$/i.test(label)) {
       throw new IntervalsSerializeError(`${where}: label "${label}" ends in "Nx", which Intervals would read as a repeat`);
     }
-    heading = label;
+    heading = heading ? `${label}\n${heading}` : label;
     cueLabel = '';
   }
   const cue = cueLabel || CUE_BY_KIND[kind] || '';
@@ -140,7 +158,7 @@ export function serializeRide(row: PlannedRideRow): IntervalsEvent {
     throw new IntervalsSerializeError(`planned workout ${row.id}: session note has a line ending in "Nx", which Intervals would read as a repeat`);
   }
   const description = note ? `${note}\n\n${lines.join('\n')}` : lines.join('\n');
-  const moving_time = steps.reduce((sum, s: any) => sum + Number(s.seconds), 0);
+  const moving_time = steps.reduce((sum, s: any) => sum + Number(Number(s?.seconds) > 0 ? s.seconds : s?.min_seconds ?? 0), 0);
 
   return {
     category: 'WORKOUT',

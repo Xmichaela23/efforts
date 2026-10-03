@@ -95,3 +95,21 @@ Deno.test('a floor saved with no shown top goes out as freeride under "N W and u
   assert(ev.description.includes('253 W and up\n- 45s freeride'), ev.description);
   assert(!/\d+-\d+%/.test(ev.description), ev.description);
 });
+
+// ⛔ WEEK BUILDER STAGE 2 (2026-10-02): Intervals.icu has no lap-button step (Workout Builder Syntax Quick Guide).
+Deno.test('an open-ended step goes as its printed minimum with the open end above it; a lap step with a length keeps it', () => {
+  const row = { id: 'f', date: '2026-10-07', type: 'ride', name: 'Fade', computed: { anchors: { ftp_w: 250 }, steps: [
+    { kind: 'warmup', seconds: 750, lap_button: true, label: '10- to 15-minute easy spin' },
+    { kind: 'work', lap_button: true, min_seconds: 60, powerRange: { lower: 325, upper: 325 } },
+  ] } };
+  const d = serializeRide(row).description;
+  assert(d.includes('- Warmup 12m30s freeride'), d);
+  assert(d.includes('Keep going past this until the power drops\n- 1m 130%'), d);
+});
+
+Deno.test('a lap step with no length cannot be written, and says so by name', () => {
+  const row = { id: 'g', date: '2026-10-07', type: 'ride', name: 'Until', computed: { anchors, steps: [
+    { kind: 'work', lap_button: true, powerRange: { lower: 300, upper: 325 } },
+  ] } };
+  assertThrows(() => serializeRide(row), IntervalsSerializeError, 'a lap-button step with no length');
+});

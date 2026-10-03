@@ -729,7 +729,11 @@ Deno.test('the slot band stays sane across the athlete space', () => {
         assert(Number.isFinite(band.shortest) && Number.isFinite(band.longest), `${where}: band is not finite`);
         assert(band.shortest > 0, `${where}: band floor is ${band.shortest}`);
         assert(band.shortest <= band.longest, `${where}: band is inverted`);
-        assert(band.longest <= 6 * 3600, `${where}: band ceiling is ${band.longest}s`);
+        // ⚠️ ONE EXEMPTION (2026-10-02): p233–234's distance repeats are metres at a percentage of threshold, so their clock
+        // is the athlete's pace — at the "absurdly slow" profile's 20:00/mi threshold, ten 1200 m repeats run past six
+        // hours. The page prints the distance; nothing shortens a run session (only swim distances are "modifiable").
+        const distanceAtThisPace = family === 'run_near_threshold' && shape.label === 'absurdly slow';
+        if (!distanceAtThisPace) assert(band.longest <= 6 * 3600, `${where}: band ceiling is ${band.longest}s`);
       }
     }
   }
@@ -902,13 +906,16 @@ Deno.test('⛔ every ride shape carries the road/trainer mark, and the trainer s
       if (a.venue === 'trainer') trainer.push(a.id);
     }
   }
-  assertEquals(rideShapes, 15, 'the spec sorts 15 ride shapes');
+  // 18 since 2026-10-02: p236's 15-second surges and p237's fade and until-fail lines (all road: by feel / max effort).
+  assertEquals(rideShapes, 18, 'the spec sorts 18 ride shapes');
   assertEquals(trainer.sort(), ['micro', 'minute_surge', 'short_vo2']);
 });
 
 Deno.test('⛔ every ride family keeps a road shape at every level — the spec\'s 3/3/3 · 3/3/3 · 1/1/1 · 3/3/2 · 2/2/2', () => {
   const want: Record<string, number[]> = {
-    ride_sprints: [3, 3, 3], ride_anaerobic: [3, 3, 3], ride_vo2: [1, 1, 1], ride_sweet_spot: [3, 3, 2], ride_endurance: [2, 2, 2],
+    // 2026-10-02: sprints L3 +1 (15-s surges), anaerobic +1 at every level (fade) and +1 at L2–3 (until-fail), sweet spot
+    // L3 +1 (tempo with sprints).
+    ride_sprints: [3, 3, 4], ride_anaerobic: [4, 5, 5], ride_vo2: [1, 1, 1], ride_sweet_spot: [3, 3, 3], ride_endurance: [2, 2, 2],
   };
   for (const family of ALL_FAMILIES) {
     if ((FAMILIES[family] as { sport: string }).sport !== 'ride') {

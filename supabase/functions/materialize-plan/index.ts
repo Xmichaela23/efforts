@@ -49,7 +49,8 @@ import {
 import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
 import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
 import { plannedNarrative } from '../_shared/planned-narrative.ts';
-import { SWIM_ENDURANCE_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
+import { SWIM_ENDURANCE_PRINTED, SWIM_OPEN_WATER_PRINTED, SWIM_SPEED_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
+import { OPEN_AND_DISTANCE_WORDS } from '../_shared/plan-tokens/quality-work.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { barLbForExercise, calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -3489,14 +3490,28 @@ export function expandTokensForRow(
   };
   const rowArchetype = rowTagValue('archetype');
   const rowLevel = Number(rowTagValue('level')) || null;
-  const PLACE_WORD: Record<string, 'between' | 'inRound' | 'allOut' | 'racePace'> = {
+  const PLACE_WORD: Record<string, 'between' | 'inRound' | 'allOut' | 'racePace' | 'fullRecovery' | 'betweenOpen' | 'openEnd'> = {
     between: 'between', in_round: 'inRound', all_out: 'allOut', race_pace: 'racePace',
+    full_recovery: 'fullRecovery', between_open: 'betweenOpen', open_end: 'openEnd',  // week builder Stage 2, 2026-10-02
+  };
+  /**
+   * ⛔ THE FOUR PLACES ADDED 2026-10-02 (week builder Stage 2) take the session's own word where `STEP_WORDS` has one,
+   * and otherwise the one word for the place (`OPEN_AND_DISTANCE_WORDS`, approved by Michael 2026-10-02): p229's "faster
+   * than vVO2", the sprint's run-out, the page's "full recovery", p237's open-ended effort.
+   */
+  const PLACE_DEFAULT: Record<string, string> = {
+    vvo2: OPEN_AND_DISTANCE_WORDS.vvo2,
+    run_out: OPEN_AND_DISTANCE_WORDS.runOut,
+    full_recovery: OPEN_AND_DISTANCE_WORDS.fullRecovery,
+    between_open: OPEN_AND_DISTANCE_WORDS.fullRecovery,
   };
   const withPageWords = (steps: any[]): any[] => steps.map((st) => {
     if (!st || typeof st !== 'object' || !st.place) return st;
     const { place, ...rest } = st;
-    const word = stepWordFor(rowFamily, rowArchetype, rowLevel, PLACE_WORD[String(place)] ?? 'between');
-    return word ? { ...rest, label: word, page_label: true } : rest;
+    const key = String(place);
+    const own = PLACE_WORD[key] ? stepWordFor(rowFamily, rowArchetype, rowLevel, PLACE_WORD[key]) : null;
+    const word = own ?? PLACE_DEFAULT[key] ?? null;
+    return word ? { ...rest, label: word, page_label: own != null } : rest;
   });
   // Where each token's steps start, so the printed swim's page words can be put on its steps after the loop.
   const tokenStarts: { tok: string; start: number }[] = [];
@@ -3520,6 +3535,16 @@ export function expandTokensForRow(
       // Allow optional suffix after unit (e.g., _easy)
       m = s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)(?:_[a-z0-9_]+)?/);
       if (m) { pushWUCD(parseInt(m[2],10), m[3], m[1]==='warmup'); continue; }
+      // ⛔ p241's SPEED AND OPEN-WATER PIECES (week builder Stage 2, 2026-10-02): a set rest, timed swims, and the
+      // untimed swim back to shore (the lap button). Words come from the printed table, below.
+      m = s.match(/^swim_rest_(\d+)s$/);
+      if (m) { steps.push({ id: uid(), kind: 'recovery', duration_s: parseInt(m[1], 10) }); continue; }
+      m = s.match(/^swim_time_(\d+)x(\d+)s$/);
+      if (m) {
+        for (let i = 0; i < parseInt(m[1], 10); i++) steps.push({ id: uid(), kind: 'work', duration_s: parseInt(m[2], 10) });
+        continue;
+      }
+      if (s === 'swim_lap') { steps.push({ id: uid(), kind: 'work', lap_button: true }); continue; }
       // Open water practice: duration from row; continuous steady effort, optional short time warmup, no interval rests
       if (s === 'swim_open_water_practice') {
         const totalMin = Number(row?.duration);
@@ -3706,15 +3731,23 @@ export function expandTokensForRow(
    * token for token (`SWIM_ENDURANCE_PRINTED`); each token's work steps take the page's words for that piece, in place
    * of the tier word ("easy") that stood for "easy-to-moderate intensity (race pace)".
    */
-  if (discipline === 'swim' && rowFamily === 'swim_endurance' && rowLevel != null) {
-    const printed = SWIM_ENDURANCE_PRINTED[rowLevel as 1 | 2 | 3] ?? [];
+  const SWIM_PRINTED_BY_FAMILY: Record<string, Partial<Record<1 | 2 | 3, { token: string; words: string }[]>>> = {
+    swim_endurance: SWIM_ENDURANCE_PRINTED,
+    swim_speed: SWIM_SPEED_PRINTED,  // week builder Stage 2, 2026-10-02
+    swim_open_water: SWIM_OPEN_WATER_PRINTED,
+  };
+  if (discipline === 'swim' && rowFamily && SWIM_PRINTED_BY_FAMILY[rowFamily] && rowLevel != null) {
+    const printed = SWIM_PRINTED_BY_FAMILY[rowFamily][rowLevel as 1 | 2 | 3] ?? [];
+    // ⚠️ BY POSITION, NOT BY NAME (2026-10-02): the speed and open-water tables repeat a token with different words
+    // ("parallel to shore" / "parallel back"), so the i-th token takes the i-th entry where the two lists line up.
+    const aligned = printed.length === tokenStarts.length && printed.every((p, k) => p.token === tokenStarts[k].tok.toLowerCase());
     tokenStarts.forEach(({ tok, start }, i) => {
-      const hit = printed.find((p) => p.token === tok.toLowerCase());
+      const hit = aligned ? printed[i] : printed.find((p) => p.token === tok.toLowerCase());
       if (!hit) return;
       const end = i + 1 < tokenStarts.length ? tokenStarts[i + 1].start : steps.length;
       for (let k = start; k < end; k += 1) {
         const st = steps[k];
-        if (st && st.kind !== 'recovery') { st.label = hit.words; st.page_label = true; }
+        if (st && (st.kind !== 'recovery' || tok.toLowerCase().startsWith('swim_rest_'))) { st.label = hit.words; st.page_label = true; }
       }
     });
   }
@@ -4166,6 +4199,12 @@ export function toV3Step(st: any, row?: any): any {
    * time at all — which the Garmin sender turned into a one-second rest. Carried now; the sender maps it to `OPEN`.
    */
   if (st?.lap_button === true) out.lap_button = true;
+  /**
+   * ⛔ AN AT-LEAST STEP KEEPS ITS PRINTED MINIMUM (week builder Stage 2, 2026-10-02) — p237's "1 minute-plus to fade at
+   * 130%". Garmin ends it on the lap button; Intervals.icu has no lap step and writes the minimum
+   * (`intervals/serialize.ts`).
+   */
+  if (typeof st?.min_duration_s === 'number' && st.min_duration_s > 0) out.min_seconds = Math.round(st.min_duration_s);
   // ⛔ THE LABEL IS THE PAGE'S OWN WORDS (2026-09-18, book-language): the step lines print it. Other labels are ours
   // and stay off the step lines, as before.
   if (st?.page_label === true && typeof st?.label === 'string' && st.label.trim()) out.page_label = true;

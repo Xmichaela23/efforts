@@ -89,7 +89,11 @@ Deno.test('⛔⛔ EVERY NEAR-THRESHOLD VARIANT TRAVELS AS TIME, WITH ITS OWN REP
    */
   for (const level of [2, 3]) {
     const offered = archetypesFor('run_near_threshold' as never, level as never).map((a) => a.id);
-    for (const archetype of [undefined, ...offered]) {
+    // ⚠️ THE DISTANCE REPEATS ARE DISTANCE (2026-10-02): p233–234 print 1200 m, 1600 m and the 800/400/200 m ladder in
+    // metres, so they travel as distance rounds with a pace target off threshold (`printed-options.test.ts`). This
+    // test holds the TIME-prescribed shapes to time.
+    const DISTANCE = new Set(['repeats_1200', 'repeats_1600_400', 'ladder_95']);
+    for (const archetype of [undefined, ...offered.filter((id) => !DISTANCE.has(id))]) {
       const t = tokensFor('run_near_threshold', level, archetype);
       const work = t.steps_preset.find((x) => !/^(warmup|cooldown|wrap)_/.test(x))!;
       const label = `${archetype ?? 'rotation default'} @L${level}`;

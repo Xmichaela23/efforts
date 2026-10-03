@@ -122,7 +122,9 @@ Deno.test('⛔⛔ TWO DIFFERENT PICKS BUILD TWO DIFFERENT SESSIONS', () => {
   const frame: FrameId = 'all_rounder';
   const slots = allSlots(frame, 'run');
   const seen = new Set<string>();
-  const fam = FAMILIES.ride_anaerobic.archetypes;
+  // ⚠️ THE SHAPES THE SLOT'S LEVEL OFFERS (2026-10-02): p237's until-fail line is printed at levels 2–3 only, and a pick
+  // the level does not offer builds the slot's own rotation, as it should.
+  const fam = FAMILIES.ride_anaerobic.archetypes.filter((a) => !a.levels || a.levels.includes(1));
   for (const a of fam) {
     const w = weekFor(frame, slots, { '2:0': a.id });
     const s = w.sessions.find((x) => x.day === 'Tuesday' && x.type === 'ride');

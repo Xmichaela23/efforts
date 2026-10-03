@@ -13,6 +13,7 @@
 // Run: deno test --no-check --allow-all supabase/functions/_shared/standing-plan/hard-rotation.test.ts
 // ============================================================================
 
+import { joinsRotationIfHeld } from '../endurance-library/index.ts';
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   FRAMES, assignSports, composeBlock, defaultCompetitionLifts, fenceMixToFrame, isHardSlot,
@@ -103,7 +104,9 @@ function readBlock(c: Case) {
 function rotationList(frame: FrameId, key: string, family: string, level: number, substituted: boolean): string[] {
   const [d, i] = key.split(':').map(Number);
   const slot = FRAMES[frame].columns.standard.find((x) => x.day === d)!.endurance[i];
-  const offered = archetypesForVenue(family as never, level as never, 'road').map((a) => a.id);
+  // ⚠️ A STAGE-2 OPTION (2026-10-03) joins only where the week holds, so it is never REQUIRED of the rotation.
+  const offered = archetypesForVenue(family as never, level as never, 'road').map((a) => a.id)
+    .filter((id) => !joinsRotationIfHeld(family, id, level));
   if (!substituted && slot.archetypes?.length) {
     const usable = slot.archetypes.filter((id) => offered.includes(id));
     if (usable.length) return usable;

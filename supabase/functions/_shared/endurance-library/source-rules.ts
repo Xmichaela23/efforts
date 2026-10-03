@@ -15,7 +15,7 @@
 // carried onto every ride session's face, and never quietly promoted to fact.
 // ============================================================================
 
-import type { FamilyId, Intensity, Level, Range, Sport } from './types.ts';
+import type { FamilyId, Intensity, Level, PrintedRange, Range, Sport } from './types.ts';
 import type { RidePowerRule } from '../plan-tokens/quality-work.ts';
 
 // ── THE PERCENTAGE BASIS ────────────────────────────────────────────────────────────────────────
@@ -459,7 +459,11 @@ export type PrintedLongRun = {
  * as work is `work`; a prescribed effort under the family's floor (MLSS's VT1 minute inside the
  * round) is `float`; the page's "easy jog" / "easy spin" / "recovery" is `recovery`.
  */
-export type PrintedSegment = { seconds: number; role: 'work' | 'float' | 'recovery'; intensity: Intensity; label?: string };
+export type PrintedSegment = {
+  seconds: number; role: 'work' | 'float' | 'recovery'; intensity: Intensity; label?: string;
+  /** See `Step.open` — p237's "1 minute-plus to fade" (`at_least`, `seconds` the minimum) and "until unable to hold" (`lap`). */
+  open?: 'at_least' | 'lap';
+};
 
 /**
  * An interval session as the page prints it: `sets` of `rounds` rounds of `round`, with the page's
@@ -474,21 +478,35 @@ export type PrintedIntervals = {
   betweenRoundsIntensity?: Intensity;
   betweenSetsSeconds?: number;
   betweenSetsIntensity?: Intensity;
+  /**
+   * ⛔ A SET OF SETS (2026-10-02) — p232 MLSS level 3: "2 larger sets of 4 sets of 4 rounds … 2-minute walk/recovery jog
+   * between small sets, 4-minute full recovery between larger sets". `sets` and `betweenSetsSeconds` are the small sets;
+   * this is the larger ones.
+   */
+  outer?: { sets: number; betweenSeconds: number; betweenIntensity?: Intensity };
 };
 
 /**
- * ⛔ A DISTANCE SESSION AS PRINTED (2026-09-23, Michael: everything a plan prints gets built). p230-231's
- * "2 rounds of 3 x 150m as 50m @ >vVO2, 50m @ all-out, 50m @ >vVO2 from flying start, full recovery between sets, full
- * recovery and stretch/mobility between rounds": each rep is written out as its segments, run straight through.
- * `betweenReps` / `betweenRounds` 'open' = the page's "full recovery" (no duration is invented).
+ * ⛔ A DISTANCE SESSION AS PRINTED, PART BY PART (week builder Stage 2, 2026-10-02). p229–231's sprints and p233–234's
+ * distance repeats: each part is `rounds` rounds of `reps` reps of `rep` (written out segment by segment, run straight
+ * through), with the page's rest between reps, between rounds and after the part.
+ *   · `betweenReps` / `betweenRounds`: seconds at an intensity, `'open'` (the page's "full recovery", no length
+ *     invented), `{ fractionOfRep }` (p233 "rest equal to 50% of the run" — the rep's own clock at the athlete's pace,
+ *     the lap button where there is no pace), or null (the page prints none).
+ *   · `after`: the rest before the next part (p233 "2 × 1600 m … with 3-minute rest, then 3 × 400 m").
  */
-export type PrintedDistance = {
+export type PrintedRest = { seconds: number; intensity: Intensity } | 'open' | { fractionOfRep: number } | null;
+export type PrintedDistancePart = {
   rounds: number;
-  repsPerRound: number;
-  rep: Array<{ meters: number; intensity: Intensity; label?: string }>;
-  betweenReps: 'open';
-  betweenRounds: 'open';
+  reps: number;
+  rep: Array<{ meters: number; intensity: Intensity; label?: string; role?: 'work' | 'float' }>;
+  betweenReps: PrintedRest;
+  betweenRounds: PrintedRest;
+  after?: PrintedRest;
 };
+
+/** A range the page prints for an option at one level — see `PrintedRange` (types.ts). `built` defaults to `lo`. */
+export type PrintedRangeSpec = { what: PrintedRange['what']; lo: number; hi: number; built?: number; cite: string };
 
 export type ArchetypeShape =
   /** Timed work reps, optionally with a second prescribed segment and optionally grouped into sets. */
@@ -634,8 +652,6 @@ export type Archetype = {
    * here falls back to the band builder.
    */
   printedIntervalsByLevel?: Partial<Record<Level, PrintedIntervals>>;
-  /** The same ruling for a distance session — see `PrintedDistance`. Overrides the distance builder at its levels. */
-  printedDistanceByLevel?: Partial<Record<Level, PrintedDistance>>;
   /**
    * ⛔ THE REP'S SECONDS AT EACH LEVEL where the page prints one number per level rather than a band
    * (p237's progressive repeats: 45 s / 1 min / 1:30). Read before `repBand` by the shape builder.
@@ -648,7 +664,18 @@ export type Archetype = {
    * race-specific lines for the half marathon and the marathon. `archetypesFor` leaves them out unless asked for that
    * race, so no other programme's rotation, swap sheet or default ever reaches them.
    */
-  raceOnly?: 'half' | 'marathon';
+  raceOnly?: 'half' | 'marathon' | '10k';
+  /** The session as printed, part by part — see `PrintedDistancePart`. Overrides every other builder at its levels. */
+  printedDistancePartsByLevel?: Partial<Record<Level, PrintedDistancePart[]>>;
+  /** The ranges the page prints for this option, per level (decision 5). Absent = every number is exact. */
+  rangesByLevel?: Partial<Record<Level, PrintedRangeSpec[]>>;
+  /**
+   * ⛔ THE LEVELS WHERE THIS OPTION JOINS A FOCUS ROTATION ONLY IF THE WEEK STILL HOLDS (Michael, 2026-10-03). Options
+   * built in week builder Stage 2 are offered everywhere a workout is picked (Build Focus, the swap sheet), but a
+   * Focus plan's rotation takes one only where it adds no week-to-week break of p148's 10% line (`compose.ts`,
+   * `heldShapes`). Absent = the option rotates as before.
+   */
+  joinsIfHeldAt?: Level[];
   /** Repeats are grouped into sets with their own stated between-set recovery. */
   set?: { repeatsPerSet: Range; restBand: Range; intensity: Intensity };
   /**
@@ -663,12 +690,21 @@ export type Archetype = {
 
 const pct = (lo: number, hi = lo): Intensity => ({ kind: 'pct_threshold', lo, hi });
 // Viada pp230-231: one 150 m rep as 50 m @ >vVO2, 50 m @ all-out, 50 m @ >vVO2.
-const MIXED_150_REP: PrintedDistance['rep'] = [
+const MIXED_150_REP: PrintedDistancePart['rep'] = [
   { meters: 50, intensity: { kind: 'faster_than_vvo2' } },
   { meters: 50, intensity: { kind: 'all_out' } },
   { meters: 50, intensity: { kind: 'faster_than_vvo2' } },
 ];
 const vt1: Intensity = { kind: 'vt1' };
+const VVO2: Intensity = { kind: 'faster_than_vvo2' };
+const ALL_OUT: Intensity = { kind: 'all_out' };
+/** p229–231's timed walk or rest between reps or rounds — an untargeted easy step. */
+const WALK = (seconds: number): PrintedRest => ({ seconds, intensity: easy });
+// Viada pp230-231: one 25/25 rep — 25 m all-out acceleration, 25 m @ >vVO2 stride down.
+const ACCEL_25_25: PrintedDistancePart['rep'] = [
+  { meters: 25, intensity: ALL_OUT, label: 'acceleration' },  // p230
+  { meters: 25, intensity: VVO2, label: 'stride down' },  // p230
+];
 
 /**
  * ⛔ THE PRINTED-ROUND SHORTHAND (2026-09-11). `W(45, 1.25)` is 45 s of work at 125%; `F(60, vt1)`
@@ -724,75 +760,257 @@ export const FAMILIES: Record<FamilyId, {
     intent: 'Pure speed, technical and neuromuscular. Paces come from performance and RPE rather '  // not-instruction: never prints — a family `intent` reaches only the library session's notes (generate.ts:1072) and slotFamilyFact's body; nothing reads those notes (translateEnduranceSession, enduranceLedgerFor, session-swap use none) and NonRaceBuilder reads only slotFamilyFact's title
       + 'than a prescribed pace; "all-out" means the best speed available that day.',
     cite: 'Viada pp229-231',
+    /**
+     * ⛔⛔ EVERY LINE pp230–231 PRINT, AS PRINTED (week builder Stage 2, 2026-10-02). The five shapes that stood here
+     * sized a count and a rep length from a band (`short_max` 25–50 m, `speed_endurance` 150–400 m, `flying_short`,
+     * `flying_long`) — method, not the page — and only `mixed_150` was the page's own. Each archetype is now one printed
+     * line (or one line per level where the page prints the same kind of session at each level), its rounds, reps,
+     * metres, targets and rests read off the page; `levels` is where the page prints it.
+     * ⚠️ THE IDS OF THE FIVE OLD SHAPES ARE KEPT for the line that is the same kind of session — p244's rotation
+     * (`frames.ts SPRINT_ROTATION`) names them, and built rows carry them.
+     * ⚠️ "@ max pace" is the page's word for an all-out pace; it builds as all-out (no pace target) and the step says
+     * "max pace". "140%+" builds at its floor, 140%. A "hard stop (drop to cover) or run out" after a rep is the
+     * athlete's choice on the day and builds no step.
+     * ⚠️ THE LABELS WERE APPROVED BY MICHAEL 2026-10-02 (copy review of Stage 2). The plan row is titled by the family
+     * ("Sprint / power"); these names print only in the week builder's list.
+     */
     archetypes: [
       {
-        id: 'short_max',
+        id: 'flying_short',
         shape: 'distance_intervals',
-        label: 'Short maximal accelerations',
-        repBand: { lo: 25, hi: 50 },
-        repsBand: { lo: 4, hi: 8 },
-        work: { kind: 'all_out' },
+        label: '50 m Repeats from a Dead Stop',  // Michael approved the words 2026-10-02
+        levels: [1, 2, 3],
+        repBand: { lo: 50, hi: 50 },
+        work: VVO2,
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: easy },
+        printedDistancePartsByLevel: {
+          // p230 L1: "3 rounds of 4 x 50m @ >vVO2 from dead stop, 1-minute walk between sets, 1-minute rest between rounds"
+          1: [{ rounds: 3, reps: 4, rep: [{ meters: 50, intensity: VVO2 }], betweenReps: WALK(60), betweenRounds: WALK(60) }],
+          // p230 L2: "2 rounds of 4 x 50m @ >vVO2 from dead stop, 1-minute walk between sets, 1-minute rest between rounds"
+          2: [{ rounds: 2, reps: 4, rep: [{ meters: 50, intensity: VVO2 }], betweenReps: WALK(60), betweenRounds: WALK(60) }],
+          // p231 L3: "2 rounds of 5 x 50m @ >vVO2 from dead stop, 1-minute walk between sets, 1-minute rest between rounds"
+          3: [{ rounds: 2, reps: 5, rep: [{ meters: 50, intensity: VVO2 }], betweenReps: WALK(60), betweenRounds: WALK(60) }],
+        },
+        cite: 'Viada pp230-231',
+      },
+      {
+        id: 'flying_75',
+        joinsIfHeldAt: [2],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '75 m Repeats from a Dead Stop',  // Michael approved the words 2026-10-02
+        levels: [2],
+        repBand: { lo: 75, hi: 75 },
+        work: VVO2,
+        recovery: { kind: 'stated', band: { lo: 120, hi: 120 }, intensity: easy },
+        printedDistancePartsByLevel: {
+          // p230 L2: "2 rounds of 2 x 75m @ >vVO2 from dead stop, 2-minute walk between sets, 1-minute rest between rounds"
+          2: [{ rounds: 2, reps: 2, rep: [{ meters: 75, intensity: VVO2 }], betweenReps: WALK(120), betweenRounds: WALK(60) }],
+        },
+        cite: 'Viada p230',
+      },
+      {
+        id: 'repeat_100',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '100 m Repeats from a Dead Stop',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 100, hi: 100 },
+        work: VVO2,
+        recovery: { kind: 'stated', band: { lo: 120, hi: 120 }, intensity: easy },
+        printedDistancePartsByLevel: {
+          // p231 L3: "3 x 100m @ >vVO2 from dead stop, 2-minute walk between sets, 1-minute rest between rounds" — one
+          // round printed, so the between-rounds rest builds no step.
+          3: [{ rounds: 1, reps: 3, rep: [{ meters: 100, intensity: VVO2 }], betweenReps: WALK(120), betweenRounds: null }],
+        },
+        cite: 'Viada p231',
+      },
+      {
+        id: 'flying_long',
+        shape: 'distance_intervals',
+        label: '200 m Flying-Start Repeats',  // Michael approved the words 2026-10-02
+        levels: [1, 2, 3],
+        repBand: { lo: 200, hi: 200 },
+        work: VVO2,
+        recovery: { kind: 'stated', band: { lo: 120, hi: 120 }, intensity: easy },
+        printedDistancePartsByLevel: {
+          // p230 L1: "2 rounds of 4 x 200m @ >vVO2 with flying start, 2-minute recovery between sets, 3-minute rest between rounds"
+          1: [{ rounds: 2, reps: 4, rep: [{ meters: 200, intensity: VVO2 }], betweenReps: WALK(120), betweenRounds: WALK(180) }],
+          // p230 L2 / p231 L3: "2 rounds of 2 x 200m @ >vVO2 with flying start, 2-minute recovery between sets, 3-minute rest between rounds"
+          2: [{ rounds: 2, reps: 2, rep: [{ meters: 200, intensity: VVO2 }], betweenReps: WALK(120), betweenRounds: WALK(180) }],
+          3: [{ rounds: 2, reps: 2, rep: [{ meters: 200, intensity: VVO2 }], betweenReps: WALK(120), betweenRounds: WALK(180) }],
+        },
+        cite: 'Viada pp230-231',
+      },
+      {
+        id: 'max_pace_50',
+        joinsIfHeldAt: [2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '50 m at Max Pace, Flying Start',  // Michael approved the words 2026-10-02
+        levels: [2, 3],
+        repBand: { lo: 50, hi: 50 },
+        work: ALL_OUT,
         recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p230 L2: "1 round of 4 x 50m with flying start @ max pace, full recovery"
+          2: [{ rounds: 1, reps: 4, rep: [{ meters: 50, intensity: ALL_OUT, label: 'max pace' }], betweenReps: 'open', betweenRounds: null }],  // pp230-231
+          // p231 L3: "2 rounds of 3 x 50m with flying start @ max pace, 2-minute rest between rounds". The page is silent on
+          // the rest between the reps; OURS, the smallest choice that invents no length: full recovery (the lap button),
+          // the rest the page gives every other max-pace line.
+          3: [{ rounds: 2, reps: 3, rep: [{ meters: 50, intensity: ALL_OUT, label: 'max pace' }], betweenReps: 'open', betweenRounds: WALK(120) }],  // pp230-231
+        },
+        cite: 'Viada pp230-231',
+      },
+      {
+        id: 'max_pace_200',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '200 m at Max Pace, Flying Start',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 200, hi: 200 },
+        work: ALL_OUT,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p231 L3: "1 round of 2 x 200m @ max pace from flying start, full recovery between sets"
+          3: [{ rounds: 1, reps: 2, rep: [{ meters: 200, intensity: ALL_OUT, label: 'max pace' }], betweenReps: 'open', betweenRounds: null }],  // pp230-231
+        },
+        cite: 'Viada p231',
+      },
+      {
+        id: 'speed_200',
+        joinsIfHeldAt: [2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '200 m at 140%, Dead Stop',  // Michael approved the words 2026-10-02
+        levels: [2, 3],
+        repBand: { lo: 200, hi: 200 },
+        work: pct(1.40),
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p230 L2 / p231 L3: "2 rounds of 2 x 200m @ 140%+ from dead stop, full recovery between sets, full recovery and
+          // stretch/mobility between rounds"
+          2: [{ rounds: 2, reps: 2, rep: [{ meters: 200, intensity: pct(1.40) }], betweenReps: 'open', betweenRounds: 'open' }],
+          3: [{ rounds: 2, reps: 2, rep: [{ meters: 200, intensity: pct(1.40) }], betweenReps: 'open', betweenRounds: 'open' }],
+        },
         cite: 'Viada pp230-231',
       },
       {
         id: 'speed_endurance',
         shape: 'distance_intervals',
-        label: 'Speed-endurance repeats',
-        repBand: { lo: 150, hi: 400 },
-        repsBand: { lo: 4, hi: 8 },
+        label: 'Speed-Endurance Repeats',  // Michael approved the words 2026-10-02
+        levels: [1, 2, 3],
+        repBand: { lo: 300, hi: 400 },
         work: pct(1.30, 1.40),
         recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p230 L1: "2 rounds of 3 x 300m @ 130–140% from dead stop, full recovery between sets, full recovery and
+          // stretch/mobility between rounds"
+          1: [{ rounds: 2, reps: 3, rep: [{ meters: 300, intensity: pct(1.30, 1.40) }], betweenReps: 'open', betweenRounds: 'open' }],
+          // p230 L2 / p231 L3: "2 rounds of 2 x 400m @ 130–140% from dead stop, …"
+          2: [{ rounds: 2, reps: 2, rep: [{ meters: 400, intensity: pct(1.30, 1.40) }], betweenReps: 'open', betweenRounds: 'open' }],
+          3: [{ rounds: 2, reps: 2, rep: [{ meters: 400, intensity: pct(1.30, 1.40) }], betweenReps: 'open', betweenRounds: 'open' }],
+        },
         cite: 'Viada pp230-231',
-      },
-      {
-        id: 'flying_short',
-        shape: 'distance_intervals',
-        label: 'Short flying-start repeats',
-        repBand: { lo: 50, hi: 75 },
-        repsBand: { lo: 4, hi: 10 },
-        work: { kind: 'faster_than_vvo2' },
-        recovery: { kind: 'stated', band: { lo: 60, hi: 120 }, intensity: easy },
-        set: { repeatsPerSet: { lo: 2, hi: 5 }, restBand: { lo: 60, hi: 180 }, intensity: easy },
-        cite: 'Viada pp230-231 — 1- to 3-minute walks between sets and rounds',
-      },
-      {
-        /**
-         * ⛔ SPLIT FROM THE SHORT FLYING REPEATS ON PURPOSE. His long flying repeats come in twos and
-         * fours; his short ones come in fours and fives. Holding both in one shape and letting the
-         * level pick the rep length while the size picks the count multiplies two numbers that are
-         * ANTI-correlated on the page, and builds a session he never wrote.
-         */
-        id: 'flying_long',
-        shape: 'distance_intervals',
-        label: 'Long flying-start repeats',
-        repBand: { lo: 150, hi: 200 },
-        repsBand: { lo: 2, hi: 4 },
-        work: { kind: 'faster_than_vvo2' },
-        recovery: { kind: 'stated', band: { lo: 120, hi: 180 }, intensity: easy },
-        set: { repeatsPerSet: { lo: 2, hi: 3 }, restBand: { lo: 120, hi: 180 }, intensity: easy },
-        cite: 'Viada pp230-231 — 2- to 3-minute recovery between sets',
       },
       {
         /**
          * ⛔ PRINTED AT ALL THREE LEVELS (p230 levels 1-2, p231 level 3), 2026-09-23: "2 rounds of 3 x 150m as 50m @
-         * >vVO2, 50m @ all-out, 50m @ >vVO2 from flying start" — level 2 is 4 x 150m. Built as printed; the bands are
-         * the page's one rep length and its counts, kept for readers that ask for them.
+         * >vVO2, 50m @ all-out, 50m @ >vVO2 from flying start" — level 2 is 4 x 150m. Built as printed.
          */
         id: 'mixed_150',
         shape: 'distance_intervals',
         label: '150 m in three parts',  // not-instruction: session name; Michael approved the words 2026-09-24
         repBand: { lo: 150, hi: 150 },
-        repsBand: { lo: 6, hi: 8 },
-        work: { kind: 'faster_than_vvo2' },
+        work: VVO2,
         recovery: { kind: 'open' },
-        printedDistanceByLevel: {
-          // not-instruction: segment labels (names for a step); Viada p230-231
-          1: { rounds: 2, repsPerRound: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
-          2: { rounds: 2, repsPerRound: 4, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
-          3: { rounds: 2, repsPerRound: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' },
+        printedDistancePartsByLevel: {
+          1: [{ rounds: 2, reps: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' }],
+          2: [{ rounds: 2, reps: 4, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' }],
+          3: [{ rounds: 2, reps: 3, rep: MIXED_150_REP, betweenReps: 'open', betweenRounds: 'open' }],
         },
         cite: 'Viada pp230-231',
+      },
+      {
+        id: 'fly_200_mixed',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '200 m in three parts',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 200, hi: 200 },
+        work: VVO2,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p231 L3: "1 round of 2 x 200m as 50m fly-in @ >vVO2, 100m @ all-out, 50m run out @ >vVO2". The page is silent on
+          // the rest between the two; OURS, full recovery (the lap button), as the line above it prints.
+          3: [{
+            rounds: 1, reps: 2, betweenReps: 'open', betweenRounds: null,
+            rep: [{ meters: 50, intensity: VVO2, label: 'fly-in' }, { meters: 100, intensity: ALL_OUT }, { meters: 50, intensity: VVO2, label: 'run out' }],
+          }],
+        },
+        cite: 'Viada p231',
+      },
+      {
+        id: 'short_max',
+        shape: 'distance_intervals',
+        label: '25/25 Accelerations',  // Michael approved the words 2026-10-02
+        levels: [1, 2, 3],
+        repBand: { lo: 50, hi: 50 },
+        work: ALL_OUT,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p230 L1: "8 x 25/25, four-point or prone start, 25 all-out acceleration, 25 @ >vVO2 stride down, full
+          // recovery between sets"; p230 L2 "6 x …"; p231 L3 "6 x 25/25, 4-point/block or prone start, …"
+          1: [{ rounds: 1, reps: 8, rep: ACCEL_25_25, betweenReps: 'open', betweenRounds: null }],
+          2: [{ rounds: 1, reps: 6, rep: ACCEL_25_25, betweenReps: 'open', betweenRounds: null }],
+          3: [{ rounds: 1, reps: 6, rep: ACCEL_25_25, betweenReps: 'open', betweenRounds: null }],
+        },
+        cite: 'Viada pp230-231',
+      },
+      {
+        id: 'short_max_crouch',
+        joinsIfHeldAt: [2],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '25/25 Accelerations, Crouching Start',  // Michael approved the words 2026-10-02
+        levels: [2],
+        repBand: { lo: 50, hi: 50 },
+        work: ALL_OUT,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p230 L2: "4 x 25/25, crouching or two-point start, 25m all-out acceleration, 25 @ >vVO2 stride down, hard stop
+          // (drop to cover) or run out, full recovery between sets"
+          2: [{ rounds: 1, reps: 4, rep: ACCEL_25_25, betweenReps: 'open', betweenRounds: null }],
+        },
+        cite: 'Viada p230',
+      },
+      {
+        id: 'short_max_plank',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '25/25 Accelerations, Plank Start',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 50, hi: 50 },
+        work: ALL_OUT,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p231 L3: "2 rounds of 3 x 25/25, 3-point or plank start, 25m all-out acceleration, 25m @ >vVO2 stride down, hard
+          // stop (drop to cover) or run out, full recovery between sets" — the rounds' rest is not printed apart from the
+          // sets', so it is the same full recovery.
+          3: [{ rounds: 2, reps: 3, rep: ACCEL_25_25, betweenReps: 'open', betweenRounds: 'open' }],
+        },
+        cite: 'Viada p231',
+      },
+      {
+        id: 'short_max_runout',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '25 m All-Out with a Run Out',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 50, hi: 50 },
+        work: ALL_OUT,
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          // p231 L3: "4 x 25m @ all-out from dead stop with 25m run out, full recovery between sets"
+          3: [{ rounds: 1, reps: 4, rep: [{ meters: 25, intensity: ALL_OUT }, { meters: 25, intensity: easy, label: 'run out', role: 'float' }], betweenReps: 'open', betweenRounds: null }],
+        },
+        cite: 'Viada p231',
       },
     ],
   },
@@ -901,11 +1119,12 @@ export const FAMILIES: Record<FamilyId, {
          * ⛔ p231-232's SECOND SHAPE, ADDED 2026-09-11 (Michael: "workouts should be by the book"):
          *   L1  3 sets of 4 rounds of: 40 s @ 130% / 20 s @ 50%, 2-minute walk/recovery jog between sets
          *   L2  5 sets of 4 rounds of the same
-         *   L3  "2 larger sets of 4 sets of 4 rounds" with two different recoveries — a nesting this
-         *       library cannot state, so the shape is not offered at level 3 rather than approximated.
+         *   L3  "2 larger sets of 4 sets of 4 rounds" with two different recoveries — built since 2026-10-02 with
+         *       `PrintedIntervals.outer`; it was left out while the library could not state the nesting.
          * ⚠️ THE NAME IS OURS (the page prints only the numbers); the numbers are the page's.
          */
         id: 'forty_twenty',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
         shape: 'intervals',
         label: 'Forty-Twenty Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
         repBand: { lo: 40, hi: 40 },
@@ -913,10 +1132,14 @@ export const FAMILIES: Record<FamilyId, {
         work: pct(1.30),
         recovery: { kind: 'stated', band: { lo: 20, hi: 20 }, intensity: pct(0.50) },
         set: { repeatsPerSet: { lo: 4, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
-        levels: [1, 2],
+        levels: [1, 2, 3],
         printedIntervalsByLevel: {
           1: { sets: 3, rounds: 4, round: [W(40, 1.30, 'Surge'), { seconds: 20, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 120 },
           2: { sets: 5, rounds: 4, round: [W(40, 1.30, 'Surge'), { seconds: 20, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 120 },
+          // ⛔ p232 L3, BUILT 2026-10-02 (the nesting `PrintedIntervals.outer` now states): "2 larger sets of 4 sets of 4
+          // rounds of: 40 s @ 130% / 20 s @ 50%; 2-minute walk/recovery jog between small sets, 4-minute full recovery
+          // between larger sets".
+          3: { sets: 4, rounds: 4, round: [W(40, 1.30, 'Surge'), { seconds: 20, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 120, outer: { sets: 2, betweenSeconds: 240 } },
         },
         cite: 'Viada pp231-232 — 2-minute walk/recovery jog between sets',
       },
@@ -959,7 +1182,32 @@ export const FAMILIES: Record<FamilyId, {
         cite: 'Viada pp231-232 — 2-minute recovery walk/jog between sets',
       },
       {
+        /**
+         * ⛔ p232's FIFTH LINE, BUILT 2026-10-02 (week builder Stage 2):
+         *   L2  2 sets of 3 rounds of: 10 s @ 100% / 10 s all-out / 50 s @ 115% / 1 min @ 95% / 1 min @ 90% / 2 min @ VT1
+         *   L3  3 sets of 4 rounds of the same with 1 min @ VT1; 1:30 walk or recovery jog between sets
+         * Level 2 prints no rest between its sets, so none is built. Not printed at level 1.
+         */
+        id: 'mixed_surge',
+        joinsIfHeldAt: [2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'intervals',
+        label: 'Mixed Surge Rounds',  // Michael approved the words 2026-10-02
+        levels: [2, 3],
+        repBand: { lo: 10, hi: 10 },
+        work: pct(1.00),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 120 }, intensity: vt1 },
+        printedIntervalsByLevel: {
+          2: { sets: 2, rounds: 3, round: [W(10, 1.00), AO(10, 'all-out'), W(50, 1.15), W(60, 0.95), W(60, 0.90), RV(120)] },
+          3: { sets: 3, rounds: 4, round: [W(10, 1.00), AO(10, 'all-out'), W(50, 1.15), W(60, 0.95), W(60, 0.90), RV(60)], betweenSetsSeconds: 90 },
+        },
+        cite: 'Viada p232',
+      },
+      {
         id: 'descending',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          3: [{ what: 'rest_seconds', lo: 90, hi: 120, built: 120, cite: 'Viada p232' }],
+        },
         shape: 'descending',
         // ⛔ FIELD-STANDARD NAME, same call as `surge_float` above — "descending ladder" is the
         // book's words; "cut-downs" is the one a runner would recognise. Id and body unchanged.
@@ -1028,6 +1276,12 @@ export const FAMILIES: Record<FamilyId, {
          * ⚠️ THE ID IS UNCHANGED — stored picks and built plans carry it.
          */
         id: 'race_repeats',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          2: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          3: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+        },
         shape: 'intervals',
         /**
          * ⛔ p233-234's RACE-SPECIFIC NT SESSIONS, THE 5K LINE, AS PRINTED (2026-09-11). The page
@@ -1062,6 +1316,12 @@ export const FAMILIES: Record<FamilyId, {
          * Offered only to a half-marathon race block (`raceOnly`).
          */
         id: 'race_repeats_half',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          2: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          3: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+        },
         shape: 'intervals',
         raceOnly: 'half',
         printedIntervalsByLevel: {
@@ -1084,6 +1344,12 @@ export const FAMILIES: Record<FamilyId, {
          *   3- to 5-minute recovery walk/jog between — 3 minutes, as above. Offered only to a marathon race block.
          */
         id: 'race_repeats_marathon',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          2: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+          3: [{ what: 'rest_seconds', lo: 180, hi: 300, built: 180, cite: 'Viada pp233-234' }],
+        },
         shape: 'intervals',
         raceOnly: 'marathon',
         printedIntervalsByLevel: {
@@ -1098,6 +1364,117 @@ export const FAMILIES: Record<FamilyId, {
         work: pct(0.92),
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
+      },
+      {
+        /**
+         * ⛔ p233–234's RACE-SPECIFIC NT, THE 10K LINE, AS PRINTED (week builder Stage 2, 2026-10-02):
+         *   L1 2 × 8-min repeats @ 100%   L2 3 × 6–8-min repeats @ 100%   L3 4 × 8-min repeats @ 100%
+         *   3- to 5-minute recovery walk/jog between — the shortest the page states, 3 minutes (as `race_repeats`).
+         * Level 2's "6–8 min" is a printed range: it builds at 6 and the range travels (`rangesByLevel`).
+         * Offered only to a 10K race block (`raceOnly`) and to the week builder's list.
+         */
+        id: 'race_repeats_10k',
+        joinsIfHeldAt: [1, 2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'intervals',
+        raceOnly: '10k',
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 2, round: [W(480, 1.00)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 3, round: [W(360, 1.00)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          3: { sets: 1, rounds: 4, round: [W(480, 1.00)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+        },
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 180, hi: 300, cite: 'Viada p233' }],
+          2: [{ what: 'rep_seconds', lo: 360, hi: 480, cite: 'Viada p234' }, { what: 'rest_seconds', lo: 180, hi: 300, cite: 'Viada p234' }],
+          3: [{ what: 'rest_seconds', lo: 180, hi: 300, cite: 'Viada p234' }],
+        },
+        label: 'Race-Specific Repeats',  // not-instruction: workout name, the 5K line's approved name (2026-09-19)
+        repBand: { lo: 360, hi: 480 },
+        work: pct(1.00),
+        recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
+      },
+      {
+        /**
+         * ⛔ p233–234's DISTANCE REPEATS, BUILT 2026-10-02 (week builder Stage 2). They were left out because a distance
+         * needs a threshold pace; the pace targets now read the athlete's threshold, and without one the repeat runs on
+         * the distance alone with the lap button for its rest.
+         *   L1 4 × 1200 m @ 90% · L2 6 × · L3 10 × — "with rest equal to 50% of the run"
+         */
+        id: 'repeats_1200',
+        joinsIfHeldAt: [1, 2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '1200 m Repeats',  // Michael approved the words 2026-10-02
+        repBand: { lo: 1200, hi: 1200 },
+        work: pct(0.90),
+        recovery: { kind: 'open' },
+        printedDistancePartsByLevel: {
+          1: [{ rounds: 1, reps: 4, rep: [{ meters: 1200, intensity: pct(0.90) }], betweenReps: { fractionOfRep: 0.5 }, betweenRounds: null }],
+          2: [{ rounds: 1, reps: 6, rep: [{ meters: 1200, intensity: pct(0.90) }], betweenReps: { fractionOfRep: 0.5 }, betweenRounds: null }],
+          3: [{ rounds: 1, reps: 10, rep: [{ meters: 1200, intensity: pct(0.90) }], betweenReps: { fractionOfRep: 0.5 }, betweenRounds: null }],
+        },
+        // p233–234: "with rest equal to 50% of the run" (the page's clause, kept out of the cite string so it never prints).
+        cite: 'Viada pp233-234',
+      },
+      {
+        /**
+         *   L1 2 × 1600 m @ 90% with 3-min rest, then 3 × 400 m @ 92–95% with 2-min rest
+         *   L2 3 × 1600 m …, then 4 × 400 m   L3 3 × 1600 m …, then 6 × 400 m
+         */
+        id: 'repeats_1600_400',
+        joinsIfHeldAt: [1, 2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: '1600 m and 400 m Repeats',  // Michael approved the words 2026-10-02
+        repBand: { lo: 400, hi: 1600 },
+        work: pct(0.90),
+        recovery: { kind: 'stated', band: { lo: 120, hi: 180 }, intensity: vt1 },
+        printedDistancePartsByLevel: {
+          1: [
+            { rounds: 1, reps: 2, rep: [{ meters: 1600, intensity: pct(0.90) }], betweenReps: { seconds: 180, intensity: vt1 }, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 3, rep: [{ meters: 400, intensity: pct(0.92, 0.95) }], betweenReps: { seconds: 120, intensity: vt1 }, betweenRounds: null },
+          ],
+          2: [
+            { rounds: 1, reps: 3, rep: [{ meters: 1600, intensity: pct(0.90) }], betweenReps: { seconds: 180, intensity: vt1 }, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 4, rep: [{ meters: 400, intensity: pct(0.92, 0.95) }], betweenReps: { seconds: 120, intensity: vt1 }, betweenRounds: null },
+          ],
+          3: [
+            { rounds: 1, reps: 3, rep: [{ meters: 1600, intensity: pct(0.90) }], betweenReps: { seconds: 180, intensity: vt1 }, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 6, rep: [{ meters: 400, intensity: pct(0.92, 0.95) }], betweenReps: { seconds: 120, intensity: vt1 }, betweenRounds: null },
+          ],
+        },
+        cite: 'Viada pp233-234',
+      },
+      {
+        /**
+         *   L1 1 × 800 m @ 95% with 3-min rest, 2 × 400 m @ 95% with 1:30 rest, 4 × 200 m @ 95% with 1-min rest
+         *   L2 2 × 800 m …, 3 × 400 m …, 4 × 200 m …
+         *   L3 1 × 1000 m (3-min rest), 1 × 800 m (3-min rest), 4 × 400 m (1:30 rest), 4 × 200 m (1-min rest), all @ 95%
+         */
+        id: 'ladder_95',
+        joinsIfHeldAt: [1, 2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'distance_intervals',
+        label: 'Descending Distance Repeats',  // Michael approved the words 2026-10-02
+        repBand: { lo: 200, hi: 1000 },
+        work: pct(0.95),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 180 }, intensity: vt1 },
+        printedDistancePartsByLevel: {
+          1: [
+            { rounds: 1, reps: 1, rep: [{ meters: 800, intensity: pct(0.95) }], betweenReps: null, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 2, rep: [{ meters: 400, intensity: pct(0.95) }], betweenReps: { seconds: 90, intensity: vt1 }, betweenRounds: null, after: { seconds: 90, intensity: vt1 } },
+            { rounds: 1, reps: 4, rep: [{ meters: 200, intensity: pct(0.95) }], betweenReps: { seconds: 60, intensity: vt1 }, betweenRounds: null },
+          ],
+          2: [
+            { rounds: 1, reps: 2, rep: [{ meters: 800, intensity: pct(0.95) }], betweenReps: { seconds: 180, intensity: vt1 }, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 3, rep: [{ meters: 400, intensity: pct(0.95) }], betweenReps: { seconds: 90, intensity: vt1 }, betweenRounds: null, after: { seconds: 90, intensity: vt1 } },
+            { rounds: 1, reps: 4, rep: [{ meters: 200, intensity: pct(0.95) }], betweenReps: { seconds: 60, intensity: vt1 }, betweenRounds: null },
+          ],
+          3: [
+            { rounds: 1, reps: 1, rep: [{ meters: 1000, intensity: pct(0.95) }], betweenReps: null, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 1, rep: [{ meters: 800, intensity: pct(0.95) }], betweenReps: null, betweenRounds: null, after: { seconds: 180, intensity: vt1 } },
+            { rounds: 1, reps: 4, rep: [{ meters: 400, intensity: pct(0.95) }], betweenReps: { seconds: 90, intensity: vt1 }, betweenRounds: null, after: { seconds: 90, intensity: vt1 } },
+            { rounds: 1, reps: 4, rep: [{ meters: 200, intensity: pct(0.95) }], betweenReps: { seconds: 60, intensity: vt1 }, betweenRounds: null },
+          ],
+        },
+        cite: 'Viada pp233-234',
       },
       // ⛔ `race_repeats_long` ("Sustained race-specific repeats") WAS DELETED HERE 2026-09-11. It
       // blended the page's half-marathon and marathon lines into one band; this programme is the
@@ -1230,6 +1607,12 @@ export const FAMILIES: Record<FamilyId, {
          * ⚠️ THE ID IS UNCHANGED; `surge_opener` is the other shape.
          */
         id: 'surge_embedded',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 90, hi: 120, built: 90, cite: 'Viada p233' }],
+          2: [{ what: 'rest_seconds', lo: 90, hi: 120, built: 90, cite: 'Viada p234' }],
+          3: [{ what: 'rest_seconds', lo: 90, hi: 120, built: 90, cite: 'Viada p234' }],
+        },
         shape: 'intervals',
         /**
          * ⛔ p233-234 AS PRINTED (read off the photos 2026-09-11):
@@ -1297,6 +1680,12 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'continuous',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'session_seconds', lo: 1500, hi: 1800, cite: 'Viada p235' }],
+          2: [{ what: 'session_seconds', lo: 2700, hi: 3600, cite: 'Viada p235' }],
+          3: [{ what: 'session_seconds', lo: 4800, hi: 5400, cite: 'Viada p235' }],
+        },
         shape: 'continuous',
         /**
          * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
@@ -1353,7 +1742,31 @@ export const FAMILIES: Record<FamilyId, {
         cite: 'Viada p235 — sets added at any point in the run',
       },
       {
+        /**
+         * ⛔ p235 L3's SECOND INSERT, BUILT 2026-10-02 (week builder Stage 2): "1.5-hour VT1 run with 3 sets added at any
+         * point. Sets are either 3 rounds of 1 minute @ 115% 30 seconds @ VT1 **or 2 rounds of 4 minutes @ 95% 1 minute @
+         * VT1**". `long_with_inserts` builds the first choice; this is the second.
+         */
+        id: 'long_with_inserts_95',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        shape: 'continuous_with_inserts',
+        label: 'Long Run with 4-Minute Sets',  // not-instruction: session name; Michael approved the words 2026-10-02 (edited)
+        levels: [3],
+        repBand: { lo: 240, hi: 240 },
+        work: pct(0.95),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        printedLongRunByLevel: {
+          3: { inserts: { count: 3, rounds: 2, round: [W(240, 0.95), { seconds: 60, role: 'recovery', intensity: vt1 }] } },
+        },
+        insertShare: 0.11,
+        cite: 'Viada p235 — sets added at any point in the run',
+      },
+      {
         id: 'race_pace_finish',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          3: [{ what: 'session_seconds', lo: 5400, hi: 7200, cite: 'Viada p235' }],
+        },
         shape: 'continuous_with_finish',
         /**
          * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
@@ -1379,6 +1792,10 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'fartlek',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          3: [{ what: 'session_seconds', lo: 7200, hi: 9000, cite: 'Viada p235' }],
+        },
         shape: 'continuous_with_inserts',
         /**
          * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
@@ -1407,6 +1824,12 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'hike',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'session_seconds', lo: 3600, hi: 5400, cite: 'Viada p235' }],
+          2: [{ what: 'session_seconds', lo: 5400, hi: 9000, cite: 'Viada p235' }],
+          3: [{ what: 'session_seconds', lo: 10800, hi: 18000, cite: 'Viada p235 — 3 h+, up to 5 h for ultrarunners' }],
+        },
         shape: 'continuous',
         /**
          * ⛔ DISPLAY NAME ONLY — the book's word for it, replaced with the field's (Michael,
@@ -1434,6 +1857,12 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'max_effort',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rep_seconds', lo: 120, hi: 180, built: 120, cite: 'Viada p236' }, { what: 'rest_seconds', lo: 300, hi: 360, built: 330, cite: 'Viada p236' }],
+          2: [{ what: 'rep_seconds', lo: 120, hi: 180, built: 150, cite: 'Viada p236' }, { what: 'rest_seconds', lo: 300, hi: 360, built: 330, cite: 'Viada p236' }],
+          3: [{ what: 'rep_seconds', lo: 120, hi: 180, built: 180, cite: 'Viada p236' }, { what: 'rest_seconds', lo: 300, hi: 360, built: 330, cite: 'Viada p236' }],
+        },
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Maximal sprints',
@@ -1447,6 +1876,12 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'flying_surge',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 120, hi: 180, built: 150, cite: 'Viada p236' }],
+          2: [{ what: 'rest_seconds', lo: 120, hi: 180, built: 150, cite: 'Viada p236' }],
+          3: [{ what: 'rest_seconds', lo: 120, hi: 180, built: 150, cite: 'Viada p236' }],
+        },
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Flying surges',
@@ -1473,6 +1908,25 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         /**
+         * ⛔ p236 L3, BUILT 2026-10-02 (week builder Stage 2): "4 rounds of flying 15-second surges to max effort, with
+         * 2 minutes of recovery between". Level 3 only.
+         */
+        id: 'flying_surge_15',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
+        shape: 'intervals',
+        label: 'Flying 15-Second Surges',  // Michael approved the words 2026-10-02
+        levels: [3],
+        repBand: { lo: 15, hi: 15 },
+        work: { kind: 'all_out' },
+        recovery: { kind: 'stated', band: { lo: 120, hi: 120 }, intensity: easy },
+        printedIntervalsByLevel: {
+          3: { sets: 1, rounds: 4, round: [AO(15, 'Surge')], betweenRoundsSeconds: 120 },
+        },
+        cite: 'Viada p236',
+      },
+      {
+        /**
          * ⛔⛔ THE ZERO-LENGTH REP WAS AN ARTIFACT (2026-08-31): `repBand { lo: 0, hi: 0 }` gave the
          * work step no clock, so the session's length was recovery-only and **all three levels built
          * an identical 92 minutes** — a level that changes nothing is a level that is not being read.
@@ -1482,6 +1936,12 @@ export const FAMILIES: Record<FamilyId, {
          * by what the page differs by rather than by nothing.
          */
         id: 'standing_start',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'rest_seconds', lo: 360, hi: 600, built: 480, cite: 'Viada p236' }],
+          2: [{ what: 'rest_seconds', lo: 360, hi: 600, built: 480, cite: 'Viada p236' }],
+          3: [{ what: 'rest_seconds', lo: 360, hi: 600, built: 480, cite: 'Viada p236' }],
+        },
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Standing starts',
@@ -1516,6 +1976,12 @@ export const FAMILIES: Record<FamilyId, {
          * inside the band. What is new is that the COUNT is now per-level too.
          */
         id: 'progressive_repeats',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'reps', lo: 6, hi: 10, cite: 'Viada p237' }, { what: 'rest_seconds', lo: 240, hi: 360, built: 300, cite: 'Viada p237' }],
+          2: [{ what: 'reps', lo: 6, hi: 10, cite: 'Viada p237' }, { what: 'rest_seconds', lo: 240, hi: 360, built: 300, cite: 'Viada p237' }],
+          3: [{ what: 'reps', lo: 6, hi: 10, cite: 'Viada p237' }, { what: 'rest_seconds', lo: 240, hi: 360, built: 300, cite: 'Viada p237' }],
+        },
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Progressive Repeats',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
@@ -1551,6 +2017,54 @@ export const FAMILIES: Record<FamilyId, {
         work: pct(1.10, 1.20),
         recovery: { kind: 'proportional', factor: 1, intensity: pct(0.50) },
         set: { repeatsPerSet: { lo: 7, hi: 8 }, restBand: { lo: 300, hi: 300 }, intensity: easy },
+        cite: 'Viada p237',
+      },
+      {
+        /**
+         * ⛔ p237's FOURTH LINE, BUILT 2026-10-02 (week builder Stage 2):
+         *   L1  4 rounds of: 30 s @ 100% / 30 s @ 110% / 1 min-plus to fade at 130% (when power drops) / 5-min spin
+         *   L2  5 rounds of: 30 s @ 100% / 1 min @ 110% / 1 min-plus to fade at 130% / 5-min spin recovery
+         *   L3  6 rounds of: 1 min @ 100% / 1:30 @ 110% / 1 min-plus to fade at 130% / 5-min spin recovery
+         * The fade is open-ended (`open: 'at_least'`): one minute at least, on until power drops; the watch ends it on the
+         * lap button. The 5-minute spin sits between rounds, not after the last.
+         */
+        id: 'fade_130',
+        joinsIfHeldAt: [1, 2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
+        shape: 'intervals',
+        label: 'Fade at 130%',  // Michael approved the words 2026-10-02
+        repBand: { lo: 60, hi: 60 },
+        work: pct(1.30),
+        recovery: { kind: 'stated', band: { lo: 300, hi: 300 }, intensity: easy },
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 4, round: [W(30, 1.00), W(30, 1.10), { ...W(60, 1.30, 'Fade'), open: 'at_least' }], betweenRoundsSeconds: 300 },
+          2: { sets: 1, rounds: 5, round: [W(30, 1.00), W(60, 1.10), { ...W(60, 1.30, 'Fade'), open: 'at_least' }], betweenRoundsSeconds: 300 },
+          3: { sets: 1, rounds: 6, round: [W(60, 1.00), W(90, 1.10), { ...W(60, 1.30, 'Fade'), open: 'at_least' }], betweenRoundsSeconds: 300 },
+        },
+        cite: 'Viada p237',
+      },
+      {
+        /**
+         * ⛔ p237's FIFTH LINE, BUILT 2026-10-02 (week builder Stage 2):
+         *   L2  30 s @ 120% / 30 s rest, repeat until unable to hold 120% for the duration; rest 5 min; repeat
+         *   L3  the same, 3 sets in all
+         * A set has no count and no clock: it is one open step (`open: 'lap'`) the athlete ends on the lap button.
+         * ⚠️ INTERVALS.ICU HAS NO LAP-BUTTON STEP, so this session cannot be written there (its serializer refuses it by
+         * name); Garmin carries it.
+         */
+        id: 'until_fail_120',
+        joinsIfHeldAt: [2, 3],  // week builder Stage 2 — see `Archetype.joinsIfHeldAt`
+        venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
+        shape: 'intervals',
+        label: '30/30 Until You Can\'t Hold 120%',  // not-instruction: workout name; Michael approved the words 2026-10-02 (edited)
+        levels: [2, 3],
+        repBand: { lo: 30, hi: 30 },
+        work: pct(1.20),
+        recovery: { kind: 'stated', band: { lo: 300, hi: 300 }, intensity: easy },
+        printedIntervalsByLevel: {
+          2: { sets: 2, rounds: 1, round: [{ ...W(0, 1.20, '30 s on, 30 s off'), open: 'lap' }], betweenSetsSeconds: 300 },
+          3: { sets: 3, rounds: 1, round: [{ ...W(0, 1.20, '30 s on, 30 s off'), open: 'lap' }], betweenSetsSeconds: 300 },
+        },
         cite: 'Viada p237',
       },
       {
@@ -1724,6 +2238,7 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         id: 'tempo',
+        joinsIfHeldAt: [3],  // week builder Stage 2 — L3 is new; see `Archetype.joinsIfHeldAt`
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'intervals',
         label: 'Tempo Blocks',  // not-instruction: workout name, ours (Michael approved the words 2026-09-19); no page prints a name for it
@@ -1734,13 +2249,16 @@ export const FAMILIES: Record<FamilyId, {
         /**
          * ⛔ p238-239 AS PRINTED (2026-09-11): L1 3 rounds of 15 min @ 80% / 5-minute easy spin;
          * L2 3 rounds of 20 min @ 80% / 5-minute easy spin. L3 adds "a 10-second all-out sprint every
-         * 4 minutes", and all-out is not a number this library can put on a step — so the shape is
-         * not offered at level 3 rather than printed without its sprints.
+         * 4 minutes" — built since 2026-10-02 (the round grammar carries an all-out step); see the L3 line below.
          */
-        levels: [1, 2],
+        levels: [1, 2, 3],
         printedIntervalsByLevel: {
           1: { sets: 1, rounds: 3, round: [W(900, 0.80)], betweenRoundsSeconds: 300 },
           2: { sets: 1, rounds: 3, round: [W(1200, 0.80)], betweenRoundsSeconds: 300 },
+          // ⛔ p239 L3, BUILT 2026-10-02: "3 rounds of 20 minutes @ 80% with 10-second all-out sprint every 4 minutes,
+          // 5-minute easy spin". Each 20 minutes is five 4-minute pieces, sprint start to sprint start — the same reading
+          // as p239's endurance ride ("a 10-second all-out sprint every 9 minutes", `printedByLevel`).
+          3: { sets: 3, rounds: 5, round: [W(230, 0.80), AO(10, 'all-out sprint')], betweenSetsSeconds: 300 },
         },
         cite: 'Viada pp238-239 — 5-minute easy spin',
       },
@@ -1758,6 +2276,12 @@ export const FAMILIES: Record<FamilyId, {
     archetypes: [
       {
         id: 'steady',
+        // ⛔ THE RANGES THE PAGE PRINTS (week builder decision 5, 2026-10-02): the numbers move only inside these.
+        rangesByLevel: {
+          1: [{ what: 'session_seconds', lo: 3600, hi: 6000, cite: 'Viada p239' }],
+          2: [{ what: 'session_seconds', lo: 9000, hi: 12600, cite: 'Viada p239' }],
+          3: [{ what: 'session_seconds', lo: 12600, hi: 18000, cite: 'Viada p239' }],
+        },
         venue: 'road',  // OURS — the road/trainer sort, SPEC-outdoor-rides-2026-09-24 §1
         shape: 'continuous',
         label: 'Steady endurance ride',
@@ -1824,13 +2348,39 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'swim',
     label: 'Swim speed',
     workFloorPct: 0,
-    intent: 'Short repeats built from easy, moderate, hard and all-out lengths.',
+    intent: 'Short repeats built from easy, moderate, hard and all-out lengths.',  // p241
     cite: 'Viada pp240-241',
     archetypes: [
       {
         id: 'descending_sets',
         shape: 'distance_intervals',
-        label: 'Sprint lengths into descending sets',
+        label: 'Sprint lengths into descending sets',  // p241
+        /**
+         * ⛔ p241 AS PRINTED, PER LEVEL (week builder Stage 2, 2026-10-02) — the band builder sized this from a distance
+         * band. The session the row carries is `SWIM_SPEED_PRINTED` (token for token, with the page's words); these parts
+         * are the same session for the library's clock. Swim numbers are free (p240), so no range travels.
+         */
+        printedDistancePartsByLevel: {
+          1: [
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'kick drill' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'with pull buoy' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 2, reps: 6, rep: [{ meters: 100, intensity: { kind: 'all_out' }, label: '25 easy, 25 moderate, 25 hard, 25 all-out' }], betweenReps: { seconds: 15, intensity: easy }, betweenRounds: { seconds: 60, intensity: easy } },  // p241
+          ],
+          2: [
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'kick drill' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'with pull buoy' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 1, reps: 6, rep: [{ meters: 50, intensity: { kind: 'all_out' }, label: 'sprint' }], betweenReps: { seconds: 15, intensity: easy }, betweenRounds: null },  // p241
+            { rounds: 2, reps: 5, rep: [{ meters: 100, intensity: { kind: 'all_out' }, label: '25 easy, 25 moderate, 25 hard, 25 all-out sprint' }], betweenReps: { seconds: 15, intensity: easy }, betweenRounds: { seconds: 60, intensity: easy } },  // p241
+            { rounds: 1, reps: 4, rep: [{ meters: 200, intensity: { kind: 'all_out' }, label: '100 easy, 50 hard, 50 all-out sprint' }], betweenReps: { seconds: 60, intensity: easy }, betweenRounds: null },  // p241
+          ],
+          3: [
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'kick drill' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 1, reps: 1, rep: [{ meters: 100, intensity: { kind: 'drill' }, label: 'with pull buoy' }], betweenReps: null, betweenRounds: null },  // p241
+            { rounds: 1, reps: 8, rep: [{ meters: 50, intensity: { kind: 'all_out' }, label: 'sprint' }], betweenReps: { seconds: 15, intensity: easy }, betweenRounds: null },  // p241
+            { rounds: 2, reps: 4, rep: [{ meters: 150, intensity: { kind: 'all_out' }, label: '50 easy, 50 hard, 50 sprint' }], betweenReps: { seconds: 30, intensity: easy }, betweenRounds: { seconds: 60, intensity: easy } },  // p241
+            { rounds: 1, reps: 4, rep: [{ meters: 200, intensity: { kind: 'all_out' }, label: '100 easy, 50 hard, 50 all-out' }], betweenReps: { seconds: 60, intensity: easy }, betweenRounds: null },  // p241
+          ],
+        },
         repBand: { lo: 50, hi: 200 },
         work: { kind: 'all_out' },
         recovery: { kind: 'stated', band: { lo: 15, hi: 60 }, intensity: easy },
@@ -1856,6 +2406,31 @@ export const FAMILIES: Record<FamilyId, {
          * than a label. ⚠️ The id `out_and_across` is unchanged.
          */
         label: 'Open-water sighting intervals',
+        /**
+         * ⛔ p241 AS PRINTED (week builder Stage 2, 2026-10-02) — "out and across":
+         *   L1  3 sets of (30-second swim out, then 4 rounds of: 30-second swim parallel to shore sighting every 10 s,
+         *       30-second swim parallel back to start sighting every 10 s), return to shore, 2-minute rest
+         *   L2  4 sets of (30-second swim out, then 3 sets of: 45-second swim parallel … every 9 s, 45-second swim back
+         *       … every 9 s), return to shore, 2-minute rest
+         * The swim back to shore has no clock on the page; the rest after it is the between-sets rest. The row carries
+         * `SWIM_OPEN_WATER_PRINTED`.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 3, rounds: 1, round: [
+            { seconds: 30, role: 'work', intensity: { kind: 'race_pace' }, label: 'swim out' },
+            ...Array.from({ length: 4 }, () => [
+              { seconds: 30, role: 'work' as const, intensity: { kind: 'race_pace' } as Intensity, label: 'parallel to shore, sighting every 10 seconds' },
+              { seconds: 30, role: 'work' as const, intensity: { kind: 'race_pace' } as Intensity, label: 'parallel back to the start, sighting every 10 seconds' },
+            ]).flat(),
+          ], betweenSetsSeconds: 120 },
+          2: { sets: 4, rounds: 1, round: [
+            { seconds: 30, role: 'work', intensity: { kind: 'race_pace' }, label: 'swim out' },
+            ...Array.from({ length: 3 }, () => [
+              { seconds: 45, role: 'work' as const, intensity: { kind: 'race_pace' } as Intensity, label: 'parallel to shore, sighting every 9 seconds' },
+              { seconds: 45, role: 'work' as const, intensity: { kind: 'race_pace' } as Intensity, label: 'parallel back to the start, sighting every 9 seconds' },
+            ]).flat(),
+          ], betweenSetsSeconds: 120 },
+        },
         // ⚠️ LEVELS 1 AND 2 ONLY. His level 3 open-water session is the straight distance below;
         // there is no level 3 out-and-across on the page, so the library does not offer one.
         levels: [1, 2],
@@ -2052,6 +2627,13 @@ export const FORM_FOCUS_NOTE =
  * The ride type's rule for a step's range (2026-09-18) — p237 floor, pp238–239 never over threshold, else none.
  * Read by materialize-plan and the Instead sheet, so the line and the steps the tap builds cannot differ.
  */
+/** Does this option join a Focus rotation at this level only where the week still holds? See `Archetype.joinsIfHeldAt`. */
+export function joinsRotationIfHeld(family: string, archetype: string, level: number): boolean {
+  const a = (FAMILIES as Record<string, { archetypes: Array<{ id: string; joinsIfHeldAt?: number[] }> }>)[family]
+    ?.archetypes.find((x) => x.id === archetype);
+  return !!a?.joinsIfHeldAt?.includes(level);
+}
+
 export function ridePowerRuleOf(family: string | null | undefined): RidePowerRule {
   const f = family ? FAMILIES[family as FamilyId] : undefined;
   if (!f) return null;
@@ -2074,25 +2656,94 @@ export const SWIM_ENDURANCE_PRINTED: Record<Level, { token: string; words: strin
   // p241 L1: "200m as 25m easy, 25m drill choice · 3 x 50m @ 25m easy, 25m sprint with 10-second rest · 2 x 600m @
   // easy-to-moderate intensity (race pace) with 2-minute rest"
   1: [
-    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
-    { token: 'swim_aerobic_3x50m_r10', words: '25m easy, 25m sprint' },
-    { token: 'swim_aerobic_2x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },  // p241
+    { token: 'swim_aerobic_3x50m_r10', words: '25m easy, 25m sprint' },  // p241
+    { token: 'swim_aerobic_2x600m_r120', words: 'easy-to-moderate intensity (race pace)' },  // p241
   ],
   // p241 L2: "100m kick · 200m as 25m easy, 25m drill choice · 4 x 50m @ 25m easy, 25m sprint with 10-second rest ·
   // 3 x 600m or 2 x 1000m @ easy-to-moderate intensity (race pace) with 2-minute rest"
   2: [
-    { token: 'swim_kick_1x100m', words: 'kick' },
-    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
-    { token: 'swim_aerobic_4x50m_r10', words: '25m easy, 25m sprint' },
-    { token: 'swim_aerobic_3x600m_r120', words: 'easy-to-moderate intensity (race pace)' },
+    { token: 'swim_kick_1x100m', words: 'kick' },  // p241
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },  // p241
+    { token: 'swim_aerobic_4x50m_r10', words: '25m easy, 25m sprint' },  // p241
+    { token: 'swim_aerobic_3x600m_r120', words: 'easy-to-moderate intensity (race pace)' },  // p241
   ],
   // p241 L3: "100m kick · 100m DPS or glide drill · 200m as 25m easy, 25m drill choice · 8 x 25m sprint with 5-second
   // rest · 3 x 1200m or 2 x 1600m @ easy-to-moderate intensity (race pace) with 3-minute rest"
   3: [
-    { token: 'swim_kick_1x100m', words: 'kick' },
-    { token: 'swim_drill_dps_1x100m', words: 'DPS or glide drill' },
-    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },
-    { token: 'swim_aerobic_8x25m_r5', words: 'sprint' },
+    { token: 'swim_kick_1x100m', words: 'kick' },  // p241
+    { token: 'swim_drill_dps_1x100m', words: 'DPS or glide drill' },  // p241
+    { token: 'swim_warmup_200m', words: '200m as 25m easy, 25m drill choice' },  // p241
+    { token: 'swim_aerobic_8x25m_r5', words: 'sprint' },  // p241
     { token: 'swim_aerobic_3x1200m_r180', words: 'easy-to-moderate intensity (race pace)' },  // p241 L3, as printed
   ],
 };
+
+/**
+ * ⛔ p241's SPEED SESSION, TOKEN FOR TOKEN, WITH THE PAGE'S WORDS (week builder Stage 2, 2026-10-02) — the same form as
+ * `SWIM_ENDURANCE_PRINTED`. `swim_rest_60s` is p241's "1-minute rest between sets".
+ *   L1 "100m kick drill · 100m with pull buoy · 2 sets of 6 x 100m as 25 easy/25 moderate/25 hard/25 all-out with
+ *      15-second rest; 1-minute rest between sets"
+ *   L2 "… · 6 x 50m sprint with 15-second rest · 2 sets of 5 x 100m as 25 easy/25 moderate/25 hard/25 all-out sprint with
+ *      15-second rest, 1-minute rest between sets · 1 set of 4 x 200m as 100m easy/50m hard/50m all-out sprint with
+ *      1-minute rest"
+ *   L3 "… · 8 x 50m sprint with 15-second rest · 2 sets of 4 x 150m as 50m easy/50m hard/50m sprint with 30-second rest,
+ *      1-minute rest between sets · 1 set of 4 x 200m as 100m easy/50m hard/50m all-out with 1-minute rest"
+ */
+export const SWIM_SPEED_PRINTED: Record<Level, { token: string; words: string }[]> = {
+  1: [
+    { token: 'swim_kick_1x100m', words: 'kick drill' },  // p241
+    { token: 'swim_pull_1x100m_buoy', words: 'with pull buoy' },  // p241
+    { token: 'swim_aerobic_6x100m_r15', words: '25 easy, 25 moderate, 25 hard, 25 all-out' },  // p241
+    { token: 'swim_rest_60s', words: 'rest between sets' },  // p241
+    { token: 'swim_aerobic_6x100m_r15', words: '25 easy, 25 moderate, 25 hard, 25 all-out' },  // p241
+  ],
+  2: [
+    { token: 'swim_kick_1x100m', words: 'kick drill' },  // p241
+    { token: 'swim_pull_1x100m_buoy', words: 'with pull buoy' },  // p241
+    { token: 'swim_aerobic_6x50m_r15', words: 'sprint' },  // p241
+    { token: 'swim_aerobic_5x100m_r15', words: '25 easy, 25 moderate, 25 hard, 25 all-out sprint' },  // p241
+    { token: 'swim_rest_60s', words: 'rest between sets' },  // p241
+    { token: 'swim_aerobic_5x100m_r15', words: '25 easy, 25 moderate, 25 hard, 25 all-out sprint' },  // p241
+    { token: 'swim_aerobic_4x200m_r60', words: '100 easy, 50 hard, 50 all-out sprint' },  // p241
+  ],
+  3: [
+    { token: 'swim_kick_1x100m', words: 'kick drill' },  // p241
+    { token: 'swim_pull_1x100m_buoy', words: 'with pull buoy' },  // p241
+    { token: 'swim_aerobic_8x50m_r15', words: 'sprint' },  // p241
+    { token: 'swim_aerobic_4x150m_r30', words: '50 easy, 50 hard, 50 sprint' },  // p241
+    { token: 'swim_rest_60s', words: 'rest between sets' },  // p241
+    { token: 'swim_aerobic_4x150m_r30', words: '50 easy, 50 hard, 50 sprint' },  // p241
+    { token: 'swim_aerobic_4x200m_r60', words: '100 easy, 50 hard, 50 all-out' },  // p241
+  ],
+};
+
+/**
+ * ⛔ p241's OPEN-WATER SESSION, TOKEN FOR TOKEN (week builder Stage 2, 2026-10-02). Timed swims: `swim_time_{n}x{s}s`;
+ * `swim_lap` is the swim back to shore, which the page does not time (the lap button); `swim_rest_120s` the 2-minute
+ * rest after it. Level 3 is "20 minutes out and 20 minutes back"; its safety rule is the session's note
+ * (`OPEN_WATER_SAFETY_NOTE`).
+ */
+const OW_SET = (outWords: string, n: number, s: number, para: string, back: string) => [
+  { token: 'swim_time_1x30s', words: outWords },  // p241
+  ...Array.from({ length: n }, () => [
+    { token: `swim_time_1x${s}s`, words: para },
+    { token: `swim_time_1x${s}s`, words: back },
+  ]).flat(),
+  { token: 'swim_lap', words: 'return to shore' },  // p241
+];
+export const SWIM_OPEN_WATER_PRINTED: Partial<Record<Level, { token: string; words: string }[]>> = {
+  1: [1, 2, 3].flatMap((k) => [
+    ...OW_SET('swim out', 4, 30, 'parallel to shore, sighting every 10 seconds', 'parallel back to the start, sighting every 10 seconds'),
+    ...(k < 3 ? [{ token: 'swim_rest_120s', words: 'rest' }] : []),  // p241
+  ]),
+  2: [1, 2, 3, 4].flatMap((k) => [
+    ...OW_SET('swim out', 3, 45, 'parallel to shore, sighting every 9 seconds', 'parallel back to the start, sighting every 9 seconds'),
+    ...(k < 4 ? [{ token: 'swim_rest_120s', words: 'rest' }] : []),  // p241
+  ]),
+  3: [
+    { token: 'swim_time_1x1200s', words: 'straight out, sighting and orienting to the shore' },  // p241
+    { token: 'swim_time_1x1200s', words: 'back' },  // p241
+  ],
+};
+

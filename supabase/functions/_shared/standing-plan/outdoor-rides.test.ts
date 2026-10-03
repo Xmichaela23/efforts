@@ -128,7 +128,8 @@ Deno.test('⛔ §6.2 — hard rides: the road rotation, and VO2 is the one road 
   // And the All Rounder's own anaerobic ride (p274 day 2) rotates p237's three by-feel shapes, all road.
   const ar = CASES.find((x) => x.label === 'All Rounder, runs')!;
   const tuesday = rides(block(ar.args)).filter(({ s }) => tag(s, 'slot:') === '2:0').map(({ s }) => tag(s, 'archetype:'));
-  walks(tuesday, ['progressive_repeats', 'one_to_one', 'sandwich']);
+  // p237's fade at 130% joined the road rotation 2026-10-02 (week builder Stage 2; by feel, so road).
+  walks(tuesday, ['progressive_repeats', 'one_to_one', 'sandwich', 'fade_130']);
 });
 
 /**

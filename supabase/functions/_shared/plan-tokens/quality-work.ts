@@ -41,12 +41,24 @@ export type QualitySegment = {
    * An untargeted step's own word — the page's `VT1`, its easy spin, its unresolved race pace, or an
    * ALL-OUT effort (p236 sprints: *"max effort"*), which is prescribed work with no power target.
    */
-  at: 'vt1' | 'easy' | 'racepace' | 'allout' | null;
+  at: 'vt1' | 'easy' | 'racepace' | 'allout' | 'vvo2' | 'runout' | null;
+  /**
+   * ⛔ A DISTANCE STEP (week builder Stage 2, 2026-10-02) — `50mvvo2`: p229–231's sprints and p233–234's 1200 m repeats
+   * are prescribed in metres. `seconds` is 0 on a distance step; the clock is the watch's.
+   */
+  meters?: number;
+  /**
+   * ⛔ AN OPEN END (2026-10-02). `60s+130`: p237's "1 minute-plus to fade at 130% (when power drops)" — at least
+   * `seconds`, then on until the effort fades; the watch ends it on the lap button. `lap120`: p237's "30 s @ 120% /
+   * 30 s rest, repeat until unable to hold 120%" — no clock at all (`seconds` 0). `rlapeasy`: the page's "full
+   * recovery" — a rest with no stated length.
+   */
+  open?: 'at_least' | 'lap';
 };
 
 export type QualityWork =
   /** `round_{n}x_{segs}` — n SETS of the segment sequence, which is itself rounds of a repeating unit. */
-  | { kind: 'round'; sets: number; segments: QualitySegment[]; restBetweenS: number }
+  | { kind: 'round'; sets: number; segments: QualitySegment[]; restBetweenS: number; /** `_Rlap`: the page's "full recovery" between sets. */ restBetweenOpen?: boolean }
   /** `interval_{n}x{s}s_{pct}pct` — n repeats at one percentage, with an easy float between. */
   | { kind: 'interval'; reps: number; workS: number; pct: number; restS: number }
   /** `bike_ss_` / `bike_thr_` — n repeats inside a BAND the token names by its prefix, not by a number. */
@@ -72,8 +84,13 @@ export const BIKE_BANDS = {
 
 // ⚠️ `allout` AND `{lo}to{hi}` ADDED 2026-09-13 for p278's VO2 and sprint rides. Additive: every token
 // that parsed before parses to the same thing.
-const SEGMENT = /^(r?)(\d+)s(\d+to\d+|\d+|vt1|easy|racepace|allout)$/;
-const ROUND = /^round_(\d+)x_((?:r?\d+s(?:\d+to\d+|\d+|vt1|easy|racepace|allout))(?:-r?\d+s(?:\d+to\d+|\d+|vt1|easy|racepace|allout))*)(?:_[rR](\d+)s)?$/;
+// ⚠️ `{n}m`, `{n}s+`, `lap`, `vvo2` and `runout` ADDED 2026-10-02 (week builder Stage 2) for the page's distance
+// sprints, open-ended efforts and full recoveries. Additive: every token that parsed before parses to the same thing.
+const TARGET = '\\d+to\\d+|\\d+|vt1|easy|racepace|allout|vvo2|runout';
+const SEG_SRC = `r?(?:\\d+s\\+?|\\d+m|lap)(?:${TARGET})`;
+const SEGMENT = new RegExp(`^(r?)(?:(\\d+)(s|m)(\\+?)|(lap))(${TARGET})$`);
+/** The round token, exported so the emitted-shape caches name it once (`session-vocabulary.ts`). */
+export const ROUND_TOKEN = new RegExp(`^round_(\\d+)x_(${SEG_SRC}(?:-${SEG_SRC})*)(?:_[rR](\\d+s|lap))?$`);
 const INTERVAL = /^interval_(\d+)x(\d+)s_(\d+)pct(?:_[rR](\d+)s)?$/;
 const BIKE_BAND = /^bike_(ss|thr)_(\d+)x(\d+)min_[rR](\d+)min$/;
 
@@ -81,23 +98,28 @@ const BIKE_BAND = /^bike_(ss|thr)_(\d+)x(\d+)min_[rR](\d+)min$/;
 export function parseQualityWork(token: string | null | undefined): QualityWork | null {
   const lower = String(token ?? '').toLowerCase();
 
-  const round = lower.match(ROUND);
+  const round = lower.match(ROUND_TOKEN);
   if (round) {
     const segments: QualitySegment[] = [];
     for (const seg of round[2].split('-')) {
       const m = seg.match(SEGMENT);
       if (!m) continue;
-      const at = m[3];
-      const named = at === 'vt1' || at === 'easy' || at === 'racepace' || at === 'allout';
+      const at = m[6];
+      const named = at === 'vt1' || at === 'easy' || at === 'racepace' || at === 'allout' || at === 'vvo2' || at === 'runout';
       const range = named ? null : at.match(/^(\d+)to(\d+)$/);
+      const isLap = m[5] === 'lap';
+      const isMeters = m[3] === 'm';
+      const workWord = at === 'racepace' || at === 'allout' || at === 'vvo2' || at === 'runout';
       segments.push({
         // ⚠️ THE LEADING `r` IS THE SOURCE'S OWN WORD — see `compoundRoundToken`. A 50% segment
         // without it is prescribed work; with it, it is the recovery the page names.
-        role: m[1] === 'r' || (named && at !== 'racepace' && at !== 'allout') ? 'recovery' : 'work',
-        seconds: parseInt(m[2], 10),
+        role: m[1] === 'r' || (named && !workWord) ? 'recovery' : 'work',
+        seconds: isLap || isMeters ? 0 : parseInt(m[2], 10),
         pct: named ? null : parseInt(range ? range[1] : at, 10) / 100,
         ...(range ? { pctHi: parseInt(range[2], 10) / 100 } : {}),
-        at: named ? (at as 'vt1' | 'easy' | 'racepace' | 'allout') : null,
+        at: named ? (at as QualitySegment['at']) : null,
+        ...(isMeters ? { meters: parseInt(m[2], 10) } : {}),
+        ...(isLap ? { open: 'lap' as const } : m[4] === '+' ? { open: 'at_least' as const } : {}),
       });
     }
     if (segments.length === 0) return null;
@@ -105,7 +127,8 @@ export function parseQualityWork(token: string | null | undefined): QualityWork 
       kind: 'round',
       sets: Math.max(1, parseInt(round[1], 10)),
       segments,
-      restBetweenS: round[3] ? parseInt(round[3], 10) : 0,
+      restBetweenS: round[3] && round[3] !== 'lap' ? parseInt(round[3], 10) : 0,
+      ...(round[3] === 'lap' ? { restBetweenOpen: true } : {}),
     };
   }
 
@@ -271,10 +294,29 @@ export function wattsAt(
  * materializer looks the page's word up by this place (`endurance-library/step-words.ts`): the rest between sets, an
  * untargeted recovery inside the round, an all-out effort, a race-pace finish.
  */
-export type StepPlace = 'between' | 'in_round' | 'all_out' | 'race_pace';
-export type RunStep = { kind: 'work' | 'recovery'; duration_s: number; pace_sec_per_mi?: number; place?: StepPlace };
+export type StepPlace = 'between' | 'in_round' | 'all_out' | 'race_pace' | 'vvo2' | 'run_out' | 'full_recovery' | 'between_open' | 'open_end';
+/**
+ * ⛔ A DISTANCE STEP CARRIES `distance_m` AND NO `duration_s`; AN OPEN STEP CARRIES `lap_button` (2026-10-02). Both are
+ * shapes the Garmin send already writes (the strides): distance as a distance step, lap_button as OPEN. An at-least step
+ * keeps its printed minimum in `min_duration_s` for a reader that needs a clock (Intervals.icu has no lap step).
+ */
+export type RunStep = {
+  kind: 'work' | 'recovery'; duration_s?: number; distance_m?: number; lap_button?: true; min_duration_s?: number;
+  pace_sec_per_mi?: number; pace_range?: [number, number]; place?: StepPlace;
+};
 /** ⚠️ `upper` IS OPTIONAL: a floor-only step has no ceiling to carry. See `wattsAt`. */
-export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: PowerRange; place?: StepPlace };
+export type RideStep = {
+  kind: 'work' | 'recovery'; duration_s?: number; lap_button?: true; min_duration_s?: number;
+  power_range?: PowerRange; place?: StepPlace;
+};
+
+/** The clock fields of one segment: seconds, metres, or the lap button (2026-10-02). */
+function clockOf(seg: QualitySegment): { duration_s?: number; distance_m?: number; lap_button?: true; min_duration_s?: number } {
+  if (seg.meters != null) return { distance_m: seg.meters };
+  if (seg.open === 'lap') return { lap_button: true };
+  if (seg.open === 'at_least') return { lap_button: true, min_duration_s: seg.seconds };
+  return { duration_s: seg.seconds };
+}
 
 /**
  * The work as running steps — what `expandRunToken` pushes for these two shapes, id aside.
@@ -294,24 +336,38 @@ export function qualityRunSteps(
   if (work.kind === 'round') {
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
-        if (seg.at === 'racepace' || seg.at === 'allout') {
+        const clock = clockOf(seg);
+        if (seg.at === 'racepace' || seg.at === 'allout' || seg.at === 'vvo2' || seg.at === 'runout') {
           // ⛔ PRESCRIBED WORK WITH NO PACE, and the library says so itself: race pace is set by the
           // race, not by this library. The step reaches the watch; the number does not, because
-          // there is no number.
+          // there is no number. ⚠️ p229's "faster than vVO2" and the sprint's run-out are the same (2026-10-02): a
+          // pace region the page gives in words, run on feel.
+          const place: StepPlace = seg.at === 'racepace' ? 'race_pace' : seg.at === 'vvo2' ? 'vvo2' : seg.at === 'runout' ? 'run_out' : 'all_out';
           out.push({
-            kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out',
+            kind: 'work', ...clock, place,
             ...(seg.at === 'racepace' && race ? { pace_sec_per_mi: race } : {}),
           });
         } else if (seg.role === 'recovery') {
           const paced = pacedAt(seg.pct, thr) ?? easyPace;
-          out.push({ kind: 'recovery', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}), ...(seg.at === 'easy' ? { place: 'in_round' as const } : {}) });
+          const place: StepPlace | null = seg.open === 'lap' ? 'full_recovery' : seg.at === 'easy' ? 'in_round' : null;
+          out.push({ kind: 'recovery', ...clock, ...(paced ? { pace_sec_per_mi: paced } : {}), ...(place ? { place } : {}) });
         } else {
+          // ⛔ A PRINTED RANGE ON FOOT GOES AS ITS RANGE (2026-10-02, p230 "130 to 140%"): the faster pace is the top.
           const paced = pacedAt(seg.pct, thr);
-          out.push({ kind: 'work', duration_s: seg.seconds, ...(paced ? { pace_sec_per_mi: paced } : {}) });
+          const pacedHi = seg.pctHi != null ? pacedAt(seg.pctHi, thr) : undefined;
+          out.push({
+            kind: 'work', ...clock, ...(paced ? { pace_sec_per_mi: pacedHi ?? paced } : {}),
+            ...(paced && pacedHi ? { pace_range: [pacedHi, paced] as [number, number] } : {}),
+            ...(seg.open === 'at_least' ? { place: 'open_end' as const } : {}),
+          });
         }
       }
-      if (work.restBetweenS > 0 && r < work.sets - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restBetweenS, ...(easyPace ? { pace_sec_per_mi: easyPace } : {}), place: 'between' });
+      if (r < work.sets - 1) {
+        if (work.restBetweenOpen) {
+          out.push({ kind: 'recovery', lap_button: true, ...(easyPace ? { pace_sec_per_mi: easyPace } : {}), place: 'between_open' });
+        } else if (work.restBetweenS > 0) {
+          out.push({ kind: 'recovery', duration_s: work.restBetweenS, ...(easyPace ? { pace_sec_per_mi: easyPace } : {}), place: 'between' });
+        }
       }
     }
     return out;
@@ -342,10 +398,11 @@ export function qualityRideSteps(
   if (work.kind === 'round') {
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
+        const clock = clockOf(seg);
         // ⛔ AN ALL-OUT STEP IS WORK WITH NO POWER TARGET — p236's "max effort", unresolved on purpose (p229).
-        if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds, place: seg.at === 'racepace' ? 'race_pace' : 'all_out' });
+        if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', ...clock, place: seg.at === 'racepace' ? 'race_pace' : 'all_out' });
         // A plain easy spin: no target (see the note above `SEGMENT`).
-        else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, place: 'in_round' });
+        else if (seg.at) out.push({ kind: 'recovery', ...clock, place: seg.open === 'lap' ? 'full_recovery' : 'in_round' });
         else {
           // ⚠️ THE RULE IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
           // 50% half) is a stated number, not an effort with a floor, and keeps its band.
@@ -355,11 +412,12 @@ export function qualityRideSteps(
             ftp,
             seg.role === 'work' ? rule : null,
           );
-          out.push({ kind: seg.role, duration_s: seg.seconds, ...(w ? { power_range: w } : {}) });
+          out.push({ kind: seg.role, ...clock, ...(w ? { power_range: w } : {}), ...(seg.open ? { place: 'open_end' as const } : {}) });
         }
       }
-      if (work.restBetweenS > 0 && r < work.sets - 1) {
-        out.push({ kind: 'recovery', duration_s: work.restBetweenS, place: 'between' });
+      if (r < work.sets - 1) {
+        if (work.restBetweenOpen) out.push({ kind: 'recovery', lap_button: true, place: 'between_open' });
+        else if (work.restBetweenS > 0) out.push({ kind: 'recovery', duration_s: work.restBetweenS, place: 'between' });
       }
     }
     return out;
@@ -446,7 +504,8 @@ export function percentWord(lo: number, hi: number): string {
  */
 export function repeatingUnit(segments: QualitySegment[]): { unit: QualitySegment[]; rounds: number } {
   const same = (a: QualitySegment, b: QualitySegment) =>
-    a.role === b.role && a.seconds === b.seconds && a.pct === b.pct && (a.pctHi ?? null) === (b.pctHi ?? null) && a.at === b.at;
+    a.role === b.role && a.seconds === b.seconds && a.pct === b.pct && (a.pctHi ?? null) === (b.pctHi ?? null) && a.at === b.at
+    && (a.meters ?? null) === (b.meters ?? null) && (a.open ?? null) === (b.open ?? null);
   const repeats = (k: number): boolean => {
     for (let i = k; i < segments.length; i += 1) if (!same(segments[i], segments[i % k])) return false;
     return true;
@@ -472,25 +531,57 @@ export function repeatingUnit(segments: QualitySegment[]): { unit: QualitySegmen
   return { unit: segments, rounds: 1 };
 }
 
+/**
+ * ⛔ HOW LONG A SEGMENT IS, IN THE PAGE'S WAY (2026-10-02): `50 m` for a distance step, `1 min or more` for p237's
+ * "1 minute-plus", nothing for an open step (its words carry it), the duration otherwise.
+ * ⚠️ Michael approved the Stage 2 copy 2026-10-02 ("or more", "full recovery", "faster than vVO2", "run out" — all copy goes
+ * through him); see `OPEN_AND_DISTANCE_WORDS`.
+ */
+export const OPEN_AND_DISTANCE_WORDS = {
+  atLeast: 'or more',
+  fullRecovery: 'full recovery',
+  vvo2: 'faster than vVO2',
+  runOut: 'run out',
+  untilHeld: 'until it cannot be held',
+} as const;
+function lengthWord(seg: QualitySegment): string {
+  if (seg.meters != null) return `${seg.meters} m`;
+  if (seg.open === 'at_least') return `${durationWord(seg.seconds)} ${OPEN_AND_DISTANCE_WORDS.atLeast}`;
+  if (seg.open === 'lap') return seg.role === 'recovery' ? OPEN_AND_DISTANCE_WORDS.fullRecovery : '';
+  return durationWord(seg.seconds);
+}
+
 function runSegmentWord(seg: QualitySegment, p: QualityPricing): string {
-  const dur = durationWord(seg.seconds);
+  const dur = lengthWord(seg);
+  if (seg.at === 'vvo2') return `${dur} ${OPEN_AND_DISTANCE_WORDS.vvo2}`;
+  if (seg.at === 'runout') return `${dur} ${OPEN_AND_DISTANCE_WORDS.runOut}`;
+  if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
+  if (seg.open === 'lap' && seg.role === 'recovery') return dur;
   // ⚠️ "easy" stands for the page's "@ VT1" here, and the word VT1 never prints on screen; see step-words.ts.
   if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
+  const hi = seg.pctHi ?? seg.pct;
   const paced = pacedAt(seg.pct, p.thresholdSecPerMi);
-  return `${dur} at ${paced ? paceWord(paced, p.units) : percentWord(seg.pct, seg.pct)}`;
+  const pacedHi = pacedAt(hi, p.thresholdSecPerMi);
+  const at = paced
+    ? (pacedHi && pacedHi !== paced ? `${paceWord(pacedHi, p.units)}–${paceWord(paced, p.units)}` : paceWord(paced, p.units))
+    : percentWord(seg.pct, hi);
+  const words = `${dur} at ${at}`.trim();
+  return seg.open === 'lap' ? `${words} ${OPEN_AND_DISTANCE_WORDS.untilHeld}` : words;
 }
 
 function rideSegmentWord(seg: QualitySegment, p: QualityPricing): string {
-  const dur = durationWord(seg.seconds);
+  const dur = lengthWord(seg);
   // ⛔ p237–p239 print the ride's untargeted recovery as "easy spin" (2026-09-18, book-language pass 2).
+  if (seg.open === 'lap' && seg.role === 'recovery') return dur;
   if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy spin`;
   // ⚠️ COPY NOT YET APPROVED (2026-09-13): the word for an all-out effort on the line. Held for Michael.
   if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
   const hi = seg.pctHi ?? seg.pct;
   const w = wattsAt(seg.pct, hi, p.ftp, seg.role === 'work' ? p.rule : null);
-  return `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, hi)}`;
+  const words = `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, hi)}`.trim();
+  return seg.open === 'lap' ? `${words} ${OPEN_AND_DISTANCE_WORDS.untilHeld}` : words;
 }
 
 /** ⚠️ PROPOSED, NOT APPROVED — every athlete-facing word goes through Michael before it ships. */
@@ -514,7 +605,10 @@ export function qualityWorkLine(work: QualityWork | null, sport: 'run' | 'ride',
     const head = rounds > 1
       ? (work.sets > 1 ? `${work.sets} sets of ${rounds} rounds: ` : `${rounds} rounds: `)
       : (work.sets > 1 ? `${work.sets} rounds: ` : '');
-    return `${head}${body}${between(work.restBetweenS, unit.length > 1 ? '; ' : ', ')}`;
+    const rest = work.restBetweenOpen
+      ? `${unit.length > 1 ? '; ' : ', '}${OPEN_AND_DISTANCE_WORDS.fullRecovery} between`
+      : between(work.restBetweenS, unit.length > 1 ? '; ' : ', ');
+    return `${head}${body}${rest}`;
   }
   if (work.kind === 'interval') {
     const paced = pacedAt(work.pct, p.thresholdSecPerMi);

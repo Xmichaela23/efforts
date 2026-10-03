@@ -26,8 +26,11 @@ for (const level of [1, 2, 3] as const) {
     assertEquals(between.length, PRINTED[level] - 1);
     for (const x of between) assertEquals(x.seconds, null);
     assertEquals(b.restBetween?.seconds ?? null, null);
-    // The watch: each 150 m run straight through is one rep.
+    // The watch (since 2026-10-02, week builder Stage 2): each rep's three parts with their targets, full recovery
+    // between reps and between rounds — it travelled as `strides_{n}x150m`, one untargeted rep, before.
     const row = translateEnduranceSession(s);
-    assertEquals(row.steps_preset.filter((t) => t.startsWith('strides_')), [`strides_${2 * PRINTED[level]}x150m`]);
+    const rep = '50mvvo2-50mallout-50mvvo2';
+    const reps = Array.from({ length: PRINTED[level] }, () => rep).join('-rlapeasy-');
+    assertEquals(row.steps_preset.filter((t) => t.startsWith('round_')), [`round_2x_${reps}_Rlap`]);
   });
 }

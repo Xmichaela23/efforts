@@ -16,9 +16,10 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
+import { ROUND_TOKEN } from '../plan-tokens/quality-work.ts';
 import { familyLineFor, NAMED_WORKOUT_FAMILIES, RACE_TEMPO_LINE, RIDE_ANAEROBIC_DRAWER_NOTE, RIDE_ENDURANCE_DRAWER_NOTE, RUN_LSD_DRAWER_NOTE, RUN_VT1_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
-import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, wrapperToken } from '../endurance-library/index.ts';
+import { ENDURANCE_CLASS, classToken, FAMILIES, SWIM_ENDURANCE_PRINTED, SWIM_OPEN_WATER_PRINTED, SWIM_SPEED_PRINTED, wrapperToken } from '../endurance-library/index.ts';
 
 /** The `type` field on a plan row. Unchanged vocabulary. */
 export type SessionType = 'run' | 'ride' | 'swim' | 'strength';
@@ -136,11 +137,17 @@ function addOnSeconds(session: EnduranceSession): number {
  */
 function compoundRoundToken(block: {
   repeat: number;
-  steps: Array<{ role: string; seconds?: number | null; intensity?: { kind: string; hi?: number } | null }>;
+  steps: Array<{ role: string; seconds?: number | null; open?: 'at_least' | 'lap'; intensity?: { kind: string; hi?: number } | null }>;
   restBetween?: { seconds?: number | null } | null;
 }): string | null {
-  const steps = block.steps.filter((st) => st.seconds != null && st.seconds > 0);
-  if (steps.length < 2) return null;
+  /**
+   * ⛔ AN OPEN STEP TRAVELS (2026-10-02, p237's fade and until-fail lines): `60s+130` is "1 minute or more at 130%", `lap120`
+   * is "until 120% cannot be held". Only a step the library marks `open` takes these forms, so no round that travelled
+   * before changes; and a round holding one is carried even when it is a single step.
+   */
+  const steps = block.steps.filter((st) => (st.seconds != null && st.seconds > 0) || st.open != null);
+  const hasOpen = steps.some((st) => st.open != null);
+  if (steps.length < 2 && !hasOpen) return null;
   const shape = steps.map((st) => {
     const i = st.intensity;
     // ⚠️ `hi` is the band's top and is what the session prescribes at; `vt1`/`easy` carry no number.
@@ -155,9 +162,10 @@ function compoundRoundToken(block: {
      * `role: 'recovery'` takes the marker.
      */
     const r = st.role === 'recovery' ? 'r' : '';
-    return `${r}${Math.round(st.seconds as number)}s${at}`;
+    if (st.open === 'lap') return `${r}lap${at}`;
+    return `${r}${Math.round(st.seconds as number)}s${st.open === 'at_least' ? '+' : ''}${at}`;
   });
-  if (new Set(shape).size < 2) return null; // one repeated step is a plain interval, not a round
+  if (!hasOpen && new Set(shape).size < 2) return null; // one repeated step is a plain interval, not a round
   const rest = block.restBetween?.seconds;
   return `round_${Math.max(1, block.repeat)}x_${shape.join('-')}`
     + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
@@ -186,6 +194,52 @@ function plainRoundToken(block: {
   const rest = block.restBetween?.seconds;
   return `round_${Math.max(1, block.repeat)}x_${Math.round(steps[0].seconds as number)}s${at}`
     + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
+}
+
+/**
+ * ⛔ A DISTANCE SESSION AS ROUND TOKENS, BLOCK BY BLOCK (week builder Stage 2, 2026-10-02) — p229–231's sprints and
+ * p233–234's distance repeats, which travelled as `strides_{n}x{m}m` (no target, no walks, no rests) or not at all.
+ * Each step is a segment: `50mvvo2`, `300m130to140`, `25mallout`, `25mrunout`, `1200m90`; a timed rest `r60seasy`
+ * (`r180svt1`), the page's "full recovery" `rlapeasy`; the rest between rounds `_R60s` / `_Rlap`. A block that is only a
+ * rest (the rest between two parts) travels as `round_1x_r180svt1`.
+ */
+function distanceRoundTokens(session: EnduranceSession): string[] {
+  const out: string[] = [];
+  const target = (i: { kind: string; lo?: number; hi?: number } | null | undefined, role: string): string | null => {
+    if (!i) return null;
+    if (i.kind === 'pct_threshold' && typeof i.hi === 'number') {
+      const hi = Math.round(i.hi * 100);
+      const lo = typeof i.lo === 'number' ? Math.round(i.lo * 100) : hi;
+      return lo < hi ? `${lo}to${hi}` : String(hi);
+    }
+    if (i.kind === 'all_out') return 'allout';
+    if (i.kind === 'faster_than_vvo2') return 'vvo2';
+    if (i.kind === 'vt1') return 'vt1';
+    if (i.kind === 'easy') return role === 'float' ? 'runout' : 'easy';
+    if (i.kind === 'drill') return 'easy';
+    return null;
+  };
+  const seg = (st: EnduranceSession['blocks'][number]['steps'][number]): string | null => {
+    const at = target(st.intensity as never, st.role);
+    if (at == null) return null;
+    if (st.meters != null && st.role !== 'rest' && st.role !== 'recovery') return `${Math.round(st.meters)}m${at}`;
+    if (st.open === 'lap' || st.seconds == null) return `rlap${at === 'runout' ? 'easy' : at}`;
+    return `r${Math.round(st.seconds)}s${at === 'runout' ? 'easy' : at}`;
+  };
+  for (const b of session.blocks) {
+    if (b.addOn) continue;
+    const segs = b.steps.map(seg);
+    if (segs.some((x) => x == null)) throw new Error(`no distance token for a ${session.family} block (${session.archetype})`);
+    const rb = b.restBetween;
+    const rest = rb == null ? '' : (rb.open === 'lap' || rb.seconds == null) ? '_Rlap' : `_R${Math.round(rb.seconds)}s`;
+    out.push(`round_${Math.max(1, b.repeat)}x_${segs.join('-')}${rest}`);
+  }
+  return out;
+}
+
+/** True when the session prescribes distance steps (the sprints, the distance repeats). */
+function isDistanceSession(session: EnduranceSession): boolean {
+  return session.blocks.some((b) => b.steps.some((st) => st.meters != null && st.role !== 'recovery' && st.role !== 'rest'));
 }
 
 /**
@@ -598,6 +652,8 @@ export function translateEnduranceSession(
        * and `interval_` can only say "n reps at one pace" — so the surge and the 90% segment were dropped
        * on the row. Same grammar the MLSS branch below has used since 2026-08-30.
        */
+      // ⛔ p233–234's DISTANCE REPEATS (2026-10-02) travel as distance rounds, part by part — see `distanceRoundTokens`.
+      if (isDistanceSession(session)) { work = distanceRoundTokens(session); break; }
       {
         const roundBlock = session.blocks.find((b) => compoundRoundToken(b as never) != null);
         const roundTok = roundBlock ? compoundRoundToken(roundBlock as never) : null;
@@ -758,21 +814,15 @@ export function translateEnduranceSession(
      * nothing — p229's "all-out" has no target and p230's recovery is "full recovery".
      */
     case 'run_sprint_power': {
-      work = session.blocks.map((b) => {
-        // ⚠️ A REP IS THE WORK STEPS RUN STRAIGHT THROUGH: p230-231's "150m as 50m / 50m all-out / 50m" is three
-        // segments and one 150 m rep. Any other step (a recovery, the full recovery) ends the rep.
-        const reps: number[] = [];
-        let run = 0;
-        for (const x of b.steps) {
-          if (x.role === 'work' && x.meters && x.meters > 0) { run += x.meters; continue; }
-          if (run > 0) { reps.push(run); run = 0; }
-        }
-        if (run > 0) reps.push(run);
-        if (reps.length === 0 || reps.some((m) => m !== reps[0])) {
-          throw new Error(`no token for a run_sprint_power block (${session.archetype})`);
-        }
-        return `strides_${Math.max(1, b.repeat) * reps.length}x${Math.round(reps[0])}m`;
-      });
+      /**
+       * ⛔⛔ THE PAGE'S TARGETS AND RESTS TRAVEL (week builder Stage 2, 2026-10-02). This emitted `strides_{n}x{m}m` — a
+       * distance with no pace target and a lap-button rest — so the watch lost p230's 130–140%, the 1-, 2- and 3-minute
+       * walks, the rounds and the 150 m rep's three speeds. Every block now travels as a distance round
+       * (`distanceRoundTokens`): metres, the page's target per segment, its timed walks and its full recoveries.
+       * ⚠️ "Faster than vVO2" and all-out carry no number (p229: "performance and RPE, as opposed to specific pacing"); the
+       * step says so in words.
+       */
+      work = distanceRoundTokens(session);
       break;
     }
     case 'ride_vo2':
@@ -848,11 +898,25 @@ export function translateEnduranceSession(
       break;
     }
 
+    /**
+     * ⛔ p241's SPEED AND OPEN-WATER SESSIONS, REACHABLE (week builder Stage 2, 2026-10-02). Both threw here on purpose
+     * while no plan could assign them. Each now travels token for token from its printed table, as the endurance swim
+     * does (`SWIM_SPEED_PRINTED`, `SWIM_OPEN_WATER_PRINTED`); the materializer puts the page's words on the steps.
+     */
+    case 'swim_speed':
+    case 'swim_open_water': {
+      const table = session.family === 'swim_speed' ? SWIM_SPEED_PRINTED : SWIM_OPEN_WATER_PRINTED;
+      const printed = table[session.level];
+      if (!printed) throw new Error(`no printed ${session.family} session at level ${session.level}`);
+      work = printed.map((x) => x.token);
+      swimPrinted = true;
+      break;
+    }
+
     default:
       // ⛔ ANY FAMILY THIS EDGE HAS NOT BEEN TAUGHT FAILS LOUDLY rather than emitting a token the
-      // materializer will silently drop. ⚠️ That deliberately includes `swim_speed` and
-      // `swim_open_water` (`ride_vo2` and `ride_sprints` left the list 2026-09-13 with cases above): none of them is reachable from this plan's assignment,
-      // and a throw here is the tripwire if one ever becomes reachable by accident.
+      // materializer will silently drop. ⚠️ `swim_speed` and `swim_open_water` left this list 2026-10-02 (week builder
+      // Stage 2) with their own case above, as `ride_vo2` and `ride_sprints` did 2026-09-13.
       // ⚠️ `ride_anaerobic` LEFT THAT LIST ON 2026-08-30 — it is now reachable ON PURPOSE and has a
       // case above. The tripwire worked exactly as written: it fired the moment the mapping changed.
       throw new Error(`no session-vocabulary translation for family: ${session.family}`);
@@ -993,6 +1057,13 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   // ⛔ p241's printed swim at levels 2 and 3 (2026-09-18): the kick length and the DPS / glide drill.
   { shape: /^swim_kick_\d+x\d+m$/, example: 'swim_kick_1x100m' },
   { shape: /^swim_drill_[a-z]+_\d+x\d+m$/, example: 'swim_drill_dps_1x100m' },
+  // ⛔ WEEK BUILDER STAGE 2 (2026-10-02): the distance and open rounds (p229–231, p233–234, p237) and p241's speed and
+  // open-water swims.
+  { shape: ROUND_TOKEN, example: 'round_2x_50mvvo2-r60seasy-50mvvo2_R60s' },
+  { shape: /^swim_pull_\d+x\d+m_buoy$/, example: 'swim_pull_1x100m_buoy' },
+  { shape: /^swim_rest_\d+s$/, example: 'swim_rest_60s' },
+  { shape: /^swim_time_\d+x\d+s$/, example: 'swim_time_1x30s' },
+  { shape: /^swim_lap$/, example: 'swim_lap' },
 ];
 
 /**
@@ -1012,12 +1083,18 @@ export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
   /bike_endurance_(\d+)min/,
   /bike_recovery_\d+min/,
   /bike_vt1sprint_(\d+)min_(\d+)s_every(\d+)min/,
+  // Week builder Stage 2 (2026-10-02): the round token, with its open steps (`parseQualityWork`).
+  ROUND_TOKEN,
 ];
 export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
   /swim_(warmup|cooldown)_(\d+)(yd|m)/,
   /^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/,
   /swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/,
   /swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/,
+  // Week builder Stage 2 (2026-10-02): p241's set rest, timed swims and the untimed swim back to shore.
+  /^swim_rest_(\d+)s$/,
+  /^swim_time_(\d+)x(\d+)s$/,
+  /^swim_lap$/,
 ];
 
 /**
@@ -1043,4 +1120,6 @@ export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
   // tripwire.
   /strides_\d+x/,
   /^strides_p210$/,
+  // Week builder Stage 2 (2026-10-02): the round token with distance and open segments (`parseQualityWork`).
+  ROUND_TOKEN,
 ];
