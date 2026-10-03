@@ -5,7 +5,7 @@
  * string is the on-screen preview, the web's print-to-PDF page and the page the iPhone turns into a PDF, so the three
  * cannot drift. Decides nothing: every word is the server's.
  */
-import type { PlanSheetV1, SheetSport } from '@shared/plan-sheet.ts';
+import type { PlanSheetV1, SheetSport, SheetTime } from '@shared/plan-sheet.ts';
 
 const esc = (s: unknown): string =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -14,6 +14,13 @@ const hm = (min: number | null | undefined): string => {
   if (min == null || !Number.isFinite(min) || min <= 0) return '—';
   const h = Math.floor(min / 60), m = Math.round(min % 60);
   return h ? `${h} h ${m} m` : `${m} min`;
+};
+
+/** "30–40 min", "1 h 8 m", "1 h 38 m–1 h 48 m"; empty when there is no time. */
+const tm = (t: SheetTime | null | undefined): string => {
+  if (!t || !(t.high > 0)) return '';
+  if (t.low === t.high) return hm(t.low);
+  return t.high < 60 ? `${t.low}–${t.high} min` : `${hm(t.low)}–${hm(t.high)}`;
 };
 
 const DOT: Record<SheetSport, string> = {
@@ -49,10 +56,15 @@ tr{break-inside:avoid}
 .rest td{color:var(--faint)}
 .total td{border-bottom:0;font-weight:600}
 .changes{margin:0;padding-left:18px;display:grid;gap:4px}
-.day{margin-top:14px;break-inside:avoid}
-.dayh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px}
-.dayh b{font-size:14.5px}
-.dayh span{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.tday{margin-top:26px}
+.tday>.dh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1.5px solid var(--ink);padding-bottom:5px;break-after:avoid}
+.tday>.dh b{font-size:17px;font-weight:600}
+.tday>.dh span{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.blk{margin-top:12px}
+.blk>.h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:3px;break-after:avoid}
+.blk>.h b{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
+.blk>.h span{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.blk.endo{break-inside:avoid}
 .lifts{table-layout:fixed}
 .lifts td{font-size:13px}
 .lifts td.r{white-space:nowrap}
@@ -63,11 +75,7 @@ tr{break-inside:avoid}
 tr.pair td{background:var(--band)}
 tr.pair td:first-child{box-shadow:inset 3px 0 0 var(--strength)}
 .pairlab{white-space:nowrap;font-family:var(--mono);font-size:10px;color:var(--strength);letter-spacing:.06em;text-transform:uppercase}
-.endo{border:1px solid var(--rule);border-radius:6px;padding:10px 12px;margin-top:8px;break-inside:avoid}
-.endo .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-.endo .h b{font-size:14px;display:flex;align-items:center;gap:7px}
-.endo .h span{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
-.steps{margin:5px 0 0;padding:0;list-style:none;display:grid;gap:2px;font-size:13px}
+.steps{margin:2px 0 0;padding:0 0 0 15px;list-style:none;display:grid;gap:2px;font-size:13px}
 .steps li{display:grid;grid-template-columns:84px 1fr;gap:10px}
 .steps li span:first-child{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding-top:1px}
 .how{font-size:12.5px;color:var(--muted);margin-top:6px}
@@ -105,49 +113,44 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
     }
     const sess = d.sessions.map((s) => `<div class="sess">${dot(s.sport)}${esc(s.title)}</div>`).join('');
     // One time per session, beside its row, as the week view prints them.
-    const times = d.sessions.map((s) => `<div class="sess t">${esc(s.time ?? hm(s.minutes)) || '&nbsp;'}</div>`).join('');
+    const times = d.sessions.map((s) => `<div class="sess t">${esc(tm(s.time)) || '&nbsp;'}</div>`).join('');
     out.push(`<tr><td>${esc(d.day)}</td><td>${sess}</td><td>${times}</td></tr>`);
   }
-  out.push(`<tr class="total"><td></td><td>${esc(w.weekTotal)}</td><td>${esc(hm(sheet.week.total_minutes))}</td></tr></tbody></table>`);
+  out.push(`<tr class="total"><td></td><td>${esc(w.weekTotal)}</td><td>${esc(tm(sheet.week.total)) || '—'}</td></tr></tbody></table>`);
 
   // How it changes
   if (sheet.changes.length) {
     out.push(`<h2>${esc(sheet.headings.changes)}</h2><ul class="changes">${sheet.changes.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`);
   }
 
-  // Lifts
-  if (sheet.lift_days.length) {
-    out.push(`<h2>${dot('strength')}${esc(sheet.headings.lifts)}</h2>`);
-    for (const ld of sheet.lift_days) {
-      out.push(`<div class="day"><div class="dayh"><b>${esc(ld.day)} · ${esc(ld.title)}</b><span>${esc(ld.time ?? hm(ld.minutes))}</span></div>`);
-      out.push(`<table class="lifts"><colgroup><col style="width:33%"><col style="width:17%"><col style="width:13%"><col style="width:37%"></colgroup><thead><tr><th>${esc(c.lift)}</th><th>${esc(c.setsReps)}</th><th>${esc(c.weight)}</th><th>${esc(c.effort)}</th></tr></thead><tbody>`);
-      for (const r of ld.rows) {
-        const tag = r.intent ? `<span class="tag">${esc(r.intent)}</span>` : '';
-        const pairLab = r.pair_first ? ` <span class="pairlab">· ${esc(w.pair)}</span>` : '';
-        out.push(`<tr${r.pair ? ' class="pair"' : ''}><td class="n">${tag}${esc(r.name)}${pairLab}</td><td class="r">${esc(r.sets_reps)}</td><td class="w">${esc(r.weight)}</td><td class="e">${esc(r.effort)}</td></tr>`);
+  // ⛔ ONE SECTION PER TRAINING DAY (Michael, 2026-10-02), Monday first, each session in the week table's order.
+  const liftCols = '<colgroup><col style="width:33%"><col style="width:17%"><col style="width:13%"><col style="width:37%"></colgroup>';
+  for (const td of sheet.training_days) {
+    out.push(`<section class="tday"><div class="dh"><b>${esc(td.day)}</b><span>${esc(tm(td.time))}</span></div>`);
+    for (const b of td.blocks) {
+      if (b.kind === 'lifts') {
+        out.push(`<div class="blk"><div class="h"><b>${dot('strength')}${esc(b.title)}</b><span>${esc(tm(b.time))}</span></div>`);
+        out.push(`<table class="lifts">${liftCols}<thead><tr><th>${esc(c.lift)}</th><th>${esc(c.setsReps)}</th><th>${esc(c.weight)}</th><th>${esc(c.effort)}</th></tr></thead><tbody>`);
+        for (const r of b.rows) {
+          const tag = r.intent ? `<span class="tag">${esc(r.intent)}</span>` : '';
+          const pairLab = r.pair_first ? ` <span class="pairlab">· ${esc(w.pair)}</span>` : '';
+          out.push(`<tr${r.pair ? ' class="pair"' : ''}><td class="n">${tag}${esc(r.name)}${pairLab}</td><td class="r">${esc(r.sets_reps)}</td><td class="w">${esc(r.weight)}</td><td class="e">${esc(r.effort)}</td></tr>`);
+        }
+        out.push(`</tbody></table></div>`);
+      } else if (b.kind === 'plyo') {
+        out.push(`<div class="blk"><div class="h"><b>${dot('plyo')}${esc(b.title)}</b><span></span></div>`);
+        out.push(`<table class="lifts"><thead><tr><th>${esc(c.drill)}</th><th>${esc(c.for)}</th></tr></thead><tbody>`);
+        for (const r of b.rows) out.push(`<tr><td class="n">${esc(r.drill)}</td><td class="e">${esc(r.for ?? '')}</td></tr>`);
+        out.push(`</tbody></table>${b.note ? `<p class="how">${esc(b.note)}</p>` : ''}</div>`);
+      } else {
+        const steps = b.steps.map((s) => `<li><span>${esc(s.label)}</span><span>${esc(s.text)}</span></li>`).join('');
+        out.push(`<div class="blk endo"><div class="h"><b>${dot(b.sport)}${esc(b.title)}</b><span>${esc(tm(b.time))}</span></div>${steps ? `<ul class="steps">${steps}</ul>` : ''}</div>`);
       }
-      out.push(`</tbody></table></div>`);
     }
-    if (sheet.weight_note) out.push(`<p class="how">${esc(sheet.weight_note)}</p>`);
+    out.push(`</section>`);
   }
 
-  // Plyometrics
-  for (const p of sheet.plyo) {
-    out.push(`<h2>${dot('plyo')}${esc(sheet.headings.plyo)} · ${esc(p.day)}</h2>`);
-    out.push(`<table class="lifts"><thead><tr><th>${esc(c.drill)}</th><th>${esc(c.for)}</th></tr></thead><tbody>`);
-    for (const r of p.rows) out.push(`<tr><td class="n">${esc(r.drill)}</td><td class="e">${esc(r.for ?? '')}</td></tr>`);
-    out.push(`</tbody></table><p class="how">${esc(p.note)}</p>`);
-  }
-
-  // Runs and rides
-  if (sheet.endurance.length) {
-    out.push(`<h2>${dot('run')}${esc(sheet.headings.endurance)}</h2>`);
-    for (const e of sheet.endurance) {
-      const steps = e.steps.map((s) => `<li><span>${esc(s.label)}</span><span>${esc(s.text)}</span></li>`).join('');
-      out.push(`<div class="endo"><div class="h"><b>${dot(e.sport)}${esc(e.day)} · ${esc(e.title)}</b><span>${esc(hm(e.minutes))}</span></div>${steps ? `<ul class="steps">${steps}</ul>` : ''}</div>`);
-    }
-  }
-
+  if (sheet.weight_note) out.push(`<p class="how" style="margin-top:20px">${esc(sheet.weight_note)}</p>`);
   if (sheet.footer.length) out.push(`<div class="foot">${sheet.footer.map((f) => `<div>${esc(f)}</div>`).join('')}</div>`);
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`

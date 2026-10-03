@@ -18,6 +18,7 @@ import { SETS_EARNED_PARAGRAPH } from './standing-plan/program-outline.ts';
 import { P227_DRILL_LINE } from './standing-plan/plyo.ts';
 import { isAsymmetrical } from './strength-grid/taxonomy.ts';
 import { plannedDurationFields } from './planned-duration-label.ts';
+import { strengthSessionMinutes } from './strength-session-minutes.ts';
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -36,9 +37,6 @@ export const ENDURANCE_CHANGES_LINE =
 export const SHEET_HEADINGS = {
   week: 'The week',
   changes: 'How it changes',
-  lifts: 'Lifts',
-  plyo: 'Plyometrics',
-  endurance: 'Runs and rides',
 } as const;
 
 export const SHEET_WORDS = {
@@ -66,7 +64,12 @@ export const INTENT_NAMES: Record<string, string> = {
 
 export type SheetSport = 'run' | 'ride' | 'strength' | 'plyo' | 'swim' | 'other';
 /** Each session carries its own time the way the week view prints it: a lift's label ("30–40 min"), else its minutes. */
-export type SheetDay = { day: string; sessions: { sport: SheetSport; title: string; minutes: number | null; time: string | null }[]; minutes: number | null };
+/**
+ * Each session's time the way the week view prints it: a lift's range off its rows ("30–40 min"), else its minutes;
+ * the plyo day carries no length (none on the row or the page). `low`/`high` are minutes; equal when it is one number.
+ */
+export type SheetTime = { low: number; high: number } | null;
+export type SheetDay = { day: string; sessions: { sport: SheetSport; title: string; time: SheetTime }[]; time: SheetTime };
 export type SheetLiftRow = {
   intent: string | null;
   name: string;
@@ -77,24 +80,26 @@ export type SheetLiftRow = {
   pair: boolean;
   pair_first: boolean;
 };
-/** `time` is the planned screens' own label for a lifting day (`planned-duration-label.ts`, "30–40 min"). */
-export type SheetLiftDay = { day: string; title: string; minutes: number | null; time: string | null; rows: SheetLiftRow[] };
-export type SheetPlyo = { day: string; minutes: number | null; rows: { drill: string; for: string | null }[]; note: string };
-export type SheetEndurance = { day: string; sport: SheetSport; title: string; minutes: number | null; steps: { label: string; text: string }[] };
+/** One session of a training day, in the week table's order. */
+export type SheetBlock =
+  | { kind: 'lifts'; title: string; time: SheetTime; rows: SheetLiftRow[] }
+  | { kind: 'plyo'; title: string; rows: { drill: string; for: string | null }[]; note: string | null }
+  | { kind: 'endurance'; sport: SheetSport; title: string; time: SheetTime; steps: { label: string; text: string }[] };
+/** A training day: its name, its time (the sum of its sessions' times) and every session on it. Rest days have none. */
+export type SheetTrainingDay = { day: string; time: SheetTime; blocks: SheetBlock[] };
 
 export type PlanSheetV1 = {
-  version: 1;
+  version: 2;
   title: string;
   /** "12 weeks · Week 5" */
   meta: string;
   week_number: number;
   total_weeks: number | null;
-  week: { days: SheetDay[]; total_minutes: number };
+  week: { days: SheetDay[]; total: SheetTime };
   changes: string[];
-  lift_days: SheetLiftDay[];
+  /** One section per training day, Monday first (Michael, 2026-10-02: the sheet is organized by day). */
+  training_days: SheetTrainingDay[];
   weight_note: string | null;
-  plyo: SheetPlyo[];
-  endurance: SheetEndurance[];
   footer: string[];
   headings: typeof SHEET_HEADINGS;
   words: Pick<typeof SHEET_WORDS, 'rest' | 'weekTotal' | 'pair' | 'noWeight'> & { columns: { day: string; sessions: string; time: string; lift: string; setsReps: string; weight: string; effort: string; drill: string; for: string } };
@@ -120,6 +125,17 @@ const minutesOf = (r: Any): number | null => {
   const s = plannedDurationFields(r).planned_duration_seconds;
   return s != null && Number.isFinite(s) && s > 0 ? Math.round(s / 60) : null;
 };
+/** A session's time as the week view prints it (`planned-duration-label.ts`): a lift off its rows, the plyo day none. */
+function timeOf(r: Any): SheetTime {
+  const sport = sportOf(r);
+  if (sport === 'plyo') return null;
+  if (sport === 'strength') {
+    const m = strengthSessionMinutes(r?.strength_exercises);
+    if (m) return { low: m.low, high: m.high };
+  }
+  const n = minutesOf(r);
+  return n ? { low: n, high: n } : null;
+}
 const dateOf = (r: Any): string => (typeof r?.date === 'string' ? r.date.slice(0, 10) : '');
 const weekdayOf = (iso: string): string =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
@@ -268,52 +284,52 @@ export function composePlanSheet(args: {
     return d;
   })() : null;
   const days: SheetDay[] = [];
-  let total = 0;
+  const training_days: SheetTrainingDay[] = [];
+  let weekLo = 0, weekHi = 0;
+  let anyRun = false, anyRide = false, anyIntent = false, anyNoWeight = false, anyLift = false, anyMe = false, anyEndurance = false;
+  let drillLineSaid = false;
   for (let k = 0; k < 7; k++) {
     let iso = '';
     if (monday) { const d = new Date(monday); d.setUTCDate(d.getUTCDate() + k); iso = d.toISOString().slice(0, 10); }
     const here = rows.filter((x) => x.d === iso).map((x) => x.r);
-    const mins = here.reduce((s, r) => s + (minutesOf(r) ?? 0), 0);
-    total += mins;
-    days.push({
-      day: WEEKDAYS[k],
-      sessions: here.map((r) => ({
-        sport: sportOf(r),
-        title: spellOut(sessionTitle(r)),
-        minutes: minutesOf(r),
-        // A lift prints its label; the plyo day prints no length (none on the row or the page — the label is null for it).
-        time: sportOf(r) === 'strength' ? plannedDurationFields(r).planned_duration_label : sportOf(r) === 'plyo' ? '' : null,
-      })),
-      minutes: here.length ? mins : null,
-    });
-  }
-
-  const lift_days: SheetLiftDay[] = [];
-  const plyo: SheetPlyo[] = [];
-  const endurance: SheetEndurance[] = [];
-  let anyRun = false, anyRide = false, anyIntent = false, anyNoWeight = false;
-  for (const { r, d } of rows) {
-    const sport = sportOf(r);
-    const day = weekdayOf(d);
-    if (sport === 'plyo') {
-      plyo.push({ day, minutes: minutesOf(r), rows: plyoRows(r), note: P227_DRILL_LINE });
-    } else if (sport === 'strength') {
-      const lr = liftRows(r);
-      if (!lr.length) continue;
-      if (lr.some((x) => x.intent)) anyIntent = true;
-      if (lr.some((x) => x.weight === SHEET_WORDS.noWeight)) anyNoWeight = true;
-      lift_days.push({ day, title: spellOut(sessionTitle(r)), minutes: minutesOf(r), time: plannedDurationFields(r).planned_duration_label, rows: lr });
-    } else if (sport === 'run' || sport === 'ride' || sport === 'swim') {
-      if (sport === 'run') anyRun = true;
-      if (sport === 'ride') anyRide = true;
-      endurance.push({ day, sport, title: spellOut(sessionTitle(r)), minutes: minutesOf(r), steps: enduranceSteps(r) });
+    let lo = 0, hi = 0;
+    const sessions: SheetDay['sessions'] = [];
+    const blocks: SheetBlock[] = [];
+    for (const r of here) {
+      const sport = sportOf(r);
+      const title = spellOut(sessionTitle(r));
+      const time = timeOf(r);
+      if (time) { lo += time.low; hi += time.high; }
+      sessions.push({ sport, title, time });
+      if (sport === 'plyo') {
+        // p227's drill line once on the sheet, under the first plyo session.
+        blocks.push({ kind: 'plyo', title, rows: plyoRows(r), note: drillLineSaid ? null : P227_DRILL_LINE });
+        drillLineSaid = true;
+      } else if (sport === 'strength') {
+        const lr = liftRows(r);
+        if (!lr.length) continue;
+        anyLift = true;
+        if (lr.some((x) => x.intent)) anyIntent = true;
+        if (lr.some((x) => x.intent === INTENT_NAMES.ME)) anyMe = true;
+        if (lr.some((x) => x.weight === SHEET_WORDS.noWeight)) anyNoWeight = true;
+        blocks.push({ kind: 'lifts', title, time, rows: lr });
+      } else if (sport === 'run' || sport === 'ride' || sport === 'swim') {
+        anyEndurance = true;
+        if (sport === 'run') anyRun = true;
+        if (sport === 'ride') anyRide = true;
+        blocks.push({ kind: 'endurance', sport, title, time, steps: enduranceSteps(r) });
+      }
     }
+    weekLo += lo; weekHi += hi;
+    const dayTime: SheetTime = here.length && hi > 0 ? { low: lo, high: hi } : null;
+    days.push({ day: WEEKDAYS[k], sessions, time: dayTime });
+    if (blocks.length) training_days.push({ day: WEEKDAYS[k], time: dayTime, blocks });
   }
 
   const changes: string[] = [];
-  if (lift_days.length) changes.push(SETS_EARNED_PARAGRAPH);
-  if (lift_days.some((ld) => ld.rows.some((x) => x.intent === INTENT_NAMES.ME))) changes.push(ME_WEIGHT_LINE);
-  if (endurance.length) changes.push(ENDURANCE_CHANGES_LINE);
+  if (anyLift) changes.push(SETS_EARNED_PARAGRAPH);
+  if (anyMe) changes.push(ME_WEIGHT_LINE);
+  if (anyEndurance) changes.push(ENDURANCE_CHANGES_LINE);
 
   const footer: string[] = [];
   if (anyRun) footer.push(SHEET_WORDS.runFooter);
@@ -323,17 +339,15 @@ export function composePlanSheet(args: {
   const title = typeof args.planName === 'string' && args.planName.trim() ? args.planName.trim() : 'Training plan';
   const tw = Number.isFinite(Number(args.totalWeeks)) && Number(args.totalWeeks) > 0 ? Number(args.totalWeeks) : null;
   return {
-    version: 1,
+    version: 2,
     title,
     meta: `${tw ? `${tw} weeks · ` : ''}Week ${args.week}`,
     week_number: args.week,
     total_weeks: tw,
-    week: { days, total_minutes: total },
+    week: { days, total: weekHi > 0 ? { low: weekLo, high: weekHi } : null },
     changes,
-    lift_days,
+    training_days,
     weight_note: anyNoWeight ? SHEET_WORDS.weightNote : null,
-    plyo,
-    endurance,
     footer,
     headings: SHEET_HEADINGS,
     words: {
