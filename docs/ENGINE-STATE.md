@@ -30,6 +30,9 @@
 >   saves the Performance summary; a run re-analysis keeps it (D-513).
 > - Speed: screen caching (react-query persistence), the held hard cycle solved once per block, ladder and accessory-
 >   options caches (a 52-week p252 block ran out of edge compute before).
+> - Logger, 2026-10-02 (f650e520f, phone only): the "Saved!" card and inline strip no longer say "View Details /
+>   Adherence to adjust weights" (TRUTH-MAP row 36 closed); the set-kind word ("Maximum Effort", "Dynamic Effort",
+>   "Hypertrophy", "Skill") leads its line in bold. Not yet seen on a device.
 >
 > **Known failing tests on main, not from this work:** `cycling-long-frame.test.ts` (ride card words),
 > `shared/strength-system/assistance-collision` + `assistance-equipment-gate` (10, kit ranking), `src/lib` club-control-

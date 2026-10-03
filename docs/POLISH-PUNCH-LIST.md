@@ -14,6 +14,15 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## [x] FIXED 2026-10-02 (f650e520f) — LOGGER: THE SAVED CARD POINTED AT A SCREEN; THE KIND OF SET DID NOT STAND OUT
+
+> Seen on Michael's phone 2026-10-02. (1) The "Saved!" card said "View Details to adjust weights for next time" and
+> the inline save strip said "View Adherence to adjust weights…" — two sentences for one state (TRUTH-MAP row 36),
+> neither naming the real place (State → Adjust). Both lines removed; the card says "Saved!". (2) The set-kind line
+> ("Maximum Effort · 1 to 5 reps, 90 to 100%…", the server's `intent_line`) read as one grey caption; the book's word
+> now renders bold in the label colour, the rest of the line unchanged. Phone only; no server, no copy change. Pushed;
+> not yet seen on a device after the build.
+
 ## [x] FIXED 2026-09-22 (217ee36a6, main 912d14cb8) — A FINISHED RUN LOST THE NAME ITS PLAN GAVE IT
 
 > The plan said "Descending Ladder"; the Today card and calendar day list printed the Garmin name. Now every surface
