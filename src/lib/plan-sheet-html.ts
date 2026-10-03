@@ -45,6 +45,7 @@ tr{break-inside:avoid}
 .week td:last-child,.week th:last-child{text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
 .sess{display:flex;align-items:center;gap:7px}
 .sess+.sess{margin-top:3px}
+.sess.t{justify-content:flex-end}
 .rest td{color:var(--faint)}
 .total td{border-bottom:0;font-weight:600}
 .changes{margin:0;padding-left:18px;display:grid;gap:4px}
@@ -89,7 +90,9 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
       continue;
     }
     const sess = d.sessions.map((s) => `<div class="sess">${dot(s.sport)}${esc(s.title)}</div>`).join('');
-    out.push(`<tr><td>${esc(d.day)}</td><td>${sess}</td><td>${esc(hm(d.minutes))}</td></tr>`);
+    // One time per session, beside its row, as the week view prints them.
+    const times = d.sessions.map((s) => `<div class="sess t">${esc(s.time ?? hm(s.minutes))}</div>`).join('');
+    out.push(`<tr><td>${esc(d.day)}</td><td>${sess}</td><td>${times}</td></tr>`);
   }
   out.push(`<tr class="total"><td></td><td>${esc(w.weekTotal)}</td><td>${esc(hm(sheet.week.total_minutes))}</td></tr></tbody></table>`);
 
@@ -102,7 +105,7 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
   if (sheet.lift_days.length) {
     out.push(`<h2>${dot('strength')}${esc(sheet.headings.lifts)}</h2>`);
     for (const ld of sheet.lift_days) {
-      out.push(`<div class="day"><div class="dayh"><b>${esc(ld.day)} · ${esc(ld.title)}</b><span>${esc(hm(ld.minutes))}</span></div>`);
+      out.push(`<div class="day"><div class="dayh"><b>${esc(ld.day)} · ${esc(ld.title)}</b><span>${esc(ld.time ?? hm(ld.minutes))}</span></div>`);
       out.push(`<table class="lifts"><colgroup><col style="width:33%"><col style="width:17%"><col style="width:13%"><col style="width:37%"></colgroup><thead><tr><th>${esc(c.lift)}</th><th>${esc(c.setsReps)}</th><th>${esc(c.weight)}</th><th>${esc(c.effort)}</th></tr></thead><tbody>`);
       for (const r of ld.rows) {
         const tag = r.intent ? `<span class="tag">${esc(r.intent)}</span>` : '';
@@ -116,7 +119,7 @@ export function planSheetHtml(sheet: PlanSheetV1): string {
 
   // Plyometrics
   for (const p of sheet.plyo) {
-    out.push(`<h2>${dot('plyo')}${esc(sheet.headings.plyo)} · ${esc(p.day)} · ${esc(hm(p.minutes))}</h2>`);
+    out.push(`<h2>${dot('plyo')}${esc(sheet.headings.plyo)} · ${esc(p.day)}</h2>`);
     out.push(`<table class="lifts"><thead><tr><th>${esc(c.drill)}</th><th>${esc(c.for)}</th></tr></thead><tbody>`);
     for (const r of p.rows) out.push(`<tr><td class="n">${esc(r.drill)}</td><td class="e">${esc(r.for ?? '')}</td></tr>`);
     out.push(`</tbody></table><p class="how">${esc(p.note)}</p>`);
