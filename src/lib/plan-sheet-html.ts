@@ -6,6 +6,7 @@
  * cannot drift. Decides nothing: every word is the server's.
  */
 import type { PlanSheetV1, SheetSport, SheetTime } from '@shared/plan-sheet.ts';
+import { workoutShapeSvg } from './workout-shape-svg';
 
 const esc = (s: unknown): string =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -65,6 +66,7 @@ tr{break-inside:avoid}
 .blk>.h b{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
 .blk>.h span{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
 .blk.endo{break-inside:avoid}
+.shape{margin:4px 0 6px 15px}
 .lifts{table-layout:fixed}
 .lifts td{font-size:13px}
 .lifts td.r{white-space:nowrap}
@@ -188,7 +190,11 @@ export function planSheetHtml(raw: PlanSheetV1): string {
         out.push(`</tbody></table>${b.note ? `<p class="how">${esc(b.note)}</p>` : ''}</div>`);
       } else {
         const steps = b.steps.map((s) => `<li><span>${esc(s.label)}</span><span>${esc(s.text)}</span></li>`).join('');
-        out.push(`<div class="blk endo"><div class="h"><b>${dot(b.sport)}${esc(b.title)}</b><span>${esc(tm(b.time))}</span></div>${steps ? `<ul class="steps">${steps}</ul>` : ''}</div>`);
+        // The workout shape in the sheet's light colours (2026-10-03), the same drawing Today uses.
+        const shape = b.sport === 'run' || b.sport === 'ride'
+          ? workoutShapeSvg(b.shape ?? null, { color: `var(--${b.sport})`, variant: 'sheet', dashColor: 'var(--faint)' })
+          : '';
+        out.push(`<div class="blk endo"><div class="h"><b>${dot(b.sport)}${esc(b.title)}</b><span>${esc(tm(b.time))}</span></div>${shape ? `<div class="shape">${shape}</div>` : ''}${steps ? `<ul class="steps">${steps}</ul>` : ''}</div>`);
       }
     }
     out.push(`</section>`);

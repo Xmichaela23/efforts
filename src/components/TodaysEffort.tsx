@@ -22,7 +22,8 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
 import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
-import PlannedSessionHeader, { plannedDurationSecondsOf } from './PlannedSessionHeader';
+import PlannedSessionHeader, { plannedDurationSecondsOf, sportColorFor } from './PlannedSessionHeader';
+import WorkoutShape from './WorkoutShape';
 // ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
@@ -2719,6 +2720,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </button>
                     </div>
                   )}
+                  {/* ⛔ THE WORKOUT SHAPE, TALL, WITH THE DASHED LINE AT THRESHOLD (2026-10-03) — after the purpose line,
+                      before the written steps. The server's `shape`, drawn as sent; none on a lift or a plain sport swap. */}
+                  <WorkoutShape
+                    shape={(selectedPlannedWorkout as any)?.computed?.shape ?? null}
+                    color={sportColorFor(displayDisciplineOf(selectedPlannedWorkout as never))}
+                    variant="tall"
+                    className="mb-3"
+                  />
                   <PlannedWorkoutSummary
                     workout={selectedPlannedWorkout}
                     baselines={baselines as any}

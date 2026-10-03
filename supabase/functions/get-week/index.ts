@@ -55,6 +55,7 @@ import { intentTitle } from '../_shared/intent-title.ts';
 // keeps the name its plan gave it (2026-09-22).
 import { sessionTitle } from '../_shared/session-title.ts';
 import { foldJoinedItems } from './joined-fold.ts';
+import { plannedShapeOf } from '../_shared/planned-shape.ts';
 import { foldPlyoItems } from './plyo-fold.ts';
 import { plyoTitleNote } from '../_shared/standing-plan/plyo.ts';
 import { spacingLineFor } from '../_shared/standing-plan/spacing-line.ts';
@@ -877,7 +878,7 @@ Deno.serve(async (req)=>{
             workout_structure: p?.workout_structure ?? null,
             friendly_summary: p?.friendly_summary ?? null,
             // ⛔ The planned swim's total and unit, written by materialize-plan (2026-09-10, audit H-T20).
-            swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null,
+            swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null, shape: plannedShapeOf(p),
             rendered_description: p?.rendered_description ?? null,
             brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
             brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1191,7 +1192,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
-          swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null,
+          swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null, shape: plannedShapeOf(p),
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1250,7 +1251,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
-          swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null,
+          swim_distance: p?.computed?.swim_distance ?? null, strength_lines: p?.computed?.strength_lines ?? null, step_lines: p?.computed?.step_lines ?? null, narrative: p?.computed?.narrative ?? null, mobility_sets: p?.computed?.mobility_sets ?? null, shape: plannedShapeOf(p),
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1744,7 +1745,7 @@ Deno.serve(async (req)=>{
         // ⚠️ `swim_distance` rides inside `computed` so every planned surface reads one path,
         // whether its row came from here or straight from `planned_workouts` (audit H-T20).
         computed: (Array.isArray(p.steps) && p.steps.length > 0)
-          ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null, swim_distance: p.swim_distance ?? null, strength_lines: p.strength_lines ?? null, step_lines: p.step_lines ?? null, narrative: p.narrative ?? null, mobility_sets: p.mobility_sets ?? null }
+          ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null, swim_distance: p.swim_distance ?? null, strength_lines: p.strength_lines ?? null, step_lines: p.step_lines ?? null, narrative: p.narrative ?? null, mobility_sets: p.mobility_sets ?? null, shape: p.shape ?? null }
           // ⛔ A mobility row has no timed steps and still carries its logger rows (audit H-T12).
           : (Array.isArray(p.mobility_sets) && p.mobility_sets.length > 0 ? { steps: [], mobility_sets: p.mobility_sets } : null),
         steps_preset: p.steps_preset ?? null,

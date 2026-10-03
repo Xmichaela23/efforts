@@ -19,6 +19,8 @@ import { P227_DRILL_LINE } from './standing-plan/plyo.ts';
 import { isAsymmetrical } from './strength-grid/taxonomy.ts';
 import { plannedDurationFields } from './planned-duration-label.ts';
 import { strengthSessionMinutes } from './strength-session-minutes.ts';
+import { plannedShapeOf } from './planned-shape.ts';
+import type { WorkoutShape } from './workout-shape.ts';
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -84,7 +86,7 @@ export type SheetLiftRow = {
 export type SheetBlock =
   | { kind: 'lifts'; title: string; time: SheetTime; rows: SheetLiftRow[] }
   | { kind: 'plyo'; title: string; rows: { drill: string; for: string | null }[]; note: string | null }
-  | { kind: 'endurance'; sport: SheetSport; title: string; time: SheetTime; steps: { label: string; text: string }[] };
+  | { kind: 'endurance'; sport: SheetSport; title: string; time: SheetTime; steps: { label: string; text: string }[]; shape?: WorkoutShape | null };
 /** A training day: its name, its time (the sum of its sessions' times) and every session on it. Rest days have none. */
 export type SheetTrainingDay = { day: string; time: SheetTime; blocks: SheetBlock[] };
 
@@ -317,7 +319,8 @@ export function composePlanSheet(args: {
         anyEndurance = true;
         if (sport === 'run') anyRun = true;
         if (sport === 'ride') anyRide = true;
-        blocks.push({ kind: 'endurance', sport, title, time, steps: enduranceSteps(r) });
+        // The workout shape on each run and ride (2026-10-03), the same one Today draws (`planned-shape.ts`).
+        blocks.push({ kind: 'endurance', sport, title, time, steps: enduranceSteps(r), shape: sport === 'swim' ? null : plannedShapeOf(r) });
       }
     }
     weekLo += lo; weekHi += hi;

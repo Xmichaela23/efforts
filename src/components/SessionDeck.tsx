@@ -12,7 +12,9 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { VENUE_LABEL } from '@shared/session-swap/copy.ts';
 import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
-import { sessionTypeFor } from '@shared/standing-plan/family-lines.ts';
+import { sessionTypeLevelFor } from '@shared/standing-plan/family-lines.ts';
+import type { WorkoutShape as Shape } from '@shared/workout-shape.ts';
+import WorkoutShape from './WorkoutShape';
 import type { SpacingLine } from '@shared/standing-plan/spacing-line.ts';
 import {
   liftLinesFor,
@@ -460,7 +462,9 @@ export const SessionCard: React.FC<{
   typeLine?: string | null;
   /** The plyo warm-up folded into this run or ride (get-week `plyo-fold.ts`, 2026-09-29), drawn before its steps. */
   plyo?: PlyoWarmUp | null;
-}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, typeLine, plyo, onOpen }) => {
+  /** The workout shape the server sends with the session (`computed.shape`, 2026-10-03). */
+  shape?: Shape | null;
+}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, typeLine, plyo, shape, onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
   // Which drill's (i) is open. Closed by default, like the lift card's.
@@ -490,18 +494,20 @@ export const SessionCard: React.FC<{
             </span>
           ) : null}
         </div>
-        {meta && !typeLine ? (
+        {meta ? (
           <div className="text-footnote tabular-nums flex-shrink-0" style={{ color: 'var(--label-secondary)' }}>
             {meta}
           </div>
         ) : null}
       </div>
-      {/* ⛔ THE TYPE LINE, UNDER THE WORKOUT'S NAME, WITH THE TIME (2026-09-19): "Maximal Lactate Steady State · 39:00". */}
+      {/* ⛔ TYPE · LEVEL UNDER THE WORKOUT'S NAME, THE TIME ON THE NAME LINE (2026-10-03, copy approved): "Anaerobic · Level 1". */}
       {typeLine ? (
         <div className="text-footnote tabular-nums" style={{ marginTop: 2, color: 'var(--label-secondary)' }}>
-          {meta ? `${typeLine} · ${meta}` : typeLine}
+          {typeLine}
         </div>
       ) : null}
+      {/* ⛔ THE WORKOUT SHAPE, THIN, WARM-UP TO COOL-DOWN (2026-10-03) — the server's `shape`, drawn as sent. */}
+      <WorkoutShape shape={shape} color={colour} variant="thin" style={{ marginTop: 8 }} />
       {/* ⛔ THE PLYO WARM-UP, FIRST, INSIDE THE RUN OR RIDE (Michael, 2026-09-29: one session, one log). Server words only:
           "Plyo warm-up" (the page's name, p246 / p274 / p278), get-week's note (p275 / p227), each drill's how-to and, behind
           its (i), p227's benefit. The (i) is a span: this whole card is one button. */}
@@ -821,8 +827,9 @@ const TodaySession: React.FC<{
       sport={sport}
       emphasis={emphasis}
       venueLabel={VENUE_LABEL[venueOf(session as never) ?? ''] ?? null}
-      typeLine={sessionTypeFor(session as never)}
+      typeLine={sessionTypeLevelFor(session as never)}
       plyo={plyoWarmUpOf(session)}
+      shape={((session as { computed?: { shape?: Shape | null } }).computed?.shape) ?? null}
       onOpen={onOpen}
     />
   );

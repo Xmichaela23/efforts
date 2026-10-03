@@ -49,6 +49,7 @@ import {
 import { ridePowerRuleOf } from '../_shared/endurance-library/source-rules.ts';
 import { stepWordFor } from '../_shared/endurance-library/step-words.ts';
 import { plannedNarrative } from '../_shared/planned-narrative.ts';
+import { workoutShape } from '../_shared/workout-shape.ts';
 import { SWIM_ENDURANCE_PRINTED, SWIM_OPEN_WATER_PRINTED, SWIM_SPEED_PRINTED, wrapperStepForToken } from '../_shared/endurance-library/source-rules.ts';
 import { OPEN_AND_DISTANCE_WORDS } from '../_shared/plan-tokens/quality-work.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
@@ -4679,6 +4680,8 @@ Deno.serve(async (req) => {
             const assessSport = String(row?.type || '').toLowerCase();
             if (assessSport === 'run' || assessSport === 'ride' || assessSport === 'walk') {
               update.computed.step_lines = plannedStepLines(v3, { units: (row as any)?.units ?? null, sport: assessSport });
+              const shape = workoutShape(assessSport, v3, update.computed.anchors);
+              if (shape) update.computed.shape = shape;
             }
             await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
             count++;
@@ -4843,6 +4846,10 @@ Deno.serve(async (req) => {
               level: Number(lineTags.find((t) => t.startsWith('level:'))?.slice('level:'.length)) || null,
             });
             if (narrative) update.computed.narrative = narrative; else delete update.computed.narrative;
+            // ⛔ THE WORKOUT SHAPE (2026-10-03) — one bar per step, off the same steps and the numbers they were built
+            // from; every planned screen draws `computed.shape`. See `_shared/workout-shape.ts`.
+            const shape = workoutShape(stepLineSport, v3, update.computed.anchors);
+            if (shape) update.computed.shape = shape; else delete update.computed.shape;
           }
           
           // Update race day description to match actual pace used in computed steps

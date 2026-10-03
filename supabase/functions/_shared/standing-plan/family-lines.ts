@@ -38,6 +38,34 @@ export function sessionTypeForFamily(family: string | null | undefined): string 
   return (FAMILIES as Record<string, { label?: string }>)[family]?.label ?? null;
 }
 
+/**
+ * ⛔ THE OTHER FIVE TYPES' NAMES ON THE CARD (Michael approved 2026-10-03, docs/WORKORDER-workout-shape-2026-10-03.md
+ * Copy) — the Build Focus picker's type names (docs/MOCKUP-week-builder-2026-10-02.html). The five types above keep
+ * their own line.
+ */
+export const CARD_TYPE_NAMES: Readonly<Record<string, string>> = {
+  run_vt1: 'Easy run',  // p235 (VT1)
+  run_lsd: 'Long slow distance',  // p235
+  ride_endurance: 'Endurance',  // p239
+  run_sprint_power: 'Sprint / power',  // pp229–231
+  ride_sprints: 'Sprints',  // p236
+};
+
+/**
+ * "Anaerobic · Level 1" — the small line under a run or ride's name on Today's card and in the drawer (approved
+ * 2026-10-03). The type is the row's `family:` tag (`sessionTypeFor`, else `CARD_TYPE_NAMES`); the level is its
+ * `level:` tag. A row with no type gets no line; a row with no level prints the type alone.
+ */
+export function sessionTypeLevelFor(row: { tags?: unknown } | null | undefined): string | null {
+  const tags = Array.isArray(row?.tags) ? (row!.tags as unknown[]).map(String) : [];
+  const fam = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length) ?? null;
+  const type = sessionTypeForFamily(fam) ?? (fam ? CARD_TYPE_NAMES[fam] ?? null : null);
+  if (!type) return null;
+  const level = Number(tags.find((t) => t.startsWith('level:'))?.slice('level:'.length));
+  // The level is the page's own (each type's levels 1–3, pp229–239), read off the row's tag.
+  return Number.isInteger(level) && level > 0 ? `${type} · Level ${level}` : type;
+}
+
 /** The type line for a planned row, off its `family:` tag. */
 export function sessionTypeFor(row: { tags?: unknown } | null | undefined): string | null {
   const tags = Array.isArray(row?.tags) ? (row!.tags as unknown[]).map(String) : [];

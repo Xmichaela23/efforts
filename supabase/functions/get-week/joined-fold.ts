@@ -36,6 +36,10 @@ export function foldJoinedItems(items: any[], plannedRows: any[]): void {
       steps: concat(h.steps, p.steps),
       step_lines: concat(h.step_lines, p.step_lines),
       narrative: concat(h.narrative, p.narrative),
+      // The workout shape of the whole session: both halves' bars in order, when both have one on the same basis.
+      shape: h.shape && p.shape && h.shape.basis === p.shape.basis
+        ? { basis: h.shape.basis, bars: concat(h.shape.bars, p.shape.bars) }
+        : null,
       total_duration_seconds: sum(h.total_duration_seconds, p.total_duration_seconds),
       duration: sum(h.duration, p.duration),
       planned_duration_seconds: (lengths.planned_duration_seconds as number | null) ?? sum(h.planned_duration_seconds, p.planned_duration_seconds),
