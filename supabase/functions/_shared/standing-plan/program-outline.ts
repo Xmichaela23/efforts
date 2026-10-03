@@ -42,10 +42,13 @@ export const PAIN_TOLERANCE_NOTE =
  * `EARNED_SETS_EVERY_ROW_IS_OURS`). Printed as approved; the set ranges and caps are p218's.
  * ⚠️ LAST SENTENCE CHANGED 2026-09-25 (Michael approved): "The row shows the count." → "The working sets under each
  * lift show the count." — one constant, so the block description and the program outline's Sets section say the same.
+ * ⚠️ REPLACED 2026-10-02 (Michael approved, plan-sheet work order): the code counts a session within one rep of the
+ * top (`progression.ts` setSessionOutcome), so "at the top of the rep range" said less than the rule. The plan sheet's
+ * "How it changes" prints this same constant.
  */
 export const SETS_EARNED_PARAGRAPH =
-  'Every exercise starts at the low end of its set range. Two sessions at the top of the rep range add a set, up to '
-  + 'its cap. One session under the range takes one off. The working sets under each lift show the count.';
+  'Each lift starts at the low end of its set range. Two sessions in a row at the top of the range, or one rep short '
+  + 'of it, add a set, up to its cap. A session below the range takes a set off.';
 
 /**
  * ⛔ THE TEST-WEEK SENTENCE, ONE COPY (`describeBlock` prints it on a tested block; the outline prints it at its foot

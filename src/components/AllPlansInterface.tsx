@@ -19,16 +19,15 @@ import UnifiedWorkoutView from './UnifiedWorkoutView';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
-import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import ProgramOutlineSheet from './ProgramOutlineSheet';
+import PlanSheetDialog from './PlanSheetDialog';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 // ⛔ THE HEADER'S WORDS ARE THE SERVER'S RULE (2026-09-15, §8.0 #25). This screen reads `planned_workouts`
 // straight from the table, so it calls the same function get-week calls — not a copy — and the header prints
 // the label ("30–40 min" for a lift priced off its rows, "63:00" otherwise, nothing on the plyo day).
 import { plannedDurationFields } from '@shared/planned-duration-label';
-import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -217,6 +216,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [showPlanDesc, setShowPlanDesc] = useState(false);
   /** The program outline sheet — what Info opens on a standing plan (2026-09-25, `overview.program_outline`). */
   const [programOutlineOpen, setProgramOutlineOpen] = useState(false);
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
 
   // ⛔ No mount-time baselines load (2026-09-10, audit H-T18): it fed the weekly summaries' structure normalizer, now deleted.
 
@@ -1208,266 +1208,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // ⛔ NO WEEKLY VOLUME IS ADDED UP HERE (2026-09-10, audit H-P02). The optional / race-day rules this
   // summed with moved to `_shared/plan-overview.ts`, which sums every week of the plan.
 
-  // Export selected plan to Markdown (all weeks); includes Arc wizard prefs from linked goal when present.
-  const exportPlanToMarkdown = async (plan: any) => {
-    if (!plan) return;
-
-    let wizardMdLines: string[] = [];
-    const exportDayOrder = dayOrderOf(plan);
-    try {
-      const gid = plan.goal_id;
-      if (gid && typeof gid === 'string') {
-        const { data: goal } = await supabase
-          .from('goals')
-          .select('name, distance, target_date, priority, sport, training_prefs, notes')
-          .eq('id', gid)
-          .maybeSingle();
-        if (goal) {
-          wizardMdLines = formatWizardPrefsMarkdownLines(goal as any);
-        }
-      }
-      if (!wizardMdLines.length) {
-        wizardMdLines = formatPlanConfigPrefsMarkdownLines(plan.config);
-      }
-    } catch {
-      wizardMdLines = formatPlanConfigPrefsMarkdownLines(plan.config);
-    }
-
-    const fmtHM = (m: number) => {
-      const h = Math.floor((m || 0) / 60);
-      const md = (m || 0) % 60;
-      return `${h}h ${md}m`;
-    };
-
-    const lines: string[] = [];
-    lines.push(`# ${plan.name || 'Training Plan'}`);
-    if (plan.description) lines.push(`\n${plan.description}`);
-    lines.push('');
-
-    // Add generation parameters if available (from wizard flow)
-    const config = plan.config || {};
-    if (config.source === 'generated' || config.approach) {
-      lines.push('## Plan Parameters');
-      lines.push('');
-      if (config.distance) lines.push(`- **Distance:** ${config.distance}`);
-      if (config.fitness) lines.push(`- **Fitness Level:** ${config.fitness}`);
-      if (config.goal) lines.push(`- **Goal:** ${config.goal}`);
-      const duration = plan.duration || plan.duration_weeks || config.duration_weeks;
-      if (duration) lines.push(`- **Duration:** ${duration} weeks`);
-      if (config.approach) lines.push(`- **Approach:** ${config.approach.replace(/_/g, ' ')}`);
-      if (config.days_per_week) lines.push(`- **Days/Week:** ${config.days_per_week}`);
-      if (typeof config.strength_frequency === 'number') lines.push(`- **Strength:** ${config.strength_frequency === 0 ? 'None' : `${config.strength_frequency}x/week`}`);
-      if (config.user_selected_start_date) lines.push(`- **Start Date:** ${config.user_selected_start_date}`);
-      lines.push('');
-    } else {
-      const duration = plan.duration || plan.duration_weeks || (plan.weeks ? plan.weeks.length : undefined);
-      if (duration) lines.push(`**Duration:** ${duration} weeks\n`);
-    }
-
-    if (wizardMdLines.length) {
-      lines.push('## Athlete preferences (Arc / wizard)');
-      lines.push('');
-      wizardMdLines.forEach((ln) => lines.push(ln));
-      lines.push('');
-    }
-
-    lines.push('---');
-    lines.push('');
-
-    const weeks: any[] = (plan.weeks || []).slice().sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0));
-    const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const titleByName = intentTitlesOf(plan);
-    for (const wk of weeks) {
-      const rawTitle = wk.title != null ? String(wk.title).trim() : '';
-      const titleRedundant = rawTitle === `Week ${wk.weekNumber}`;
-      lines.push(`## Week ${wk.weekNumber}${rawTitle && !titleRedundant ? `: ${rawTitle}` : ''}`);
-      if (wk.focus) lines.push(`> ${wk.focus}`);
-      const groups: Record<string, any[]> = {};
-      (wk.workouts || []).forEach((w: any) => {
-        const d = w.day || 'Unscheduled';
-        groups[d] = groups[d] ? [...groups[d], w] : [w];
-      });
-      const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
-      for (const d of orderedDays) {
-        lines.push(`### ${d}`);
-        // The server's `day_order`, the same number the weekly view lists by.
-        const dayWorkouts = listByDayOrder(groups[d] as any[], exportDayOrder);
-        // Bricks emit as two session rows (bike leg + run leg) from session-factory; the export
-        // merges them into one combined bullet ("Brick — Bike Xhr + Run Ymi") so a brick week
-        // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
-        // (session-factory emits "Brick — Bike 2.5 hr" and "Brick — Run 4 mi off the bike"); fall
-        // back to duration-derived values if the name shape changes.
-        //
-        // The bike leg's `w.type` is `'ride'` (not `'bike'`) because the import normalization at
-        // ~line 804 maps `discipline === 'bike'` → `mappedType = 'ride'`. Accept both labels so
-        // brick titles always include the bike portion. Without this, the combined name dropped
-        // to "Brick — Run 4mi" (run-only) and athletes interpreted the day as no-bike.
-        const isBrickWorkout = (w: any) => Array.isArray(w?.tags) && w.tags.includes('brick');
-        const isBikeLikeType = (t: unknown) => {
-          const s = String(t || '').toLowerCase();
-          return s === 'bike' || s === 'ride' || s === 'cycling';
-        };
-        const brickLegs = dayWorkouts.filter(isBrickWorkout);
-        const nonBrickWorkouts = dayWorkouts.filter((w) => !isBrickWorkout(w));
-        if (brickLegs.length > 0) {
-          const bikeLeg = brickLegs.find((w) => isBikeLikeType(w.type));
-          const runLeg = brickLegs.find((w) => String(w.type || '').toLowerCase() === 'run');
-          const parts: string[] = [];
-          if (bikeLeg) {
-            const m = String(bikeLeg.name || '').match(/Bike\s+([\d.]+)\s*hr/i);
-            const hr = m ? m[1] : ((bikeLeg.duration || 0) / 60).toFixed(1);
-            parts.push(`Bike ${hr}hr`);
-          }
-          if (runLeg) {
-            const m = String(runLeg.name || '').match(/Run\s+([\d.]+)\s*mi/i);
-            parts.push(m ? `Run ${m[1]}mi` : 'Run');
-          }
-          const combinedName = parts.length ? `Brick — ${parts.join(' + ')}` : 'Brick';
-          const totalDuration = brickLegs.reduce(
-            (sum, w) => sum + (typeof w.duration === 'number' ? w.duration : 0),
-            0,
-          );
-          const brickMeta: string[] = [];
-          if (totalDuration > 0) brickMeta.push(fmtHM(totalDuration));
-          lines.push(`- ${combinedName}${brickMeta.length ? ` (${brickMeta.join(' • ')})` : ''}`);
-          for (const leg of brickLegs) {
-            if (leg.description) lines.push(`  - ${leg.description}`);
-          }
-        }
-        for (const w of nonBrickWorkouts) {
-          const meta: string[] = [];
-          // Handle intensity - only include if it's a valid string
-          if (w.intensity && typeof w.intensity === 'string' && w.intensity.length > 0) {
-            meta.push(w.intensity);
-          }
-          if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
-          // ⛔ THE DOWNLOAD IS A SURFACE TOO. A lifting day prints its title in the book's terms — the one the
-          // composer stamped on the plan's session (`intent_title`, 2026-09-18), matched here by name.
-          lines.push(`- ${w.intent_title || titleByName.get(String(w.name ?? '')) || w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
-          if (w.description) lines.push(`  - ${w.description}`);
-
-          const discExport = String(w.type || w.discipline || '').toLowerCase();
-          if (discExport === 'swim') {
-            // D-043 item 4: server appendPoolGearLine already appends a
-            // canonical "Pool gear — Required: …. Optional: …." line onto
-            // w.description during session-factory construction. Re-emitting
-            // here duplicates it (the description carries the server line
-            // verbatim; the client line uses a different separator "·" and
-            // word "Bring" instead of "Required" → formatting drift on top
-            // of the dupe). Only fall back to client-side regeneration when
-            // the description doesn't already carry a Pool gear line — that
-            // covers older / non-canonical descriptions.
-            const descAlreadyHasGearLine = /pool\s*gear\s*[—-]/i.test(String(w.description || ''));
-            if (!descAlreadyHasGearLine) {
-              const eq = swimPlannedEquipmentFromWorkout(w);
-              if (eq) {
-                const parts: string[] = [];
-                if (eq.required.length) parts.push(`Bring: ${eq.required.join(', ')}`);
-                if (eq.optional.length) parts.push(`Optional: ${eq.optional.join(', ')}`);
-                if (parts.length) lines.push(`  - Pool gear — ${parts.join(' · ')}`);
-              }
-            }
-          }
-
-          /**
-           * ⛔ THE PAGE THIS SESSION COMES FROM (Michael, 2026-08-31: *"do we have a page per
-           * session?"*). The block carried one citation and every session under it carried none,
-           * while the library has held a page per session type and per workout shape all along —
-           * they simply stopped at the composer. ⚠️ Last line of the session, after its own notes:
-           * provenance, not instruction.
-           */
-          const sessionCite = String((w as { cite?: string })?.cite || '').trim();
-          if (sessionCite) lines.push(`  - _${sessionCite}_`);
-
-          // Include materialized strength exercises with calculated weights
-          const strengthExercises = w.computed?.steps?.filter((s: any) => s?.kind === 'strength')?.map((s: any) => s.strength) 
-            || w.strength_exercises 
-            || [];
-          if (Array.isArray(strengthExercises) && strengthExercises.length > 0) {
-            lines.push(`  - **Exercises:**`);
-            for (const ex of strengthExercises) {
-              // The name the phone shows: the kit's own name for the row first ("Dumbbell Leg Curl" where
-              // there is no machine), then the stored name (2026-09-16, same pick as `plainLiftList`).
-              const name = String(ex?.execution_name || ex?.name || '').trim() || 'Exercise';
-              // ⛔ THE SERVER'S LINE, PRINTED AS SENT (book-language fix, 2026-09-18). materialize-plan stamps
-              // `display_line` on every strength step (`_shared/strength/strength-display-lines.ts`, the one
-              // owner — kind word, sets × reps, p218's reserve band). The composition below is only for a
-              // row that was never materialized.
-              if (typeof ex?.display_line === 'string' && ex.display_line.trim()) {
-                lines.push(`    - ${ex.display_line.trim()}`);
-                continue;
-              }
-              // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): `name · words`, no dose.
-              if (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim()) {
-                lines.push(`    - ${name} · ${ex.prescription_words.trim()}`);
-                continue;
-              }
-              const sets = ex?.sets || 0;
-              const reps = ex?.reps || 0;
-              const weightDisplay = ex?.weight_display;
-              const notes = ex?.notes ? ` (${ex.notes})` : '';
-              
-              let weightStr = '';
-              if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
-                weightStr = ` @ ${weightDisplay}`;
-              } else if (ex?.baseline_missing) {
-                weightStr = ' @ [Setup 1RM]';
-              }
-              
-              // ⛔ A ROW WITH NO SET COUNT IS A REP TOTAL, NOT "0 SETS". `sets || 0` turned the
-              // absent set count on an assistance row into a literal zero — "Dips: 0×25 total" —
-              // which reads as a prescription for nothing. Assistance carries a TOTAL the athlete
-              // splits however they like (the composer's own description says "25 total reps"); the
-              // sets field is deliberately absent there, and this exporter is the only place that
-              // insisted on printing it.
-              // ⛔ A RAMP IS NOT "SETS × REPS". A the previous program anchor week prescribes 100×5, 110×3, 125×1+
-              // — three sets at three weights and three rep counts — and this printed
-              // "Bench Press: 3×1+ @ 125 lb", which reads as THREE SETS OF ONE at the top weight.
-              // The row-level `sets`/`reps`/`weight` deliberately carry the TOP set (so older
-              // consumers see the work set) and combining them invents a prescription nobody wrote.
-              // ⚠️ It matters most exactly where it is most wrong: the anchor cycle, where the top
-              // set is the rep-out that decides the next cycle's training max.
-              const plan = Array.isArray(ex?.set_plan) ? ex.set_plan : null;
-              const isRamp = !!plan && plan.length > 1
-                && new Set(plan.map((p: any) => `${p?.weight}x${p?.reps}${p?.amrap ? '+' : ''}`)).size > 1;
-              if (isRamp) {
-                // ⛔ A WORK SET CARRIES NO REP COUNT, AND THAT IS DELIBERATE UPSTREAM — the composer
-                // omits `reps` rather than storing a zero, because a stored 0 is the FAILED ATTEMPT
-                // signal and inventing one would undo an earned jump. This exporter interpolated the
-                // gap straight into the string: Michael's week 2-12 bench rows read
-                // "135×undefined" on the main lift, every week. The prescription for that set is the
-                // row's rep BAND, so print the band; if there is no band either, print the weight
-                // alone rather than a word the athlete has to decode.
-                const repsFor = (p: any) => {
-                  if (p?.reps !== undefined && p?.reps !== null) return `×${p.reps}`;
-                  const band = ex?.reps;
-                  return band !== undefined && band !== null && String(band).trim() !== ''
-                    ? `×${String(band).trim()}`
-                    : '';
-                };
-                const ramp = plan!.map((p: any) => `${p?.weight}${repsFor(p)}${p?.amrap ? '+' : ''}`).join(', ');
-                lines.push(`    - ${name}: ${ramp}${notes}`);
-              } else {
-                const setsPrefix = sets ? `${sets}×` : '';
-                lines.push(`    - ${name}: ${setsPrefix}${reps}${weightStr}${notes}`);
-              }
-            }
-          }
-        }
-        lines.push('');
-      }
-      lines.push('');
-    }
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(plan.name || 'training-plan').replace(/\s+/g,'-').toLowerCase()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // Day View via unified modal (Planned tab)
   if (currentView === 'day' && selectedWorkout) {
     return (
@@ -1507,6 +1247,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           open={programOutlineOpen}
           onOpenChange={setProgramOutlineOpen}
         />
+        <PlanSheetDialog
+          planId={selectedPlanDetail?.id ?? null}
+          open={planSheetOpen}
+          onClose={() => setPlanSheetOpen(false)}
+          totalWeeks={overview?.total_weeks ?? null}
+          initialWeek={overview?.current_week_index ?? null}
+        />
         <div
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
           style={{ WebkitOverflowScrolling: 'touch' }}
@@ -1536,12 +1283,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
+            {/* ⛔ THE PLAN SHEET (2026-10-02): one week on one page, saved or shared as a PDF on the web and the phone. */}
             <button
               type="button"
-              onClick={() => void exportPlanToMarkdown(selectedPlanDetail)}
-              className="hidden sm:block px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm"
+              onClick={() => setPlanSheetOpen(true)}
+              aria-haspopup="dialog"
+              className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm"
             >
-              Download
+              Plan sheet
             </button>
             {/* ⛔ ON A STANDING PLAN, INFO OPENS THE PROGRAM OUTLINE (2026-09-25) — the sheet Today's plan name opens,
                 sent by `plan-overview`. Any other plan keeps the description toggle. */}

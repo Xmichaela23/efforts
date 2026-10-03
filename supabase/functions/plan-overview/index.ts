@@ -11,12 +11,14 @@
  * Two calls:
  *   · {}                     → { plans: [plan row + current_week_index, current_phase, total_weeks, progress_pct] }
  *   · { plan_id }            → { plan: (same), overview: { current_week_index, total_weeks, progress_pct, weeks, phases, totals } }
+ *   · { plan_id, sheet_week } → { sheet } — the plan sheet of that week (`_shared/plan-sheet.ts`, 2026-10-02), ready to draw.
  * `as_of` (YYYY-MM-DD, the athlete's calendar date) is optional; without it the server's date is used.
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildPlanOverview, planListFields } from '../_shared/plan-overview.ts';
 import { dayOrderFor } from '../_shared/day-order.ts';
 import { composeProgramOutline } from '../_shared/standing-plan/program-outline.ts';
+import { composePlanSheet } from '../_shared/plan-sheet.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -69,6 +71,22 @@ Deno.serve(async (req) => {
     const day_order: Record<string, number> = {};
     for (const r of rows ?? []) { const n = order.get(r); if (r?.id && n != null) day_order[String(r.id)] = n; }
     const overview = buildPlanOverview({ plan, rows: rows ?? [], asOfIso: asOf });
+    /**
+     * ⛔ THE PLAN SHEET (2026-10-02, docs/WORKORDER-plan-sheet-2026-10-02.md): one week of the plan's own built rows,
+     * composed here; the phone and the web draw it as sent. Any week, not only the ones opened on screen.
+     */
+    const sheetWeek = Number(body?.sheet_week);
+    if (Number.isInteger(sheetWeek) && sheetWeek > 0) {
+      const sheet = composePlanSheet({
+        planName: plan.name ?? null,
+        totalWeeks: Number(overview.total_weeks) || null,
+        week: sheetWeek,
+        rows: (rows ?? [])
+          .filter((r) => Number(r?.week_number) === sheetWeek)
+          .map((r) => ({ ...r, day_order: r?.id ? day_order[String(r.id)] ?? null : null })),
+      });
+      return json({ success: true, sheet });
+    }
     /**
      * ⛔ THE PROGRAM OUTLINE (2026-09-25, `_shared/standing-plan/program-outline.ts`) — the sheet Info opens on a
      * standing plan, the same one Today's plan name opens. Null on any other plan, which keeps its old Info.
