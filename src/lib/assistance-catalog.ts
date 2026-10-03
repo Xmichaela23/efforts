@@ -182,7 +182,7 @@ export type CatalogEntry = {
 };
 
 /**
- * ⛔ 28 MOVEMENTS. TWENTY-SEVEN ARE THE PREVIOUS PROGRAM'S; ONE IS NOT, AND IT IS MARKED WHERE IT SITS.
+ * ⛔ 26 MOVEMENTS (28 until 2026-10-02 — front squat and reverse hyper left; see below). ALL BUT ONE ARE THE PREVIOUS PROGRAM'S; ONE IS NOT, AND IT IS MARKED WHERE IT SITS.
  *
  * No Plank — it is not his. Sit-Up and Side Bend ARE his (the previous program). The single exception is the HIP
  * THRUST pair, flagged in place below with its justification. **Nothing else may be added here that
@@ -222,7 +222,9 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   // ── SINGLE-LEG / CORE ───────────────────────────────────────────────────────────────────────────
   { name: 'Reverse Lunge', display: 'Reverse Lunge', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
   { name: 'Bulgarian Split Squat', display: 'Bulgarian Split Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
-  { name: 'Front Squat', display: 'Front Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
+  // ⛔ FRONT SQUAT AND REVERSE HYPER LEFT THIS BUCKET 2026-10-02 (week builder Stage 1): neither is single-leg or core
+  // work. The book files the front squat as a primary push lower lift (p219) and the bench reverse hyper as a secondary
+  // hinge (p220) — `taxonomy.ts FILING`, the one place a lift's heading lives. Guarded in `assistance-catalog.test.ts`.
   // ⛔ THE ONE DELIBERATE DEPARTURE FROM THE PREVIOUS PROGRAM'S LIST, AND IT IS HERE RATHER THAN IN A CHANGELOG SO
   // NOBODY "CORRECTS" IT BACK OUT.
   //
@@ -242,7 +244,6 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'ours — see note', focus: ['glutes'] , eccentricCost: 'mild' },
   { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'high' },
   { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
-  { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
   { name: 'Hanging Leg Raise', display: 'Hanging Leg Raise', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: [], isAbs: true , eccentricCost: 'none' },
   { name: 'Ab Wheel Rollout', display: 'Ab Wheel', category: 'single_leg_core', muscle: 'abs', source: 'p.30', focus: [], isAbs: true , eccentricCost: 'none' },
   { name: 'Weighted Sit-Up', display: 'Weighted Sit-Up', category: 'single_leg_core', muscle: 'abs', source: '2nd ed p.43', focus: [], isAbs: true , eccentricCost: 'none' },

@@ -53,6 +53,9 @@ Deno.test('⛔ THE DROPPED TEN ARE OUT OF THE POOL, BY NAME', () => {
   assertEquals([...PRESCRIPTION_EXCLUDED].sort(), [
     'backpack carry', 'captain s chair knee raise', "captain's chair knee raise", 'ghd sit up',
     'landmine twist', 'ring dips', 'roman chair sit up', 'sandbag lunge',
+    // The rest of p226 (week builder Stage 1, 2026-10-02): filed and loggable, never placed by the engine.
+    'yoke walk', 'frame carry', 'sandbag carry', 'zercher carry', 'duck walk', 'truck push', 'plate push',
+    'sandbag drag', 'tire flip', "fingal's fingers",
   ].sort(), 'the drop list changed — Michael ruled on these ten 2026-08-26, and took the two sled rows off 2026-09-16');
 
   const pool = new Set(allGridMovements().map((m) => foldExerciseName(m.name)));

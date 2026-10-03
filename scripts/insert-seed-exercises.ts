@@ -63,6 +63,8 @@ const ALLOWED_MOVEMENT_PATTERNS = new Set([
   'isolation_lower',
   'core',
   'rotational',
+  // Jumps, hops and bounds (p227), 2026-10-02 — the catalogue's own pattern for them.
+  'plyometric',
 ]);
 
 const ALLOWED_EQUIPMENT = new Set([

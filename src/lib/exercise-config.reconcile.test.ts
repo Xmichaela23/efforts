@@ -22,6 +22,7 @@ import { SAME_MOVEMENT, EXERCISE_CONFIG, getExerciseConfig } from './exercise-co
 // ⛔ One name for one movement since 2026-09-18: a merged spelling reads the one entry it names (SAME_MOVEMENT).
 const CFG = (k: string) => EXERCISE_CONFIG[SAME_MOVEMENT[k] ?? k];
 import { EXERCISE_TYPE_CAPABILITIES, lookupExerciseType } from './exercise-role.ts';
+import { searchableLiftNames } from '../../supabase/functions/_shared/strength/shown-name.ts';
 import { equipmentForExercise, isDurationLogged, loggingModeForExercise } from './strength-logging-mode.ts';
 
 const fold = (s: string) => s.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -30,15 +31,13 @@ const fold = (s: string) => s.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/
 const foldForSearch = fold;
 
 /**
- * The add-picker's list, read out of `StrengthLogger.tsx` and EVALUATED as the array literal it is.
- * ⚠️ Comments are stripped first; they contain apostrophes and quoted words.
+ * The add-picker's list: every name the search matches on — each lift's shown name and every other spelling the
+ * catalogue knows for it. ⛔ Since 2026-10-02 the logger reads `searchableLiftNames` (the one catalogue) instead of
+ * an array typed into `StrengthLogger.tsx`.
  */
 async function pickerList(): Promise<string[]> {
-  const src = await Deno.readTextFile(new URL('../components/StrengthLogger.tsx', import.meta.url));
-  const body = src.split('const commonExercises = [')[1].split('\n  ];')[0];
-  const noComments = body.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
-  const arr = new Function(`return [${noComments}]`)() as string[];
-  assert(arr.length > 120, `expected the picker array to parse, got ${arr.length}`);
+  const arr = searchableLiftNames().flatMap((l) => [l.name, ...l.also]);
+  assert(arr.length > 120, `expected the picker list to load, got ${arr.length}`);
   return arr;
 }
 
@@ -303,7 +302,9 @@ Deno.test('⛔ EVERY NEWLY-ADDED PICKER NAME RESOLVES TO THE RIGHT LOGGING MODE'
   const missing: string[] = [];
   const wrongMode: string[] = [];
   for (const [name, mode] of expectations) {
-    if (!list.some((e) => foldForSearch(e) === foldForSearch(name))) missing.push(name);
+    // The search folds plurals ("Bench Jump" finds Bench Jumps), as the logger's does.
+    const plural = (x: string) => foldForSearch(x).replace(/(\w)s\b/g, '$1');
+    if (!list.some((e) => plural(e) === plural(name))) missing.push(name);
     const actual = loggingModeForExercise(name);
     if (actual !== mode) wrongMode.push(`${name} → ${actual}, expected ${mode}`);
   }
@@ -337,8 +338,10 @@ Deno.test('ADDITIVE — no config key was removed, and the picker list only grew
     assert(CFG(k), `pre-existing config key went missing: ${k}`);
   }
   const list = await pickerList();
+  // Findable by typing it (the search folds apostrophes and plurals, as the logger's does).
+  const f = (x: string) => fold(x).replace(/['’]/g, '').replace(/(\w)s\b/g, '$1');
   for (const k of ['Deadlift', 'Squat', 'Bench Press', 'Face Pulls', "Farmer's Carry", 'TRX Fallout',
                    'Hip Thrust', 'Suitcase Carry', 'Overhead Carry']) {
-    assert(list.includes(k), `pre-existing picker entry went missing: ${k}`);
+    assert(list.some((e) => f(e).includes(f(k))), `pre-existing picker entry went missing: ${k}`);
   }
 });

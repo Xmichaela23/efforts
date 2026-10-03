@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Dumbbell } from 'lucide-react';
+import { searchableLiftNames } from '@shared/strength/shown-name';
 
 interface OneRepMax {
   id: string;
@@ -23,12 +24,8 @@ const StrengthPlansView: React.FC<StrengthPlansViewProps> = ({
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Common strength exercises for autocomplete
-  const commonExercises = [
-    'Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Barbell Row',
-    'Incline Bench Press', 'Front Squat', 'Romanian Deadlift', 'Pull ups',
-    'Dips', 'Close Grip Bench Press', 'Sumo Deadlift', 'Bulgarian Split Squat'
-  ];
+  // Exercise names for autocomplete: the one catalogue (week builder Stage 1, 2026-10-02).
+  const commonExercises = searchableLiftNames().map((l) => l.name);
 
   const filteredExercises = currentExercise.length > 0
     ? commonExercises

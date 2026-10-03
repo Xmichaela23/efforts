@@ -352,6 +352,18 @@ export const FILING: Readonly<Record<string, Filed>> = {
   'overhead carry': F('carry', null, 'variant', 'p226 — axial loading/carry variants'),
   'sled push': F('carry', null, 'printed', 'p226'),
   'sled pull': F('carry', null, 'printed', 'p226'),
+  // The rest of p226's table (week builder Stage 1, 2026-10-02). Filed and loggable; the engine never places them
+  // (`PRESCRIPTION_EXCLUDED`), so they reach a week only when the athlete picks them.
+  'yoke walk': F('carry', null, 'printed', 'p226'),
+  'frame carry': F('carry', null, 'printed', 'p226'),
+  'sandbag carry': F('carry', null, 'printed', 'p226'),
+  'zercher carry': F('carry', null, 'printed', 'p226'),
+  'duck walk': F('carry', null, 'printed', 'p226'),
+  'truck push': F('carry', null, 'printed', 'p226'),
+  'plate push': F('carry', null, 'printed', 'p226'),
+  'sandbag drag': F('carry', null, 'printed', 'p226'),
+  'tire flip': F('carry', null, 'printed', 'p226'),
+  "fingal's fingers": F('carry', null, 'printed', 'p226'),
 };
 
 /**
@@ -472,6 +484,20 @@ export const PRESCRIPTION_EXCLUDED: readonly string[] = [
   'sandbag lunge',
   // ⛔ `sled pull` AND `sled push` LEFT THIS LIST 2026-09-16 (D-479) with the "Sled" chip, on Michael's ruling
   // from p226. They are gated on that chip (`ASSISTANCE_GEAR`) and offered on the carry row only.
+  // ⛔ THE REST OF p226 (2026-10-02, week builder Stage 1). Printed and filed above, so the athlete can pick and log
+  // them; the engine does not place them, by the same rule as the rest of this list: no kit chip names a yoke, a frame,
+  // a sandbag, a truck, a tire or Fingal's Fingers. Zercher carry and plate push need only a bar or a plate; they wait
+  // here with the others so today's plans build exactly as before, and leave with a ruling of their own.
+  'yoke walk',
+  'frame carry',
+  'sandbag carry',
+  'zercher carry',
+  'duck walk',
+  'truck push',
+  'plate push',
+  'sandbag drag',
+  'tire flip',
+  "fingal's fingers",
 ];
 
 /**
@@ -533,6 +559,31 @@ export function allGridMovements(): GridMovement[] {
  * and more."* So p223 is examples. **The defensible cut is the four placeholder non-movements, not a
  * cut to five.**
  */
+
+/**
+ * ⛔ SESSION CONTAINERS, NOT MOVEMENTS. Catalogue keys so a planned row of that name resolves; never offered as a
+ * lift to search for (the four placeholder non-movements named in the note above).
+ */
+const NOT_A_MOVEMENT_RE = /^core (work|circuit)\b/;
+
+/**
+ * ⛔ EVERY MOVEMENT THE CATALOGUE KNOWS, ONE STORED NAME EACH (week builder Stage 1, 2026-10-02) — on a page or not,
+ * prescribable or not. What the athlete can type into a log: the add-lift search reads this, never a hand-typed list.
+ * Plural twins collapse as in {@link allGridMovements}; the session containers are left out. Display through
+ * `shownName` (`_shared/strength/shown-name.ts`).
+ */
+export function catalogueMovementNames(): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of [...Object.keys(FILING), ...Object.keys(EXERCISE_CONFIG)]) {
+    if (NOT_A_MOVEMENT_RE.test(name)) continue;
+    const dk = dedupeKey(name);
+    if (seen.has(dk)) continue;
+    seen.add(dk);
+    out.push(name);
+  }
+  return out;
+}
 
 /** Movements in one cell of the grid. Unfiltered by equipment — that is the grid's job. */
 export function movementsIn(category: ViadaCategory, pattern: ViadaPattern | null): GridMovement[] {

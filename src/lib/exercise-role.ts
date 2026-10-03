@@ -678,6 +678,17 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'backpack carry': 'carry',
   'sled push': 'carry',
   'sled pull': 'carry',
+  // The rest of p226 (2026-10-02), filed in `taxonomy.ts`.
+  'yoke walk': 'carry',
+  'frame carry': 'carry',
+  'sandbag carry': 'carry',
+  'zercher carry': 'carry',
+  'duck walk': 'carry',
+  'truck push': 'carry',
+  'plate push': 'carry',
+  'sandbag drag': 'carry',
+  'tire flip': 'carry',
+  'fingal s finger': 'carry', // Fingal's Fingers, as `canonical` folds it (apostrophe → space, plural dropped)
 
   // ── BAND: the band IS the resistance. Priced by `strengthSetVolume`'s ADD path, never by
   // multiplying a poundage here. ⚠️ `band assisted pull up` is deliberately NOT in this list — it

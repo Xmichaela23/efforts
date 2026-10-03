@@ -11,7 +11,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { EXERCISE_CONFIG, type ExerciseConfig } from '../supabase/functions/materialize-plan/exercise-config.ts';
+// ⛔ THE CATALOGUE MOVED TO src/lib (the materialize-plan copy is gone), and this import broke with it. Fixed 2026-10-02.
+import { EXERCISE_CONFIG, resolveExerciseConfig, type ExerciseConfig } from '../src/lib/exercise-config.ts';
+import { filingOf } from '../supabase/functions/_shared/strength-grid/taxonomy.ts';
 import { canonicalize, muscleGroup } from '../supabase/functions/_shared/canonicalize.ts';
 import {
   CORE_EXERCISES,
@@ -488,6 +490,40 @@ function musclesFromMuscleGroupSlug(slug: string): { primary: string[]; secondar
 // Movement pattern + equipment
 // ---------------------------------------------------------------------------
 
+/**
+ * ⛔ THE PATTERN COMES FROM THE ONE CATALOGUE (week builder Stage 1, 2026-10-02): the book's filing
+ * (`taxonomy.ts FILING`) and the config's movement pattern. The name regex below is only the fallback for a name the
+ * catalogue does not hold. It had filed the farmer's carry as core, the leg extension as a squat, bounding as
+ * rotational and the skater hop as a squat.
+ */
+function sharedMovementPattern(names: string[]): string | null {
+  // A spelling the book files decides first (a DB lateral raise is a focused lateral raise); the config's pattern next.
+  const ordered = [...names.filter((n) => filingOf(n)), ...names.filter((n) => !filingOf(n))];
+  for (const name of ordered) {
+    const filed = filingOf(name);
+    const r = resolveExerciseConfig(name);
+    const cfg = r.via === 'exact' || r.via === 'folded' ? r.config : null;
+    if (!filed && !cfg) continue;
+    if (filed?.category === 'carry') return 'carry';
+    if (filed?.category === 'core' || cfg?.pattern === 'core') return 'core';
+    if (cfg?.pattern === 'plyometric') return 'plyometric';
+    if (cfg?.pattern === 'calf') return 'isolation_lower';
+    if (filed?.category === 'focused') {
+      return filed.pattern === 'hinge_lower' || filed.pattern === 'press_lower' ? 'isolation_lower' : 'isolation_upper';
+    }
+    switch (cfg?.pattern) {
+      case 'knee_dominant': return 'squat';
+      case 'hip_dominant': return 'hip_hinge';
+      case 'horizontal_push':
+      case 'horizontal_pull':
+      case 'vertical_push':
+      case 'vertical_pull':
+        return cfg.pattern;
+    }
+  }
+  return null;
+}
+
 function inferMovementPattern(slug: string): string {
   if (/squat|leg_press|lunge|split_squat|step_up|goblet|bike_squat|box_jump|jump|skater|calf|leg_extension|air_squat|bodyweight_squat/.test(slug))
     return /calf/.test(slug) ? 'isolation_lower' : 'squat';
@@ -748,7 +784,8 @@ function main() {
     const inCanonical = Object.values(CANONICAL_MAP).includes(slug);
 
     const movementPattern =
-      coreEx && !lib ? coreMovementPattern(coreEx) : inferMovementPattern(slug);
+      sharedMovementPattern([...configs.map((c) => c.key), ...[...aliasSet].sort()])
+      ?? (coreEx && !lib ? coreMovementPattern(coreEx) : inferMovementPattern(slug));
 
     let primaryMuscles: string[] = [];
     let secondaryMuscles: string[] = [];

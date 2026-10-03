@@ -42,11 +42,12 @@ Deno.test('the three tiers are what they claim to be', () => {
   // Deep flexion under eccentric load. ⚠️ THE GLUTE-HAM RAISE IS IN HERE. It reads as posterior-chain
   // "accessory" work and it is one of the most eccentric hamstring movements there is — it was the
   // deadlift day's default, stacked on the lift that already loaded those hamstrings.
-  for (const n of ['Reverse Lunge', 'Bulgarian Split Squat', 'Front Squat', 'Glute-Ham Raise']) {
+  // Front squat and reverse hyper left the menu 2026-10-02 (the book files neither as single-leg/core work).
+  for (const n of ['Reverse Lunge', 'Bulgarian Split Squat', 'Glute-Ham Raise']) {
     assertEquals(costOf(n), 'high', n);
   }
   // Hip-hinge: loaded, but not through deep knee flexion.
-  for (const n of ['Barbell Hip Thrust', 'Single-Leg Hip Thrust', 'Back Extension', 'Reverse Hyper']) {
+  for (const n of ['Barbell Hip Thrust', 'Single-Leg Hip Thrust', 'Back Extension']) {
     assertEquals(costOf(n), 'mild', n);
   }
   // Trunk only — the legs are untouched and the run is unaffected.

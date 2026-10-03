@@ -1686,6 +1686,20 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
   },
+  // ⛔ THE REST OF p226's CARRY / DRAG / PICK TABLE (week builder Stage 1, 2026-10-02). The page prints thirteen; the
+  // three above were the only ones in the catalogue. Same shape as the sled: one implement, a total load, ratio 0 — a
+  // carry load is not a fraction of any barbell max. Filed in `taxonomy.ts FILING`; never placed by the engine
+  // (`PRESCRIPTION_EXCLUDED` — the kit is not something the app can ask about), so the athlete picks and logs them.
+  'yoke walk': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'frame carry': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'sandbag carry': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'zercher carry': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'duck walk': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'truck push': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'plate push': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'sandbag drag': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'tire flip': { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  "fingal's fingers": { pattern: null, primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
   // ══════════════════════════════════════════════════════════════════════════════════════════════
   // RECONCILED AGAINST THE ATHLETE'S ACTUAL PLANS AND LOGS (2026-08-03, second pass). Additive.
@@ -2714,6 +2728,8 @@ export interface ConfigResolution {
  * not say which row.
  */
 export const SAME_MOVEMENT: Record<string, string> = {
+  // `canonical`'s fold of Fingal's Fingers (exercise-role TYPE_TABLE key), 2026-10-02.
+  'fingal s finger': "fingal's fingers",
   "ab rollout": "ab wheel rollout",
   // 2026-09-24 (B2): the floor version under a loaded bar is deleted; "Back Extension" is the bench movement.
   "back extension": "ghd back extension",

@@ -52,8 +52,9 @@ export type CarryPrescription = {
   /** ⛔ NO REPS AND NO PERCENTAGE. p226 prescribes carries in words; inventing either is forbidden. */
   load: string;
   emphasis: string;
-  /** Whether accumulating fatigue is the point, tolerated, or a fault. His words, his distinction. */
-  fatigue: 'target' | 'expected' | 'avoid';
+  /** Whether accumulating fatigue is the point, tolerated, or a fault. His words, his distinction.
+   *  Null where p226 says nothing about fatigue (ME). */
+  fatigue: 'target' | 'expected' | 'avoid' | null;
   rpe: number | null;
   cite: string;
 };
@@ -122,7 +123,8 @@ const CARRY: Record<ViadaIntent, Omit<CarryPrescription, 'kind'>> = {
     intent: 'ME',
     load: 'Near-maximal weight.',
     emphasis: 'The initial pick is a challenge; several steps of movement.',
-    fatigue: 'expected',
+    // ⛔ p226 PRINTS NO FATIGUE WORD FOR ME (2026-10-02, book-pieces audit §3). It said 'expected', copied from DE.
+    fatigue: null,
     rpe: 9,
     cite: 'Viada p226',
   },

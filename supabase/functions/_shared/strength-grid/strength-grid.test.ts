@@ -327,6 +327,8 @@ Deno.test('carries reuse the four names and mean different things by them', () =
   const hyp = prescribe('HYP', 'carry');
   if (me.kind !== 'carry' || skill.kind !== 'carry' || hyp.kind !== 'carry') throw new Error('wrong family');
   assertEquals(me.rpe, 9);
+  // p226 prints no fatigue word for ME (2026-10-02).
+  assertEquals(me.fatigue, null);
   // ⛔ HIS OWN DISTINCTION, AND IT INVERTS BETWEEN TWO OF THE FOUR: skill work accumulates NO
   // fatigue and hypertrophy work accumulates it ON PURPOSE. Collapsing them loses the whole point.
   assertEquals(skill.fatigue, 'avoid');

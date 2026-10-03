@@ -31,6 +31,7 @@ import {
   getExerciseConfig,
 } from '@/lib/exercise-config';
 import { canonicalize } from '@shared/canonicalize';
+import { searchableLiftNames } from '@shared/strength/shown-name';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -2018,102 +2019,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return null;
   };
 
-  // Comprehensive exercise database
-  const commonExercises = [
-    'Deadlift', 'Squat', 'Back Squat', 'Front Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
-    'Romanian Deadlift', 'Incline Bench Press', 'Decline Bench Press',
-    'Barbell Curl', 'Close Grip Bench Press', 'Bent Over Row', 'Sumo Deadlift',
-    'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
-    'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
-    'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
-    'Push ups', 'Pull ups', 'Chin ups', 'Dips', 'Planks', 'Burpees',
-    // D-322: lifts the config can price that the curated list never offered. Hip Thrust is the
-    // clearest miss — it has a config entry (deadlift x 0.90) and a measured e1RM, and typing
-    // "hip" returned Hip Extension and Side Plank with Hip Dip. Added by hand every session as
-    // unconfigured free text as a result.
-    'Hip Thrust', 'Glute Bridge', 'Good Morning', 'Sumo Deadlift', 'Trap Bar Deadlift',
-    'Leg Curl', 'Single Leg RDL', 'Reverse Lunge', 'Lateral Lunge', 'Step Up', 'Calf Raise',
-    'Mountain Climbers', 'Lunges', 'Squats', 'Jump Squats', 'Pike Push ups',
-    'Handstand Push ups', 'L Sits', 'Pistol Squats', 'Ring Dips',
-    'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
-    'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
-    'Kettlebell Swings', 'Turkish Get ups', 'Kettlebell Snatches',
-    'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows',
-    // Core suggestions
-    'Sit Up', 'Crunch', 'Reverse Crunch', 'Cross Body Crunch', 'Bicycle Crunch', 'V Up',
-    'Flutter Kicks', 'Scissor Kicks', 'Toe Touches',
-    'Plank', 'Side Plank', 'Side Plank with Hip Dip', 'Plank with Shoulder Taps', 'Copenhagen Plank',
-    'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes to Bar', 'Hanging Windshield Wipers',
-    'Stability Ball Rollout', 'Stir the Pot', 'TRX Fallout', 'Ab Wheel Rollout',
-    'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
-    "Farmer's Carry", 'Suitcase Carry', 'Overhead Carry',
-    'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
-    'Cable Crunch', 'Ab Machine Crunch', "Captain's Chair Knee Raise", 'Roman Chair Sit Up', 'GHD Sit Up',
-
-    // ══════════════════════════════════════════════════════════════════════════════════════════
-    // RECONCILED AGAINST THE TYPE TABLE (2026-08-03). Purely additive.
-    //
-    // ⛔ THIS LIST — NOT `exercise-config.ts` — IS WHAT THE ADD-EXERCISE SEARCH READS. That matters
-    // because the gap was reported as a config gap and it is not one: `getFilteredExercises` filters
-    // THIS array and nothing else. Confirmed against the device report exactly — typing "ban"
-    // returned nothing, "sled" returned nothing, and "fa" returned Face Pulls / Farmer's Carry /
-    // TRX Fallout, which is precisely what this array does and does not contain. Adding entries to
-    // the config would not have put a single one of them in the picker.
-    //
-    // ⛔ SO THE FIX IS TWO-SIDED AND BOTH SIDES ARE NEEDED: a movement has to be FINDABLE (here) and
-    // CORRECTLY PRICED (`exercise-config.ts`). Every name below is one the app already classifies in
-    // `exercise-role.ts`'s TYPE_TABLE — the engine knew what each of these was and the athlete could
-    // not type it in.
-    //
-    // ⚠️ WHY THE OMISSION LOOKED RANDOM: this array is hand-curated and grew by whoever hit a miss.
-    // Face Pulls and Farmer's Carry were added at some point; Band Pull Apart and Sled Push never
-    // were. There is nothing systematic to fix in the search itself — the list was just short.
-    // ⚠️ AND IT IS ONE OF THREE COPIES (`StrengthPlansView.tsx`, `StrengthExerciseBuilder.tsx` each
-    // hold their own `commonExercises`). Only the logger's is reconciled here; see the report.
-
-    // Bands — the whole category was absent, which is the "ban returns nothing" report.
-    'Band Pull Apart', 'Band Face Pull', 'Band Row', 'Band Pull Down', 'Band Overhead Press',
-    'Band Lateral Raise', 'Lateral Band Walk', 'Band Assisted Pull up', 'Resistance Band Row',
-    'Clamshell',
-
-    // Carries and sleds. ⚠️ Farmer's Carry / Suitcase Carry / Overhead Carry were already above —
-    // this is the rest of the carry row, and the sled, which is why "sled" returned nothing.
-    'Sled Push', 'Sled Pull', 'Farmers Carry', 'Farmer Walk', 'Backpack Carry',
-
-    // Holds and mobility — logged against the clock. Dead Hang is the reported miss.
-    'Dead Hang', 'Wall Sit', 'Wall Angel', 'Foot Doming', 'Plank Hold', 'Side Plank Abduction',
-
-    // Bodyweight the table classifies and the list never offered.
-    'Air Squat', 'Bodyweight Squat', 'Bird Dog', 'Dead Bug', 'Inverted Row', 'Inverted Ring Row',
-    'Nordic Hamstring Curl', 'Single Leg Squat', 'Single Leg Glute Bridge', 'Single Leg Calf Raise',
-    'Soleus Raise', 'Tibialis Raise', 'Archer Push up', 'Diamond Push up', 'Decline Push up',
-
-    // Plyometrics — reps only, never a loaded bar (the Box Jump lesson).
-    'Box Jump', 'Broad Jump', 'Bench Jump', 'Bounding', 'Skater Hop', 'Jump Lunge', 'Squat Jump',
-
-    // Loaded accessories with a config entry the picker could not reach.
-    'Barbell Hip Thrust', 'Goblet Squat', 'Chest Supported Row', 'Box Step Up', 'Walking Lunge',
-    'Dumbbell Walking Lunge', 'Barbell Walking Lunge', 'Sandbag Lunge', 'Explosive Step Up',
-    'Cable Face Pull', 'External Rotation', 'Prone Y T W Raise', 'Rear Delt Fly',
-    'Lat Pull Down', 'Weighted Single Leg Calf Raise', 'DB Row', 'DB Floor Press',
-    'DB Push Press', 'DB Romanian Deadlift', 'KB Swing',
-
-    // Main lifts the picker was missing. ⛔ "Press" and "Military Press" are the previous program's own names for
-    // the overhead press and neither could be typed in — while "Press" also resolved to a LEG PRESS
-    // prescription in the config. Both halves of that are fixed.
-    'Press', 'Military Press', 'Push Press', 'Barbell Bench Press',
-
-    // Second pass — movements with a config entry whose full name still returned nothing.
-    // ⚠️ WHAT IS DELIBERATELY NOT HERE: `pushup` / `pullup` / `chinup` (server `canonicalize()` keys,
-    // never what a human types — "push up" already finds "Push ups"), `core circuit` / `core work`
-    // (internal session names the type table documents as never shown to an athlete), and the
-    // `db …` / `kb …` abbreviations whose spelled-out form is in the list.
-    'Front Raise', 'Reverse Fly', 'YTW Raise', 'Single Leg Romanian Deadlift',
-    'Dumbbell Bench Press', 'Dumbbell Incline Press', 'Dumbbell Lateral Raise',
-    'Dumbbell Shoulder Press', 'Dumbbell Swing', 'Light DB Row', 'Explosive Lat Pull Down',
-    'Farmer Carry', 'Band Lateral Walk', 'Conventional Deadlift', 'Barbell Back Squat',
-    'Standing Barbell Overhead Press',
-  ];
+  // ⛔ THE ADD-LIFT SEARCH READS THE ONE CATALOGUE (week builder Stage 1, 2026-10-02): every movement the app knows,
+  // under its one shown name, with every other spelling it resolves (`searchableLiftNames`). The hand-typed list that
+  // stood here grew by whoever hit a miss ("ban" and "sled" once found nothing) and was a second copy of the catalogue.
+  const commonExercises = searchableLiftNames();
 
 
 
@@ -3426,15 +3335,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // athlete typing "pull-up" (or a legacy name coming back off a saved workout) must still
   // find "Pull ups". Same fold the config lookup uses — one canonical comparison form, so a
   // hyphen can never again decide whether a lift is findable.
-  const foldForSearch = (s: string) => s.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Apostrophes and plural endings fold too, so "Farmer's Carry" and "face pulls" find their lift.
+  const foldForSearch = (s: string) => s.toLowerCase().replace(/['’]/g, '').replace(/[-_]+/g, ' ')
+    .replace(/(\w)s\b/g, '$1').replace(/\s+/g, ' ').trim();
   const getFilteredExercises = (searchTerm: string) => {
     const q = foldForSearch(searchTerm);
     if (!q) return [];
-    // Prefix matches rank first, so "hip" surfaces "Hip Thrust" above "Side Plank with Hip Dip".
+    // Prefix matches rank first, so "hip" surfaces "Hip Thrust" above "Side Plank with Hip Dip". A lift matches on
+    // its shown name or on any other spelling the catalogue knows for it ("military press" finds Overhead Press).
     const scored = commonExercises
-      .map((exercise) => ({ exercise, f: foldForSearch(exercise) }))
-      .filter(({ f }) => f.includes(q))
-      .sort((a, b) => (a.f.startsWith(q) === b.f.startsWith(q) ? 0 : a.f.startsWith(q) ? -1 : 1));
+      .map((lift) => ({ exercise: lift.name, fs: [lift.name, ...lift.also].map(foldForSearch) }))
+      .filter(({ fs }) => fs.some((f) => f.includes(q)))
+      .map(({ exercise, fs }) => ({ exercise, prefix: fs.some((f) => f.startsWith(q)) }))
+      .sort((a, b) => (a.prefix === b.prefix ? 0 : a.prefix ? -1 : 1));
     return scored.slice(0, 8).map(({ exercise }) => exercise);
   };
 

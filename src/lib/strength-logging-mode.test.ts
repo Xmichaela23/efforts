@@ -134,9 +134,13 @@ Deno.test('⛔ THE FIVE MOVEMENTS THE OLD REGEX MISSED — and only those five',
   // words appear in "L Sit" or "Stir the Pot", which is the identical blind spot that made it miss
   // a sled push and a dead hang. Every one still changes TOWARD being timed, which the loop below
   // asserts — the direction is what makes it a fix rather than a drift.
+  // ⚠️ AND SEVEN MORE ON 2026-10-02: the rest of p226 entered the catalogue (`yoke walk`, `duck walk`, `truck push`,
+  // `plate push`, `sandbag drag`, `tire flip`, Fingal's Fingers) typed `carry`. Same blind spot: no `carry`/`farmer` word in the name.
+  // (`frame carry`, `sandbag carry`, `zercher carry` say "carry", so the old regex already timed them.)
   assertEquals(
     changed.sort(),
-    ['dead hang', 'foot doming', 'l sit', 'l sits', 'sled pull', 'sled push', 'stir the pot', 'wall angel'],
+    ['dead hang', 'duck walk', "fingal's fingers", 'foot doming', 'l sit', 'l sits', 'plate push', 'sandbag drag',
+      'sled pull', 'sled push', 'stir the pot', 'tire flip', 'truck push', 'wall angel', 'yoke walk'],
     'the set of movements whose logging mode changed is not the reviewed set',
   );
   // …and every one of them changed toward being timed, never away from it.

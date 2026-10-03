@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Copy, Trash2, ChevronRight, Dumbbell } from 'lucide-react';
+import { searchableLiftNames } from '@shared/strength/shown-name';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface StrengthExercise {
@@ -27,22 +28,8 @@ interface StrengthExerciseBuilderProps {
   isMetric?: boolean;
 }
 
-// Common exercise names for autopopulation
-const commonExercises = [
-  'Deadlift', 'Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
-  'Romanian Deadlift', 'Front Squat', 'Incline Bench Press', 'Decline Bench Press',
-  'Barbell Curl', 'Close Grip Bench Press', 'Bent Over Row', 'Sumo Deadlift',
-  'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
-  'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
-  'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
-  'Push ups', 'Pull ups', 'Chin ups', 'Dips', 'Planks', 'Burpees',
-  'Mountain Climbers', 'Lunges', 'Jump Squats', 'Pike Push ups',
-  'Handstand Push ups', 'L Sits', 'Pistol Squats', 'Ring Dips',
-  'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
-  'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
-  'Kettlebell Swings', 'Turkish Get ups', 'Kettlebell Snatches',
-  'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
-];
+// Exercise names for autopopulation: the one catalogue (week builder Stage 1, 2026-10-02).
+const commonExercises = searchableLiftNames().map((l) => l.name);
 
 export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false, isMetric = false }: StrengthExerciseBuilderProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);

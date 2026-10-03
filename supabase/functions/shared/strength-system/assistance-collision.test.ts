@@ -122,16 +122,16 @@ Deno.test('⛔ THE ATHLETE\'S PICK IS WHAT APPEARS — nothing is re-roled, on a
   const prefs = normalizeAssistancePrefs({
     version: 2,
     by_day: {
-      press: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
-      bench: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
-      squat: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
-      deadlift: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      press: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
+      bench: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
+      squat: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
+      deadlift: { push: 'Push-Up', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
     },
     focus: [],
   });
   for (const day of LIFT_DAYS) {
     assertEquals(resolveDayAssistance(prefs, day, 50).map((r) => r.name),
-      ['Push-Up', 'Barbell Row', 'Front Squat'], `${day} did not honour the picks`);
+      ['Push-Up', 'Barbell Row', 'Reverse Lunge'], `${day} did not honour the picks`);
   }
 });
 
@@ -560,7 +560,7 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
       // carry a `press` block whose only job was to be discarded. The press has no key now: it is
       // trained on the deadlift's day and reads that day's picks.
       by_day: {
-        bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+        bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
         squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
         deadlift: { push: 'DB Shoulder Press', pull: 'Inverted Row', single_leg_core: 'Glute-Ham Raise' },
       },
@@ -569,7 +569,7 @@ Deno.test('the composer gives each lifting day ITS OWN picks', () => {
   } as any);
   const rows = assistanceRowsOf(plan);
   const namesFor = (session: string) => rows.filter((r: any) => r.session === session).map((r: any) => r.name);
-  assertEquals(namesFor('Strength — Bench Press').slice(0, 3), ['Dips', 'Barbell Row', 'Front Squat']);
+  assertEquals(namesFor('Strength — Bench Press').slice(0, 3), ['Dips', 'Barbell Row', 'Reverse Lunge']);
   assertEquals(namesFor('Strength — Back Squat').slice(0, 3), ['Push-Up', 'Lat Pulldown', 'Reverse Lunge']);
   // ⛔ THE SHARED DAY BUILDS THE ATHLETE'S DEADLIFT+PRESS PICKS, AND THIS IS THE INVERSION SLICE 5
   // EXISTS FOR. The old assertion here was that a fourth block of picks reached NOTHING — twelve
@@ -598,8 +598,8 @@ Deno.test('⛔ A STORED `press` KEY FROM AN OLDER GOAL IS DROPPED, NOT READ', ()
   const prefs = normalizeAssistancePrefs({
     version: 2,
     by_day: {
-      press: { push: 'Plate Raise', pull: 'Face Pull', single_leg_core: 'Reverse Hyper' },
-      bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Front Squat' },
+      press: { push: 'Plate Raise', pull: 'Face Pull', single_leg_core: 'Hanging Leg Raise' },
+      bench: { push: 'Dips', pull: 'Barbell Row', single_leg_core: 'Reverse Lunge' },
       squat: { push: 'Push-Up', pull: 'Lat Pulldown', single_leg_core: 'Reverse Lunge' },
       deadlift: { push: 'DB Shoulder Press', pull: 'Inverted Row', single_leg_core: 'Glute-Ham Raise' },
     },
@@ -609,7 +609,7 @@ Deno.test('⛔ A STORED `press` KEY FROM AN OLDER GOAL IS DROPPED, NOT READ', ()
   const everyPick = LIFT_DAYS.flatMap((d) => [
     prefs.by_day[d].push, prefs.by_day[d].pull, prefs.by_day[d].single_leg_core,
   ]);
-  for (const orphan of ['Plate Raise', 'Face Pull', 'Reverse Hyper']) {
+  for (const orphan of ['Plate Raise', 'Face Pull', 'Hanging Leg Raise']) {
     assertEquals(everyPick.includes(orphan), false,
       `${orphan} came from the deleted press key and must not resurface on another day`);
   }
@@ -814,7 +814,8 @@ Deno.test('D-406 — every loadable catalog option resolves against the OneRepMa
   // Asserts by OUTPUT: every loadable option must actually produce a suggestion for an athlete with
   // all four maxes on file.
   const loadable = ['DB Shoulder Press', 'DB Bench Press', 'DB Incline Press', 'Dumbbell Row',
-    'Barbell Row', 'Front Squat', 'Reverse Lunge', 'Bulgarian Split Squat', 'Dumbbell Curl',
+    // 'Front Squat' left the menu 2026-10-02 (p219 files it a primary lift, not single-leg/core work).
+    'Barbell Row', 'Reverse Lunge', 'Bulgarian Split Squat', 'Dumbbell Curl',
     'Triceps Pushdown', 'Lat Pulldown'];
   // ⚠️ 'Triceps Extension' LEFT THIS LIST 2026-09-18: it is one entry with Skull Crusher now (Michael), which is
   // prescribed by feel, so it carries no suggested weight.

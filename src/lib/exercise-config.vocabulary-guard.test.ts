@@ -30,6 +30,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { EXERCISE_CONFIG, resolveExerciseConfig } from './exercise-config.ts';
+import { searchableLiftNames } from '../../supabase/functions/_shared/strength/shown-name.ts';
 
 const read = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
@@ -86,13 +87,11 @@ async function vocabularySources(): Promise<Source[]> {
     ],
   });
 
-  // 5. The add-exercise picker in the logger — what the athlete can type in. Evaluated as the array
-  // literal it is; a regex here mis-parses `"Farmer's Carry"` and silently drops the entries after it.
-  const loggerSrc = await read('../components/StrengthLogger.tsx');
-  const body = loggerSrc.split('const commonExercises = [')[1].split('\n  ];')[0];
+  // 5. The add-exercise picker in the logger — what the athlete can type in. Since 2026-10-02 it is the one
+  // catalogue (`searchableLiftNames`), each lift under its shown name; the shown names are what a row stores.
   out.push({
     label: 'add-exercise picker',
-    names: new Function(`return [${stripComments(body)}]`)() as string[],
+    names: searchableLiftNames().map((l) => l.name),
   });
 
   // 6. ⛔ THE ONE THAT MATTERS MOST — what has actually been planned and logged. See the header.
